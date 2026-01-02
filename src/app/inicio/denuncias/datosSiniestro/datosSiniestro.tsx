@@ -46,7 +46,6 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
 
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
 
-
   // Estado de carga para búsqueda de Prestador Inicial por CUIT
   const [prestadorLoading, setPrestadorLoading] = useState(false);
   const lastPrestadorCuitRef = useRef<string>("");
@@ -95,13 +94,19 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
 
   // Datos ROAM
   const { data: roamList } = ArtAPI.useGetRefRoam();
+  // Prestadores (CUIT - Razón Social) para Autocomplete de traslado
+  const { data: refPrestadores } = ArtAPI.useGetRefPrestadores();
+  const prestadoresOptions = Array.isArray(refPrestadores) ? refPrestadores : [];
 
   // Generador de handlers para campos numéricos.
   const numericChange = (
     name: string,
-    options?: { format?: (digits: string) => string; formatWhenLen?: number }
+    options?: { format?: (digits: string) => string; formatWhenLen?: number; maxDigits?: number }
   ) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = onlyDigits(e.target.value || "");
+    let digits = onlyDigits(e.target.value || "");
+    if (options?.maxDigits != null) {
+      digits = digits.slice(0, options.maxDigits);
+    }
     const synthetic = { target: { name, value: digits } } as any;
     onTextFieldChange(synthetic);
     try {
@@ -132,7 +137,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
         setPrestadorLoading(true);
         const data: PrestadorResponse = await ArtAPI.getPrestador({ CUIT: Number(digits) });
         if (!data) return;
-        const fantasia = data.nombreFantasia ?? "";
+        const fantasia = data.razonSocial ?? "";
         const synthetic = { target: { name: "prestadorInicialRazonSocial", value: fantasia } } as any;
         onTextFieldChange(synthetic);
         lastPrestadorCuitRef.current = digits;
@@ -207,8 +212,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     }
   }, [form.roamNro, roamList, isDisabled]);
 
-  // Bloquear edición de ROAM Nro (solo lectura) cuando hay un ROAM seleccionado, sin opacidad
-  const lockRoamNro = Boolean(form.roamDescripcion);
+  //Condicion para habilitar campos roan
+  const roamEnabled = !isDisabled && String(form.roam) === "Si";
   return (
     <>
       {/* Estado del Trabajador */}
@@ -417,7 +422,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             error={touched.contextoDenuncia && !!errors.contextoDenuncia}
             disabled={isDisabled}
           >
-            <InputLabel>Contexto Denuncia</InputLabel>
+            <InputLabel>¿Contexto de Riesgo?</InputLabel>
             <Select
               name="contextoDenuncia"
               value={form.contextoDenuncia}
@@ -425,9 +430,9 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               onChange={onSelectChange}
               onBlur={() => onBlur("contextoDenuncia")}
             >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Urgente">Urgente</MenuItem>
-              <MenuItem value="Normal">Normal</MenuItem>
+              <MenuItem value="Ignora">Si</MenuItem>
+              <MenuItem value="Urgente">No</MenuItem>
+              <MenuItem value="Normal">Ignora</MenuItem>
             </Select>
             {touched.contextoDenuncia && errors.contextoDenuncia && (
               <Typography
@@ -532,6 +537,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCiiu ? errors.establecimientoCiiu : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="CIIU"
             />
           </div>
@@ -547,6 +553,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCalle ? errors.establecimientoCalle : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Calle"
             />
 
@@ -560,6 +567,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoNumero ? errors.establecimientoNumero : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Número"
             />
 
@@ -573,6 +581,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoPiso ? errors.establecimientoPiso : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Piso"
             />
 
@@ -586,6 +595,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoDpto ? errors.establecimientoDpto : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Dpto"
             />
           </div>
@@ -601,6 +611,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCodLocalidad ? errors.establecimientoCodLocalidad : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Código localidad"
             />
 
@@ -614,6 +625,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCodPostal ? errors.establecimientoCodPostal : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Código postal"
             />
 
@@ -627,6 +639,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoTelefono ? errors.establecimientoTelefono : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Teléfono"
             />
 
@@ -640,6 +653,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoEmail ? errors.establecimientoEmail : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Email"
             />
           </div>
@@ -666,8 +680,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
           </FormControl>
 
           <Autocomplete
-            className={styles.wideField}
-            disabled={isDisabled}
+            className={`${styles.wideField} ${!roamEnabled ? styles.disabledOpacity : ''}`}
+            disabled={!roamEnabled}
             options={(roamList || []) as any[]}
             getOptionLabel={(option: any) => String(option?.roamDetalle || "")}
             isOptionEqualToValue={(opt: any, val: any) => String(opt?.interno) === String(val?.interno)}
@@ -700,8 +714,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             onChange={numericChange("roamNro")}
             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             fullWidth
-            disabled={isDisabled}
-            InputProps={{ readOnly: !isDisabled && lockRoamNro }}
+            disabled={!roamEnabled}
+            className={!roamEnabled ? styles.disabledOpacity : undefined}
             placeholder="Número ROAM"
           />
 
@@ -712,7 +726,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             onChange={numericChange("roamAno")}
             inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             fullWidth
-            disabled={isDisabled}
+            disabled={!roamEnabled}
+            className={!roamEnabled ? styles.disabledOpacity : undefined}
             placeholder="Año ROAM"
           />
 
@@ -722,21 +737,10 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             value={form.roamCodigo}
             onChange={onTextFieldChange}
             fullWidth
-            disabled={isDisabled}
+            disabled={!roamEnabled}
+            className={!roamEnabled ? styles.disabledOpacity : undefined}
             placeholder="Código ROAM"
           />
-
-          {/* <TextField
-            label="ROAM Código"
-            name="roamCodigo"
-            value={form.roamCodigo}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            placeholder="Código ROAM"
-          /> */}
-
-
 
         </div>
       </div>
@@ -764,14 +768,33 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             </Select>
           </FormControl>
 
-          <TextField
-            label="Prestador Traslado"
-            name="prestadorTraslado"
-            value={form.prestadorTraslado}
-            onChange={onTextFieldChange}
+          <Autocomplete
             fullWidth
             disabled={isDisabled}
-            placeholder="Prestador de traslado"
+            options={prestadoresOptions}
+            getOptionLabel={(opt: any) => {
+              const cuit = opt?.cuit != null ? String(opt.cuit) : '';
+              const rs = String(opt?.razonSocial ?? '');
+              const cuitFmt = cuit ? Formato.CUIP(cuit) : '';
+              return cuitFmt ? `${cuitFmt} - ${rs}` : rs;
+            }}
+            isOptionEqualToValue={(opt: any, val: any) => String(opt?.cuit) === String(val?.cuit)}
+            value={prestadoresOptions.find((p: any) => String(p?.razonSocial ?? '') === String(form.prestadorTraslado ?? '')) ?? null}
+            onChange={(_e, value: any) => {
+              const rs = value ? String(value.razonSocial ?? '') : '';
+              const synthetic = { target: { name: 'prestadorTraslado', value: rs } } as any;
+              onTextFieldChange(synthetic);
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Prestador Traslado"
+                placeholder="Seleccione prestador"
+                error={touched.prestadorTraslado && !!errors.prestadorTraslado}
+                helperText={touched.prestadorTraslado && errors.prestadorTraslado}
+                onBlur={() => onBlur('prestadorTraslado')}
+              />
+            )}
           />
         </div>
       </div>
@@ -787,7 +810,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             label="CUIT Prestador Inicial"
             name="prestadorInicialCuit"
             value={form.prestadorInicialCuit}
-            onChange={numericChange("prestadorInicialCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
+            onChange={numericChange("prestadorInicialCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11, maxDigits: 11 })}
+            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
             onBlur={() => onBlur("prestadorInicialCuit")}
             error={
               touched.prestadorInicialCuit && !!errors.prestadorInicialCuit
@@ -804,15 +828,6 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
             disabled={isDisabled}
             placeholder="CUIT del prestador inicial"
           />
-          {/* <CustomButton
-            color="primary"
-            size="mid"
-            className={styles.smallButton}
-            icon={<span>🔍</span>}
-            aria-label="buscar prestador"
-          >
-            {""}
-          </CustomButton> */}
 
           <TextField
             label="Razón Social Prestador"
@@ -836,27 +851,6 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
           />
         </div>
       </div>
-
-      {/* Verificación de Contacto Inicial */}
-      {/* <div className={styles.formSection}>
-        <Typography variant="h6" className={styles.sectionTitle}>
-          Verificación de Contacto Inicial
-        </Typography>
-
-        <div className={styles.formRow}>
-          <TextField
-            label="Verifica Contacto Inicial"
-            name="verificaContactoInicial"
-            value={form.verificaContactoInicial}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            multiline
-            rows={2}
-            placeholder="Información de verificación del contacto inicial"
-          />
-        </div>
-      </div> */}
     </>
   );
 };

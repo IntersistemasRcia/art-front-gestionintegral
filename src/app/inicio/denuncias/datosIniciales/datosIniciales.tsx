@@ -194,6 +194,30 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
     onTextFieldChange(synthetic);
   }, [isEditing, isDisabled, form.apellidoNombres, form.nombre, onTextFieldChange]);
 
+  // Si el tipo de denuncia es "Enfermedad Profesional", bloquear campos relacionados con "Accidente de Trabajo"
+  const bloquearPorEnfermedad = String(form.tipoDenuncia ?? "") === "Enfermedad";
+
+  const tipoDenunciaKey = String(form.tipoDenuncia ?? "");
+  const tipoSiniestroOptions = React.useMemo(() => {
+    if (tipoDenunciaKey === "AccidenteTrabajo") {
+      return ["Accidente Trabajo", "Accidente In Itinere", "Reingreso"];
+    }
+    if (tipoDenunciaKey === "Enfermedad") {
+      return ["Enfermedad Profesional", "Reingreso"];
+    }
+    return [] as string[];
+  }, [tipoDenunciaKey]);
+
+  // Si cambia tipoDenuncia y el tipoSiniestro actual no aplica, limpiarlo
+  React.useEffect(() => {
+    const current = String(form.tipoSiniestro ?? "");
+    if (!current) return;
+    if (tipoSiniestroOptions.length === 0 || !tipoSiniestroOptions.includes(current)) {
+      const syntheticClear = { target: { name: "tipoSiniestro", value: "" } } as any;
+      onTextFieldChange(syntheticClear);
+    }
+  }, [tipoDenunciaKey, form.tipoSiniestro, tipoSiniestroOptions, onTextFieldChange]);
+
   return (
     <>
       {/* Contacto Inicial */}
@@ -232,9 +256,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
           />
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             error={touched.relacionAccidentado && !!errors.relacionAccidentado}
-            disabled={isDisabled}
+            disabled={isDisabled || bloquearPorEnfermedad}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
           >
             <InputLabel>Relación c/accidentado</InputLabel>
             <Select
@@ -300,18 +325,37 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             )}
           </FormControl>
 
-          <TextField
-            label="Tipo Siniestro"
-            name="tipoSiniestro"
-            value={form.tipoSiniestro}
-            onChange={onTextFieldChange}
-            onBlur={() => onBlur("tipoSiniestro")}
+          <FormControl
             fullWidth
-            disabled={isDisabled}
-            placeholder="Tipo de siniestro"
-          />
+            error={touched.tipoSiniestro && !!errors.tipoSiniestro}
+            disabled={isDisabled || !tipoDenunciaKey}
+          >
+            <InputLabel>Tipo Siniestro</InputLabel>
+            <Select
+              name="tipoSiniestro"
+              value={form.tipoSiniestro}
+              label="Tipo Siniestro"
+              onChange={onSelectChange}
+              onBlur={() => onBlur("tipoSiniestro")}
+            >
+              {tipoSiniestroOptions.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </Select>
+            {touched.tipoSiniestro && errors.tipoSiniestro && (
+              <Typography
+                variant="caption"
+                color="error"
+                className={styles.captionNote}
+              >
+                {errors.tipoSiniestro}
+              </Typography>
+            )}
+          </FormControl>
 
-          <FormControl fullWidth disabled={isDisabled}>
+          <FormControl fullWidth disabled={isDisabled || bloquearPorEnfermedad} className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}>
             <InputLabel>¿En Vía Pública?</InputLabel>
             <Select
               name="enViaPublica"
@@ -343,8 +387,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             error={touched.fechaOcurrencia && !!errors.fechaOcurrencia}
             helperText={touched.fechaOcurrencia && errors.fechaOcurrencia}
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             InputLabelProps={{ shrink: true }}
           />
           <TextField
@@ -357,8 +403,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             error={touched.hora && !!errors.hora}
             helperText={touched.hora && errors.hora}
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             InputLabelProps={{ shrink: true }}
           />
         </div>
@@ -372,10 +420,11 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             onBlur={() => onBlur("calle")}
             error={touched.calle && !!errors.calle}
             helperText={touched.calle && errors.calle}
-            className={styles.halfField}
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={`${styles.halfField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Nombre de la calle"
           />
           <div className={`${styles.halfField} ${styles.inlineGroup}`}>
@@ -386,6 +435,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               onChange={onTextFieldChange}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               placeholder="Número"
             />
             <TextField
@@ -395,6 +446,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               onChange={onTextFieldChange}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               placeholder="Piso"
             />
             <TextField
@@ -404,6 +457,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               onChange={onTextFieldChange}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               placeholder="Depto"
             />
           </div>
@@ -417,6 +472,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             onChange={onTextFieldChange}
             fullWidth
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             placeholder="Entre calle"
           />
           <TextField
@@ -426,6 +483,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             onChange={onTextFieldChange}
             fullWidth
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             placeholder="y calle"
           />
         </div>
@@ -454,9 +513,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             name="busqueda"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className={styles.smallField}
             fullWidth
-            disabled={isDisabled}
+            disabled={isDisabled || bloquearPorEnfermedad}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Buscar..."
           />
 
@@ -467,13 +527,15 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             // icon={<span>🔍</span>}
             aria-label="buscar localidad"
             onClick={handleBuscarLocalidades}
+            disabled={bloquearPorEnfermedad || false}
           >
             <FaSearch />
           </CustomButton>
 
           <div className={styles.smallField}>
             <Autocomplete
-              disabled={isDisabled}
+              disabled={isDisabled || bloquearPorEnfermedad}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               options={localidadesOptions}
               getOptionLabel={(opt: any) => String(opt?.nombreCompleto ?? opt?.nombre ?? "")}
               isOptionEqualToValue={(opt: any, val: any) => String(opt?.codigo) === String(val?.codigo)}
@@ -519,10 +581,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             name="codPostal"
             value={form.codPostal}
             onChange={onTextFieldChange}
-            className={styles.smallField}
             fullWidth
-            disabled={isDisabled}
+            disabled={isDisabled || bloquearPorEnfermedad}
             InputProps={{ readOnly: true }}
+            className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Código postal"
           />
 
@@ -532,10 +594,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             value={form.litProvincia}
             onChange={onTextFieldChange}
             onBlur={() => onBlur("litProvincia")}
-            className={styles.smallField}
             fullWidth
-            disabled={isDisabled}
+            disabled={isDisabled || bloquearPorEnfermedad}
             InputProps={{ readOnly: true }}
+            className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Provincia"
           />
         </div>

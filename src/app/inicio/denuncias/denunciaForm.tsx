@@ -20,6 +20,7 @@ import ConfirmacionDenuncia from "./confirmacion/confirmacion";
 import DatosEmpleador from "./datosEmpleador/datosEmpleador";
 import CustomTab from "@/utils/ui/tab/CustomTab";
 import ArtAPI from "@/data/artAPI";
+import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 
 
 export default function DenunciaForm({
@@ -27,6 +28,7 @@ export default function DenunciaForm({
   onClose,
   onSubmit,
   initialData,
+  initialFiles,
   errorMsg,
   method,
   isSubmitting = false,
@@ -42,6 +44,12 @@ export default function DenunciaForm({
   const lastAutoValuesRef = useRef<Record<string, string>>({});
   const { user } = useAuth();
   const [empCuitReadOnly, setEmpCuitReadOnly] = useState(false);
+  const [empModalOpen, setEmpModalOpen] = useState(false);
+  const [empModalType, setEmpModalType] = useState<MessageType>('alert');
+  const [empModalMessage, setEmpModalMessage] = useState('');
+  const lastFetchedPrestadorCuitRef = useRef<string>("");
+  const lastFetchedLocalidadAccRef = useRef<string>("");
+  const lastFetchedLocalidadTrabRef = useRef<string>("");
 
   // Lógica de Modos y Estado
   const isViewing = method === "view";
@@ -51,8 +59,34 @@ export default function DenunciaForm({
   const isDisabled = isViewing || isDeleting;
 
   useEffect(() => {
+    //mostrar vacío si vienen en 0
+    const sanitizeNumericZeros = (data: DenunciaFormData): DenunciaFormData => {
+      const numericFields: Array<keyof DenunciaFormData> = [
+        // Inicio
+        "nro", "piso", "codLocalidad", "codPostal",
+        // Trabajador
+        "cuil", "docNumero", "domicilioNro", "domicilioPiso", "codLocalidadTrabajador", "codPostalTrabajador",
+        // Dat Siniestros
+        "roamNro", "roamAno", "roamCodigo", "prestadorInicialCuit",
+        "establecimientoCuit", "establecimientoNumero", "establecimientoCodLocalidad", "establecimientoCodPostal",
+        // (Empleador)
+        "empCuit", "empPoliza", "empDomicilioNro", "empDomicilioPiso", "empCodLocalidad", "empCodPostal",
+      ];
+
+      const cleaned: Partial<DenunciaFormData> = {};
+      numericFields.forEach((key) => {
+        const val = (data as any)[key];
+        if (val === 0 || val === "0") {
+          (cleaned as any)[key] = "";
+        }
+      });
+
+      return { ...data, ...cleaned } as DenunciaFormData;
+    };
+
     if (initialData) {
-      setForm(initialData);
+      const dataForEdit = isEditing ? sanitizeNumericZeros(initialData) : initialData;
+      setForm(dataForEdit);
     } else {
       setForm(initialDenunciaFormData);
     }
@@ -60,6 +94,23 @@ export default function DenunciaForm({
     setTouched({});
     setActiveTab(0);
     setMaxVisitedTab(0);
+
+    lastFetchedEmpCuitRef.current = "";
+    lastAutoValuesRef.current = {};
+    // Pre-cargar adjuntos existentes sólo si los proveen (modo edición)
+    if (Array.isArray(initialFiles) && initialFiles.length > 0 && method === "edit") {
+      setUploadedFiles(initialFiles);
+      setForm(prev => ({
+        ...prev,
+        archivosAdjuntos: initialFiles
+      }));
+    } else {
+      setUploadedFiles([]);
+      setForm(prev => ({
+        ...prev,
+        archivosAdjuntos: []
+      }));
+    }
   }, [initialData, open]);
 
   useEffect(() => {
@@ -78,15 +129,15 @@ export default function DenunciaForm({
   const modalTitle = useMemo(() => {
     switch (method) {
       case "create":
-        return "Registro de Denuncia de Siniestro";
+        return "Registro de Pre-Denuncia";
       case "edit":
-        return "Editar Denuncia de Siniestro";
+        return "Editar Pre-Denuncia";
       case "view":
-        return "Ver Denuncia de Siniestro";
+        return "Ver Pre-Denuncia";
       case "delete":
-        return "Eliminar Denuncia de Siniestro";
+        return "Eliminar Pre-Denuncia";
       default:
-        return "Formulario de Denuncia";
+        return "Formulario de Pre-Denuncia";
     }
   }, [method]);
 
@@ -151,6 +202,14 @@ export default function DenunciaForm({
         lastFetchedEmpCuitRef.current = rawCuitDigits;
       } catch (e) {
         console.warn("No se pudo obtener la empresa por CUIT", e);
+        const empresaCUITUsuario = Number((user as any)?.empresaCUIT ?? 0);
+        if (!cancelled && empresaCUITUsuario === 0) {
+          setEmpModalMessage('El CUIT de la empresa no se encuentra.');
+          setEmpModalType('alert');
+          setEmpModalOpen(true);
+          setForm((prev) => ({ ...prev, empCuit: '' }));
+          lastFetchedEmpCuitRef.current = "";
+        }
       }
     };
 
@@ -167,27 +226,40 @@ export default function DenunciaForm({
     return undefined;
   };
 
-  const validateField = (name: keyof DenunciaFormData, value: string): string | undefined => {
+  const validateField = (
+    formData: DenunciaFormData,
+    name: keyof DenunciaFormData,
+    value: string
+  ): string | undefined => {
+    const esEnfermedad = String(formData.tipoDenuncia ?? "") === "Enfermedad";
+
     switch (name) {
       case "telefonos":
         return validateRequired(value, "Teléfono");
       case "apellidoNombres":
         return validateRequired(value, "Apellido y Nombres");
       case "relacionAccidentado":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Relación con el accidentado");
       case "tipoDenuncia":
         return validateRequired(value, "Tipo de Denuncia");
       case "fechaOcurrencia":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Fecha de Ocurrencia");
       case "hora":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Hora");
       case "calle":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Calle");
       case "nro":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Número");
       case "codLocalidad":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Código de Localidad");
       case "codPostal":
+        if (esEnfermedad) return undefined;
         return validateRequired(value, "Código Postal");
       case "empCuit":
         {
@@ -265,65 +337,63 @@ export default function DenunciaForm({
       case "prestadorInicialRazonSocial":
         return validateRequired(value, "Razón Social Prestador");
       case "aceptoTerminos":
-        if (!form.aceptoTerminos) return "Debe aceptar los términos y condiciones";
+        if (!formData.aceptoTerminos) return "Debe aceptar los términos y condiciones";
         return undefined;
       default:
         return undefined;
     }
   };
 
-  const validateAllFields = (tabToValidate?: number): boolean => {
+  const validateAllFields = (formData: DenunciaFormData, tabToValidate?: number): ValidationErrors => {
     const newErrors: ValidationErrors = {};
-    let hasErrors = false;
 
-    if (isDisabled) return true;
+    if (isDisabled) return newErrors;
 
     const currentTab = tabToValidate !== undefined ? tabToValidate : activeTab;
     let fieldsToValidate: (keyof DenunciaFormData)[] = [];
+    const esEnfermedad = String(formData.tipoDenuncia ?? "") === "Enfermedad";
 
     if (currentTab === 0) {
-      // Validar campos del primer tab
-      fieldsToValidate = [
-        "telefonos", "apellidoNombres", "relacionAccidentado", 
-        "tipoDenuncia", "fechaOcurrencia", "hora", "calle", "descripcion"
-      ];
+      if (esEnfermedad) {
+        fieldsToValidate = [
+          "telefonos", "apellidoNombres", "tipoDenuncia", "descripcion"
+        ];
+      } else {
+        fieldsToValidate = [
+          "telefonos", "apellidoNombres", "relacionAccidentado",
+          "tipoDenuncia", "fechaOcurrencia", "hora", "calle", "descripcion"
+        ];
+      }
     } else if (currentTab === 1) {
-      // Validar campos del segundo tab
       fieldsToValidate = [
         "cuil", "docTipo", "docNumero", "nombre", "fechaNac", 
         "sexo", "estadoCivil", "nacionalidad", "domicilioCalle", "telefono", "email"
       ];
     } else if (currentTab === 2) {
-      // Validar campos del tercer tab
       fieldsToValidate = [
         "estaConsciente", "color", "habla", "gravedad", "respira", 
         "tieneHemorragia", "contextoDenuncia", "prestadorInicialCuit", "prestadorInicialRazonSocial"
       ];
     } else if (currentTab === 3) {
-      // Nuevo tab: Datos del Empleador -> solo CUIT es requerido en esta pestaña
       fieldsToValidate = [
         "empCuit",
       ];
     } else if (currentTab === 4) {
-      // Validar campos del quinto tab (Confirmación)
-      const aceptoTerminosError = form.aceptoTerminos ? undefined : "Debe aceptar los términos y condiciones";
+      const aceptoTerminosError = formData.aceptoTerminos ? undefined : "Debe aceptar los términos y condiciones";
       if (aceptoTerminosError) {
         newErrors.aceptoTerminos = aceptoTerminosError;
-        hasErrors = true;
       }
     }
 
     fieldsToValidate.forEach((fieldName) => {
-      const value = String(form[fieldName] ?? "");
-      const error = validateField(fieldName, value);
+      const value = String(formData[fieldName] ?? "");
+      const error = validateField(formData, fieldName, value);
       if (error) {
         newErrors[fieldName as keyof ValidationErrors] = error;
-        hasErrors = true;
       }
     });
 
-    setErrors(newErrors);
-    return !hasErrors;
+    return newErrors;
   };
 
   // Handlers
@@ -337,7 +407,7 @@ export default function DenunciaForm({
     }));
 
     if (touched[fieldName as keyof TouchedFields]) {
-      const error = validateField(fieldName, value);
+      const error = validateField({ ...form, [fieldName]: value }, fieldName, value);
       setErrors((prev) => ({
         ...prev,
         [fieldName]: error,
@@ -355,7 +425,7 @@ export default function DenunciaForm({
     }));
 
     if (touched[fieldName as keyof TouchedFields]) {
-      const error = validateField(fieldName, value);
+      const error = validateField({ ...form, [fieldName]: value }, fieldName, value);
       setErrors((prev) => ({
         ...prev,
         [fieldName]: error,
@@ -365,11 +435,102 @@ export default function DenunciaForm({
 
   const handleBlur = (fieldName: keyof DenunciaFormData) => {
     setTouched((prev) => ({ ...prev, [fieldName]: true }));
-    const error = validateField(fieldName, String(form[fieldName] ?? ""));
+    const error = validateField(form, fieldName, String(form[fieldName] ?? ""));
     setErrors((prev) => ({
       ...prev,
       [fieldName]: error,
     }));
+  };
+
+  const onlyDigits = (v?: string): string => String(v ?? "").replace(/\D/g, "");
+
+  const hydratePrestadorInicialIfNeeded = async (formData: DenunciaFormData): Promise<DenunciaFormData> => {
+    if (isDisabled) return formData;
+
+    const cuitDigits = onlyDigits(formData.prestadorInicialCuit);
+    const hasCuit = cuitDigits.length === 11;
+    const hasRazonSocial = String(formData.prestadorInicialRazonSocial ?? "").trim().length > 0;
+
+    if (!hasCuit || hasRazonSocial) return formData;
+    if (lastFetchedPrestadorCuitRef.current === cuitDigits) return formData;
+
+    try {
+      const data: any = await ArtAPI.getPrestador({ CUIT: Number(cuitDigits) });
+      lastFetchedPrestadorCuitRef.current = cuitDigits;
+      const razonSocial = String(data?.razonSocial ?? "").trim();
+      if (!razonSocial) return formData;
+      return { ...formData, prestadorInicialRazonSocial: razonSocial };
+    } catch {
+      // Si falla la búsqueda, dejamos que la validación existente lo marque como error.
+      lastFetchedPrestadorCuitRef.current = cuitDigits;
+      return formData;
+    }
+  };
+
+  const hydrateLocalidadAccidenteIfNeeded = async (formData: DenunciaFormData): Promise<DenunciaFormData> => {
+    if (isDisabled) return formData;
+
+    const codDigits = onlyDigits(formData.codLocalidad);
+    const hasCodigo = codDigits.length > 0;
+    const needsPostal = String(formData.codPostal ?? "").trim().length === 0;
+    const needsProvincia = String(formData.litProvincia ?? "").trim().length === 0;
+    const needsNombre = String(formData.localidadAccidente ?? "").trim().length === 0;
+
+    if (!hasCodigo || (!needsPostal && !needsProvincia && !needsNombre)) return formData;
+    if (lastFetchedLocalidadAccRef.current === codDigits) return formData;
+
+    try {
+      const data: any = await ArtAPI.getLocalidadesbyCodigo({ Codigo: Number(codDigits) });
+      lastFetchedLocalidadAccRef.current = codDigits;
+      const item = Array.isArray(data) ? data[0] : data;
+      if (!item) return formData;
+
+      const codPostal = String(item?.codPostal ?? item?.CodPostal ?? "");
+      const provincia = String(item?.litProvincia ?? item?.provincia ?? "");
+      const nombre = String(item?.nombreCompleto ?? item?.nombre ?? "");
+
+      const next: DenunciaFormData = { ...formData };
+      if (needsPostal && codPostal) next.codPostal = codPostal;
+      if (needsProvincia && provincia) next.litProvincia = provincia;
+      if (needsNombre && nombre) next.localidadAccidente = nombre;
+      return next;
+    } catch {
+      lastFetchedLocalidadAccRef.current = codDigits;
+      return formData;
+    }
+  };
+
+  const hydrateLocalidadTrabajadorIfNeeded = async (formData: DenunciaFormData): Promise<DenunciaFormData> => {
+    if (isDisabled) return formData;
+
+    const codDigits = onlyDigits(formData.codLocalidadTrabajador);
+    const hasCodigo = codDigits.length > 0;
+    const needsPostal = String(formData.codPostalTrabajador ?? "").trim().length === 0;
+    const needsProvincia = String(formData.litProvinciaTrabajador ?? "").trim().length === 0;
+    const needsNombre = String(formData.localidadTrabajador ?? "").trim().length === 0;
+
+    if (!hasCodigo || (!needsPostal && !needsProvincia && !needsNombre)) return formData;
+    if (lastFetchedLocalidadTrabRef.current === codDigits) return formData;
+
+    try {
+      const data: any = await ArtAPI.getLocalidadesbyCodigo({ Codigo: Number(codDigits) });
+      lastFetchedLocalidadTrabRef.current = codDigits;
+      const item = Array.isArray(data) ? data[0] : data;
+      if (!item) return formData;
+
+      const codPostal = String(item?.codPostal ?? item?.CodPostal ?? "");
+      const provincia = String(item?.litProvincia ?? item?.provincia ?? "");
+      const nombre = String(item?.nombreCompleto ?? item?.nombre ?? "");
+
+      const next: DenunciaFormData = { ...formData };
+      if (needsPostal && codPostal) next.codPostalTrabajador = codPostal;
+      if (needsProvincia && provincia) next.litProvinciaTrabajador = provincia;
+      if (needsNombre && nombre) next.localidadTrabajador = nombre;
+      return next;
+    } catch {
+      lastFetchedLocalidadTrabRef.current = codDigits;
+      return formData;
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -377,7 +538,7 @@ export default function DenunciaForm({
     setActiveTab(newValue);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isDeleting) {
@@ -391,25 +552,43 @@ export default function DenunciaForm({
     }, {} as TouchedFields);
     setTouched(allTouched);
 
+    // Asegurar que los campos read-only autocompletados por API esten para mandar al validar
+    let formToSubmit: DenunciaFormData = form;
+    formToSubmit = await hydratePrestadorInicialIfNeeded(formToSubmit);
+    formToSubmit = await hydrateLocalidadAccidenteIfNeeded(formToSubmit);
+    formToSubmit = await hydrateLocalidadTrabajadorIfNeeded(formToSubmit);
+    if (formToSubmit !== form) {
+      setForm(formToSubmit);
+    }
+
     console.log('DenunciaForm.handleSubmit invoked', {
       method,
       activeTab,
       isDeleting,
-      aceptoTerminos: form.aceptoTerminos,
+      aceptoTerminos: formToSubmit.aceptoTerminos,
     });
 
-    // Validar todas las solapas antes del envío final
-    const allTabsValid = [0, 1, 2, 3, 4].every((tabIndex) => validateAllFields(tabIndex));
-    console.log('DenunciaForm.validateAllFields (all tabs) result:', allTabsValid, { errors });
+    // Validar todas las solapas y acumular errores para mostrarlos en todas
+    const combinedErrors: ValidationErrors = {};
+    [0, 1, 2, 3, 4].forEach((tabIndex) => {
+      const tabErrors = validateAllFields(formToSubmit, tabIndex);
+      Object.assign(combinedErrors, tabErrors);
+    });
+
+    const allTabsValid = Object.keys(combinedErrors).length === 0;
+    setErrors(combinedErrors);
+    console.log('DenunciaForm.validateAllFields (all tabs) result:', allTabsValid, { combinedErrors });
 
     if (allTabsValid) {
-      console.log('DenunciaForm calling onSubmit with form (final):', form);
-      onSubmit(form, { final: true });
+      console.log('DenunciaForm calling onSubmit with form (final):', formToSubmit);
+      onSubmit(formToSubmit, { final: true });
     } else {
       console.warn('DenunciaForm validation failed, not submitting');
       if (onValidationError) {
+        const firstFew = Object.values(combinedErrors).filter(Boolean).slice(0, 5).join("\n");
         onValidationError(
-          'Faltan completar datos obligatorios de la denuncia. Por favor revise todas las solapas antes de enviar.'
+          'Faltan completar datos obligatorios de la denuncia. Por favor revise todas las solapas antes de enviar.' +
+          (firstFew ? `\n\nDetalle:\n${firstFew}` : "")
         );
       }
     }
@@ -422,11 +601,9 @@ export default function DenunciaForm({
   };
 
   const handleNext = () => {
-    if (validateAllFields(activeTab)) {
-      const next = activeTab + 1;
-      setActiveTab(next);
-      setMaxVisitedTab((prev) => Math.max(prev, next));
-    }
+    const next = activeTab + 1;
+    setActiveTab(next);
+    setMaxVisitedTab((prev) => Math.max(prev, next));
   };
 
   const handlePrevious = () => {
@@ -475,6 +652,13 @@ export default function DenunciaForm({
       size="large"
     >
       <Box component="form" className={styles.formContainer} onSubmit={handleSubmit}>
+        <CustomModalMessage
+          open={empModalOpen}
+          type={empModalType}
+          message={empModalMessage}
+          onClose={() => setEmpModalOpen(false)}
+          title={empModalType === 'alert' ? 'CUIT no encontrado' : undefined}
+        />
         {errorMsg && (
           <Typography className={styles.errorMessage}>{errorMsg}</Typography>
         )}

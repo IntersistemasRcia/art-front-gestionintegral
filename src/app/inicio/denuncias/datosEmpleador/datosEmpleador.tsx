@@ -4,9 +4,7 @@ import { SelectChangeEvent } from "@mui/material/Select";
 import styles from "../denuncias.module.css";
 import type { DenunciaFormData, DatosEmpleadorProps } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
-
-
- 
+import { useAuth } from "@/data/AuthContext";
 
 const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   form,
@@ -18,6 +16,15 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   onSelectChange,
   onBlur,
 }) => {
+  const { user } = useAuth();
+
+  const empresaId = Number((user as any)?.empresaId ?? 0);
+  const lockAllFields = isDisabled || empresaId > 0;
+  const lockNonCuitFields = empresaId === 0; // admin: solo CUIT editable
+  const nonCuitLocked = lockAllFields || lockNonCuitFields;
+  const cuitLocked = lockAllFields || readonlyEmpCuit;
+  const cuitEnabled = !cuitLocked;
+  const nonCuitEnabled = !nonCuitLocked;
   // Helper para mantener sólo dígitos
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
 
@@ -67,6 +74,30 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
     }
     empCuitInitRef.current = true;
   }, [form.empCuit]);
+
+  // Prefill automático desde empresaCUIT del usuario si está disponible
+  const userCuitPrefilledRef = useRef(false);
+  useEffect(() => {
+    if (userCuitPrefilledRef.current) return;
+    const userCuit = Number((user as any)?.empresaCUIT ?? 0);
+    if (!userCuit || String(userCuit).length !== 11) return;
+
+    const currentDigits = onlyDigits(form.empCuit);
+    const desiredDigits = String(userCuit);
+    if (currentDigits === desiredDigits) {
+      userCuitPrefilledRef.current = true;
+      return;
+    }
+
+    try {
+      const formatted = Formato.CUIP(desiredDigits);
+      const synthetic = { target: { name: "empCuit", value: formatted } } as any;
+      onTextFieldChange(synthetic);
+      userCuitPrefilledRef.current = true;
+    } catch {
+      // ignore
+    }
+  }, [user, form.empCuit, onTextFieldChange]);
   return (
     <div className={styles.formSection}>
       <Typography variant="h5" component="h2" className={styles.sectionTitle}>
@@ -83,8 +114,8 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empCuit && !!errors.empCuit}
           helperText={touched.empCuit && errors.empCuit}
           fullWidth
-          disabled={isDisabled || readonlyEmpCuit}
-          InputProps={{ readOnly: readonlyEmpCuit }}
+          disabled={!cuitEnabled}
+          InputProps={{ readOnly: !cuitEnabled }}
           placeholder="Solo números"
         />
 
@@ -97,7 +128,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empPoliza && !!errors.empPoliza}
           helperText={touched.empPoliza && errors.empPoliza}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
           placeholder="Número de póliza"
         />
       </div>
@@ -112,7 +143,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empRazonSocial && !!errors.empRazonSocial}
           helperText={touched.empRazonSocial && errors.empRazonSocial}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -126,7 +157,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empDomicilioCalle && !!errors.empDomicilioCalle}
           helperText={touched.empDomicilioCalle && errors.empDomicilioCalle}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -138,7 +169,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empDomicilioNro && !!errors.empDomicilioNro}
           helperText={touched.empDomicilioNro && errors.empDomicilioNro}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -151,7 +182,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioPiso")}
           error={touched.empDomicilioPiso && !!errors.empDomicilioPiso}
           helperText={touched.empDomicilioPiso && errors.empDomicilioPiso}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -162,7 +193,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioDpto")}
           error={touched.empDomicilioDpto && !!errors.empDomicilioDpto}
           helperText={touched.empDomicilioDpto && errors.empDomicilioDpto}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -175,7 +206,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioEntreCalle1")}
           error={touched.empDomicilioEntreCalle1 && !!errors.empDomicilioEntreCalle1}
           helperText={touched.empDomicilioEntreCalle1 && errors.empDomicilioEntreCalle1}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -186,7 +217,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioEntreCalle2")}
           error={touched.empDomicilioEntreCalle2 && !!errors.empDomicilioEntreCalle2}
           helperText={touched.empDomicilioEntreCalle2 && errors.empDomicilioEntreCalle2}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -199,7 +230,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empCodLocalidad")}
           error={touched.empCodLocalidad && !!errors.empCodLocalidad}
           helperText={touched.empCodLocalidad && errors.empCodLocalidad}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -210,7 +241,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empCodPostal")}
           error={touched.empCodPostal && !!errors.empCodPostal}
           helperText={touched.empCodPostal && errors.empCodPostal}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -224,7 +255,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empTelefonos && !!errors.empTelefonos}
           helperText={touched.empTelefonos && errors.empTelefonos}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -236,7 +267,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empEmail && !!errors.empEmail}
           helperText={touched.empEmail && errors.empEmail}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
     </div>

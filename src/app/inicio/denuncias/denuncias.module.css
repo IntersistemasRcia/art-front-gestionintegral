@@ -342,6 +342,12 @@
   margin-top: 4px;
 }
 
+/* Utilidad: layout en columna */
+.flexColumn {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Contenedor de la tabla de trabajadores relacionados */
 .relatedWorkersContainer {
   background-color: #f5f5f5;
@@ -468,7 +474,7 @@
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 
@@ -535,4 +541,14 @@
   font-weight: 700;
   margin-bottom: 8px;
   color: #1565c0;
+}
+
+/* Utilidad: atenuar elementos deshabilitados */
+.disabledOpacity {
+  opacity: 0.6;
+}
+
+/* Enlaces sin subrayado (confirmación de archivos adjuntos) */
+.noUnderlineLink {
+  text-decoration: none;
 }

@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import {
   Box,
@@ -10,12 +9,15 @@ import {
   Paper,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
 } from "@mui/material";
 import styles from "../denuncias.module.css";
 import type { DenunciaFormData, ConfirmacionProps } from "../types/tDenuncias";
+import { FaTrash } from "react-icons/fa";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 
 const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
@@ -29,8 +31,15 @@ const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
   onCheckboxChange,
   onBlur,
 }) => {
+  const localTheme = createTheme({
+    typography: {
+      fontSize: 18,
+    },
+  });
+
   return (
-    <>
+    <ThemeProvider theme={localTheme}>
+      <>
       {/* Resumen de la Denuncia */}
       <div className={styles.formSection}>
         <Typography variant="h6" className={styles.sectionTitle}>
@@ -77,6 +86,18 @@ const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
               </Typography>
               <Typography variant="body2">Email: {form.email}</Typography>
             </Box>
+            <Box>
+              <Typography
+                variant="subtitle2"
+                className={styles.summaryTitle}
+              >
+                Datos del Empleador
+              </Typography>
+              <Typography variant="body2">CUIT: {form.empCuit}</Typography>
+              <Typography variant="body2">Razón Social: {form.empRazonSocial}</Typography>
+              <Typography variant="body2">Teléfono: {form.empTelefonos}</Typography>
+              <Typography variant="body2">Email: {form.empEmail}</Typography>
+            </Box>
           </Box>
         </Paper>
       </div>
@@ -115,8 +136,17 @@ const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
               {uploadedFiles.map((file, index) => (
                 <ListItem key={index}>
                   <ListItemText
-                    primary={file.name}
-                    secondary={`${(file.size / 1024 / 1024).toFixed(2)} MB`}
+                    primary={" "}
+                    secondary={
+                      <a
+                        href={URL.createObjectURL(file)}
+                        download={file.name}
+                        title={file.name}
+                        className={styles.noUnderlineLink}
+                      >
+                        {file.name}
+                      </a>
+                    }
                   />
                   <ListItemSecondaryAction>
                     <IconButton
@@ -125,7 +155,7 @@ const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
                       disabled={isDisabled}
                       className={styles.fileListRemoveBtn}
                     >
-                      ❌
+                      <FaTrash />
                     </IconButton>
                   </ListItemSecondaryAction>
                 </ListItem>
@@ -219,15 +249,15 @@ const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
             variant="body2"
             className={styles.additionalInfoTitle}
           >
-            ℹ️ Información Importante
+             Información Importante
           </Typography>
 
           <Typography variant="body2" paragraph>
-            • Una vez enviada la denuncia, recibirá un número de seguimiento.
+            • Una vez enviada la pre-denuncia, recibirá un número de seguimiento.
           </Typography>
 
           <Typography variant="body2" paragraph>
-            • Puede consultar el estado de su denuncia en cualquier momento.
+            • Puede consultar el estado de su pre-denuncia en cualquier momento.
           </Typography>
 
           <Typography variant="body2" paragraph>
@@ -241,7 +271,8 @@ const ConfirmacionDenuncia: React.FC<ConfirmacionProps> = ({
           </Typography>
         </Paper>
       </div>
-    </>
+      </>
+    </ThemeProvider>
   );
 };
 

@@ -21,7 +21,10 @@ import {
 } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
 import ArtAPI from "@/data/artAPI";
+import DataTable from "@/utils/ui/table/DataTable";
+import { ColumnDef } from "@tanstack/react-table";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
+import dayjs from "dayjs";
 
 type DatosTrabajadorProps = {
   form: DenunciaFormData;
@@ -45,9 +48,10 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   onBlur,
 }) => {
 
-
   // Traemos países desde /api/Paises
   const { data: paisesData } = ArtAPI.useGetRefPaises();
+  // Máxima fecha de nacimiento permitida 16 años
+  const maxNacimiento = useMemo(() => dayjs().subtract(16, "year").format("YYYY-MM-DD"), []);
 
   // Nos aseguramos de tener un array y lo ordenamos por denominación
   const paisesOrdenados = useMemo(
@@ -115,7 +119,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   }
 
   const isValidating = isValidatingNombre || isValidatingCP;
-
   const telInputRef = useRef<HTMLInputElement | null>(null);
   const afiLoadingRef = useRef(false);
   const [afiLoading, setAfiLoading] = useState(false);
@@ -162,6 +165,90 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     onBlur("telefono");
   };
 
+  // EmpleadorTrabajadores por CUIL
+  const [empTrabList, setEmpTrabList] = useState<any[]>([]);
+  const [empTrabLoading, setEmpTrabLoading] = useState<boolean>(false);
+  const lastEmpTrabCuilRef = useRef<string>("");
+
+  useEffect(() => {
+    const digits = onlyDigits(form.cuil);
+    if (isDisabled) return;
+
+    if (digits.length !== 11) {
+      if (empTrabList.length) setEmpTrabList([]);
+      lastEmpTrabCuilRef.current = "";
+      return;
+    }
+    if (lastEmpTrabCuilRef.current === digits) return;
+
+    let cancelled = false;
+    const fetchEmpTrab = async () => {
+      try {
+        setEmpTrabLoading(true);
+        const list = await ArtAPI.getEmpleadorTrabajadores({ CUIL: Number(digits) });
+        if (cancelled) return;
+        setEmpTrabList(Array.isArray(list) ? list : []);
+        lastEmpTrabCuilRef.current = digits;
+      } catch {
+        if (!cancelled) setEmpTrabList([]);
+      } finally {
+        if (!cancelled) setEmpTrabLoading(false);
+      }
+    };
+
+    fetchEmpTrab();
+    return () => { cancelled = true; };
+  }, [form.cuil, isDisabled]);
+
+  const empTrabColumns = useMemo<ColumnDef<any>[]>(() => ([
+    {
+      accessorKey: 'cuil',
+      header: 'Trabajador',
+      size: 130,
+      cell: (info) => Formato.CUIP(String(info.getValue() ?? '')),
+    },
+    {
+      accessorKey: 'cuit',
+      header: 'Empresa',
+      size: 130,
+      cell: (info) => Formato.CUIP(String(info.getValue() ?? '')),
+    },
+    {
+      accessorKey: 'periodo',
+      header: 'Periodo',
+      size: 100,
+      cell: (info) => {
+        const raw = String(info.getValue() ?? '');
+        const digits = raw.replace(/\D/g, '');
+        if (digits.length >= 6) {
+          const six = digits.slice(0, 6);
+          return `${six.slice(0, 4)}-${six.slice(4, 6)}`;
+        }
+        return raw;
+      },
+    },
+    {
+      accessorKey: 'origenTipo',
+      header: 'Origen',
+      size: 120,
+      cell: (info) => {
+        const v = String(info.getValue() ?? '').toUpperCase();
+        if (v === 'N') return 'DDJJ';
+        if (v === 'R') return 'RL';
+        return v;
+      },
+    },
+    {
+      accessorKey: 'empresaRazonSocial',
+      header: 'Razón Social',
+      size: 260,
+      cell: (info) => {
+        const v = String(info.getValue() ?? '');
+        return v && v.length > 60 ? `${v.substring(0, 60)}...` : v;
+      },
+    },
+  ]), []);
+
   const handleBuscarLocalidades = () => {
     const text = busqueda.trim();
     if (text) {
@@ -183,8 +270,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     setNombreBuscado(null);
     setCpBuscado(cp);
   };
-
-  
 
   // Helper para mantener sólo dígitos
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
@@ -219,9 +304,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     }
   }, [form.cuil]);
 
-
   // Generador de handlers para campos numéricos.
-  // Opcionalmente aplica un formateo cuando la longitud de dígitos coincide con formatWhenLen.
   const numericChange = (
     name: string,
     options?: { format?: (digits: string) => string; formatWhenLen?: number }
@@ -246,8 +329,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   };
 
   // Autocompletado por CUIL: cuando se ingresan 11 dígitos válidos, consulta afiliado y completa.
-  // En edición: si la base trae CUIL y coincide con el actual, no consulta.
-  // Si el CUIL actual difiere del inicial o no hay CUIL inicial, consulta.
   useEffect(() => {
     const digits = onlyDigits(form.cuil);
     if (isDisabled) return;
@@ -307,12 +388,11 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
           textEvent("domicilioNro", domNro ?? "");
           textEvent("domicilioPiso", domPiso ?? "");
           textEvent("domicilioDpto", domDpto ?? "");
-          // Entre calles disponibles: domEntre1, domEntre2
-
+          textEvent("domicilioEntreCalle1", domEntre1 ?? "");
+          textEvent("domicilioEntreCalle2", domEntre2 ?? "");
           // Localidad y CP
           selectEvent("codLocalidadTrabajador", String(locSrt ?? ""));
           textEvent("codPostalTrabajador", String(cpPostal ?? ""));
-
           // Contacto: completar solo si no hay datos pre-cargados
           if (!form.telefono) {
             textEvent("telefono", data.telefono ?? "");
@@ -341,7 +421,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
       fetchAndFill();
       return;
     }
-
     // En creación: si hay 11 dígitos, realizar búsqueda (evita duplicados)
     if (digits.length !== 11) return;
     if (lastAfiCuilRef.current === digits) return;
@@ -394,8 +473,8 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         textEvent("domicilioNro", domNro ?? "");
         textEvent("domicilioPiso", domPiso ?? "");
         textEvent("domicilioDpto", domDpto ?? "");
-        // Entre calles no están visibles como campos separados en el formulario actual,
-        // pero si se agregan, estos valores están disponibles: domEntre1, domEntre2
+        textEvent("domicilioEntreCalle1", domEntre1 ?? "");
+        textEvent("domicilioEntreCalle2", domEntre2 ?? "");
 
         // Localidad y CP
         selectEvent("codLocalidadTrabajador", String(locSrt ?? ""));
@@ -429,7 +508,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     fetchAndFill();
   }, [form.cuil, isDisabled, isEditing]);
 
-
   return (
     <>
       <CustomModalMessage
@@ -446,26 +524,25 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         </Typography>
 
         <div className={styles.formRow}>
-          <TextField
-            label="Cuil"
-            name="cuil"
-            value={form.cuil}
-            onChange={numericChange("cuil", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-
-
-            error={touched.cuil && !!errors.cuil}
-            helperText={touched.cuil && errors.cuil}
-            fullWidth
-            required={!isDisabled}
-            disabled={isDisabled}
-            placeholder="Ingrese CUIL"
-            className={styles.compactField}
-          />
-          {afiLoading && (
-            <Typography variant="caption" className={styles.captionNote}>
-              Buscando afiliado para autocompletar...
-            </Typography>
-          )}
+          <div className={`${styles.compactField} ${styles.flexColumn}`}>
+            <TextField
+              label="Cuil"
+              name="cuil"
+              value={form.cuil}
+              onChange={numericChange("cuil", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
+              error={touched.cuil && !!errors.cuil}
+              helperText={touched.cuil && errors.cuil}
+              fullWidth
+              required={!isDisabled}
+              disabled={isDisabled}
+              placeholder="Ingrese CUIL"
+            />
+            {afiLoading && (
+              <Typography variant="caption" className={styles.captionNote}>
+                cargando...
+              </Typography>
+            )}
+          </div>
 
           <FormControl
             fullWidth
@@ -544,6 +621,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
             required={!isDisabled}
             disabled={isDisabled}
             InputLabelProps={{ shrink: true }}
+            inputProps={{ max: maxNacimiento }}
             className={styles.compactField}
           />
 
@@ -824,21 +902,19 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         </div>
       </div>
 
-      {/* Tabla de trabajadores relacionados */}
+      {/* EmpleadorTrabajadores por CUIL */}
       <div className={styles.formSection}>
-        <div className={styles.relatedWorkersContainer}>
-          {/* Encabezados de la tabla */}
-          <div className={styles.relatedWorkersHeader}>
-            <div>Trabajador</div>
-            <div>Empresa</div>
-            <div>Período</div>
-            <div>Origen</div>
-          </div>
-
-          {/* Contenido de la tabla (vacío por ahora) */}
-          <div className={styles.relatedWorkersBody}>
-            {/* Aquí se mostrarían los trabajadores relacionados */}
-          </div>
+        <Typography variant="h6" className={styles.sectionTitle}>
+          Historial de Relación Empleador-Trabajador
+        </Typography>
+        <div className={styles.compactTable}>
+          <DataTable
+            columns={empTrabColumns}
+            data={Array.isArray(empTrabList) ? empTrabList : []}
+            isLoading={empTrabLoading}
+            enableFiltering={false}
+            pageSize={5}
+          />
         </div>
       </div>
     </>

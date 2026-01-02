@@ -6,7 +6,7 @@ import RefEmpleador from "@/app/inicio/usuarios/interfaces/RefEmpleador";
 import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
-import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam } from "@/app/inicio/denuncias/types/tDenuncias";
+import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 
@@ -449,6 +449,16 @@ export class ArtAPIClass extends ExternalAPI {
     );
   //#endregion
 
+  //Region Prestadores get
+  readonly refPrestadoresURL = () => this.getURL({ path: "/api/Prestadores" }).toString();
+  getRefPrestadores = async () => tokenizable.get<RefPrestadores[]>(
+    this.refPrestadoresURL()
+  ).then(({ data }) => data);
+  useGetRefPrestadores = () => useSWR(
+    [this.refPrestadoresURL(), token.getToken()], () => this.getRefPrestadores()
+  );
+  //#endregion
+
 
   //Region paises
   readonly refPaisesURL = () => this.getURL({ path: "/api/Paises" }).toString();
@@ -469,7 +479,6 @@ export class ArtAPIClass extends ExternalAPI {
     [this.refObraSocialURL(), token.getToken()], () => this.getRefObraSocial()
   );
   //#endregion
-
 
   //Region ROAM
   readonly refRoamURL = () => this.getURL({ path: "/api/Roam" }).toString();
@@ -516,6 +525,21 @@ export class ArtAPIClass extends ExternalAPI {
   );
   //#endregion
 
+  //#region EmpleadorTrabajadores
+  readonly getEmpleadorTrabajadoresURL = (params: ParametersEmpleadorT = {}) => {
+    //params.CUIT ??= useAuth().user?.empresaCUIT ?? 0; este parametro lo paso desde el componente que lo usa
+    return this.getURL({ path: "/api/EmpleadorTrabajadores/CUIL", search: toURLSearch(params) }).toString();
+  };
+  getEmpleadorTrabajadores = async (params: ParametersEmpleadorT = {}) => tokenizable.get(
+    this.getEmpleadorTrabajadoresURL(params),
+  ).then(({ data }) => data);
+  useGetEmpleadorTrabajadoresURL = (params: ParametersEmpleadorT = {}) => useSWR(
+    [this.getEmpleadorTrabajadoresURL(params), token.getToken()], () => this.getEmpleadorTrabajadores(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
 
 }
 
