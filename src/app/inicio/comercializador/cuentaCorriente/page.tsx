@@ -55,7 +55,7 @@ function CuentaCorrienteComercializador() {
     // NOTA: Usamos ctacteSelected?.periodo, y lo convertimos a string si existe.
     // Esto hace que la clave SWR solo se active cuando ctacteSelected.periodo tiene un valor.
     const { data: CtaCteRawData, isLoading: isCtaCteLoading, error: viewCtaCteError, isValidating, mutate: mutateCtaCte } =
-    gestionComercializadorAPI.useGetViewCtaCte(cuit ? { CUIL: cuit, page: `${PageIndex},${PageSize}`, sort: "periodo" } : { page: `${PageIndex},${PageSize}`, sort: "periodo" });
+    gestionComercializadorAPI.useGetViewCtaCte(cuit ? { CUIL: cuit, page: `${PageIndex},${PageSize}`, sort: "-periodo" } : { page: `${PageIndex},${PageSize}`, sort: "-periodo" });
 
     const periodoFiltro = ctacteSelected?.periodo || 0;
     
@@ -66,7 +66,7 @@ function CuentaCorrienteComercializador() {
             CUIL: cuit, 
             page: `${PageIndexDetalle},${PageSizeDetalle}`, // Usar la paginación de detalles
             periodo: periodoFiltro, // Filtro por periodo
-            sort: "fecha" // Ordenar por fecha para los detalles es común
+            sort: "-fecha" // Ordenar por fecha para los detalles es común
         } : undefined // Si no hay periodo seleccionado, no se consulta
     );
 
@@ -183,9 +183,9 @@ function CuentaCorrienteComercializador() {
         { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'IVA', accessorKey: 'IVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Sin IVA', accessorKey: 'TotalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Con IVA', accessorKey: 'TotalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
+        { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
+        { header: 'Total Sin IVA', accessorKey: 'totalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
+        { header: 'Total Con IVA', accessorKey: 'totalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
     ], []);
 
     const columnsDetalles: ColumnDef<ViewCuentaCorrienteDetalle>[] = useMemo(() => [
@@ -198,9 +198,10 @@ function CuentaCorrienteComercializador() {
         { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
         { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
         { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
-        { header: 'IVA', accessorKey: 'IVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Sin IVA', accessorKey: 'TotalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Con IVA', accessorKey: 'TotalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },   
+        { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
+        { header: 'Total Sin IVA', accessorKey: 'totalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
+        { header: 'Total Con IVA', accessorKey: 'totalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },   
+        { header: 'Aplica IVA', id: 'aplicaIVA', cell: (info: any) => {const ivaVal = info.row?.original?.iva ?? info.getValue?.(); const num = Number(String(ivaVal ?? 0).replace(',', '.')); return (isNaN(num) || num === 0) ? 'No' : 'Si';}, meta: { align: 'center' } },
     ], []);
 
 
