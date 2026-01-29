@@ -182,7 +182,10 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
         },
       });
       headers.columns[name] = { key: name, header: label ?? name };
-      if (formatter) headers.options.formatters!.row![name] = formatter;
+      // No registrar formatters para campos calculados (ya se calculan antes de exportar)
+      if (formatter && name !== "Estado" && name !== "DiasTrans") {
+        headers.options.formatters!.row![name] = formatter;
+      }
     });
 
     const fields: Field[] = fieldsForQB.map(({ name, label, operators: colOps, valueEditorType, values, type }) => ({
@@ -315,6 +318,13 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
     const fileName = `${options.sheet.name.replaceAll(" ", "_")}-${now.format("YYYYMMDDHHmmssSSS")}.xlsx`;
     options.sheet.name += ` (${now.format("DD-MM-YYYY")})`;
 
+    // Agregar campos calculados a cada fila para la exportación
+    const rowsConCamposCalculados = rows.map(row => ({
+      ...row,
+      Estado: estadoFormatter(row),
+      DiasTrans: diasTranscurridosFormatter(row),
+    }));
+
     setDialog(
       <Dialog
         open
@@ -327,7 +337,7 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       </Dialog>
     );
 
-    await saveTable(headers.columns, rows, fileName, options).then(
+    await saveTable(headers.columns, rowsConCamposCalculados, fileName, options).then(
       onCloseDialog,
       (e) => errorDialog({
         title: "Error al generar excel",
