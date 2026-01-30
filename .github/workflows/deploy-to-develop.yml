@@ -133,6 +133,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path $DEPLOY_DIR | Out-Null
           # ensure deploy logs folder exists
           New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
+          
+          # Backup .env files before deployment to avoid overwriting
+          $envFiles = @('.env', '.env.local', '.env.production', '.env.production.local')
+          $tempEnvDir = Join-Path $env:TEMP "env_backup_$(Get-Date -Format 'yyyyMMddHHmmss')"
+          New-Item -ItemType Directory -Force -Path $tempEnvDir | Out-Null
+          foreach ($envFile in $envFiles) {
+            $envPath = Join-Path $DEPLOY_DIR $envFile
+            if (Test-Path $envPath) {
+              Copy-Item $envPath $tempEnvDir -Force
+              Write-Host "Backed up $envFile"
+            }
+          }
+          
           # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
           # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
           $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'
@@ -140,6 +153,26 @@ jobs:
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
+          
+          # Restore backed up .env files
+          foreach ($envFile in $envFiles) {
+            $backupPath = Join-Path $tempEnvDir $envFile
+            if (Test-Path $backupPath) {
+              Copy-Item $backupPath (Join-Path $DEPLOY_DIR $envFile) -Force
+              Write-Host "Restored $envFile"
+            }
+          }
+          
+          # Clean up temp backup
+          Remove-Item -Recurse -Force $tempEnvDir -ErrorAction SilentlyContinue
+          
+          # Verify .next folder exists
+          $nextPath = Join-Path $DEPLOY_DIR '.next'
+          if (Test-Path $nextPath) {
+            Write-Host ".next build folder successfully copied to deployment directory"
+          } else {
+            Write-Host "WARNING: .next folder not found after copy!"
+          }
           exit 0
 
       - name: Stop PM2 application before deployment (Windows)
@@ -163,7 +196,25 @@ jobs:
         run: |
           if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
           Set-Location -Path $DEPLOY_DIR
+          
+          # Check if .next folder exists before installing dependencies
+          $nextPath = Join-Path $DEPLOY_DIR '.next'
+          $nextExists = Test-Path $nextPath
+          if ($nextExists) {
+            Write-Host ".next folder exists before npm ci"
+          } else {
+            Write-Host "WARNING: .next folder missing before npm ci!"
+          }
+          
           npm ci --omit=dev
+          
+          # Verify .next folder still exists after npm ci, rebuild if missing
+          if (-not (Test-Path $nextPath)) {
+            Write-Host "ERROR: .next folder missing after npm ci! Rebuilding..."
+            npm run build
+          } else {
+            Write-Host ".next folder verified after npm ci"
+          }
 
       # - name: Upload robocopy logs
       #   if: always()
