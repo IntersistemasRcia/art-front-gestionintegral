@@ -486,7 +486,7 @@ export type RefCIIU = {
 export type RefCIIUListSWRKey = [url: string, token: string];
 export type RefCIIUListOptions = SWRConfiguration<RefCIIU[], AxiosError, Fetcher<RefCIIU[], RefCIIUListSWRKey>>
 //#endregion Types RefCIIU - List
-
+ 
 //#region Types RefCIIU - Read
 export type RefCIIUReadParams = {
   pId: number;
@@ -631,6 +631,24 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
       }
     );
   };
+
+  // Métodos de mutación para AvisoObra
+  readonly avisoObraInsertURL = this.getURL({ path: "/api/AvisoObra" }).toString();
+  avisoObraInsert = async (data: any) => tokenizable.post(
+    this.avisoObraInsertURL,
+    data
+  ).then(({ data }) => data);
+
+  readonly avisoObraUpdateURL = (interno: number) => this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
+  avisoObraUpdate = async (interno: number, data: any) => tokenizable.put(
+    this.avisoObraUpdateURL(interno),
+    data
+  ).then(({ data }) => data);
+
+  readonly avisoObraDeleteURL = (interno: number) => this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
+  avisoObraDelete = async (interno: number) => tokenizable.delete(
+    this.avisoObraDeleteURL(interno)
+  ).then(({ data }) => data);
   //#endregion
 
   //#region SVCC
