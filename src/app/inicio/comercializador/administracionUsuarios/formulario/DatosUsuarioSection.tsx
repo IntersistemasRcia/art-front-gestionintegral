@@ -13,8 +13,8 @@ import {
   UsuarioFormFields,
   ValidationErrors,
   TouchedFields,
-  RolesInterface,
 } from "./types/formulario";
+import RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface";
 
 export type SelectOption = {
   value: string;

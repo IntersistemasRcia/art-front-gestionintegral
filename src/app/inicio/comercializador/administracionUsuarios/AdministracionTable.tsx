@@ -8,25 +8,25 @@ import { Box, IconButton, Tooltip } from '@mui/material';
 import { IoMdEye } from "react-icons/io";
 import { MdEdit, MdGroupRemove } from "react-icons/md";
 import { CUIP } from "@/utils/Formato";
-import type { ComercializadorRow, EditKind, OrganizadorRow, UserRow } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios";
+import type { VComercializadorRow, EditKind, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios";
 import styles from "./administracionUsuarios.module.css";
 
 interface AdministracionTableProps {
   currentTab: number;
   onTabChange: (_event: SyntheticEvent, newTabValue: string | number) => void;
-  grupoRows: UserRow[];
-  organizadorRows: OrganizadorRow[];
-  comercializadorRows: ComercializadorRow[];
+  grupoRows: ComercializadoresGOrganizadoresRow[];
+  organizadorRows: ComercializadoresOrganizadoresRow[];
+  comercializadorRows: VComercializadorRow[];
   isLoadingGrupoTable: boolean;
   isLoadingOrganizador: boolean;
   isLoadingComercializador: boolean;
   selectedGrupoRowKey: string | null;
   selectedOrganizadorRowKey: string | null;
-  onGrupoRowSelect: (key: string | number | null, row?: UserRow) => void;
-  onOrganizadorRowSelect: (key: string | number | null, row?: OrganizadorRow) => void;
-  onViewRow: (row: UserRow | OrganizadorRow | ComercializadorRow, kind: EditKind) => void;
-  onEditRow: (row: UserRow | OrganizadorRow | ComercializadorRow, kind: EditKind) => void;
-  onDeleteRow: (row: UserRow | OrganizadorRow | ComercializadorRow, kind: EditKind) => void;
+  onGrupoRowSelect: (key: string | number | null, row?: ComercializadoresGOrganizadoresRow) => void;
+  onOrganizadorRowSelect: (key: string | number | null, row?: ComercializadoresOrganizadoresRow) => void;
+  onViewRow: (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => void;
+  onEditRow: (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => void;
+  onDeleteRow: (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => void;
   hasTask: (task: string) => boolean;
   isGrupoOrganizador: boolean;
   isOrganizadorComercializador: boolean;
@@ -58,7 +58,7 @@ export default function AdministracionTable({
   isDeletingOrganizador,
   isDeletingComercializador,
 }: AdministracionTableProps) {
-  const columnsGrupo = useMemo<ColumnDef<UserRow, any>[]>(
+  const columnsGrupo = useMemo<ColumnDef<ComercializadoresGOrganizadoresRow, any>[]>(
     () => [
       { accessorKey: 'cuil', header: 'CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'razonSocial', header: 'Nombre' },
@@ -116,7 +116,7 @@ export default function AdministracionTable({
     [hasTask, isDeletingGrupo, isGrupoOrganizador, isOrganizadorComercializador, onDeleteRow, onEditRow, onViewRow]
   );
 
-  const columnsOrganizador = useMemo<ColumnDef<OrganizadorRow, any>[]>(
+  const columnsOrganizador = useMemo<ColumnDef<ComercializadoresOrganizadoresRow, any>[]>(
     () => [
       { accessorKey: 'cuil', header: 'CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'razonSocial', header: 'Nombre' },
@@ -173,7 +173,7 @@ export default function AdministracionTable({
     [hasTask, isDeletingOrganizador, isOrganizadorComercializador, onDeleteRow, onEditRow, onViewRow]
   );
 
-  const columnsComercializador = useMemo<ColumnDef<ComercializadorRow, any>[]>(
+  const columnsComercializador = useMemo<ColumnDef<VComercializadorRow, any>[]>(
     () => [
       { accessorKey: 'cuil', header: 'CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'referenteRazonSocial', header: 'Nombre' },
@@ -236,7 +236,7 @@ export default function AdministracionTable({
       value: 0,
       content: (
         <>
-          <DataTable<UserRow>
+          <DataTable<ComercializadoresGOrganizadoresRow>
             data={grupoRows}
             columns={columnsGrupo}
             size="mid"
@@ -256,7 +256,7 @@ export default function AdministracionTable({
       value: 1,
       content: (
         <>
-          <DataTable<OrganizadorRow>
+          <DataTable<ComercializadoresOrganizadoresRow>
             data={organizadorRows}
             columns={columnsOrganizador}
             size="mid"
@@ -276,7 +276,7 @@ export default function AdministracionTable({
       value: 2,
       content: (
         <>
-          <DataTable<ComercializadorRow>
+          <DataTable<VComercializadorRow>
             data={comercializadorRows}
             columns={columnsComercializador}
             size="mid"

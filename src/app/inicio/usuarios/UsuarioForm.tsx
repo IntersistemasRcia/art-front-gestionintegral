@@ -24,13 +24,27 @@ import CargoInterface from "./interfaces/CargoInterface";
 import Formato from "@/utils/Formato";
 
 // Definición del modo de operación (replicada desde UsuariosPage)
-type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
+export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
 
 export interface UsuarioFormFields {
   nombre: string;
   email: string;
   cuit: string; // Keep as string for form input, will convert to number on submit
   phoneNumber: string;
+  matricula?: string;
+  fechaNacimiento?: string;
+  canalInterviniente?: string;
+  inicioFecha?: string;
+  bajaFecha?: string | null;
+  domicilioCalle?: string;
+  domicilioNro?: string;
+  domicilioPiso?: string;
+  domicilioEntreCalle1?: string;
+  domicilioEntreCalle2?: string;
+  domicilioCodPostal?: string;
+  domicilioCodLocalidad?: string;
+  domicilioLocalidad?: string;
+  domicilioProvincia?: string;
   cargoId?: number;
   password?: string;
   confirmPassword?: string;
@@ -39,9 +53,13 @@ export interface UsuarioFormFields {
   userName: string;
   empresaId: number;
   id?: string;
+  comision?: number;
+  serviciosAdicionales?: number;
+  aplicaIva?: number;
+  srtComercializadorOrganizadorInterno?: number;
 }
 
-interface Props {
+export interface Props {
   open: boolean;
   onClose: () => void;
   onSubmit: (formData: UsuarioFormFields) => void;
@@ -70,11 +88,22 @@ const initialFormState: UsuarioFormFields = {
 };
 
 // Interfaces completas para errores y campos tocados
-interface ValidationErrors {
+export interface ValidationErrors {
   nombre?: string;
   email?: string;
   cuit?: string;
   phoneNumber?: string;
+  matricula?: string;
+  fechaNacimiento?: string;
+  domicilioCalle?: string;
+  domicilioNro?: string;
+  domicilioPiso?: string;
+  domicilioEntreCalle1?: string;
+  domicilioEntreCalle2?: string;
+  domicilioCodPostal?: string;
+  domicilioCodLocalidad?: string;
+  domicilioLocalidad?: string;
+  domicilioProvincia?: string;
   cargoId?: string;
   password?: string;
   confirmPassword?: string;
@@ -85,11 +114,25 @@ interface ValidationErrors {
   id?: string;
 }
 
-interface TouchedFields {
+export interface TouchedFields {
   nombre?: boolean;
   email?: boolean;
   cuit?: boolean;
   phoneNumber?: boolean;
+  matricula?: boolean;
+  fechaNacimiento?: boolean;
+  canalInterviniente?: boolean;
+  inicioFecha?: boolean;
+  bajaFecha?: boolean;
+  domicilioCalle?: boolean;
+  domicilioNro?: boolean;
+  domicilioPiso?: boolean;
+  domicilioEntreCalle1?: boolean;
+  domicilioEntreCalle2?: boolean;
+  domicilioCodPostal?: boolean;
+  domicilioCodLocalidad?: boolean;
+  domicilioLocalidad?: boolean;
+  domicilioProvincia?: boolean;
   cargoId?: boolean;
   password?: boolean;
   confirmPassword?: boolean;
@@ -98,6 +141,9 @@ interface TouchedFields {
   // userName?: boolean;
   empresaId?: boolean;
   id?: boolean;
+  comision?: boolean;
+  serviciosAdicionales?: boolean;
+  aplicaIva?: boolean;
 }
 
 export default function UsuarioForm({

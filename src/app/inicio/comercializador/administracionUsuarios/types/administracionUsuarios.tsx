@@ -1,4 +1,4 @@
-export type UserRow = {
+export type ComercializadoresGOrganizadoresRow = {
 	interno?: number | string;
 	cuil: string;
 	descripcion?: string;
@@ -18,7 +18,7 @@ export type UserRow = {
 	id?: string;
 };
 
-export type OrganizadorRow = {
+export type ComercializadoresOrganizadoresRow = {
 	interno: number;
 	cuil: string;
 	observacion?: string;
@@ -45,7 +45,7 @@ export type OrganizadorRow = {
 	estado?: string;
 };
 
-export type ComercializadorRow = {
+export type VComercializadorRow = {
 	interno?: number;
 	cuil: string;
 	referenteRazonSocial?: string;

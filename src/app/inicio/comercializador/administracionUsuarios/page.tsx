@@ -10,7 +10,7 @@ import type { UsuarioFormFields } from '@/app/inicio/comercializador/administrac
 import useUsuarios from '@/app/inicio/usuarios/useUsuarios';
 import { useAuth } from "@/data/AuthContext";
 import ArtAPI from "@/data/artAPI";
-import type { ComercializadorRow, EditKind, FormMethod, OrganizadorRow, UserRow, ComercializadorPutRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios";
+import type { VComercializadorRow, EditKind, FormMethod, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow, ComercializadorPutRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios";
 import AdministracionTable from "@/app/inicio/comercializador/administracionUsuarios/AdministracionTable";
 import styles from "./administracionUsuarios.module.css";
 
@@ -165,7 +165,7 @@ export default function AdminUserPage() {
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   );
 
-  const grupoRows: UserRow[] = useMemo(() => {
+  const grupoRows: ComercializadoresGOrganizadoresRow[] = useMemo(() => {
     if (!isGrupoOrganizador && !isAdministrador && !isOrganizadorComercializador) return [];
 
     const source = isOrganizadorComercializador
@@ -207,7 +207,7 @@ export default function AdminUserPage() {
     }
   }, [gOrgData, selectedGrupoInterno, isOrganizadorComercializador]);
 
-  const organizadorRows: OrganizadorRow[] = useMemo(() => {
+  const organizadorRows: ComercializadoresOrganizadoresRow[] = useMemo(() => {
     if (!canLoadComercializadores) return [];
     return asArray(organizadorData).map((x: any) => ({
       interno: Number(x?.interno ?? x?.Interno ?? 0),
@@ -248,7 +248,7 @@ export default function AdminUserPage() {
     }
   }, [organizadorData, selectedOrganizadorInterno]);
 
-  const comercializadorRows: ComercializadorRow[] = useMemo(() => {
+  const comercializadorRows: VComercializadorRow[] = useMemo(() => {
     if (!canLoadComercializadores) return [];
     return asArray(comercializadorData).map((x: any) => ({
       interno: Number(x?.interno ?? x?.Interno ?? x?.id ?? x?.ID ?? 0),
@@ -285,7 +285,7 @@ export default function AdminUserPage() {
     setFormOpen(true);
   };
 
-  const openFormEditFromRow = async (row: UserRow | OrganizadorRow | ComercializadorRow, kind: EditKind) => {
+  const openFormEditFromRow = async (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => {
     const interno = Number((row as any)?.interno ?? NaN);
 
     setFormError(null);
@@ -414,12 +414,12 @@ export default function AdminUserPage() {
     setFormOpen(true);
   };
 
-  const openFormViewFromRow = async (row: UserRow | OrganizadorRow | ComercializadorRow, kind: EditKind) => {
+  const openFormViewFromRow = async (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => {
     await openFormEditFromRow(row, kind);
     setFormMethod("view");
   };
 
-  const openFormDeleteFromRow = async (row: UserRow | OrganizadorRow | ComercializadorRow, kind: EditKind) => {
+  const openFormDeleteFromRow = async (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => {
     setFormError(null);
     setPendingComercializador(null);
     setPendingOrganizador(null);
@@ -433,7 +433,7 @@ export default function AdminUserPage() {
     setCurrentTab(newTabValue as number);
   };
 
-  const handleGrupoRowSelect = (key: string | number | null, row?: UserRow) => {
+  const handleGrupoRowSelect = (key: string | number | null, row?: ComercializadoresGOrganizadoresRow) => {
     if (!row) return;
     const normalizedKey = key ? String(key) : null;
     if (normalizedKey && normalizedKey === selectedGrupoRowKey) {
@@ -451,7 +451,7 @@ export default function AdminUserPage() {
     setSelectedOrganizadorRowKey(null);
   };
 
-  const handleOrganizadorRowSelect = (key: string | number | null, row?: OrganizadorRow) => {
+  const handleOrganizadorRowSelect = (key: string | number | null, row?: ComercializadoresOrganizadoresRow) => {
     if (!row) return;
     if (key && key === selectedOrganizadorRowKey) {
       setSelectedOrganizadorRowKey(null);
@@ -505,6 +505,9 @@ export default function AdminUserPage() {
       <UsuarioForm
         open={formOpen}
         onClose={() => setFormOpen(false)}
+        roles={roles}
+        cargos={cargos}
+        refEmpleadores={refEmpleadores}
         onSubmit={async (data: UsuarioFormFields) => {
           setIsSubmitting(true);
           setFormError(null);
@@ -825,9 +828,6 @@ export default function AdminUserPage() {
             setIsSubmitting(false);
           }
         }}
-        roles={roles}
-        cargos={cargos}
-        refEmpleadores={refEmpleadores}
         method={formMethod}
         initialData={formInitialData}
         isSubmitting={isSubmitting}
