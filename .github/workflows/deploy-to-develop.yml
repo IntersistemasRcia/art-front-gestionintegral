@@ -85,8 +85,6 @@ jobs:
       - name: Build
         shell: powershell
         run: |
-          # Set NODE_ENV to development for develop branch deployment
-          $env:NODE_ENV = "development"
           npm run build
 
       - name: Backup current deployment (keep configured count)
