@@ -136,7 +136,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
           
           # Backup .env files before deployment to avoid overwriting
-          $envFiles = @('.env', '.env.local', '.env.production', '.env.production.local')
+          $envFiles = @('.env', '.env.local', '.env.production', '.env.production.local', '.env.development')
           $tempEnvDir = Join-Path $env:TEMP "env_backup_$(Get-Date -Format 'yyyyMMddHHmmss')"
           New-Item -ItemType Directory -Force -Path $tempEnvDir | Out-Null
           foreach ($envFile in $envFiles) {
@@ -150,7 +150,7 @@ jobs:
           # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
           # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
           $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'
-          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
+          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.development .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
@@ -244,7 +244,7 @@ jobs:
           pm2 start ecosystem.config.js
           if ($LASTEXITCODE -ne 0) {
             Write-Host "pm2 startOrReload failed with code $LASTEXITCODE, attempting start then restart fallback"
-            pm2 start ecosystem.config.js --env production
+            pm2 start ecosystem.config.js --env development
             if ($LASTEXITCODE -ne 0) {
               Write-Host "pm2 start also failed with code $LASTEXITCODE, attempting pm2 restart by name: $appName"
               pm2 restart $appName
