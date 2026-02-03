@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, Dispatch, SetStateAction } from 'react';
 import { usePathname } from 'next/navigation';
 import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data } from 'react-icons/bs';
+import { MdGroups } from "react-icons/md";
 import { FaFileInvoiceDollar } from "react-icons/fa6";
 import { IconType } from 'react-icons';
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse } from '@mui/material';
@@ -55,6 +56,7 @@ const menuItems: MenuItem[] = [
         children: [
             { name: "Cuenta Corriente", icon: BsGraphUpArrow, link: "/inicio/comercializador/cuentaCorriente", permissionTask: "Comercializador_CuentaCorriente" },
             { name: "Polizas", icon: BsFileText, link: "/inicio/comercializador/polizas",permissionTask: "Comercializador_Polizas" },
+            { name: "Administración", icon: MdGroups , link: "/inicio/comercializador/administracionUsuarios", permissionTask: "Comercializador_Administracion" },
         ],
     },
     {
