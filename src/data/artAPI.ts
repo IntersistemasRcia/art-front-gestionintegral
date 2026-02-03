@@ -9,7 +9,8 @@ import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador} from "@/app/inicio/comercializador/polizas/types/poliza";
-import {ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios"
+import {ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
+import {ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia} from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 
@@ -607,7 +608,7 @@ export class ArtAPIClass extends ExternalAPI {
 
   //#region Comercializador
 
-  //GET
+  //GET comercializador
   readonly getComercializadorURL = (params: ParametersComercializador = {}) => {
     return this.getURL({ path: "/api/SRTComercializadores", search: toURLSearch(params) }).toString();
   };
@@ -946,6 +947,37 @@ export class ArtAPIClass extends ExternalAPI {
     );
   //#endregion
 
+  // # Region Empleador Pago Comercializador
+  readonly getEmpleadorPagoComercializadorURL = (params: ParametersEmpleadorPagosComercializador = {}) => {
+    return this.getURL({ path: "/api/EmpleadorPagosComercializador", search: toURLSearch(params) }).toString();
+  };
+  getEmpleadorPagoComercializador = async (params: ParametersEmpleadorPagosComercializador = {}) => tokenizable.get(
+    this.getEmpleadorPagoComercializadorURL(params),
+  ).then(({ data }) => data);
+  useGetEmpleadorPagoComercializadorURL = (params: ParametersEmpleadorPagosComercializador = {}) => useSWR(
+    [this.getEmpleadorPagoComercializadorURL(params), token.getToken()], () => this.getEmpleadorPagoComercializador(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+// # End Region Empleador Pago Comercializador
+
+// # Region afipTransferencia
+  readonly getAfipTransferenciaURL = (params: ParametersAfipTranferencia = {}) => {
+    return this.getURL({ path: "/api/AfipTransferencias", search: toURLSearch(params) }).toString();
+  };
+  getAfipTransferencia = async (params: ParametersAfipTranferencia = {}) => tokenizable.get(
+    this.getAfipTransferenciaURL(params),
+  ).then(({ data }) => data);
+  useGetAfipTransferenciaURL = (params: ParametersAfipTranferencia = {}) => useSWR(
+    [this.getAfipTransferenciaURL(params), token.getToken()], () => this.getAfipTransferencia(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+  // # End Region afipTransferencia
 
 
 

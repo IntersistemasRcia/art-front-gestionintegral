@@ -67,7 +67,6 @@ export default function DatosReferenteSection({
           onClick={onBuscarLocalidades}
           disabled={isDisabled}
           className={styles.searchButton}
-          style={{ minWidth: 0, padding: "4px 10px" }}
         >
           <FaSearch size={14} />
         </CustomButton>
@@ -146,7 +145,9 @@ export default function DatosReferenteSection({
           fullWidth
           disabled={isDisabled}
           InputProps={{ readOnly: true }}
+          inputProps={{ maxLength: 4 }}
           placeholder="Código postal"
+          className={styles.postalField}
         />
 
         <TextField
@@ -186,6 +187,8 @@ export default function DatosReferenteSection({
           fullWidth
           disabled={isDisabled}
           placeholder="Ingrese número"
+          inputProps={{ maxLength: 6 }}
+          className={styles.nroField}
         />
         <TextField
           label="Piso"
@@ -198,6 +201,8 @@ export default function DatosReferenteSection({
           fullWidth
           disabled={isDisabled}
           placeholder="Ingrese piso"
+          inputProps={{ maxLength: 4 }}
+          className={styles.pisoField}
         />
       </div>
 
