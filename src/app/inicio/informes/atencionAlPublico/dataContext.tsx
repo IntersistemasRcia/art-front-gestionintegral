@@ -62,6 +62,47 @@ const fechaFormatter = (v: any) => Formato.Fecha(v);
 const numeroFormatter = (v: any) => Formato.Numero(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
 
+//Funcion para obtener los valores de [Estado,  Dias.Trans, Sector]
+//Estado: Estado "Pendiente", "Cerrado".
+//Estado Pendiente: El mismio se obtiene si el campo "cierre" de mi tabla "reclamoConsulta" es igual a null, en este caso utilizamos
+//la vista "vw_EstadoAtencionAlPublico" para obtener el estado "Pendiente".
+//si el mismo esta pendiente, se concatena [Pendiente + el campo de (Apertura) de la vista "vw_AtencionAlPublico"]
+//con formato dd/mm/aaaa hh:mm:ss
+//ejemplo: "Pendiente 12/03/2024 14:30:00"
+
+//Estado Cerrado: El mismo se obtiene si el campo "cierre" de mi tabla "reclamoConsulta" es distinto de null, en este caso utilizamos
+//la vista "vw_EstadoAtencionAlPublico" para obtener el estado "Cerrado".
+//si el mismo esta cerrado, se concatena [Cerrado + el campo de (Cierre) de la vista "vw_AtencionAlPublico"]
+//con formato dd/mm/aaaa hh:mm:ss
+//ejemplo: "Cerrado 20/03/2024 10:15:00"
+//-------------------------------------
+//Dias.Trans: se obtiene si tiene fecha de "cierre", [Fecha de cierre - Fecha de apertura] en dias
+//sino, si no tiene fecha de cierre, se toma la fecha actual - fecha de apertura.
+
+const diasTranscurridosFormatter = (row: Row) => {
+  const cierre = tolerantGet(row, "Cierre");
+  const apertura = tolerantGet(row, "Apertura");
+  const fechaApertura = apertura ? dayjs(apertura) : null;
+  if (fechaApertura) {
+    const fechaCierre = cierre ? dayjs(cierre) : dayjs(); 
+    const diffDias = fechaCierre.diff(fechaApertura, "day");
+    return `${diffDias} dias`;
+  }
+  return null; 
+}
+
+
+const estadoFormatter = (row: Row) => {
+  const cierre = tolerantGet(row, "Cierre");
+  const apertura = tolerantGet(row, "Apertura");
+  if (cierre) {
+    return `Cerrado ${Formato.FechaHora(cierre)}`;
+  } else {
+    return `Pendiente ${Formato.FechaHora(apertura)}`;
+  }
+};
+
+
 // accessor tolerante (case-insensitive y sin _ ni espacios)
 const normalizeKey = (s: string) => (typeof s === "string" ? s.toLowerCase().replace(/[_\s]/g, "") : s);
 const tolerantGet = (row: Row, key: string) => {
@@ -85,33 +126,43 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export function DataContextProvider({ children }: { children: ReactNode }) {
   const [tables] = useState<Tables>({
     vw_AtencionAlPublico: [
-      // NOTA: Había dos "Interno" duplicados; dejo uno solo
+
       { name: "Interno", label: "Número", type: "number", formatter: numeroFormatter },
 
       { name: "OrigenDescripcion", label: "Origen", type: "text"},
       
-      { name: "ContactoTrabajadorEmpleador", label: "Contacto Tipo", type: "text"},
+      { name: "ContactoTrabajadorEmpleador", label: "Trab./Emp.", type: "text"},
       { name: "ContactoDocNro", label: "CUIT/DNI", type: "text", formatter: cuipFormatter },
       { name: "ContactoNombre", label: "Contacto Nombre", type: "text" },
 
       { name: "TemaDescripcion", label: "Tema", type: "text" },
       { name: "CategoriaDescripcion", label: "Categoría", type: "text" },
       { name: "TipoTramiteDescripcion", label: "Trámite", type: "text" },
+      /////////////////////////////////////////////////////////////////////
+      //Nuevos campos [Estado, Dias.Trans, Sector] 
+      { name: "Estado", label: "Estado", type: "text",  formatter: estadoFormatter },
+      { name: "DiasTrans", label: "T. Trans.", type: "number", formatter: diasTranscurridosFormatter },
+      { name: "SectorDescripcion", label: "Sector", type: "text" },
+     
       
       { name: "MedioDireccion", label: "Email", type: "text" },
 
       { name: "Apertura", label: "Fecha Contacto", type: "date", formatter: fechaFormatter },
       { name: "Cierre", label: "Fecha Último Estado", type: "date", formatter: fechaFormatter },
       //{ name: "AfiliadoComentario", label: "Departamento", type: "text" },
+       
     ],
   });
 
 
 
-  // Columnas + campos para QB (excluyo Interno del QB, como en tu implementación previa)
+  // Columnas + campos para QB (excluyo Interno del QB)
   const { columns, fields, headers } = useMemo(() => {
     const all = tables.vw_AtencionAlPublico;
     const fieldsForQB = all.filter(c => c.name !== "Interno");
+    // Excluyo campos calculados del SELECT (no existen en la DB)
+    const camposCalculados = ["Estado", "DiasTrans"];
+    const fieldsForSelect = all.filter(c => !camposCalculados.includes(c.name));
 
     const columns: ColumnDef<Row>[] = [];
     const headers: Headers = { columns: {}, options: { formatters: { row: {} } } };
@@ -121,13 +172,20 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
         accessorKey: name,
         header: label ?? name,
         cell: (info) => {
+          // Para campos calculados (Estado, DiasTrans), paso toda la fila al formatter
+          if (name === "Estado" || name === "DiasTrans") {
+            return formatter ? formatter(info.row.original) : "";
+          }
           const raw = tolerantGet(info.row.original, name);
           const val = display(raw);
           return formatter ? formatter(val) : (val ?? "");
         },
       });
       headers.columns[name] = { key: name, header: label ?? name };
-      if (formatter) headers.options.formatters!.row![name] = formatter;
+      // No registrar formatters para campos calculados (ya se calculan antes de exportar)
+      if (formatter && name !== "Estado" && name !== "DiasTrans") {
+        headers.options.formatters!.row![name] = formatter;
+      }
     });
 
     const fields: Field[] = fieldsForQB.map(({ name, label, operators: colOps, valueEditorType, values, type }) => ({
@@ -140,7 +198,7 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       inputType: type ? (type === "dateTime" ? "datetime-local" : type) : undefined,
     }));
 
-    return { columns, fields, headers };
+    return { columns, fields, headers, fieldsForSelect };
   }, [tables.vw_AtencionAlPublico]);
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -168,10 +226,13 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
 
     return (async function procesar() {
       const table = "vw_AtencionAlPublico" as const;
+      const camposCalculados = ["Estado", "DiasTrans"];
+      const camposASeleccionar = tables[table].filter(c => !camposCalculados.includes(c.name));
 
       const q: Query = {
         // alias = nombre exacto (como en tu componente de referencia)
-        select: tables[table].map((c) => ({ value: c.name, name: c.name })),
+        // Solo selecciono campos que existen en la DB (excluyo calculados)
+        select: camposASeleccionar.map((c) => ({ value: c.name, name: c.name })),
         from: [{ table }],
         order: { by: [tables[table][0].name] }, // orden por primera columna: Interno
       };
@@ -194,7 +255,6 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
                   (n) => !got.some((k) => normalizeKey(k) === normalizeKey(n))
                 );
                 if (missing.length) {
-                  console.warn("[atencion-publico] columnas no presentes en la respuesta:", missing);
                   errorDialog({
                     title: "Aviso de columnas faltantes",
                     message:
@@ -207,14 +267,14 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
 
             onCloseDialog();
           })
-          .catch((error) =>
+          .catch((error) => {
             errorDialog({
               message:
                 typeof error === "string"
                   ? error
                   : error?.detail ?? error?.message ?? JSON.stringify(error),
-            })
-          );
+            });
+          });
       }
 
       await analyze(q)
@@ -258,6 +318,13 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
     const fileName = `${options.sheet.name.replaceAll(" ", "_")}-${now.format("YYYYMMDDHHmmssSSS")}.xlsx`;
     options.sheet.name += ` (${now.format("DD-MM-YYYY")})`;
 
+    // Agregar campos calculados a cada fila para la exportación
+    const rowsConCamposCalculados = rows.map(row => ({
+      ...row,
+      Estado: estadoFormatter(row),
+      DiasTrans: diasTranscurridosFormatter(row),
+    }));
+
     setDialog(
       <Dialog
         open
@@ -270,7 +337,7 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       </Dialog>
     );
 
-    await saveTable(headers.columns, rows, fileName, options).then(
+    await saveTable(headers.columns, rowsConCamposCalculados, fileName, options).then(
       onCloseDialog,
       (e) => errorDialog({
         title: "Error al generar excel",

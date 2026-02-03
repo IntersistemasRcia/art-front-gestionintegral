@@ -244,7 +244,7 @@ jobs:
           pm2 start ecosystem.config.js
           if ($LASTEXITCODE -ne 0) {
             Write-Host "pm2 startOrReload failed with code $LASTEXITCODE, attempting start then restart fallback"
-            pm2 start ecosystem.config.js --env development
+            pm2 start ecosystem.config.js --env production
             if ($LASTEXITCODE -ne 0) {
               Write-Host "pm2 start also failed with code $LASTEXITCODE, attempting pm2 restart by name: $appName"
               pm2 restart $appName
