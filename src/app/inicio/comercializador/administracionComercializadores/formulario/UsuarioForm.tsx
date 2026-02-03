@@ -74,6 +74,7 @@ export default function UsuarioForm({
   method,
   isSubmitting = false,
   isAdmin = false,
+  creationRole = null,
 }: Props) {
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -290,6 +291,11 @@ export default function UsuarioForm({
       setForm(processedData);
     } else {
       setForm(initialFormState);
+      // Al abrir en modo crear, asegurarse de limpiar selects dependientes
+      setSelectedGrupoId("");
+      setSelectedOrganizadorId("");
+      // Limpiar campo de búsqueda de localidad / C.P.
+      setBusqueda("");
     }
     
     setErrors({});
@@ -310,6 +316,15 @@ export default function UsuarioForm({
         return "Formulario de Usuario";
     }
   }, [method, form.nombre]);
+
+  const submitRoleLabel = (() => {
+    const r = String(creationRole ?? form.rol ?? '').toLowerCase();
+    if (!r) return 'Usuario';
+    if (r === 'comercializador') return 'Comercializador';
+    if (r === 'organizadorcomercializador' || r.includes('organizador')) return 'Organizador';
+    if (r === 'grupoorganizador' || r.includes('grupo')) return 'Grupo';
+    return (creationRole || form.rol || '')?.toString().charAt(0).toUpperCase() + (creationRole || form.rol || '').toString().slice(1);
+  })();
 
   // --- Funciones de Validación ---
 
@@ -357,7 +372,8 @@ export default function UsuarioForm({
       case "nombre":
         return validateRequired(value, "Nombre");
       case "rol":
-        return validateRequired(value, "Rol");
+        // Rol será determinado por el contexto; no forzamos validación aquí
+        return undefined;
       default:
         return undefined;
     }
@@ -451,7 +467,12 @@ export default function UsuarioForm({
   }, [roles, isAdmin, allowedAdminRoles, isOrganizadorComercializador, isGrupoOrganizador]);
 
   useEffect(() => {
-    if (!isCreating) return;
+    // If parent provided a creationRole (context of the table), use it
+    if (creationRole) {
+      if (form.rol !== creationRole) setForm((prev) => ({ ...prev, rol: creationRole }));
+      return;
+    }
+
     if (isOrganizadorComercializador) {
       const target = displayedRoles[0]?.nombre || "Comercializador";
       if (form.rol !== target) {
@@ -579,6 +600,7 @@ export default function UsuarioForm({
               isDisabled={isDisabled}
               isGrupoOrganizador={isGrupoOrganizador}
               isOrganizadorComercializador={isOrganizadorComercializador}
+              creationRole={creationRole}
               grupoOptions={grupoOptions}
               organizadorOptions={organizadorOptions}
               selectedGrupoId={selectedGrupoId}
@@ -622,7 +644,7 @@ export default function UsuarioForm({
                         ? "Dando de baja..."
                         : isEditing
                           ? "Guardando..."
-                          : "Registrando..."}
+                          : `Registrando ${submitRoleLabel}...`}
                     </>
                   ) : (
                     <>
@@ -630,7 +652,7 @@ export default function UsuarioForm({
                         ? "Dar de baja Usuario"
                         : isEditing
                           ? "Guardar Cambios"
-                          : "Registrar Usuario"}
+                          : `Registrar ${submitRoleLabel}`}
                     </>
                   )}
                 </CustomButton>
@@ -652,6 +674,7 @@ export default function UsuarioForm({
                 Información Importante
               </Typography>
               <ul className={styles.infoList}>
+                <li>Al registrar este formulario automaticamente se creara un nuevo usuario y podrá acceder a ART Gestión Integral</li>
                 <li>El usuario recibirá un email para activar su cuenta</li>
                 <li>La contraseña temporal será el CUIL ingresado</li>
                 <li>La contraseña temporal debe ser cambiada en el primer ingreso</li>

@@ -149,6 +149,14 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
     );
   }, [rows]);
 
+  const formatEmpresaLabel = (e?: EmpresaOption | null) => {
+    if (!e) return '';
+    const razon = String(e.razonSocial ?? '').trim();
+    const cuit = String(e.cuit ?? '').trim();
+    const cuitForm = cuit ? Formato.CUIP(cuit) || cuit : '';
+    return cuit ? `${razon}${cuitForm ? ' - ' + cuitForm : ''}` : razon;
+  };
+
   const [empresa, setEmpresa] = useState<EmpresaOption | null>(null);
 
   const filteredRows = useMemo(() => {
@@ -164,8 +172,8 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
         <div className={styles.topRow}>
           <div className={styles.selectItem}>
             <CustomSelectSearch<EmpresaOption>
-              options={empresas}
-              getOptionLabel={(e) => String(e?.razonSocial ?? '')}
+            options={empresas}
+            getOptionLabel={(e) => formatEmpresaLabel(e)}
               value={empresa}
               onChange={(_event, newValue) => {
                 setEmpresa(newValue);
@@ -193,7 +201,7 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
         <div className={styles.selectItem}>
           <CustomSelectSearch<EmpresaOption>
             options={empresas}
-            getOptionLabel={(e) => String(e?.razonSocial ?? '')}
+            getOptionLabel={(e) => formatEmpresaLabel(e)}
             value={empresa}
             onChange={(_event, newValue) => {
               setEmpresa(newValue);

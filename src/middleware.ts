@@ -18,7 +18,7 @@ const permissionMap: { [key: string]: string | null } = {
   "/inicio/empleador/credenciales": "empleador_Credenciales",
   "/inicio/comercializador/cuentaCorriente": "Comercializador_CuentaCorriente",
   "/inicio/comercializador/polizas": "Comercializador_Polizas",
-  "/inicio/comercializador/administracionUsuarios": "Comercializador_Administracion",
+  "/inicio/comercializador/administracionComercializadores": "Comercializador_Administracion",
   "/inicio/cotizaciones": "Cotizaciones",
   "/inicio/denuncias": "Denuncias",
   "/inicio/informes/comisionesMedicas": "Informes_ComisionesMedicas",

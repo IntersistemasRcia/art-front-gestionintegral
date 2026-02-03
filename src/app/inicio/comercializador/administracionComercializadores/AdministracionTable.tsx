@@ -8,7 +8,7 @@ import { Box, IconButton, Tooltip } from '@mui/material';
 import { IoMdEye } from "react-icons/io";
 import { MdEdit, MdGroupRemove } from "react-icons/md";
 import { CUIP } from "@/utils/Formato";
-import type { VComercializadorRow, EditKind, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios";
+import type { VComercializadorRow, EditKind, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios";
 import styles from "./administracionUsuarios.module.css";
 
 interface AdministracionTableProps {

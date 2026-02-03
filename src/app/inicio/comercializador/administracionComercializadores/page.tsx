@@ -5,13 +5,13 @@ import useSWR from "swr";
 import { Box } from '@mui/material';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import { IoPersonAddSharp } from 'react-icons/io5';
-import UsuarioForm from '@/app/inicio/comercializador/administracionUsuarios/formulario/UsuarioForm';
-import type { UsuarioFormFields } from '@/app/inicio/comercializador/administracionUsuarios/formulario/types/formulario';
+import UsuarioForm from '@/app/inicio/comercializador/administracionComercializadores/formulario/UsuarioForm';
+import type { UsuarioFormFields } from '@/app/inicio/comercializador/administracionComercializadores/formulario/types/formulario';
 import useUsuarios from '@/app/inicio/usuarios/useUsuarios';
 import { useAuth } from "@/data/AuthContext";
 import ArtAPI from "@/data/artAPI";
-import type { VComercializadorRow, EditKind, FormMethod, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow, ComercializadorPutRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest } from "@/app/inicio/comercializador/administracionUsuarios/types/administracionUsuarios";
-import AdministracionTable from "@/app/inicio/comercializador/administracionUsuarios/AdministracionTable";
+import type { VComercializadorRow, EditKind, FormMethod, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow, ComercializadorPutRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios";
+import AdministracionTable from "@/app/inicio/comercializador/administracionComercializadores/AdministracionTable";
 import styles from "./administracionUsuarios.module.css";
 
 function digits(value: unknown) {
@@ -63,6 +63,7 @@ export default function AdminUserPage() {
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
   const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador';
+  const isComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'comercializador';
   const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdministrador;
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
   const userCuitValid = Number.isFinite(userCuit) && userCuit > 0 ? userCuit : undefined;
@@ -285,6 +286,26 @@ export default function AdminUserPage() {
     setFormOpen(true);
   };
 
+  const creationRoleForTab = (tabIndex: number) => {
+    switch (tabIndex) {
+      case 0:
+        return { label: 'Crear Grupo Organizador', role: 'GrupoOrganizador' };
+      case 1:
+        return { label: 'Crear Organizador Comercializador', role: 'OrganizadorComercializador' };
+      case 2:
+      default:
+        return { label: 'Crear Comercializador', role: 'Comercializador' };
+    }
+  };
+
+  const canCreateForTab = (tabIndex: number) => {
+    if (isComercializador) return false;
+    if (isOrganizadorComercializador) return tabIndex === 2; // solo Comercializador
+    if (isGrupoOrganizador) return tabIndex === 1 || tabIndex === 2; // Organizador o Comercializador
+    if (isAdministrador) return true;
+    return false;
+  };
+
   const openFormEditFromRow = async (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => {
     const interno = Number((row as any)?.interno ?? NaN);
 
@@ -473,8 +494,9 @@ export default function AdminUserPage() {
           color="primary"
           icon={<IoPersonAddSharp />}
           onClick={openFormCreate}
+          disabled={!canCreateForTab(currentTab)}
         >
-          Crear Usuario
+          {creationRoleForTab(currentTab).label}
         </CustomButton>
       </Box>
 
@@ -508,6 +530,7 @@ export default function AdminUserPage() {
         roles={roles}
         cargos={cargos}
         refEmpleadores={refEmpleadores}
+        creationRole={formMethod === 'create' ? creationRoleForTab(currentTab).role : null}
         onSubmit={async (data: UsuarioFormFields) => {
           setIsSubmitting(true);
           setFormError(null);

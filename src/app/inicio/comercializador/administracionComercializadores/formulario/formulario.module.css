@@ -86,14 +86,14 @@
 /* Botón de búsqueda: evitar que tome el mismo flex que los campos */
 .searchButton {
   flex: 0 0 auto;
-  width: 40px;
-  height: 34px;
   align-self: center;
-  padding: 4px !important;
-  min-height: unset !important;
   display: flex;
   justify-content: center;
   align-items: center;
+  min-width: 0;
+  padding: 4px 10px !important;
+  height: 34px;
+  min-height: unset !important;
 }
 
 /* Input de búsqueda: hacerlo un poco más angosto que el resto */
@@ -110,6 +110,43 @@
 
 .fullRowField {
   flex: 1 !important;
+}
+
+/* Campos con ancho reducido */
+.postalField {
+  flex: 0 0 auto;
+  max-width: 160px;
+  width: 100%;
+  align-self: center;
+}
+
+.nroField {
+  flex: 0 0 auto;
+  max-width: 120px;
+  width: 100%;
+  align-self: center;
+}
+
+.pisoField {
+  flex: 0 0 auto;
+  max-width: 100px;
+  width: 100%;
+  align-self: center;
+}
+
+/* Checkbox grande usado en etiquetas */
+.checkboxLarge {
+  transform: scale(1.25);
+}
+
+/* FormControlLabel personalizado */
+.formControlLabel {
+  align-items: center;
+}
+
+.formControlLabel .MuiFormControlLabel-label {
+  font-size: 1.15rem;
+  font-weight: 500;
 }
 
 /* Ayuda para contraseñas */

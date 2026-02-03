@@ -12,7 +12,9 @@ import type {
 export type RequestMethod = UsuarioRequestMethod;
 export type UsuarioFormFields = BaseUsuarioFormFields;
 
-export type Props = UsuarioFormProps;
+export type Props = UsuarioFormProps & {
+  creationRole?: string | null; // rol determinado por el contexto (tabla) desde donde se crea
+};
 
 // Interfaces completas para errores y campos tocados
 export type ValidationErrors = BaseValidationErrors;

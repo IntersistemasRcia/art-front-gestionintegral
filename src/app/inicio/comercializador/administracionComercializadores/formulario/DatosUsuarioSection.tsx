@@ -42,6 +42,7 @@ interface Props {
   onSelectChange: (e: SelectChangeEvent<string>) => void;
   onBlur: (field: keyof TouchedFields) => void;
   onToggleAplicaIva: (checked: boolean) => void;
+  creationRole?: string | null;
 }
 
 export default function DatosUsuarioSection({
@@ -65,11 +66,23 @@ export default function DatosUsuarioSection({
   onSelectChange,
   onBlur,
   onToggleAplicaIva,
+  creationRole = null,
 }: Props) {
+  const roleLabel = (() => {
+    const r = String(creationRole ?? form.rol ?? '').toLowerCase();
+    if (!r) return 'Usuario';
+    if (r === 'comercializador') return 'Comercializador';
+    if (r === 'organizadorcomercializador') return 'Organizador Comercializador';
+    if (r === 'grupoorganizador') return 'Grupo Organizador';
+    if (r.includes('organizador')) return 'Organizador';
+    if (r.includes('grupo')) return 'Grupo';
+    // Fallback: capitalize first letter
+    return creationRole?.charAt(0).toUpperCase() + String(creationRole).slice(1);
+  })();
   return (
     <div className={styles.formSection}>
       <Typography variant="h6" className={styles.sectionTitle}>
-        Datos del Usuario
+        {`Datos del usuario ${roleLabel}`}
       </Typography>
 
       <div className={styles.formRow}>
@@ -149,40 +162,7 @@ export default function DatosUsuarioSection({
         />
       </div>
 
-      {isCreating && (
-        <div className={styles.formRow}>
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.rol && !!errors.rol}
-            disabled={isDisabled}
-          >
-            <InputLabel>Rol</InputLabel>
-            <Select
-              name="rol"
-              value={form.rol}
-              label="Rol"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("rol")}
-            >
-              {displayedRoles.map((rol) => (
-                <MenuItem key={rol.id} value={rol.nombre}>
-                  {rol.nombre}
-                </MenuItem>
-              ))}
-            </Select>
-            {touched.rol && errors.rol && (
-              <Typography
-                variant="caption"
-                color="error"
-                sx={{ ml: 2, mt: 0.5 }}
-              >
-                {errors.rol}
-              </Typography>
-            )}
-          </FormControl>
-        </div>
-      )}
+      {/* Rol removido: se determina desde el contexto donde se crea el usuario */}
 
       {(isCreating || isEditing || isViewing) && (
         <div className={styles.formRow}>
@@ -312,17 +292,11 @@ export default function DatosUsuarioSection({
                     checked={Number(form.aplicaIva ?? 0) === 1}
                     onChange={(e) => onToggleAplicaIva(e.target.checked)}
                     disabled={isDisabled}
-                    sx={{ transform: "scale(1.25)" }}
+                    className={styles.checkboxLarge}
                   />
                 }
                 label="Aplica IVA"
-                sx={{
-                  alignItems: "center",
-                  "& .MuiFormControlLabel-label": {
-                    fontSize: "1.15rem",
-                    fontWeight: 500,
-                  },
-                }}
+                className={styles.formControlLabel}
               />
             </div>
           </>
