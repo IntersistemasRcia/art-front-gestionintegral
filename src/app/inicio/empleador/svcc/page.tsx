@@ -1,21 +1,14 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Box } from '@mui/material';
-import CustomTab from '@/utils/ui/tab/CustomTab';
+import { Box, Typography } from '@mui/material';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import Formato from '@/utils/Formato';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
-import PortadaHandler from './Portada/PortadaHandler';
-import AnexoVHandler from './AnexoV/AnexoVHandler';
-import NominasHandler from './Nomina/NominasHandler';
 import { SVCCPresentacionContextProvider } from './context';
-import IniciarHandler from './Iniciar/IniciarHandler';
-import FinalizarHandler from './Finalizar/FinalizarHandler';
-import ConstanciaHandler from './Constancia/ConstanciaHandler';
+import PresentacionesHandler from './Presentaciones/PresentacionesHandler';
 
 export default function SVCCPage() {
-  const [currentTab, setCurrentTab] = useState(0);// Queremos que inicie en la primera pestaña (0)
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
@@ -68,42 +61,10 @@ export default function SVCCPage() {
           disabled={isLoadingEmpresas}
         />
       </Box>
-      <CustomTab
-        currentTab={currentTab}
-        onTabChange={(_event, tab) => setCurrentTab(tab)}
-        tabs={[
-          {
-            label: 'Inicio',
-            value: 0,
-            content: <IniciarHandler />,
-          },
-          {
-            label: 'Portada',
-            value: 1,
-            content: <PortadaHandler />,
-          },
-          {
-            label: 'Anexo V',
-            value: 2,
-            content: <AnexoVHandler />,
-          },
-          {
-            label: 'Nóminas',
-            value: 3,
-            content: <NominasHandler />,
-          },
-          {
-            label: 'Confirma',
-            value: 4,
-            content: <FinalizarHandler />,
-          },
-          {
-            label: 'Constancia',
-            value: 5,
-            content: <ConstanciaHandler />,
-          },
-        ]}
-      />
+      {empresaSeleccionada == null
+        ? (<Typography color="error">Debe seleccionar una empresa</Typography>)
+        : (<PresentacionesHandler/>)
+      }
     </SVCCPresentacionContextProvider>
   );
 }

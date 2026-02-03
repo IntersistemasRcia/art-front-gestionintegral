@@ -18,7 +18,7 @@ export default function FinalizarHandler() {
           variant="contained"
           color="primary"
           size="large"
-          onClick={() => finaliza.trigger({ ...ultima.data })}
+          onClick={() => finaliza.trigger({ interno: ultima.data!.interno, ...ultima.data })}
           loading={isWorking}
           disabled={disabled}
         >
@@ -29,7 +29,7 @@ export default function FinalizarHandler() {
         ? (<Typography variant="caption" color="info" sx={{ ml: 2, mt: 0.5 }}>Cargando..</Typography>)
         : (ultima.error == null)
           ? (presentacionFecha == null)
-            ? (<Typography variant="h6" color="info" sx={{ ml: 2, mt: 0.5 }}>No se confirmaron presentaciones anteriormente</Typography>)
+            ? (<Typography variant="h6" color="info" sx={{ ml: 2, mt: 0.5 }}>Presentacion pendiente de confirmar</Typography>)
             : (<Typography variant="h6" color="info" sx={{ ml: 2, mt: 0.5 }}>Ultima presentación confirmada el {Formato.Fecha(presentacionFecha)}</Typography>)
           : (
             <Grid size={12}>
