@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext } from "react";
 import gestionEmpleadorAPI, { SustanciaDTO } from "@/data/gestionEmpleadorAPI";
 import { AnexoVContextProvider } from "../AnexoV/context";
+import { useSVCCPresentacionContext } from "../context";
 
 export type NominaContextType = {
   sustancias: {
@@ -28,7 +29,10 @@ export function NominaContextProvider({
 }: {
   children: ReactNode;
 }) {
-  const sustancias = useSVCCSustanciaList({}, {});
+  const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
+
+  const sustancias = useSVCCSustanciaList(presentacion ? { presentacionId: presentacion.interno } : undefined, {});
+
   return (
     <NominaContext.Provider
       value={{

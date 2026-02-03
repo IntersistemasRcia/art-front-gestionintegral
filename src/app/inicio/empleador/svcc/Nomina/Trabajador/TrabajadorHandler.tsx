@@ -1,5 +1,11 @@
 import { useState } from "react";
-import gestionEmpleadorAPI, { SVCCTrabajadorDeleteParams, SVCCTrabajadorUpdateParams, TrabajadorDTO } from "@/data/gestionEmpleadorAPI";
+import gestionEmpleadorAPI, {
+  TrabajadorBaseDTO,
+  TrabajadorCreateDTO,
+  TrabajadorDTO,
+  SVCCTrabajadorDeleteParams,
+  SVCCTrabajadorUpdateParams,
+} from "@/data/gestionEmpleadorAPI";
 import { FormProps } from "@/utils/ui/form/Form";
 import { useSVCCPresentacionContext } from "../../context";
 import { Data } from "@/utils/ui/table/Browse";
@@ -28,7 +34,7 @@ export default function NominaHandler() {
   const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
   const [data, setData] = useState<Data<TrabajadorDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCTrabajadorList(
-    { page: `${index + 1},${size}` },
+    { presentacionId: ultima.data?.interno ?? 0, page: `${index + 1},${size}` },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
@@ -134,7 +140,7 @@ export default function NominaHandler() {
   function handleEditOnConfirm() {
     switch (edit.action) {
       case "create": {
-        triggerCreate(edit.data as TrabajadorDTO)
+        triggerCreate({ presentacionId: ultima.data?.interno ?? 0, ...edit.data } as TrabajadorCreateDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();
@@ -145,7 +151,7 @@ export default function NominaHandler() {
         break;
       }
       case "update": {
-        triggerUpdate(edit.data as TrabajadorDTO)
+        triggerUpdate(edit.data as TrabajadorBaseDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();

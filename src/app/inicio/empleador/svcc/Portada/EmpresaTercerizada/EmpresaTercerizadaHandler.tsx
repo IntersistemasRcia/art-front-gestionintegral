@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import gestionEmpleadorAPI, {
-  EmpresaTercerizadaDTO, SVCCEmpresaTercerizadaUpdateParams, SVCCEmpresaTercerizadaDeleteParams
+  EmpresaTercerizadaBaseDTO,
+  EmpresaTercerizadaCreateDTO,
+  EmpresaTercerizadaDTO,
+  SVCCEmpresaTercerizadaUpdateParams,
+  SVCCEmpresaTercerizadaDeleteParams,
 } from "@/data/gestionEmpleadorAPI";
 import { Data } from "@/utils/ui/table/Browse";
 import { FormProps } from "@/utils/ui/form/Form";
@@ -26,11 +30,11 @@ type EditState = Omit<FormProps<EmpresaTercerizadaDTO>, "onChange"> & {
 };
 export default function EmpresaTercerizadaHandler() {
   const [edit, setEdit] = useState<EditState>({ data: {} });
-  const { ultima: { data: presentacion }, establecimientos, refCIIU } = useSVCCPresentacionContext();
+  const { presentacion: { selected: presentacion }, establecimientos, refCIIU } = useSVCCPresentacionContext();
   const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
   const [data, setData] = useState<Data<EmpresaTercerizadaDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCEmpresaTercerizadaList(
-    { page: `${index + 1},${size}` },
+    { presentacionId: presentacion?.interno ?? 0, page: `${index + 1},${size}` },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
@@ -151,7 +155,7 @@ export default function EmpresaTercerizadaHandler() {
   function handleEditOnConfirm() {
     switch (edit.action) {
       case "create": {
-        triggerCreate(edit.data as EmpresaTercerizadaDTO)
+        triggerCreate({ presentacionId: presentacion?.interno ?? 0, ...edit.data } as EmpresaTercerizadaCreateDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();
@@ -162,7 +166,7 @@ export default function EmpresaTercerizadaHandler() {
         break;
       }
       case "update": {
-        triggerUpdate(edit.data as EmpresaTercerizadaDTO)
+        triggerUpdate(edit.data as EmpresaTercerizadaBaseDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();
