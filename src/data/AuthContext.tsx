@@ -56,6 +56,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
+        // Durante el build/SSR, retornar valores por defecto en lugar de lanzar error
+        if (typeof window === 'undefined') {
+            return {
+                session: null,
+                status: 'loading' as const,
+                user: null,
+                hasTask: () => false,
+            };
+        }
         throw new Error('useAuth debe ser usado dentro de un AuthProvider');
     }
     return context;

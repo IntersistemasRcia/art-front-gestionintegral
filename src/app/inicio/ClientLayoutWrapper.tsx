@@ -20,6 +20,10 @@ const formatTitleFromPath = (pathname: string): string => {
     return 'Póliza';
   }
 
+  if (pathname === '/inicio/comercializador/polizas') {
+    return 'Pólizas';
+  }
+
   if (pathname === '/inicio/informes/comisionesMedicas') {
     return 'Comisiones Médicas';
   }

@@ -55,7 +55,7 @@ const menuItems: MenuItem[] = [
         permissionTask: "Comercializador",
         children: [
             { name: "Cuenta Corriente", icon: BsGraphUpArrow, link: "/inicio/comercializador/cuentaCorriente", permissionTask: "Comercializador_CuentaCorriente" },
-            { name: "Polizas", icon: BsFileText, link: "/inicio/comercializador/polizas",permissionTask: "Comercializador_Polizas" },
+            { name: "Pólizas", icon: BsFileText, link: "/inicio/comercializador/polizas",permissionTask: "Comercializador_Polizas" },
             { name: "Administración", icon: MdGroups , link: "/inicio/comercializador/administracionComercializadores", permissionTask: "Comercializador_Administracion" },
         ],
     },
