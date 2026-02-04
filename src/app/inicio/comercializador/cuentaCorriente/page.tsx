@@ -319,7 +319,7 @@ function CuentaCorrienteComercializador() {
 
     const columns: ColumnDef<ViewCuentaCorriente>[] = useMemo(() => [
         { id: 'periodoCtaCte', header: 'Período', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} }, 
-        { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center', width: '10%' } },
+        { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
