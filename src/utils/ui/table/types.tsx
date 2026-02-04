@@ -4,7 +4,8 @@ import {
 } from "@tanstack/react-table";
 
 export type ColumnMeta = {
-     align?: "left" | "center" | "right" | "justify" 
+     align?: "left" | "center" | "right" | "justify";
+     width?: string | number;
     };
 
 export interface DataTableProps<TData extends object> {
