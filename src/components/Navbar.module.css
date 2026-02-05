@@ -41,6 +41,7 @@
     border-radius: 9999px !important;
     font-family: var(--font) !important;
     transition: box-shadow 0.2s ease-in-out !important;
+    min-height: 5rem !important;
 }
 
 .searchInputBase fieldset {
@@ -59,8 +60,8 @@
 }
 
 .searchInputField {
-    padding: 0.75rem 1.5rem 0.75rem 0.5rem !important;
-    font-size: 1.2rem !important;
+    padding: 1.2rem 1.8rem 1.2rem 0.8rem !important;
+    font-size: 1.6rem !important;
     color: var(--negro) !important;
     font-family: var(--font) !important;
 }
@@ -69,12 +70,13 @@
     color: var(--gris) !important;
     opacity: 1 !important;
     font-family: var(--font) !important;
+    font-size: 1.6rem !important;
 }
 
 .searchIcon {
     color: var(--naranja) !important;
-    font-size: 1.8rem !important;
-    margin-right: 0.5rem !important;
+    font-size: 2.2rem !important;
+    margin-right: 0.8rem !important;
 }
 
 .menu {
