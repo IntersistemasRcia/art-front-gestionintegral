@@ -131,10 +131,20 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
         }
     };
 
+    // Función para normalizar texto eliminando acentos y diéresis
+    const normalizeText = (text: string): string => {
+        return text
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos (acentos, diéresis, etc.)
+            .toLowerCase();
+    };
+
     // Función para verificar si un texto coincide con el término de búsqueda
     const matchesSearch = (text: string, search: string): boolean => {
         if (!search.trim()) return true;
-        return text.toLowerCase().includes(search.toLowerCase());
+        const normalizedText = normalizeText(text);
+        const normalizedSearch = normalizeText(search);
+        return normalizedText.includes(normalizedSearch);
     };
 
     // Función para filtrar items recursivamente
