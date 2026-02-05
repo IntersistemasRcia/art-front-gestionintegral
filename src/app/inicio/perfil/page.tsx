@@ -2,6 +2,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
+import { useAuth } from '@/data/AuthContext';
 import { useState } from "react";
 import {
   Typography,
@@ -31,7 +32,10 @@ import Formato from "@/utils/Formato";
 
 function ProfilePage() {
   const { data: session, status } = useSession();
+  const { hasTask } = useAuth();
   const [mostrarDetalles, setMostrarDetalles] = useState(false);
+
+  const detalleEnabled = hasTask("perfil_DetalleSesion");
 
   if (status === "loading") {
     return (
@@ -148,6 +152,7 @@ function ProfilePage() {
                   <CustomButton 
                     onClick={() => setMostrarDetalles(!mostrarDetalles)}
                     size="mid"
+                    disabled={!detalleEnabled}
                   >
                     {mostrarDetalles ? (
                       <>
