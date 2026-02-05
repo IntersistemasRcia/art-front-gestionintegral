@@ -162,3 +162,38 @@
     width: 100%;
   }
 }
+
+.phoneField {
+  width: 100%;
+}
+
+.phoneContainer {
+  width: 100% !important;
+}
+
+.phoneInput {
+  width: 100% !important;
+  height: 43px;
+  border: 1px solid #45661f !important;
+  border-radius: 4px !important;
+  color: #474747 !important;
+  font-family: Outfit, sans-serif !important;
+  font-size: 1.5rem !important;
+}
+
+.phoneButton {
+  border-color: #45661f !important;
+}
+
+.phoneContainer :global(.special-label) {
+  color: #45661f;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.showPasswordRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}

@@ -14,6 +14,8 @@ import {
   Checkbox,
   FormControlLabel,
 } from "@mui/material";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
@@ -163,6 +165,7 @@ export default function UsuarioForm({
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<TouchedFields>({});
   const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
@@ -214,6 +217,7 @@ export default function UsuarioForm({
     setErrors({});
     setTouched({});
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
+    setShowPassword(false); // Resetear la visibilidad de contraseña
   }, [initialData, open, isEditing, isCreating, cargos]);
 
   const modalTitle = useMemo(() => {
@@ -497,6 +501,10 @@ export default function UsuarioForm({
     }
   };
 
+  const handleShowPasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowPassword(event.target.checked);
+  };
+
   const handleBlur = (fieldName: keyof UsuarioFormFields) => {
     setTouched((prev) => ({ ...prev, [fieldName]: true }));
     const error = validateField(fieldName, String(form[fieldName] ?? ""));
@@ -620,7 +628,7 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
-                  label="CUIT"
+                  label="CUIT/CUIL"
                   name="cuit"
                   value={form.cuit}
                   onChange={handleTextFieldChange}
@@ -632,18 +640,30 @@ export default function UsuarioForm({
                   disabled={isDisabled}
                   placeholder="Ingrese CUIT (11 dígitos)"
                 />
-                <TextField
-                  label="Teléfono"
-                  name="phoneNumber"
-                  value={form.phoneNumber}
-                  onChange={handleTextFieldChange}
-                  onBlur={() => handleBlur("phoneNumber")}
-                  error={touched.phoneNumber && !!errors.phoneNumber}
-                  helperText={touched.phoneNumber && errors.phoneNumber}
-                  fullWidth
-                  disabled={isDisabled}
-                  placeholder="Ingrese teléfono"
-                />
+                <div className={styles.phoneField}>
+                  <PhoneInput
+                    country="ar"
+                    value={form.phoneNumber}
+                    onChange={(value) =>
+                      setForm((prev: UsuarioFormFields) => ({
+                        ...prev,
+                        phoneNumber: value,
+                      }))
+                    }
+                    onBlur={() => handleBlur("phoneNumber")}
+                    disabled={isDisabled}
+                    specialLabel="Teléfono"
+                    containerClass={styles.phoneContainer}
+                    inputClass={styles.phoneInput}
+                    buttonClass={styles.phoneButton}
+                    inputProps={{ name: "phoneNumber" }}
+                  />
+                  {touched.phoneNumber && errors.phoneNumber && (
+                    <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
+                      {errors.phoneNumber}
+                    </Typography>
+                  )}
+                </div>
               </div>
 
               <div className={styles.formRow}>
@@ -789,7 +809,7 @@ export default function UsuarioForm({
                           : "Nueva contraseña (opcional)"
                       }
                       name="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={handleTextFieldChange}
                       onBlur={() => handleBlur("password")}
@@ -809,7 +829,7 @@ export default function UsuarioForm({
                           : "Confirmar nueva contraseña"
                       }
                       name="confirmPassword"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={form.confirmPassword}
                       onChange={handleTextFieldChange}
                       onBlur={() => handleBlur("confirmPassword")}
@@ -826,6 +846,20 @@ export default function UsuarioForm({
                         isCreating ? "••••••••" : "Dejar vacío para no cambiar"
                       }
                     />
+
+                    <div className={styles.showPasswordRow}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={showPassword}
+                            onChange={handleShowPasswordChange}
+                            disabled={isDisabled}
+                            color="primary"
+                          />
+                        }
+                        label="Mostrar contraseña"
+                      />
+                    </div>
                   </div>
 
                   <Typography variant="body2" className={styles.passwordHelp}>
