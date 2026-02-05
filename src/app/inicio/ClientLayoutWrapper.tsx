@@ -47,7 +47,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   // Cargar empresas automáticamente cuando el usuario esté autenticado
   useEmpresasLoader();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const pathname = usePathname();
   const pageTitle = formatTitleFromPath(pathname);
 

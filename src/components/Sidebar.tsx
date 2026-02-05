@@ -98,7 +98,7 @@ export interface SidebarProps {
 
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
-    const [isLocked, setIsLocked] = useState(false);
+    const [isLocked, setIsLocked] = useState(true);
     const [openMenus, setOpenMenus] = useState<string[]>([]);
     const pathname = usePathname();
     const { hasTask } = useAuth();
@@ -115,17 +115,14 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     };
 
     const handleToggleLock = () => {
-        if (isLocked) {
-            setIsLocked(false);
-            setIsOpen(false);
-        } else {
-            setIsLocked(true);
-            setIsOpen(true);
-        }
+        setIsOpen(!isOpen);
+        setIsLocked(!isOpen);
     };
 
     const handleMouseEnter = () => {
-        setIsOpen(true);
+        if (!isLocked) {
+            setIsOpen(true);
+        }
     };
 
     const handleMouseLeave = () => {

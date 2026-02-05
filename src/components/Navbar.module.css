@@ -41,7 +41,7 @@
     border-radius: 9999px !important;
     font-family: var(--font) !important;
     transition: box-shadow 0.2s ease-in-out !important;
-    min-height: 5rem !important;
+    min-height: 4rem !important;
 }
 
 .searchInputBase fieldset {
