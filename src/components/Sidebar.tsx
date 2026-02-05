@@ -193,11 +193,14 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
         }
     }, [searchTerm, filteredMenuItems]);
 
-    // Resetear búsqueda cuando se navega
+    // Resetear búsqueda cuando se navega (solo cuando el pathname realmente cambia)
+    const prevPathnameRef = React.useRef<string>(pathname);
     useEffect(() => {
-        if (pathname) {
+        // Solo limpiar si el pathname cambió (no en el primer render)
+        if (prevPathnameRef.current !== pathname && prevPathnameRef.current) {
             clearSearch();
         }
+        prevPathnameRef.current = pathname;
     }, [pathname, clearSearch]);
 
     const renderMenuItems = (items: MenuItem[], isSubmenu: boolean = false) => {

@@ -1,7 +1,7 @@
 // src/data/SearchContext.tsx
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 type SearchContextType = {
   searchTerm: string;
@@ -14,9 +14,9 @@ const SearchContext = createContext<SearchContextType | undefined>(undefined);
 export function SearchProvider({ children }: { children: ReactNode }) {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchTerm('');
-  };
+  }, []);
 
   return (
     <SearchContext.Provider value={{ searchTerm, setSearchTerm, clearSearch }}>
