@@ -12,6 +12,7 @@ import { useAuth } from '@/data/AuthContext';
 import { useSearch } from '@/data/SearchContext';
 import CustomButton from "@/utils/ui/button/CustomButton";
 import Formato from "@/utils/Formato";
+import { TextField, InputAdornment } from '@mui/material';
 
 function Navbar() {
   const { data: session, status } = useSession();
@@ -45,14 +46,24 @@ function Navbar() {
           />
         </Link>
         <div className={styles.searchContainer}>
-          <input
-            type="text"
+          <TextField
             placeholder="Buscar en el menú..."
-            className={styles.searchInput}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            variant="outlined"
+            className={styles.searchInput}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <BsSearch className={styles.searchIcon} />
+                </InputAdornment>
+              ),
+              className: styles.searchInputBase,
+            }}
+            inputProps={{
+              className: styles.searchInputField,
+            }}
           />
-          <BsSearch className={styles.searchIcon} />
         </div>
         <ul className={styles.menu}>
           {session ? (
