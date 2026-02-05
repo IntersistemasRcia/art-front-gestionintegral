@@ -16,9 +16,7 @@ import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 import dayjs from "dayjs";
 
-export function getPeriodo(): string {
-  return dayjs().subtract(2, "month").format("YYYYMM");
-}
+const getPeriodo = (): string => dayjs().subtract(2, "month").format("YYYYMM");
 
 function CredencialesPage() {
   const { user } = useAuth();
