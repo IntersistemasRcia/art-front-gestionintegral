@@ -1,15 +1,16 @@
 "use client";
 import * as React from 'react';
 import Link from 'next/link';
-import { useState, Dispatch, SetStateAction } from 'react';
+import { useState, useEffect, useMemo, Dispatch, SetStateAction } from 'react';
 import { usePathname } from 'next/navigation';
 import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data } from 'react-icons/bs';
 import { MdGroups } from "react-icons/md";
 import { FaFileInvoiceDollar } from "react-icons/fa6";
 import { IconType } from 'react-icons';
-import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse } from '@mui/material';
+import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse, Typography } from '@mui/material';
 import styles from './Sidebar.module.css';
 import { useAuth } from '@/data/AuthContext';
+import { useSearch } from '@/data/SearchContext';
 
 // Define la estructura de los datos del menú
 export interface MenuItem {
@@ -101,6 +102,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     const [openMenus, setOpenMenus] = useState<string[]>([]);
     const pathname = usePathname();
     const { hasTask } = useAuth();
+    const { searchTerm, clearSearch } = useSearch();
 
     const handleMenuClick = (menuName: string) => {
       setOpenMenus(prevOpenMenus => {
@@ -132,8 +134,75 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
         }
     };
 
+    // Función para verificar si un texto coincide con el término de búsqueda
+    const matchesSearch = (text: string, search: string): boolean => {
+        if (!search.trim()) return true;
+        return text.toLowerCase().includes(search.toLowerCase());
+    };
+
+    // Función para filtrar items recursivamente
+    const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
+        if (!searchTerm.trim()) return items;
+
+        const filtered: MenuItem[] = [];
+
+        items.forEach((item) => {
+            // Verificar permisos primero
+            if (item.permissionTask && !hasTask(item.permissionTask)) {
+                return;
+            }
+
+            const itemMatches = matchesSearch(item.name, searchTerm);
+            
+            if (item.children) {
+                // Filtrar hijos recursivamente
+                const filteredChildren = filterMenuItems(item.children);
+                
+                // Si el item padre coincide o tiene hijos que coinciden, incluirlo
+                if (itemMatches || filteredChildren.length > 0) {
+                    filtered.push({
+                        ...item,
+                        children: filteredChildren,
+                    });
+                }
+            } else {
+                // Si es un item sin hijos y coincide, incluirlo
+                if (itemMatches) {
+                    filtered.push(item);
+                }
+            }
+        });
+
+        return filtered;
+    };
+
+    // Obtener items filtrados con useMemo para optimizar
+    const filteredMenuItems = useMemo(() => filterMenuItems(menuItems), [searchTerm, hasTask]);
+    const hasResults = filteredMenuItems.length > 0;
+
+    // Abrir automáticamente los menús que tienen coincidencias cuando hay búsqueda activa
+    useEffect(() => {
+        if (searchTerm.trim()) {
+            const menusToOpen: string[] = [];
+            filteredMenuItems.forEach((item) => {
+                if (item.children && item.children.length > 0) {
+                    menusToOpen.push(item.name);
+                }
+            });
+            setOpenMenus(menusToOpen);
+        }
+    }, [searchTerm, filteredMenuItems]);
+
+    // Resetear búsqueda cuando se navega
+    useEffect(() => {
+        if (pathname) {
+            clearSearch();
+        }
+    }, [pathname, clearSearch]);
+
     const renderMenuItems = (items: MenuItem[], isSubmenu: boolean = false) => {
         return items.map((item) => {
+            // Los permisos ya se verifican en filterMenuItems, pero mantenemos esta verificación por seguridad
             if (item.permissionTask && !hasTask(item.permissionTask)) {
                 return null;
             }
@@ -221,7 +290,24 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                 {isOpen && <span className={styles.headerText}>ART Gestión</span>}
             </Box>
             <List className={styles.listContainer}>
-                {renderMenuItems(menuItems)}
+                {searchTerm.trim() && !hasResults ? (
+                    <ListItem disablePadding className={styles.listItem}>
+                        <Box sx={{ padding: '20px', textAlign: 'center', width: '100%' }}>
+                            <Typography 
+                                variant="body1" 
+                                sx={{ 
+                                    color: 'white', 
+                                    fontSize: '1.4rem',
+                                    fontStyle: 'italic'
+                                }}
+                            >
+                                No se encontraron coincidencias para "{searchTerm}"
+                            </Typography>
+                        </Box>
+                    </ListItem>
+                ) : (
+                    renderMenuItems(filteredMenuItems)
+                )}
             </List>
         </Box>
     );

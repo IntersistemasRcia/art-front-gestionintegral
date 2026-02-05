@@ -9,12 +9,14 @@ import styles from './Navbar.module.css';
 import Image from 'next/image';
 import { useState } from 'react';
 import { useAuth } from '@/data/AuthContext';
+import { useSearch } from '@/data/SearchContext';
 import CustomButton from "@/utils/ui/button/CustomButton";
 import Formato from "@/utils/Formato";
 
 function Navbar() {
   const { data: session, status } = useSession();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { searchTerm, setSearchTerm } = useSearch();
 
   const toggleModal = () => {
     setIsModalOpen(!isModalOpen);
@@ -45,8 +47,10 @@ function Navbar() {
         <div className={styles.searchContainer}>
           <input
             type="text"
-            placeholder="Buscar..."
+            placeholder="Buscar en el menú..."
             className={styles.searchInput}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
           <BsSearch className={styles.searchIcon} />
         </div>
