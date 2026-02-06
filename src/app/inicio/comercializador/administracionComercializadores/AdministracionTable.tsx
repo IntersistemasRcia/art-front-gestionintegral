@@ -60,7 +60,7 @@ export default function AdministracionTable({
 }: AdministracionTableProps) {
   const columnsGrupo = useMemo<ColumnDef<ComercializadoresGOrganizadoresRow, any>[]>(
     () => [
-      { accessorKey: 'cuil', header: 'CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
+      { accessorKey: 'cuil', header: 'CUIT/CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'razonSocial', header: 'Nombre' },
       { accessorKey: 'email', header: 'Email' },
       { accessorKey: 'telefono', header: 'Teléfono' },
@@ -118,7 +118,7 @@ export default function AdministracionTable({
 
   const columnsOrganizador = useMemo<ColumnDef<ComercializadoresOrganizadoresRow, any>[]>(
     () => [
-      { accessorKey: 'cuil', header: 'CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
+      { accessorKey: 'cuil', header: 'CUIT/CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'razonSocial', header: 'Nombre' },
       { accessorKey: 'email', header: 'Email' },
       { accessorKey: 'telefono', header: 'Teléfono' },
@@ -175,7 +175,7 @@ export default function AdministracionTable({
 
   const columnsComercializador = useMemo<ColumnDef<VComercializadorRow, any>[]>(
     () => [
-      { accessorKey: 'cuil', header: 'CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
+      { accessorKey: 'cuil', header: 'CUIT/CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'referenteRazonSocial', header: 'Nombre' },
       { accessorKey: 'matricula', header: 'Matrícula' },
       { accessorKey: 'email', header: 'Email' },

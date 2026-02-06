@@ -346,7 +346,7 @@ function CuentaCorrienteComercializador() {
     const columnsEmpleadorPeriodo: ColumnDef<any>[] = useMemo(() => [
         { header: 'CUIT', accessorKey: 'cuit', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center' } },
         { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'center' } },
-        { header: 'Poliza Nro.', accessorKey: 'poliza', meta: { align: 'center' } },
+        { header: 'Póliza Nro.', accessorKey: 'poliza', meta: { align: 'center' } },
         { header: 'Monto Premio', accessorKey: 'montoPremio', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Monto Prima', accessorKey: 'montoPrima', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
@@ -360,7 +360,7 @@ function CuentaCorrienteComercializador() {
         { header: 'Trabajador', accessorKey: 'cuitContribuyente', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center' } },
         { header: 'Fecha Transferencia', accessorKey: 'fechProc', cell: (info: any) => Formato.Fecha(info.getValue()), meta: { align: 'center' } },
         { header: 'Periodo Fiscal', accessorKey: 'periodo', meta: { align: 'center' } },
-        { header: 'Cod. Concepto', accessorKey: 'codConcepto', meta: { align: 'center' } },
+        { header: 'Cód. Concepto', accessorKey: 'codConcepto', meta: { align: 'center' } },
         { header: 'Importe', accessorKey: 'importe', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
     ], []);
 

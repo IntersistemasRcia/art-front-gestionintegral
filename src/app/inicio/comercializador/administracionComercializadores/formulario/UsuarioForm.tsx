@@ -302,10 +302,19 @@ export default function UsuarioForm({
     setTouched({});
   }, [initialData, open, isEditing, isCreating]);
 
+  const submitRoleLabel = (() => {
+    const r = String(creationRole ?? form.rol ?? '').toLowerCase();
+    if (!r) return '';
+    if (r === 'comercializador') return 'Comercializador';
+    if (r === 'grupoorganizador' || r.includes('grupo')) return 'Grupo Organizador';
+    if (r === 'organizadorcomercializador' || r.includes('organizador')) return 'Organizador Comercializador';
+    return (creationRole || form.rol || '')?.toString().charAt(0).toUpperCase() + (creationRole || form.rol || '').toString().slice(1);
+  })();
+
   const modalTitle = useMemo(() => {
     switch (method) {
       case "create":
-        return "Crear Nuevo Usuario";
+        return `Crear nuevo usuario${submitRoleLabel ? '  ' + submitRoleLabel : ''}`;
       case "edit":
         return `Editar Usuario`;
       case "view":
@@ -315,16 +324,7 @@ export default function UsuarioForm({
       default:
         return "Formulario de Usuario";
     }
-  }, [method, form.nombre]);
-
-  const submitRoleLabel = (() => {
-    const r = String(creationRole ?? form.rol ?? '').toLowerCase();
-    if (!r) return 'Usuario';
-    if (r === 'comercializador') return 'Comercializador';
-    if (r === 'organizadorcomercializador' || r.includes('organizador')) return 'Organizador';
-    if (r === 'grupoorganizador' || r.includes('grupo')) return 'Grupo';
-    return (creationRole || form.rol || '')?.toString().charAt(0).toUpperCase() + (creationRole || form.rol || '').toString().slice(1);
-  })();
+  }, [method, form.nombre, submitRoleLabel]);
 
   // --- Funciones de Validación ---
 
@@ -674,12 +674,12 @@ export default function UsuarioForm({
                 Información Importante
               </Typography>
               <ul className={styles.infoList}>
-                <li>Al registrar este formulario automaticamente se creara un nuevo usuario y podrá acceder a ART Gestión Integral</li>
-                <li>El usuario recibirá un email para activar su cuenta</li>
-                <li>La contraseña temporal será el CUIL ingresado</li>
-                <li>La contraseña temporal debe ser cambiada en el primer ingreso</li>
-                <li>Posteriormente se podrán configurar los permisos</li>
-                <li>Los campos marcados con * son obligatorios</li>
+                <li>Al registrar este formulario automáticamente se creará un nuevo usuario y podrá acceder a ART Gestión Integral.</li>
+                <li>El usuario recibirá un email para activar su cuenta.</li>
+                <li>La contraseña temporal será el CUIT/CUIL ingresado.</li>
+                <li>La contraseña temporal deberá ser cambiada en el primer ingreso.</li>
+                <li>Posteriormente se podrán configurar los permisos.</li>
+                <li>Los campos marcados con * son obligatorios.</li>
               </ul>
             </div>
           )}
