@@ -606,7 +606,7 @@ export default function UsuarioForm({
                 />
               </div>
 
-              {isCreating && (
+              {(isCreating || isEditing) && (
                 <div className={styles.formRow}>
                   <TextField
                     label="Email"

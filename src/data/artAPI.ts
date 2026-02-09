@@ -538,10 +538,12 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region Establecimientos por CUIT
-  getEstablecimientosEmpresa = async (cuit: number): Promise<ApiEstablecimientoEmpresa[]> => {
-    const url = this.getURL({
+  getEstablecimientosEmpresa = async (cuit: number, activos?: string): Promise<ApiEstablecimientoEmpresa[]> => {
+    const opts: any = {
       path: `/api/Establecimientos/Empresa/${encodeURIComponent(cuit)}`,
-    });
+    };
+    if (activos !== undefined) opts.search = toURLSearch({ Activos: activos });
+    const url = this.getURL(opts);
     const res = await fetch(url.toString(), { cache: "no-store", headers: { Accept: "application/json" } });
     if (res.status === 404) return [];
     if (!res.ok) {

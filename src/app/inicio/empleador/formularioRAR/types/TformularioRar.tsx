@@ -30,6 +30,7 @@ export type EstablecimientoById = {
 
 export type ParametersEstablecimientoByCUIT = {
   CUIT?: number;
+  Activos?: string;
 }
 
 
