@@ -48,6 +48,7 @@ export default function UsuariosPage() {
     phoneNumber: "",
     nombre: "",
     userName: "",
+    maxUsuarios: 0,
     // Usamos el `|| 1` como valor por defecto, aunque es mejor que el backend lo maneje si no existe
     empresaId: user?.empresaId || 0, 
     cargoId: undefined,
@@ -357,6 +358,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         roles={roles}
         cargos={cargos}
         refEmpleadores={refEmpleadores}
+        usuarios={usuarios}
         initialData={currentInitialData}
         errorMsg={formError}
         method={requestState.method || "create"}
