@@ -274,7 +274,7 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     const ingreso = convertirFechaExcel(row.getCell(4).value);
     const fechaInicio = convertirFechaExcel(row.getCell(5).value);
     
-    const exposicion = String(row.getCell(6).value || '').trim();
+    let exposicion = String(row.getCell(6).value || '').trim();
     
     // Convertir fecha fin exposición
     const fechaFinExposicion = convertirFechaExcel(row.getCell(7).value);
@@ -282,7 +282,12 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     // Convertir último examen médico
     const ultimoExamenMedico = convertirFechaExcel(row.getCell(8).value);
     
-    const codigoAgente = String(row.getCell(9).value || '').trim();
+    const codigoAgenteRaw = row.getCell(9).value;
+    const codigoAgente = codigoAgenteRaw instanceof Date && Number(exposicion) === 0
+      ? '1'
+      : String(codigoAgenteRaw || '').trim();
+
+    if (!exposicion && codigoAgente === '1') exposicion = '0';
 
     // Si la fila está completamente vacía, no la contamos ni la procesamos
     const filaVacia = [cuil, nombre, sectorTareas, ingreso, fechaInicio, exposicion, fechaFinExposicion, ultimoExamenMedico, codigoAgente]
@@ -358,6 +363,8 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
       erroresFila.push('Código Agente es requerido');
     } else if (isNaN(Number(codigoAgente))) {
       erroresFila.push('Código Agente debe ser un número válido');
+    } else if (Number(codigoAgente) === 1 && Number(exposicion) !== 0) {
+      erroresFila.push('Código Agente 1 solo es válido si Horas Exposición es 0');
     }
 
     // Validar Fecha Fin Exposición (es opcional, pero si se proporciona debe ser válida)
@@ -453,95 +460,29 @@ export async function descargarPlantillaExcel() {
   instruccionesSheet.columns = [{ header: 'Información', key: 'info', width: 100 }];
 
   const instrucciones = [
-    '📋 GUÍA DE CARGA DE TRABAJADORES',
+    '📋 GUÍA RÁPIDA PARA CARGAR TRABAJADORES EN EL EXCEL RAR',
     '',
-    'ℹ️ IMPORTANTE: Complete la hoja "Trabajadores" con sus datos reales.',
-    '   • La primera fila es la cabecera (no modifique).',
-    '   • Ingrese sus datos a partir de la fila 2.',
-    '   • Si Excel cambia el código de agente a fecha, defina la columna "Código Agente" como Texto.',
+    '1️⃣ Complete la hoja "Trabajadores"',
+    '   • No modifique la primera fila (cabecera).',
+    '   • Ingrese datos desde la fila 2.',
     '',
-    '✅ EJEMPLO COMPLETO DE CARGA:',
+    '2️⃣ Datos obligatorios',
+    '   • CUIL: formato XX-XXXXXXXX-X (ej: 20-12345678-9).',
+    '   • Nombre completo: ej. Juan Pérez.',
+    '   • Sector/Tareas: ej. Producción, Administración.',
+    '   • Fecha ingreso: DD/MM/AAAA (ej: 15/01/2023).',
+    '   • Fecha inicio exposición: igual o posterior a ingreso.',
+    '   • Horas exposición: número de horas diarias (ej: 8).',
+    '   • Último examen médico: fecha posterior o igual al ingreso.',
+    '   • Código agente: 5 dígitos (ej: 40005 = Ruido).',
     '',
-    '┌────────────────────────────────────────────────────────────────────────────────────────┐',
-    '│ CUIL             │ 20-12345678-9                                                       │',
-    '│ Nombre           │ Juan Carlos Pérez García                                            │',
-    '│ Sector/Tareas    │ Operario de Producción                                              │',
-    '│ Fecha Ingreso    │ 15/01/2023                                                          │',
-    '│ Fecha Inicio Exp │ 15/01/2023                                                          │',
-    '│ Horas Exposición │ 8                                                                   │',
-    '│ Fecha Fin Exp    │ (vacío o fecha si ya finalizó)                                      │',
-    '│ Último Examen    │ 30/06/2024                                                          │',
-    '│ Código Agente    │ 40005                                                               │',
-    '└────────────────────────────────────────────────────────────────────────────────────────┘',
+    '3️⃣ Datos opcionales',
+    '   • Fecha fin exposición: solo si ya terminó la exposición.',
     '',
-    '🔸 EJEMPLO CON MÚLTIPLES EXPOSICIONES:',
-    '   Si un trabajador está expuesto a más de un agente, agregue UNA FILA por cada agente:',
+    '4️⃣ Si un trabajador tiene varios agentes',
+    '   • Ingrese una fila por cada agente.',
     '',
-    '   Fila 2: Juan Pérez | Operario | ... | Código Agente: 40005 (Ruido)',
-    '   Fila 3: Juan Pérez | Operario | ... | Código Agente: 40007 (Vibraciones)',
-    '',
-    '1️⃣  CUIL (Código Único de Identidad Laboral)',
-    '   • Formato: XX-XXXXXXXX-X (ejemplo: 20-12345678-9)',
-    '   • Debe tener exactamente 11 dígitos',
-    '   • Campo obligatorio',
-    '',
-    '2️⃣  NOMBRE',
-    '   • Nombre completo del trabajador (Nombre y Apellido)',
-    '   • Ejemplos: Juan Carlos Pérez, María Josefina García López',
-    '   • Campo obligatorio',
-    '',
-    '3️⃣  SECTOR/TAREAS',
-    '   • Descripción del sector o puesto donde trabaja',
-    '   • Ejemplos: Operario de Producción, Administrativo, Mantenimiento Industrial',
-    '   • Campo obligatorio',
-    '',
-    '4️⃣  FECHA DE INGRESO (DD/MM/YYYY)',
-    '   • Fecha en que el trabajador ingresó a la empresa',
-    '   • Formatos aceptados: 15/01/2023 o 15/1/2023 (sin necesidad de ceros a la izquierda)',
-    '   • Ejemplo: 15/01/2023 o simplemente 15/1/2023',
-    '   • Campo obligatorio',
-    '',
-    '5️⃣  FECHA INICIO EXPOSICIÓN (DD/MM/YYYY)',
-    '   • Fecha en que comenzó la exposición a factores de riesgo',
-    '   • Puede ser igual o posterior a la fecha de ingreso',
-    '   • Ejemplo: 15/01/2023',
-    '   • Campo obligatorio',
-    '',
-    '6️⃣  HORAS DE EXPOSICIÓN',
-    '   • Número de horas diarias de exposición',
-    '   • Rango: 0 a 8 (o más, según corresponda)',
-    '   • IMPORTANTE: Si es 0 = Sin exposición, debe usar Código Agente 1',
-    '   • Campo obligatorio',
-    '',
-    '7️⃣  FECHA FIN EXPOSICIÓN (OPCIONAL)',
-    '   • Fecha en que finalizó la exposición',
-    '   • Puede dejarse vacío si el trabajador continúa expuesto',
-    '   • Ejemplo: 30/11/2024',
-    '   • Campo OPCIONAL',
-    '',
-    '8️⃣  ÚLTIMO EXAMEN MÉDICO (DD/MM/YYYY)',
-    '   • Fecha del último chequeo médico del trabajador',
-    '   • ⚠️  IMPORTANTE: Debe ser POSTERIOR O IGUAL a la fecha de ingreso',
-    '   • Ejemplo: 30/06/2024',
-    '   • Campo obligatorio',
-    '',
-    '9️⃣  CÓDIGO AGENTE',
-    '   • Código del agente causante o factor de riesgo (5 dígitos)',
-    '   • Ejemplos comunes:',
-    '      - 1 = Sin exposición (use cuando Horas = 0)',
-    '      - 40005 = Ruido',
-    '      - 40007 = Vibraciones',
-    '      - 40012 = Radiaciones ionizantes',
-    '   • ⚠️  IMPORTANTE: Use el código COMPLETO de 5 dígitos',
-    '   • Consulte su catálogo de agentes disponibles',
-    '   • Campo obligatorio',
-    '',
-    '⏱️  NOTAS IMPORTANTES:',
-    '   • Los formatos de fecha deben ser DD/MM/YYYY (flexibles en día/mes)',
-    '   • Si un trabajador tiene múltiples factores, ingrese una fila por cada factor',
-    '   • El sistema validará automáticamente todos los datos antes de cargarlos',
-    '   • Los registros con errores se reportarán para que los corrija',
-    ''
+    '✅ Ejemplo simple: CUIL: 20-12345678-9 | Nombre: Juan Pérez | Sector: Producción | Fecha ingreso: 15/01/2023 | Inicio exposición: 15/01/2023 | Horas: 8 | Último examen: 30/06/2024 | Código agente: 40005'
   ];
 
   instrucciones.forEach((linea) => {

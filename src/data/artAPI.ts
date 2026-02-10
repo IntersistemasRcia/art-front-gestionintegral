@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { ExternalAPI } from "./api";
 import { token } from "./usuarioAPI";
 import RefEmpleador from "@/app/inicio/usuarios/interfaces/RefEmpleador";
-import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
+import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse  } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
@@ -41,6 +41,7 @@ export type EstablecimientoVm = {
 }
 export type EstablecimientoListParams = {
   cuit: number;
+  Activos: boolean;
 }
 export type EstablecimientoListSWRKey = [url: string, token: string, params: string];
 export type EstablecimientoListOptions = SWRConfiguration<EstablecimientoVm[], AxiosError, Fetcher<EstablecimientoVm[], EstablecimientoListSWRKey>>
@@ -132,9 +133,12 @@ export class ArtAPIClass extends ExternalAPI {
     );
   //#endregion
 
-  //#region Establecimiento
-  readonly establecimientoListURL = ({ cuit }: EstablecimientoListParams) =>
-    this.getURL({ path: `/api/Establecimientos/empresa/${cuit}` }).toString();
+  //#region Establecimiento CUIT
+  readonly establecimientoListURL = (params: EstablecimientoListParams) =>
+    this.getURL({
+      path: `/api/Establecimientos/Empresa/${params.cuit}`,
+      search: toURLSearch({ Activos: params.Activos }),
+    }).toString();
   establecimientoList = async (params: EstablecimientoListParams) => tokenizable.get<EstablecimientoVm[]>(
     this.establecimientoListURL(params)
   ).then(({ data }) => data);
@@ -159,7 +163,7 @@ export class ArtAPIClass extends ExternalAPI {
       }
     );
   };
-  //#endregion Establecimiento
+  //#endregion Establecimiento CUIT
 
   //#region FormulariosRAR
   readonly getFormulariosRARURL = (params: ParametersFormularioRar = {}) => {
@@ -231,6 +235,52 @@ export class ArtAPIClass extends ExternalAPI {
     }
   );
   //#endregion
+
+  // #region Formulario RAR POST
+  readonly postFormularioRARURL = this.getURL({ path: "/api/FormulariosRAR" }).toString();
+
+  postFormularioRAR = async (payload: FormularioRARPostRequest) =>
+    tokenizable.post<FormulariosRARApiResponse>(this.postFormularioRARURL, payload).then(({ data }) => data);
+
+  swrPostFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: FormularioRARPostRequest }) => Promise<FormulariosRARApiResponse>;
+  } = Object.freeze({
+    key: [this.postFormularioRARURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postFormularioRAR(arg),
+  });
+
+  usePostFormularioRAR = () =>
+    useSWRMutation<FormulariosRARApiResponse, Error, [url: string, token: string], FormularioRARPostRequest>(
+      this.swrPostFormularioRAR.key,
+      this.swrPostFormularioRAR.fetcher
+    );
+  //#endregion
+
+  //#region RAR PUT
+  readonly putFormularioRARBaseURL = this.getURL({ path: "/api/FormulariosRAR" }).toString();
+
+  readonly putFormularioRARURL = (id: number | string) =>
+    this.getURL({ path: `/api/FormulariosRAR/${id}` }).toString();
+
+  putFormularioRAR = async (id: number | string, data: FormularioRARPutRequest) =>
+    tokenizable.put<FormulariosRARApiResponse>(this.putFormularioRARURL(id), data).then(({ data }) => data);
+
+  swrPutFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: FormularioRARPutRequest } }) => Promise<FormulariosRARApiResponse>;
+  } = Object.freeze({
+    key: [this.putFormularioRARBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putFormularioRAR(arg.id, arg.data),
+  });
+
+  usePutFormularioRAR = () =>
+    useSWRMutation<FormulariosRARApiResponse, Error, [url: string, token: string], { id: number | string; data: FormularioRARPutRequest }>(
+      this.swrPutFormularioRAR.key,
+      this.swrPutFormularioRAR.fetcher
+    );
+  //#endregion
+
 
   //#region FormulariosRGRL
   getFormulariosRGRL = async (cuit: number, all: boolean = false): Promise<ApiFormularioRGRL[]> => {
