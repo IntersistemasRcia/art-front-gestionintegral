@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import UsuarioForm, { UsuarioFormFields } from "./UsuarioForm";
 import UsuarioTable from "./UsuarioTable";
+import EmpresaTable from "./EmpresaTable";
 import Tareas from "./Tareas";
 import useUsuarios from "./useUsuarios";
 import styles from "./Usuario.module.css";
@@ -12,6 +13,7 @@ import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import UsuarioRow from "./interfaces/UsuarioRow";
 import { useAuth } from "@/data/AuthContext";
 import IUsuarioDarDeBajaReactivar from "./interfaces/IUsuarioDarDeBajaReactivar";
+import CustomTabs from "@/utils/ui/tab/CustomTab";
 
 type RequestMethod =
   | "create"
@@ -33,7 +35,8 @@ interface PermisosModulo {
 }
 
 export default function UsuariosPage() {
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
+  const canConfigEmpresa = hasTask("Usuarios_EmpresaConfiguracion");
   
   // Determinar si el usuario es administrador
   const isAdmin = user?.rol?.toLowerCase() === "administrador";
@@ -75,6 +78,13 @@ export default function UsuariosPage() {
     method: null,
     userData: null,
   });
+  const [currentTab, setCurrentTab] = useState<number>(0);
+
+  useEffect(() => {
+    if (!canConfigEmpresa && currentTab === 1) {
+      setCurrentTab(0);
+    }
+  }, [canConfigEmpresa, currentTab]);
 
   const [permisosModal, setPermisosModal] = useState<{
     open: boolean;
@@ -328,27 +338,52 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   // AHORA currentInitialData siempre será UsuarioFormFields o initialForm
   // Lo cual satisface la prop initialData de UsuarioForm
   const currentInitialData = requestState.userData || initialForm; // LÍNEA 144
+
+  const tabs = [
+    {
+      label: "Configuracion de Usuario",
+      value: 0,
+      content: (
+        <>
+          <CustomButton
+            onClick={() => handleOpenModal("create")}
+            style={{ float: "right" }}
+          >
+            Crear usuario
+          </CustomButton>
+
+          <UsuarioTable
+            data={usuarios}
+            onEdit={(row) => handleOpenModal("edit", row)}
+            onView={(row) => handleOpenModal("view", row)}
+            onDelete={(row) => handleOpenModal("delete", row)}
+            onActivate={(row) => handleOpenModal("activate", row)}
+            onRemove={(row) => handleOpenModal("remove", row)}
+            onReestablecer={(row) => handleReestablecer(row)}
+            onPermisos={handleOpenPermisos}
+            onReenviarCorreo={handleReenviarCorreo}
+            isLoading={loading}
+          />
+        </>
+      ),
+    },
+    ...(canConfigEmpresa
+      ? [
+          {
+            label: "Configuracion de Empresa",
+            value: 1,
+            content: <EmpresaTable />,
+          },
+        ]
+      : []),
+  ];
   
   return (
     <Box className={styles.usuariosPageContainer}>
-      <CustomButton
-        onClick={() => handleOpenModal("create")}
-        style={{ float: "right" }}
-      >
-        Crear usuario
-      </CustomButton>
-
-      <UsuarioTable
-        data={usuarios}
-        onEdit={(row) => handleOpenModal("edit", row)}
-        onView={(row) => handleOpenModal("view", row)}
-        onDelete={(row) => handleOpenModal("delete", row)}
-        onActivate={(row) => handleOpenModal("activate", row)}
-        onRemove={(row) => handleOpenModal("remove", row)}
-        onReestablecer={(row) => handleReestablecer(row)}
-        onPermisos={handleOpenPermisos}
-        onReenviarCorreo={handleReenviarCorreo}
-        isLoading={loading}
+      <CustomTabs
+        tabs={tabs}
+        currentTab={currentTab}
+        onTabChange={(_event, newTabValue) => setCurrentTab(newTabValue)}
       />
 
       <UsuarioForm

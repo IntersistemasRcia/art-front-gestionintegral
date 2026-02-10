@@ -46,6 +46,13 @@ export type EstablecimientoListSWRKey = [url: string, token: string, params: str
 export type EstablecimientoListOptions = SWRConfiguration<EstablecimientoVm[], AxiosError, Fetcher<EstablecimientoVm[], EstablecimientoListSWRKey>>
 //#endregion Types Establecimiento
 
+export type EmpresaParametroPutRequest = {
+  nombre: string;
+  valor: string;
+};
+
+export type EmpresaParametroPutResponse = unknown;
+
 //#endregion Types
 
 export function EstablecimientoVmDescripcion(establecimiento?: EstablecimientoVm) {
@@ -572,6 +579,32 @@ export class ArtAPIClass extends ExternalAPI {
     }
   );
   //#endregion
+
+
+  //#region Empresa PUT
+  readonly putEmpresaParametroBaseURL = this.getURL({ path: "/api/Empresas" }).toString();
+
+  readonly putEmpresaParametroURL = (id: number | string) =>
+    this.getURL({ path: `/api/Empresas/${id}/Parametro` }).toString();
+
+  putEmpresaParametro = async (id: number | string, data: EmpresaParametroPutRequest) =>
+    tokenizable.put<EmpresaParametroPutResponse>(this.putEmpresaParametroURL(id), data).then(({ data }) => data);
+
+  swrPutEmpresaParametro: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: EmpresaParametroPutRequest } }) => Promise<EmpresaParametroPutResponse>;
+  } = Object.freeze({
+    key: [this.putEmpresaParametroBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putEmpresaParametro(arg.id, arg.data),
+  });
+
+  usePutEmpresaParametro = () =>
+    useSWRMutation<EmpresaParametroPutResponse, Error, [url: string, token: string], { id: number | string; data: EmpresaParametroPutRequest }>(
+      this.swrPutEmpresaParametro.key,
+      this.swrPutEmpresaParametro.fetcher
+    );
+  //#endregion
+
 
   //#region EmpleadorTrabajadores
   readonly getEmpleadorTrabajadoresURL = (params: ParametersEmpleadorT = {}) => {
