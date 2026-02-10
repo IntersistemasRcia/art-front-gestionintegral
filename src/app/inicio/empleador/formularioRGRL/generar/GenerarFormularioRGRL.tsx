@@ -1237,7 +1237,13 @@ const GenerarFormularioRGRL: React.FC<{
           <FormControl fullWidth disabled={esReplica} title={esReplica ? 'Tipo fijado por replicación' : undefined}>
             <Autocomplete
               options={establecimientos}
-              getOptionLabel={(opt) => (`${opt.domicilioCalle ?? ''} - ${opt.domicilioNro ?? ''}`).trim()}
+              getOptionLabel={(opt) => {
+                const suc = String(opt.nroSucursal ?? '').trim();
+                const calle = String(opt.domicilioCalle ?? '').trim();
+                const nro = String(opt.domicilioNro ?? '').trim();
+                const dir = [calle, nro].filter(Boolean).join(' ').trim();
+                return [suc, dir].filter(Boolean).join(' - ').trim();
+              }}
               value={estActual ?? null}
               onChange={(_e, newVal) => setEstablecimientoSel(newVal ? newVal.interno : undefined)}
               isOptionEqualToValue={(option, value) => option.interno === value.interno}
