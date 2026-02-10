@@ -238,3 +238,8 @@
 .wideField {
   flex: 1.5;
 }
+
+.checkboxLabel {
+  font-size: 1.5rem;
+  font-weight: 400;
+}
