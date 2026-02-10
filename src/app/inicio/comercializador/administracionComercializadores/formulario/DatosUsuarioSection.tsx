@@ -123,7 +123,7 @@ export default function DatosUsuarioSection({
 
       <div className={styles.formRow}>
         <TextField
-          label="CUIT"
+          label="CUIT/CUIL"
           name="cuit"
           value={form.cuit}
           onChange={onTextFieldChange}
@@ -295,7 +295,11 @@ export default function DatosUsuarioSection({
                     className={styles.checkboxLarge}
                   />
                 }
-                label="Aplica IVA"
+                label={
+                  <Typography className={styles.checkboxLabel} component="span">
+                    Aplica IVA
+                  </Typography>
+                }
                 className={styles.formControlLabel}
               />
             </div>

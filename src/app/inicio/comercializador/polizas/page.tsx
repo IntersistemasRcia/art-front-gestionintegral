@@ -13,7 +13,7 @@ import Link from 'next/link';
 import type { Poliza, EmpresaOption } from "./types/poliza";
 
 const columns: ColumnDef<Poliza>[] = [
-  { accessorKey: 'numero', header: 'Nro. Poliza', meta: { align: 'left' } },
+  { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
   {
     accessorKey: 'CUIT',
     header: 'CUIT',
