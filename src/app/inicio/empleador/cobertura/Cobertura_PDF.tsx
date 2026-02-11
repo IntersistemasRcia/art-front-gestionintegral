@@ -4,6 +4,8 @@ import React, { useEffect, useRef } from 'react';
 import styles from './cobertura.module.css';
 import Image from 'next/image';
 import Formato from '@/utils/Formato';
+import ArtAPI from '@/data/artAPI';
+import useSWR from 'swr';
 
 type CoberturaPDFProps = {
   poliza?: any;
@@ -16,6 +18,7 @@ type CoberturaPDFProps = {
   fechaHasta?: string;
   clausula?: boolean;
   nominasSeleccionadas?: Array<{ cuil?: string | number; nombreEmpleador?: string }>;
+  cuitEmpresa?: number;
 };
 
 export default function Cobertura_PDF(props: CoberturaPDFProps) {
@@ -30,17 +33,35 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
     fechaHasta,
     clausula,
     nominasSeleccionadas,
+    cuitEmpresa,
   } = props;
 
   // refs separados: primero el certificado (pagina 1), luego el resto (pagina 2+)
   const firstRef = useRef<HTMLDivElement | null>(null);
   const restRef = useRef<HTMLDivElement | null>(null);
+  const generatedRef = useRef(false);
+
+  const { data: empresaByCuit } = useSWR(
+    cuitEmpresa ? ['empresaByCuit', cuitEmpresa] : null,
+    () => ArtAPI.getEmpresaByCUIT({ CUIT: cuitEmpresa })
+  );
 
   // Acepta poliza como array o como objeto
   const p = Array.isArray(poliza) ? poliza[0] : poliza ?? {};
 
+  // Destinatario para la cláusula: usar el valor ingresado en el formulario si existe
+  const destinatarioEnClausula = presentadoA?.trim() ? presentadoA : 'A quien corresponda';
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      generatedRef.current = false;
+      return;
+    }
+
+    if (!empresaByCuit) return;
+
+    if (generatedRef.current) return;
+    generatedRef.current = true;
 
     const generate = async () => {
       try {
@@ -117,6 +138,23 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
           }
         }
 
+        // Pie de página en todas las páginas
+        const footerLines = [
+          'San Martin 588 - Piso 5to. - (1004) Capital Federal - Bs As. - Argentina - Tel: 0800-333-2786',
+          'Mail: atencion.clientes@artmutualrural.org.ar',
+        ];
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const pageCount = pdf.getNumberOfPages();
+        pdf.setFontSize(8);
+        pdf.setTextColor(120);
+        for (let i = 1; i <= pageCount; i++) {
+          pdf.setPage(i);
+          pdf.setDrawColor(200);
+          pdf.line(30, pageHeight - 42, pageWidth - 30, pageHeight - 42);
+          pdf.text(footerLines, pageWidth / 2, pageHeight - 28, { align: 'center' });
+        }
+
         pdf.save('CertificadoDeCobertura.pdf');
       } catch (err) {
         // eslint-disable-next-line no-console
@@ -128,7 +166,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
 
     generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, empresaByCuit]);
 
   return (
     // off-screen wrapper: dos bloques separados para forzar que la tabla quede en bloques distintos
@@ -169,7 +207,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
 
                 <div className={styles.pdfSection} style={{ lineHeight: 1.4 }}>
                   Consta por la presente que <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>, renuncia en forma expresa a reclamar o iniciar toda acción de
-                  repetición o de regreso contra: A quien corresponda, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley
+                  repetición o de regreso contra: {destinatarioEnClausula}, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley
                   N° 24.557, sea en cualquier otra norma jurídica, con motivo de las prestaciones en especie o dinerarias que se vea obligada a abonar, contratar
                   u otorgar al personal dependiente o ex dependiente de <strong>{p.empleador_Denominacion ?? ''}</strong>, amparados por la cobertura del Contrato de
                   Afiliación N° <strong>{p.numero ?? ''}</strong>, por accidentes del trabajo o enfermedades profesionales, ocurridos o contraídos por el hecho
@@ -211,21 +249,27 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
 
       {/* Bloque separado que se renderiza en páginas posteriores */}
       <div ref={restRef} className={styles.pdfContainer}>
+        <div className={styles.pdfHeader}>
+          <div className={styles.pdfLogo}>
+            <Image src="/icons/LogoTexto.svg" alt="Logo" width={130} height={130} />
+          </div>
+          <div className={styles.pdfLugarFecha}>Ciudad Autónoma de Buenos Aires, {dia ?? ''}</div>
+        </div>
+
         <div className={styles.pdfSecondPage}>
           <h3>Nómina de Personal a la Fecha</h3>
 
           <div className={styles.pdfPolicyInfo}>
-            <div>Razón Social: {p.empleador_Denominacion ?? ''}</div>
-            <div>CUIT: {p.cuit ?? ''}</div>
+            <div>Razón Social: {empresaByCuit?.razonSocial ?? ''}</div>
+            <div>CUIT: {empresaByCuit?.cuit ?? ''}</div>
             <div>
-              Calle: {p.empleador_Domicilio_Calle ?? ''} {p.empleador_Domicilio_Altura ?? ''} {p.empleador_Domicilio_Piso ?? ''}{' '}
-              {p.empleador_Domicilio_Depto ?? ''}
+              Calle: {empresaByCuit?.domicilioCalle ?? ''}
             </div>
             <div>
-              Localidad: {p.empleador_Domicilio_Localidad_Descripcion ?? ''} - CP: {p.empleador_Domicilio_CP ?? ''}
+              CP: {empresaByCuit?.codLocalidadPostal ?? ''}
             </div>
-            <div>Nro.Contrato: {p.numero ?? p.nroContrato ?? ''}</div>
-            <div>Ciiu Rev. 4: {p.ciiu ?? ''}</div>
+            <div>Nro.Contrato: {empresaByCuit?.contratoNro ?? ''}</div>
+            <div>Ciiu Rev. 4: {empresaByCuit?.ciiu ?? ''}</div>
           </div>
 
           <table className={styles.pdfTable}>
