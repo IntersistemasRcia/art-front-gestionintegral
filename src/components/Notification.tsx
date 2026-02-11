@@ -4,7 +4,18 @@ import React, { useEffect, useState } from 'react';
 import { GoBellFill } from 'react-icons/go';
 import styles from './Navbar.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
-import ArtAPI, { formatEstablecimientoLabel } from '@/data/artAPI';
+import ArtAPI from '@/data/artAPI';
+
+const formatEstablecimientoLabel = (est?: Partial<any> | null): string => {
+  if (!est) return "";
+  const nroSucursal = (est as any).nroSucursal;
+  const domicilio = `${(est as any).domicilioCalle || ""} ${(est as any).domicilioNro || ""}`.trim();
+  const parts: string[] = [];
+  if (nroSucursal !== undefined && nroSucursal !== null) parts.push(String(nroSucursal));
+  if (domicilio) parts.push(domicilio);
+  if (parts.length === 0) return "";
+  return `Sucursal: ${parts.join(" - ")}`;
+};
 
 type Props = {
   empresaCUIT?: number | string | null;
