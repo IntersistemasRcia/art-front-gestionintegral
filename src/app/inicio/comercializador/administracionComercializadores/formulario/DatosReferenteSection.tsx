@@ -120,6 +120,7 @@ export default function DatosReferenteSection({
                 {...params}
                 label="Localidad"
                 placeholder="Seleccione localidad"
+                InputLabelProps={{ shrink: !!form.domicilioLocalidad }}
                 error={
                   touched.domicilioCodLocalidad &&
                   !!errors.domicilioCodLocalidad
@@ -160,6 +161,7 @@ export default function DatosReferenteSection({
           disabled={isDisabled}
           InputProps={{ readOnly: true }}
           placeholder="Provincia"
+          InputLabelProps={{ shrink: !!form.domicilioProvincia }}
         />
       </div>
 

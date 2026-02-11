@@ -29,13 +29,15 @@ export default function CoberturaPage() {
     const searchParams = useSearchParams();
     const cuitQuery = searchParams.get("cuit") ?? searchParams.get("cuil");
     const cuitDesdeQuery = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
+
+    const cuitEmpresaActual = Number.isFinite(cuitDesdeQuery) && cuitDesdeQuery > 0
+        ? cuitDesdeQuery
+        : (empresaSeleccionada?.cuit ?? NaN);
    
     // Obtener personal y póliza usando el CUIT de la empresa seleccionada o, si viene por query, ese CUIT
-    const paramsCUIT = Number.isFinite(cuitDesdeQuery) && cuitDesdeQuery > 0
-        ? { CUIT: cuitDesdeQuery }
-        : empresaSeleccionada
-            ? { CUIT: empresaSeleccionada.cuit }
-            : {};
+    const paramsCUIT = Number.isFinite(cuitEmpresaActual) && cuitEmpresaActual > 0
+        ? { CUIT: cuitEmpresaActual }
+        : {};
 
     const { data: personalRawData, isLoading: isPersonalLoading } = useGetPersonal(paramsCUIT); 
     const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza(paramsCUIT);
@@ -372,10 +374,13 @@ export default function CoberturaPage() {
             cuit: Formato.CUIP(polizaData.cuit) || "",
             vigenciaDesde: Formato.Fecha(polizaData.vigencia_Desde) || "",
             vigenciaHasta: Formato.Fecha(polizaData.vigencia_Hasta) || "",
-            empleadorDenominacion: polizaData.empleador_Denominacion || "",
+            empleadorDenominacion: polizaData.empleador_Denoominacion || "",
             numero: polizaData.numero || ""
         };
     }, [polizaData, isMounted]);
+
+    // Mostrar destinatario específico en la cláusula si fue ingresado, sino uso el genérico
+    const destinatarioEnClausula = presentadoA?.trim() ? presentadoA : 'A quien corresponda';
 
     return ( 
         <div className={styles.inicioContainer}>
@@ -579,7 +584,7 @@ export default function CoberturaPage() {
                     <>
                         <p>
                             Consta por la presente que <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>, renuncia en forma expresa a reclamar o iniciar toda acción de 
-                            repetición o de regreso contra: A quien corresponda, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley 
+                                repetición o de regreso contra: {destinatarioEnClausula}, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley 
                             N° 24.557, sea en cualquier otra norma jurídica, con motivo de las prestaciones en especie o dinerarias que se vea obligada a abonar, contratar
                             u otorgar al personal dependiente o ex dependiente de <strong>{formattedValues.empleadorDenominacion}</strong>, amparados por la cobertura del Contrato de
                             Afiliación N° <strong>{formattedValues.numero}</strong>, por accidentes del trabajo o enfermedades profesionales, ocurridos o contraídos por el hecho 
@@ -636,6 +641,7 @@ export default function CoberturaPage() {
                     fechaHasta={polizaData?.vigencia_Hasta}             // opcional
                     clausula={clausula}       // opcional
                     nominasSeleccionadas={selectedCubierto} // si aplicable
+                cuitEmpresa={Number.isFinite(cuitEmpresaActual) ? cuitEmpresaActual : undefined}
                 />
                 ) : null}
           </div>
