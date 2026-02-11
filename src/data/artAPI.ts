@@ -41,7 +41,7 @@ export type EstablecimientoVm = {
 }
 export type EstablecimientoListParams = {
   cuit: number;
-  Activos: boolean;
+  Activos?: boolean;
 }
 export type EstablecimientoListSWRKey = [url: string, token: string, params: string];
 export type EstablecimientoListOptions = SWRConfiguration<EstablecimientoVm[], AxiosError, Fetcher<EstablecimientoVm[], EstablecimientoListSWRKey>>
