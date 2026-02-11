@@ -183,8 +183,9 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     },
     {
       accessorKey: 'Exposicion',
-      header: 'Exposición',
+      header: 'Horas de Exposición',
       size: 90,
+      meta: { align: 'center' }
     },
     {
       accessorKey: 'FechaFinExposicion',
@@ -194,7 +195,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
         const fecha = getValue();
         return fecha && fecha.trim() !== ''
           ? fecha
-          : <span className={styles.fechaNoEspecificada}>No especif.</span>;
+          : null;
       }
     },
     {
@@ -428,12 +429,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
       if (!esModoEdicionFormulario || editarId <= 0) return;
       try {
         console.log(' MODO EDICIÓN: cargando formulario existente', editarId);
-        const r = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${editarId}`);
-        if (!r.ok) {
-          console.error(' No se pudo cargar el formulario para edición');
-          return;
-        }
-        const data = await r.json();
+        const data = await ArtAPI.getFormularioRARById(editarId);
         if (cancel) return;
 
         // Cantidades
@@ -527,37 +523,26 @@ React.useEffect(() => {
           return;
         }
 
-        // Establecimientos
-        const url = `http://arttest.intersistemas.ar:8302/api/Establecimientos/Empresa/${cuitParaUsar}`;
-
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          mode: 'cors',
-        });
-
-        const establecimientos = resp.ok ? await resp.json() : [];
+        // Establecimientos (por CUIT del usuario logueado)
+        const establecimientos = await ArtAPI.establecimientoList({ cuit: Number(cuitParaUsar), Activos: true });
 
         console.log(' Respuesta establecimientos:', establecimientos);
 
-        const estArr = Array.isArray(establecimientos)
-          ? establecimientos
-          : establecimientos?.data
-            ? (Array.isArray(establecimientos.data) ? establecimientos.data : [establecimientos.data])
-            : (establecimientos ? [establecimientos] : []);
+        const estArr = Array.isArray(establecimientos) ? establecimientos : [];
 
         console.log(' Array procesado:', estArr);
 
         const opciones: OpcionEstablecimiento[] = estArr
-          .filter((est: any) => est && (est.domicilioCalle || est.interno))
-          .map((est: any) => ({
-            interno: String(est.interno ?? ''),
-            domicilioCalle: String(est.domicilioCalle ?? ''),
-            displayText: `${est.domicilioCalle ?? 'Sin dirección'}`
-          }));
+          .filter((est: any) => est && (est.nroSucursal || est.domicilioCalle || est.interno))
+          .map((est: any) => {
+            const nro = est.nroSucursal ?? est.interno ?? '';
+            const direccion = [est.domicilioCalle, est.domicilioNro].filter(Boolean).join(' ');
+            return {
+              interno: String(est.interno ?? ''),
+              domicilioCalle: String(est.domicilioCalle ?? ''),
+              displayText: `${nro}${direccion ? ' - ' + direccion : ''}`.trim()
+            } as OpcionEstablecimiento;
+          });
 
         console.log(' Opciones finales:', opciones);
 
@@ -1019,27 +1004,14 @@ React.useEffect(() => {
 
       console.log(' Enviando POST request...');
 
-      const urlGuardar = esModoEdicionFormulario ? `http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${editarId}` : 'http://arttest.intersistemas.ar:8302/api/FormulariosRAR';
-      const metodo = esModoEdicionFormulario ? 'PUT' : 'POST';
-      const resp = await fetch(urlGuardar, {
-        method: metodo,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let responseData: any = null;
 
-      console.log(' Respuesta del servidor:', {
-        status: resp.status,
-        statusText: resp.statusText,
-        ok: resp.ok
-      });
-
-      if (!resp.ok) {
-        const t = await resp.text();
-        console.log(' Error del servidor:', t);
-        throw new Error(`Error del servidor (${resp.status}): ${t}`);
+      if (esModoEdicionFormulario) {
+        responseData = await ArtAPI.putFormularioRAR(editarId, payload);
+      } else {
+        responseData = await ArtAPI.postFormularioRAR(payload);
       }
 
-      const responseData = await resp.json();
       console.log(' Respuesta exitosa:', responseData);
 
       // Mostrar mensaje de éxito y preguntar qué hacer
@@ -1094,7 +1066,7 @@ React.useEffect(() => {
           fechaIngreso: dayjs(f.Ingreso || fechaActual).toISOString(),
           fechaUltimoExamenMedico: dayjs(f.UltimoExamenMedico || fechaActual).toISOString(),
           codigoAgente: Number(f.CodigoAgente) || 1,
-          fechaInicioExposicion: dayjs(f.FechaFin || fechaActual).toISOString(),
+          fechaInicioExposicion: dayjs(f.FechaInicio || fechaActual).toISOString(),
           fechaFinExposicion: f.FechaFinExposicion && f.FechaFinExposicion.trim() !== ''
             ? dayjs(f.FechaFinExposicion).toISOString()
             : dayjs('2099-01-01').toISOString(), // Fecha por defecto: 01/01/2099 para indicar "no especificada"
@@ -1114,16 +1086,7 @@ React.useEffect(() => {
         formularioRARDetalle: formularioRARDetalle,
       };
 
-      const resp = await fetch('http://arttest.intersistemas.ar:8302/api/FormulariosRAR', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!resp.ok) {
-        const t = await resp.text();
-        throw new Error(`Error del servidor (${resp.status}): ${t}`);
-      }
+      await ArtAPI.postFormularioRAR(payload);
 
 
       finalizaCarga(true);
