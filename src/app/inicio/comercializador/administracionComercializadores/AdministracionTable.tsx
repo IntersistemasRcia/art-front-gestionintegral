@@ -68,9 +68,10 @@ export default function AdministracionTable({
       {
         id: 'accion',
         header: 'Acción',
+        meta: { width: "8%" , align: "center"},
         cell: ({ row }) => (
           <Box className={styles.actionButtons}>
-            <Tooltip title="Ver" arrow>
+            <Tooltip title="Ver" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 disabled={!hasTask("Comercializador_Administracion_AccionVer")}
@@ -79,10 +80,10 @@ export default function AdministracionTable({
                   onViewRow(row.original, "grupo");
                 }}
               >
-                <IoMdEye />
+                <IoMdEye className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Editar" arrow>
+            <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 disabled={isOrganizadorComercializador || !hasTask("Comercializador_Administracion_AccionEditar")}
@@ -92,10 +93,10 @@ export default function AdministracionTable({
                   onEditRow(row.original, "grupo");
                 }}
               >
-                <MdEdit />
+                <MdEdit className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Dar de baja" arrow>
+            <Tooltip title="Dar de baja" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 color="error"
@@ -106,7 +107,7 @@ export default function AdministracionTable({
                   onDeleteRow(row.original, "grupo");
                 }}
               >
-                <MdGroupRemove fontSize="medium" />
+                <MdGroupRemove className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
           </Box>
@@ -126,9 +127,10 @@ export default function AdministracionTable({
       {
         id: 'accion',
         header: 'Acción',
+        meta: { width: "8%" , align: "center"},
         cell: ({ row }) => (
           <Box className={styles.actionButtons}>
-            <Tooltip title="Ver" arrow>
+            <Tooltip title="Ver" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 disabled={!hasTask("Comercializador_Administracion_AccionVer")}
@@ -137,10 +139,10 @@ export default function AdministracionTable({
                   onViewRow(row.original, "organizador");
                 }}
               >
-                <IoMdEye />
+                <IoMdEye className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Editar" arrow>
+            <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 disabled={!hasTask("Comercializador_Administracion_AccionEditar")}
@@ -149,10 +151,10 @@ export default function AdministracionTable({
                   onEditRow(row.original, "organizador");
                 }}
               >
-                <MdEdit />
+                <MdEdit className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Dar de baja" arrow>
+            <Tooltip title="Dar de baja" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 color="error"
@@ -163,7 +165,7 @@ export default function AdministracionTable({
                   onDeleteRow(row.original, "organizador");
                 }}
               >
-                <MdGroupRemove fontSize="medium" />
+                <MdGroupRemove className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
           </Box>
@@ -184,9 +186,10 @@ export default function AdministracionTable({
       {
         id: 'accion',
         header: 'Acción',
+        meta: { width: "8%" , align: "center"},
         cell: ({ row }) => (
           <Box className={styles.actionButtons}>
-            <Tooltip title="Ver" arrow>
+            <Tooltip title="Ver" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 disabled={!hasTask("Comercializador_Administracion_AccionVer")}
@@ -195,10 +198,10 @@ export default function AdministracionTable({
                   onViewRow(row.original, "comercializador");
                 }}
               >
-                <IoMdEye />
+                <IoMdEye className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Editar" arrow>
+            <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 disabled={!hasTask("Comercializador_Administracion_AccionEditar")}
@@ -207,10 +210,10 @@ export default function AdministracionTable({
                   onEditRow(row.original, "comercializador");
                 }}
               >
-                <MdEdit />
+                <MdEdit className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Dar de baja" arrow>
+            <Tooltip title="Dar de baja" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
                 color="error"
@@ -220,7 +223,7 @@ export default function AdministracionTable({
                   onDeleteRow(row.original, "comercializador");
                 }}
               >
-                <MdGroupRemove fontSize="medium" />
+                <MdGroupRemove className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
           </Box>
