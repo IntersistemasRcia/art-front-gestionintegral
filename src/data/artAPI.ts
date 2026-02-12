@@ -1074,22 +1074,3 @@ const ArtAPI = Object.seal(new ArtAPIClass()) as ArtAPIClass;
 
 export default ArtAPI;
 
-export const formatEstablecimientoLabel = (est?: Partial<ApiEstablecimientoEmpresa> | null): string => {
-  if (!est) return "";
-  const nroSucursal =
-    (est as any).nroSucursal ?? (est as any).NroSucursal ?? (est as any).nroSucursalEmpresa ?? (est as any).sucursal ?? "";
-  const domicilioCalle =
-    (est as any).domicilioCalle ?? (est as any).domicilio ?? (est as any).calle ?? (est as any).direccion ?? "";
-  const domicilioNro =
-    (est as any).domicilioNro ?? (est as any).domicilioNroEmpresa ?? (est as any).domicilioNroString ?? (est as any).domicilioNroStr ?? (est as any).domicilioNumero ?? "";
-
-  const domicilio = `${String(domicilioCalle || "").trim()} ${String(domicilioNro || "").trim()}`.trim();
-
-  const parts: string[] = [];
-  parts.push(String(nroSucursal));
-  parts.push(domicilio);
-
-  const filled = parts.map(p => (p && p !== "undefined" && p !== "null" ? p : "")).filter(p => p && p.trim().length > 0);
-  if (filled.length === 0) return "";
-  return `Sucursal: ${filled.join(" - ")}`;
-};

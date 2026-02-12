@@ -1270,7 +1270,25 @@ React.useEffect(() => {
 
                     // Si el CUIL está completo (11 dígitos), consultar datos automáticamente
                     if (value.length === 11) {
-                      consultarDatosPorCuil(f);
+                      // Primero, verificar si ya existe en las filas cargadas
+                      const cuilDigits = value;
+                      const filaExistente = filas.find((fi) => normalizarCuil(fi.CUIL) === cuilDigits);
+
+                      if (filaExistente) {
+                        // Completar los demás campos con los datos previamente ingresados
+                        setNombre(filaExistente.Nombre || '');
+                        setSector(filaExistente.SectorTareas || '');
+                        setIngreso(filaExistente.Ingreso || '');
+                        //setFechaInicio(filaExistente.FechaInicio || '');
+                        //setExposicion(filaExistente.Exposicion != null ? String(filaExistente.Exposicion) : '0');
+                        //setFechaFinExposicion(filaExistente.FechaFinExposicion || '');
+                        setUltimoExamenMedico(filaExistente.UltimoExamenMedico || '');
+                        //setCodigoAgente(filaExistente.CodigoAgente != null ? String(filaExistente.CodigoAgente) : '');
+                        console.log('CUIL repetido detectado, campos autocompletados desde fila existente:', filaExistente);
+                      } else {
+                        // Si no existe localmente, consultar servicio externo para completar el nombre
+                        consultarDatosPorCuil(f);
+                      }
                     }
                   }
                 }}
