@@ -28,6 +28,11 @@ interface PermisosModulo {
   moduloId: number;
   moduloDescripcion: string;
   habilitado: boolean;
+  tareas: {
+    tareaId: number;
+    moduloId: number;
+    habilitada: boolean;
+  }[];
 }
 
 export default function Tareas({
@@ -37,26 +42,38 @@ export default function Tareas({
   onSave,
 }: TareasProps) {
   const [permisosModulos, setPermisosModulos] = useState<Record<number, boolean>>({});
+  const [permisosTareas, setPermisosTareas] = useState<Record<string, boolean>>({});
   const [modulosExpandidos, setModulosExpandidos] = useState<Record<number, boolean>>({});
+
+  const getTareaKey = (moduloId: number, tareaId: number) => `${moduloId}-${tareaId}`;
+
+  const getModulosUnicos = () => {
+    if (!usuario?.modulos) return [];
+    return usuario.modulos.filter(
+      (modulo, index, array) => array.findIndex((m) => m.id === modulo.id) === index
+    );
+  };
 
   useEffect(() => {
     if (usuario?.modulos) {
-      // Filtrar módulos únicos por ID
-      const modulosUnicos = usuario.modulos.filter((modulo, index, array) => 
-        array.findIndex(m => m.id === modulo.id) === index
-      );
-      
-      // Inicializar permisos y estado de expansión basados en los módulos únicos
+      const modulosUnicos = getModulosUnicos();
+
       const permisosModulosIniciales: Record<number, boolean> = {};
+      const permisosTareasIniciales: Record<string, boolean> = {};
       const modulosExpandidosIniciales: Record<number, boolean> = {};
 
       modulosUnicos.forEach((modulo) => {
-        // Usar el campo habilitado que viene de la API
         permisosModulosIniciales[modulo.id] = modulo.habilitado;
-        modulosExpandidosIniciales[modulo.id] = false; // Inicialmente contraídos
+        modulosExpandidosIniciales[modulo.id] = false;
+
+        modulo.tareas?.forEach((tarea) => {
+          permisosTareasIniciales[getTareaKey(modulo.id, tarea.tareaId)] =
+            tarea.habilitada ?? modulo.habilitado;
+        });
       });
 
       setPermisosModulos(permisosModulosIniciales);
+      setPermisosTareas(permisosTareasIniciales);
       setModulosExpandidos(modulosExpandidosIniciales);
     }
   }, [usuario]);
@@ -65,6 +82,47 @@ export default function Tareas({
     setPermisosModulos((prev) => ({
       ...prev,
       [moduloId]: habilitado,
+    }));
+
+    setPermisosTareas((prev) => {
+      const next = { ...prev };
+      const modulo = getModulosUnicos().find((m) => m.id === moduloId);
+      modulo?.tareas?.forEach((tarea) => {
+        next[getTareaKey(moduloId, tarea.tareaId)] = habilitado;
+      });
+      return next;
+    });
+  };
+
+  const handleTareaPermisoChange = (
+    moduloId: number,
+    tareaId: number,
+    habilitada: boolean
+  ) => {
+    setPermisosTareas((prev) => ({
+      ...prev,
+      [getTareaKey(moduloId, tareaId)]: habilitada,
+    }));
+
+    const modulo = getModulosUnicos().find((m) => m.id === moduloId);
+    const tareasDelModulo = modulo?.tareas ?? [];
+
+    if (tareasDelModulo.length === 0) {
+      setPermisosModulos((prev) => ({
+        ...prev,
+        [moduloId]: habilitada,
+      }));
+      return;
+    }
+
+    const hayAlgunaHabilitada = tareasDelModulo.some((tarea) => {
+      if (tarea.tareaId === tareaId) return habilitada;
+      return permisosTareas[getTareaKey(moduloId, tarea.tareaId)] ?? false;
+    });
+
+    setPermisosModulos((prev) => ({
+      ...prev,
+      [moduloId]: hayAlgunaHabilitada,
     }));
   };
 
@@ -78,15 +136,19 @@ export default function Tareas({
   const handleGuardarConfiguracion = () => {
     if (!usuario?.modulos) return;
 
-    // Filtrar módulos únicos y crear array de módulos con sus permisos
-    const modulosUnicos = usuario.modulos.filter((modulo, index, array) => 
-      array.findIndex(m => m.id === modulo.id) === index
-    );
-    
+    const modulosUnicos = getModulosUnicos();
+
     const permisosModulosArray: PermisosModulo[] = modulosUnicos.map((modulo) => ({
       moduloId: modulo.id,
       moduloDescripcion: modulo.nombre,
       habilitado: permisosModulos[modulo.id] ?? false,
+      tareas:
+        modulo.tareas?.map((tarea) => ({
+          tareaId: tarea.tareaId,
+          moduloId: modulo.id,
+          habilitada:
+            permisosTareas[getTareaKey(modulo.id, tarea.tareaId)] ?? false,
+        })) ?? [],
     }));
 
     console.log('Permisos módulos a enviar:', permisosModulosArray);
@@ -101,31 +163,35 @@ export default function Tareas({
   const handleDarAccesoATodo = () => {
     if (!usuario?.modulos) return;
 
-    // Filtrar módulos únicos
-    const modulosUnicos = usuario.modulos.filter((modulo, index, array) => 
-      array.findIndex(m => m.id === modulo.id) === index
-    );
+    const modulosUnicos = getModulosUnicos();
 
     const nuevosPermisos: Record<number, boolean> = {};
+    const nuevosPermisosTareas: Record<string, boolean> = {};
     modulosUnicos.forEach((modulo) => {
       nuevosPermisos[modulo.id] = true;
+      modulo.tareas?.forEach((tarea) => {
+        nuevosPermisosTareas[getTareaKey(modulo.id, tarea.tareaId)] = true;
+      });
     });
     setPermisosModulos(nuevosPermisos);
+    setPermisosTareas(nuevosPermisosTareas);
   };
 
   const handleQuitarTodosLosAccesos = () => {
     if (!usuario?.modulos) return;
 
-    // Filtrar módulos únicos
-    const modulosUnicos = usuario.modulos.filter((modulo, index, array) => 
-      array.findIndex(m => m.id === modulo.id) === index
-    );
+    const modulosUnicos = getModulosUnicos();
 
     const nuevosPermisos: Record<number, boolean> = {};
+    const nuevosPermisosTareas: Record<string, boolean> = {};
     modulosUnicos.forEach((modulo) => {
       nuevosPermisos[modulo.id] = false;
+      modulo.tareas?.forEach((tarea) => {
+        nuevosPermisosTareas[getTareaKey(modulo.id, tarea.tareaId)] = false;
+      });
     });
     setPermisosModulos(nuevosPermisos);
+    setPermisosTareas(nuevosPermisosTareas);
   };
 
   if (!usuario) {
@@ -207,10 +273,7 @@ export default function Tareas({
           </Box>
 
           {/* Contenido - Módulos */}
-          {usuario.modulos
-            ?.filter((modulo, index, array) => 
-              array.findIndex(m => m.id === modulo.id) === index
-            )
+          {getModulosUnicos()
             ?.map((modulo, moduloIndex) => (
             <Box key={`modulo-${modulo.id}`}>
               {/* Header del módulo con control de permisos y expandir/contraer */}
@@ -312,21 +375,48 @@ export default function Tareas({
                     </Typography>
 
                     <Box sx={{ flex: 1, textAlign: "center" }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontSize: "1.1rem", color: "#666" }}
+                      <Box
+                        sx={{
+                          display: "inline-block",
+                          width: 30,
+                          height: 20,
+                          borderRadius: "3px",
+                          backgroundColor:
+                            permisosTareas[getTareaKey(modulo.id, tarea.tareaId)]
+                              ? "#4CAF50"
+                              : "#f44336",
+                          color: "white",
+                          textAlign: "center",
+                          lineHeight: "20px",
+                          fontSize: "15px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                        onClick={() =>
+                          handleTareaPermisoChange(
+                            modulo.id,
+                            tarea.tareaId,
+                            !(
+                              permisosTareas[
+                                getTareaKey(modulo.id, tarea.tareaId)
+                              ] ?? false
+                            )
+                          )
+                        }
                       >
-                        {permisosModulos[modulo.id]
-                          ? "Habilitado"
-                          : "Deshabilitado"}
-                      </Typography>
+                        {permisosTareas[getTareaKey(modulo.id, tarea.tareaId)]
+                          ? "S"
+                          : "N"}
+                      </Box>
                     </Box>
 
                     <Typography
                       variant="body2"
                       sx={{ flex: 2, fontSize: "1.1rem", color: "#666" }}
                     >
-                      • Tarea incluida en el módulo
+                      {permisosTareas[getTareaKey(modulo.id, tarea.tareaId)]
+                        ? "• Tarea habilitada"
+                        : "• Tarea deshabilitada"}
                     </Typography>
                   </Box>
                 ))}
