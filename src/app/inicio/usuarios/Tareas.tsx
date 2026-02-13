@@ -15,6 +15,7 @@ import CustomModal from '@/utils/ui/form/CustomModal';
 import IModulo from './interfaces/IModulo';
 import UsuarioRow from './interfaces/UsuarioRow';
 import styles from './Usuario.module.css';
+import tareasStyles from './Tareas.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
 
 interface TareasProps {
@@ -376,22 +377,13 @@ export default function Tareas({
 
                     <Box sx={{ flex: 1, textAlign: "center" }}>
                       <Box
-                        sx={{
-                          display: "inline-block",
-                          width: 30,
-                          height: 20,
-                          borderRadius: "3px",
-                          backgroundColor:
+                        className={
+                          `${tareasStyles.toggleBadge} ${
                             permisosTareas[getTareaKey(modulo.id, tarea.tareaId)]
-                              ? "#4CAF50"
-                              : "#f44336",
-                          color: "white",
-                          textAlign: "center",
-                          lineHeight: "20px",
-                          fontSize: "15px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
-                        }}
+                              ? tareasStyles.enabled
+                              : tareasStyles.disabled
+                          }`
+                        }
                         onClick={() =>
                           handleTareaPermisoChange(
                             modulo.id,
