@@ -1,29 +1,82 @@
 // components/poliza/poliza.tsx
 "use client"; // Marca el componente como un Componente de Cliente
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styles from "./poliza.module.css";
 import { useAuth } from "@/data/AuthContext";
-import { TextField } from "@mui/material";
+import { TextField, Box } from "@mui/material";
 import Formato from "@/utils/Formato";
 import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import { BsDownload } from "react-icons/bs";
 import { saveAs } from "file-saver";
 import { getSession } from "next-auth/react";
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useSearchParams } from "next/navigation";
 
 const { useGetPoliza } = gestionEmpleadorAPI;
 
 const Poliza = () => {
-  const { user } = useAuth();
-  const { data: polizaRawData, isLoading: isPersonalLoading } = useGetPoliza();
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
+  const [bloquearBusquedaPorCuit, setBloquearBusquedaPorCuit] = useState(false);
 
-  if (!user) {
-    return <p>Error: Sesión no válida o no encontrada.</p>;
-  }
+  const searchParams = useSearchParams();
+  const cuitQuery = searchParams.get("cuit") ?? searchParams.get("cuil");
+  const cuitForzado = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
+  
+  // Obtener la póliza priorizando el CUIT forzado por query param (viene desde comercializador)
+  const { data: polizaRawData, isLoading: isPersonalLoading } = useGetPoliza(
+    Number.isFinite(cuitForzado) && cuitForzado > 0 ? { CUIT: cuitForzado } : empresaSeleccionada ? { CUIT: empresaSeleccionada.cuit }: {}
+  );
 
-  // Accede a las propiedades de la sesión con seguridad
-  const { email, empresaCUIT, empresaRazonSocial } = user as any;
+  // Seleccionar automáticamente si solo hay una empresa
+  useEffect(() => {
+    if (Number.isFinite(cuitForzado) && cuitForzado > 0) return;
+    if (!isLoadingEmpresas) {
+      if (empresas.length === 1) {
+        // Si hay exactamente 1 empresa, seleccionarla automáticamente
+        setEmpresaSeleccionada(empresas[0]);
+        seleccionAutomaticaRef.current = true;
+      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+        // Si hay más de 1 empresa o 0 empresas, y la selección fue automática,
+        // limpiar la selección
+        setEmpresaSeleccionada(null);
+        seleccionAutomaticaRef.current = false;
+      }
+    }
+  }, [empresas.length, isLoadingEmpresas]);
+
+  // Si viene CUIT por query param, forzar selección por CUIT y bloquear el selector
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+
+    const hasCuitForzado = Number.isFinite(cuitForzado) && cuitForzado > 0;
+    setBloquearBusquedaPorCuit(hasCuitForzado);
+    if (!hasCuitForzado) return;
+
+    const match = empresas.find((e) => {
+      const digits = Number(String((e as any)?.cuit ?? "").replace(/\D/g, ""));
+      return Number.isFinite(digits) && digits === cuitForzado;
+    });
+
+    if (match) {
+      setEmpresaSeleccionada(match);
+      seleccionAutomaticaRef.current = true;
+    }
+  }, [cuitForzado, empresas, isLoadingEmpresas]);
+
+  // Si está bloqueado por CUIT y no hay match en el store, igual mostrar la Razón Social en el combo
+  useEffect(() => {
+    if (!bloquearBusquedaPorCuit) return;
+    if (empresaSeleccionada) return;
+    const razonSocial = polizaRawData?.empleador_Denominacion;
+    if (!razonSocial) return;
+    setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as any);
+  }, [bloquearBusquedaPorCuit, empresaSeleccionada, polizaRawData?.empleador_Denominacion]);
 
   const handleDownloadPDF = async () => {
     if (!polizaRawData?.archivo) {
@@ -71,8 +124,47 @@ const Poliza = () => {
     }
   };
 
+  const handleEmpresaChange = (
+    _event: React.SyntheticEvent,
+    newValue: Empresa | null
+  ) => {
+    if (bloquearBusquedaPorCuit) return;
+    setEmpresaSeleccionada(newValue);
+    // Marcar que la selección fue manual
+    seleccionAutomaticaRef.current = false;
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
+    const cuitFormateado = Formato.CUIP((empresa as any)?.cuit);
+    return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
+  };
+
   return (
     <div>
+      {/* Combo de selección de empresa en la parte superior izquierda */}
+      <Box className={styles.empresaSelectorContainer}>
+        <CustomSelectSearch<Empresa>
+          options={empresas}
+          getOptionLabel={getEmpresaLabel}
+          value={empresaSeleccionada}
+          onChange={handleEmpresaChange}
+          label="Seleccionar Empresa"
+          placeholder="Buscar empresa..."
+          loading={isLoadingEmpresas}
+          loadingText="Cargando empresas..."
+          noOptionsText={
+            isLoadingEmpresas
+              ? "Cargando..."
+              : empresas.length === 0
+              ? "No hay empresas disponibles"
+              : "No se encontraron empresas"
+          }
+          disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
+        />
+      </Box>
+
       {/* Botón de descarga PDF */}
       <div style={{ marginBottom: "20px" }}>
         <CustomButton
@@ -89,7 +181,7 @@ const Poliza = () => {
       <div className={styles.sectionHeader}>
         <h2 className={styles.headerTitle}>Razón Social</h2>
         <p className={styles.headerData}>
-          {empresaRazonSocial ?? "Usuario sin Empresa"}
+          {polizaRawData?.empleador_Denominacion ?? "---"}
         </p>
       </div>
 

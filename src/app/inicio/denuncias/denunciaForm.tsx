@@ -45,7 +45,7 @@ export default function DenunciaForm({
   const { user } = useAuth();
   const [empCuitReadOnly, setEmpCuitReadOnly] = useState(false);
   const [empModalOpen, setEmpModalOpen] = useState(false);
-  const [empModalType, setEmpModalType] = useState<MessageType>('alert');
+  const [empModalType, setEmpModalType] = useState<MessageType>('warning');
   const [empModalMessage, setEmpModalMessage] = useState('');
   const lastFetchedPrestadorCuitRef = useRef<string>("");
   const lastFetchedLocalidadAccRef = useRef<string>("");
@@ -205,7 +205,7 @@ export default function DenunciaForm({
         const empresaCUITUsuario = Number((user as any)?.empresaCUIT ?? 0);
         if (!cancelled && empresaCUITUsuario === 0) {
           setEmpModalMessage('El CUIT de la empresa no se encuentra.');
-          setEmpModalType('alert');
+          setEmpModalType('warning');
           setEmpModalOpen(true);
           setForm((prev) => ({ ...prev, empCuit: '' }));
           lastFetchedEmpCuitRef.current = "";
@@ -633,7 +633,7 @@ export default function DenunciaForm({
           type={empModalType}
           message={empModalMessage}
           onClose={() => setEmpModalOpen(false)}
-          title={empModalType === 'alert' ? 'CUIT no encontrado' : undefined}
+          title={empModalType === 'warning' ? 'CUIT no encontrado' : undefined}
         />
         {errorMsg && (
           <Typography className={styles.errorMessage}>{errorMsg}</Typography>

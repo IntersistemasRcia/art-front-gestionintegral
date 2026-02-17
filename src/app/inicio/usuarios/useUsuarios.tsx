@@ -57,29 +57,16 @@ export default function useUsuarios() {
     }
   };
 
-  const actualizarPermisosUsuario = async (usuarioId: string, permisosModulos: Array<{moduloId: number, moduloDescripcion: string, habilitado: boolean}>) => {
-    try {      
-      // Convertir permisos de módulos a permisos de tareas usando la nueva estructura
-      const permisosTareas: Array<{tareaId: number, habilitada: boolean}> = [];
-      
-      permisosModulos.forEach(permisoModulo => {
-        // Encontrar el módulo correspondiente
-        // const modulo = usuario.modulos?.find(m => m.id === permisoModulo.moduloId);
-        
-        // if (modulo?.tareas) {
-        //   // Agregar cada tarea del módulo con el permiso del módulo
-        //   modulo.tareas.forEach(tarea => {
-        //     permisosTareas.push({
-        //       tareaId: tarea.tareaId,
-        //       habilitada: permisoModulo.habilitado
-        //     });
-        //   });
-        // }
-      });
-
-      // console.log('Permisos módulos:', permisosModulos);
-      // console.log('Permisos tareas convertidos:', permisosTareas);
-
+  const actualizarPermisosUsuario = async (
+    usuarioId: string,
+    permisosModulos: Array<{
+      moduloId: number;
+      moduloDescripcion: string;
+      habilitado: boolean;
+      tareas: Array<{ tareaId: number; moduloId: number; habilitada: boolean }>;
+    }>
+  ) => {
+    try {
       await tareasUpdate(usuarioId, permisosModulos);
       // Revalidar los datos de usuarios para obtener los permisos actualizados
       await mutateUsuarios();

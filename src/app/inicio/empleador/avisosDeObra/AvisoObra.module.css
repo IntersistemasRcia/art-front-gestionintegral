@@ -3,3 +3,24 @@
     font-size: 1.5rem !important;
     margin-bottom: 1rem;
 }
+
+.subtitulo {
+    font-weight: bold !important;
+    font-size: 1.3rem !important;
+    margin-bottom: 0.5rem;
+}
+
+.checkboxGroup {
+  --checkbox-font-size: 1.5rem;
+}
+
+/* Tamaño de la label dentro de FormControlLabel */
+.checkboxGroup :global(.MuiFormControlLabel-root .MuiFormControlLabel-label) {
+  font-size: var(--checkbox-font-size) !important;
+  line-height: 1.2 !important;
+}
+
+/* Tipografia */
+.checkboxGroup :global(.MuiFormControlLabel-root) :global(.MuiTypography-root) {
+  font-size: var(--checkbox-font-size) !important;
+}

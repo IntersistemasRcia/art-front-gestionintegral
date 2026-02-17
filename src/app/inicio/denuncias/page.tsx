@@ -430,7 +430,7 @@ function DenunciasPage() {
   }>({
     open: false,
     message: '',
-    type: 'alert'
+    type: 'warning'
   });
 
   // Build query parameters
@@ -512,7 +512,7 @@ function DenunciasPage() {
     setModalMessage({
       open: false,
       message: '',
-      type: 'alert'
+      type: 'warning'
     });
   };
 

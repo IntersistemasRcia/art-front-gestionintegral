@@ -1,8 +1,8 @@
 // src/app/inicio/empleador/avisosDeObra/page.tsx
 "use client"
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios, { AxiosError } from "axios"; 
-import {Button,Card,CardContent,Dialog,DialogActions, DialogContent,DialogTitle, Grid,CircularProgress } from "@mui/material";
+import {Button,Card,CardContent,Dialog,DialogActions, DialogContent,DialogTitle, Grid,CircularProgress, Box } from "@mui/material";
 import { AddCircleOutline } from "@mui/icons-material";
 // Importaciones de módulos y tipos locales
 import AvisosObraList from "./AvisosObraList";
@@ -10,19 +10,58 @@ import AvisoObraForm from "./AvisoObraForm";
 import {AvisoObraRecord,Request,Response,ApiQueryState,ApiError,FormDataState } from "./types/types";
 import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import Formato from "@/utils/Formato";
 import { useAuth } from "@/data/AuthContext";
-const { useGetAvisoObra } = gestionEmpleadorAPI;
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
+const { useGetAvisoObra, avisoObraInsert, avisoObraUpdate, avisoObraDelete } = gestionEmpleadorAPI;
 import { getDefaultAvisoObra } from "./data/defaultAvisoObra";
 import AvisosObraPdfGenerator from "./AvisoObraPdfGenerator";
 
 const AvisosObraHandler: React.FC = () => {
+    const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+    const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+    const seleccionAutomaticaRef = useRef(false);
+
+    // Seleccionar automáticamente si solo hay una empresa
+    useEffect(() => {
+        if (!isLoadingEmpresas) {
+            if (empresas.length === 1) {
+                setEmpresaSeleccionada(empresas[0]);
+                seleccionAutomaticaRef.current = true;
+            } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+                setEmpresaSeleccionada(null);
+                seleccionAutomaticaRef.current = false;
+            }
+        }
+    }, [empresas.length, isLoadingEmpresas]);
+
+    const handleEmpresaChange = (
+        _event: React.SyntheticEvent,
+        newValue: Empresa | null
+    ) => {
+        setEmpresaSeleccionada(newValue);
+        seleccionAutomaticaRef.current = false;
+    };
+
+    const getEmpresaLabel = (empresa: Empresa | null): string => {
+        if (!empresa) return "";
+        return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
+    };
+
+    // Parámetros para la consulta de avisos de obra
+    const paramsAvisoObra = useMemo(() => {
+        return empresaSeleccionada?.cuit ? { CUIT: empresaSeleccionada.cuit } : {};
+    }, [empresaSeleccionada?.cuit]);
+
     // Obtención de datos con SWR
     const { 
         data: avisoObraRawData, 
         isLoading: isDataLoading, 
         error: fetchError,
         mutate: refetchAvisos // Función de SWR para forzar la recarga
-    } = useGetAvisoObra(); 
+    } = useGetAvisoObra(paramsAvisoObra); 
 
     const { user } = useAuth(); 
     const empresaCUIT = user?.empresaCUIT;
@@ -65,8 +104,6 @@ const AvisosObraHandler: React.FC = () => {
 
         if ([Request.Insert, Request.Change, Request.Delete].includes(action as Request)) {
             const isInsert = action === Request.Insert;
-            const method = isInsert ? "post" : action === Request.Change ? "put" : "delete";
-            const urlSuffix = isInsert ? "AvisoObra" : `AvisoObra/${data.interno}`;
             
             // Preparar payload: NO enviar 'interno' en INSERT
             const payload: Partial<AvisoObraRecord> = { ...data };
@@ -74,24 +111,35 @@ const AvisosObraHandler: React.FC = () => {
                  // El casting a any permite eliminar la propiedad opcional
                 delete (payload as any).interno;
             }
-            // Lógica de Petición HTTP
-            axios.request({
-                method: method,
-                url: `http://arttest.intersistemas.ar:8670/api/${urlSuffix}`,
-                headers: {
-                    "Content-Type": "application/json",
-                    // Aquí va el Authorization Bearer si fuera necesario
-                },
-                data: action === Request.Delete ? undefined : payload,
-            })
-            .then(async (response) => {
-                // Si hay confirmación (la fecha no es null), abrimos el PDF
-                if (data.confirmacionFecha != null) await abrirPDFAvisoDeObra(response.data);
-                cerrarFormulario(true);
-            })
-            .catch(async (error: AxiosError | any) => {
-                abrirError(error);
-            });
+            
+            // Lógica de Petición HTTP usando gestionEmpleadorAPI
+            let requestPromise: Promise<any>;
+            
+            if (isInsert) {
+                requestPromise = avisoObraInsert(payload);
+            } else if (action === Request.Change) {
+                if (!data.interno) {
+                    abrirError({ title: "Error", message: "El interno es requerido para actualizar" });
+                    return;
+                }
+                requestPromise = avisoObraUpdate(data.interno, payload);
+            } else { // Request.Delete
+                if (!data.interno) {
+                    abrirError({ title: "Error", message: "El interno es requerido para eliminar" });
+                    return;
+                }
+                requestPromise = avisoObraDelete(data.interno);
+            }
+            
+            requestPromise
+                .then(async (response) => {
+                    // Si hay confirmación (la fecha no es null), abrimos el PDF
+                    if (data.confirmacionFecha != null) await abrirPDFAvisoDeObra(response);
+                    cerrarFormulario(true);
+                })
+                .catch(async (error: AxiosError | any) => {
+                    abrirError(error);
+                });
         }
         
     }, [apiQuery, refetchAvisos]); // Dependencias: apiQuery y la función de recarga de SWR
@@ -164,8 +212,10 @@ const AvisosObraHandler: React.FC = () => {
         }
 
         // Rellenar datos estáticos del empleador (si no existen)
-        currentRecord.empleadorCUIT = empresaCUIT ?? currentRecord.empleadorCUIT ?? null;
-        currentRecord.empleadorRazonSocial = empresaRazonSocial ?? currentRecord.empleadorRazonSocial ?? null;
+        const cuitParaUsar = empresaSeleccionada?.cuit ?? empresaCUIT;
+        const razonSocialParaUsar = empresaSeleccionada?.razonSocial ?? empresaRazonSocial;
+        currentRecord.empleadorCUIT = cuitParaUsar ?? currentRecord.empleadorCUIT ?? null;
+        currentRecord.empleadorRazonSocial = razonSocialParaUsar ?? currentRecord.empleadorRazonSocial ?? null;
         
         setFormData({ request: request, data: currentRecord });
     };
@@ -232,13 +282,35 @@ const AvisosObraHandler: React.FC = () => {
         <Card variant="outlined">
             <CardContent>
                 <Grid container direction="column" rowSpacing={2}>
+                    <Grid style={{ marginBottom: '16px' }}>
+                        <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
+                            <CustomSelectSearch<Empresa>
+                                options={empresas}
+                                getOptionLabel={getEmpresaLabel}
+                                value={empresaSeleccionada}
+                                onChange={handleEmpresaChange}
+                                label="Seleccionar Empresa"
+                                placeholder="Buscar empresa..."
+                                loading={isLoadingEmpresas}
+                                loadingText="Cargando empresas..."
+                                noOptionsText={
+                                    isLoadingEmpresas
+                                        ? "Cargando..."
+                                        : empresas.length === 0
+                                        ? "No hay empresas disponibles"
+                                        : "No se encontraron empresas"
+                                }
+                                disabled={isLoadingEmpresas}
+                            />
+                        </Box>
+                    </Grid>
                     <Grid  style={{ marginBottom: '16px' }}>
                         <CustomButton
                             variant="contained"
                             color="primary"
                             startIcon={<AddCircleOutline />}
                             onClick={() => handleFormOpen(Request.Insert, getDefaultAvisoObra())}
-                            disabled={isDataLoading} 
+                            disabled={isDataLoading || !empresaSeleccionada} 
                         >
                             Agregar Aviso
                         </CustomButton>

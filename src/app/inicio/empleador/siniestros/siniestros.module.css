@@ -1,0 +1,11 @@
+.empresaSelectorContainer {
+  margin-bottom: 16px;
+  max-width: 400px;
+}
+
+@media (max-width: 600px) {
+  .empresaSelectorContainer {
+    max-width: 100%;
+  }
+}
+

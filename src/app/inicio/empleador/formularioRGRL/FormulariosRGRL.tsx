@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import DataTableImport from '@/utils/ui/table/DataTable';
 import { saveTable, type TableColumn } from '@/utils/excelUtils';
@@ -15,6 +15,10 @@ import Formato, { CUIP, Fecha, FechaHora } from '@/utils/Formato';
 import { useAuth } from '@/data/AuthContext';
 import dayjs from 'dayjs';
 import styles from './FormulariosRGRL.module.css';
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { Box } from '@mui/material';
 import type {
   FormulariosRGRLProps,
   FormularioRGRL,
@@ -311,7 +315,11 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   // Estados principales: loading, lista de formularios, selección, detalle/planillas,
   // pestañas secundarias, modales (impresión/generación), y paginación del detalle.
   const router = useRouter();
-  const [loading, setLoading] = useState<boolean>(true);
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
+  
+  const [loading, setLoading] = useState<boolean>(false);
   const [formulariosRGRL, setFormulariosRGRL] = useState<FormularioRGRL[]>([]);
   const [cargarFormulario, setCargarFormulario] = useState<boolean>(false);
   const [internoSeleccionado, setInternoSeleccionado] = useState<number>(0);
@@ -366,16 +374,53 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     if (detallePage > totalPages) setDetallePage(totalPages);
   }, [totalPages, detallePage]);
 
-  const [cuitBusqueda, setCuitBusqueda] = useState<string>(String(empresaCUIT ?? ''));
+  // Seleccionar automáticamente si solo hay una empresa
+  useEffect(() => {
+    if (!isLoadingEmpresas) {
+      if (empresas.length === 1) {
+        setEmpresaSeleccionada(empresas[0]);
+        seleccionAutomaticaRef.current = true;
+      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+        setEmpresaSeleccionada(null);
+        seleccionAutomaticaRef.current = false;
+      }
+    }
+  }, [empresas.length, isLoadingEmpresas]);
+
+  // Limpiar formularios cuando cambia la empresa seleccionada
+  useEffect(() => {
+    setFormulariosRGRL([]);
+    setInternoSeleccionado(0);
+    setActiveTab('none');
+    setDetalle([]);
+    setDetallePage(1);
+    setGremios([]);
+    setContratistas([]);
+    setResponsables([]);
+  }, [empresaSeleccionada?.cuit]);
+
+  const handleEmpresaChange = (
+    _event: React.SyntheticEvent,
+    newValue: Empresa | null
+  ) => {
+    setEmpresaSeleccionada(newValue);
+    seleccionAutomaticaRef.current = false;
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
+  };
 
   const fetchFormularios = useCallback(
     // Busca cabeceras por CUIT; si CUIT inválido, limpia la grilla.
     async (cuitParam?: number) => {
       try {
         setLoading(true);
-        const c = Number(cuitParam ?? empresaCUIT);
+        const c = Number(cuitParam ?? empresaSeleccionada?.cuit);
         if (!c || Number.isNaN(c)) {
           setFormulariosRGRL([]);
+          setLoading(false);
           return;
         }
         const response = await CargarConsultaFormulariosRGRL(c);
@@ -384,25 +429,15 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         setLoading(false);
       }
     },
-    [empresaCUIT]
+    [empresaSeleccionada?.cuit]
   );
-  // Carga inicial y recarga cuando cambian "cuit" o "referenteDatos".
+  
+  // Carga inicial y recarga cuando cambian la empresa seleccionada o "referenteDatos".
   useEffect(() => {
-    fetchFormularios(empresaCUIT);
-  }, [fetchFormularios, referenteDatos, empresaCUIT]);
-
-  // Ejecuta búsqueda por CUIT ingresado y resetea selección/tabs/detalle.
-  const onBuscar = async () => {
-    await fetchFormularios(Number(cuitBusqueda));
-    setInternoSeleccionado(0);
-    setActiveTab('none');
-
-    setDetalle([]);
-    setDetallePage(1);
-    setGremios([]);
-    setContratistas([]);
-    setResponsables([]);
-  };
+    if (empresaSeleccionada?.cuit) {
+      fetchFormularios(empresaSeleccionada.cuit);
+    }
+  }, [fetchFormularios, referenteDatos, empresaSeleccionada?.cuit]);
 
   //#region table-and-handlers
   // Definición de columnas de la grilla principal y handlers asociados.
@@ -617,27 +652,27 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
       {!cargarFormulario ? (
         <div>
-          {/* Buscador: input para CUIT y tecla Enter para buscar */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="text"
-              disabled={empresaCUIT != 0}
-              placeholder="Ingresá CUIT/CUIL (solo números)"
-              value={cuitBusqueda}
-              onChange={(e) => setCuitBusqueda(e.target.value.replace(/[^\d]/g, ''))}
-              onKeyDown={(e) => e.key === 'Enter' && onBuscar()}
-              style={{
-                height: 36,
-                padding: '6px 10px',
-                border: '1px solid #c7c7c7',
-                borderRadius: 6,
-                width: 280,
-              }}
+          {/* Selector de empresa */}
+          <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
+            <CustomSelectSearch<Empresa>
+              options={empresas}
+              getOptionLabel={getEmpresaLabel}
+              value={empresaSeleccionada}
+              onChange={handleEmpresaChange}
+              label="Seleccionar Empresa"
+              placeholder="Buscar empresa..."
+              loading={isLoadingEmpresas}
+              loadingText="Cargando empresas..."
+              noOptionsText={
+                isLoadingEmpresas
+                  ? "Cargando..."
+                  : empresas.length === 0
+                  ? "No hay empresas disponibles"
+                  : "No se encontraron empresas"
+              }
+              disabled={isLoadingEmpresas}
             />
-            <CustomButton disabled={empresaCUIT != 0} onClick={onBuscar}>BUSCAR</CustomButton>
-          </div>
-
-          <br />
+          </Box>
 
           {/* Acciones: editar, generar, replicar y exportar */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
@@ -927,11 +962,13 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       >
         <GenerarFormularioRGRL
           //Generar
-          initialCuit={Number(cuitBusqueda) || Number(cuit) || undefined}
+          initialCuit={empresaSeleccionada?.cuit || undefined}
           replicaDe={replicaDe}
           onDone={async () => {
             setOpenGenerar(false);
-            await fetchFormularios(Number(cuitBusqueda) || cuit);
+            if (empresaSeleccionada?.cuit) {
+              await fetchFormularios(empresaSeleccionada.cuit);
+            }
           }}
         />
       </CustomModal>

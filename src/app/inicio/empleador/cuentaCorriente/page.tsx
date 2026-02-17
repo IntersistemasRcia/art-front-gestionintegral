@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, SyntheticEvent } from 'react';
+import React, { useMemo, useState, SyntheticEvent, useEffect, useRef } from 'react';
 import DataTable from '@/utils/ui/table/DataTable'; 
 import { ColumnDef } from '@tanstack/react-table';
 import { Box, Typography } from '@mui/material';
@@ -8,33 +8,131 @@ import Formato from '@/utils/Formato';
 import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
 import type { CuentaCorrienteRegistro, DDJJRegistro } from './types/cuentaCorriente';
 import ExportButtons from './components/ExportButtons';
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useSearchParams } from 'next/navigation';
 
 
 
-// Función auxiliar para formatear a moneda
-const formatCurrency = (value: number | string) => {
-    // Si el dato es una cadena con comas (como en ddjjData), reemplazar coma por punto
-    const cleanValue = typeof value === 'string' ? value.replace(',', '.') : value;
-    const num = parseFloat(String(cleanValue)); 
+// Funciones auxiliares para parsear y formatear números asegurando coma decimal
+const parseToNumber = (value: unknown): number => {
+    const s = String(value ?? '').trim();
+    if (s === '') return NaN;
+
+    const hasDot = s.indexOf('.') !== -1;
+    const hasComma = s.indexOf(',') !== -1;
+
+    let normalized = s;
+    if (hasDot && hasComma) {
+        normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else if (hasComma && !hasDot) {
+        // "1234,56" -> "1234.56"
+        normalized = normalized.replace(',', '.');
+    }
+
+    return parseFloat(normalized);
+};
+
+const formatCurrency = (value: unknown) => {
+    const num = typeof value === 'number' ? value : parseToNumber(value);
 
     return new Intl.NumberFormat('es-AR', {
         style: 'currency',
         currency: 'ARS',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-    }).format(num);
+    }).format(isNaN(num) ? 0 : num);
 };
+
+const formatDecimal = (
+    value: unknown,
+    options: Intl.NumberFormatOptions = { minimumFractionDigits: 2, maximumFractionDigits: 6 }
+) => {
+    const num = typeof value === 'number' ? value : parseToNumber(value);
+    if (isNaN(num)) return '';
+    return new Intl.NumberFormat('es-AR', options).format(num);
+};
+
+const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
 
 // ----------------------------------------------------
 // 3. DEFINICIÓN DE COLUMNAS Y COMPONENTE
 // ----------------------------------------------------
 function CuentaCorrientePage() {
+    const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+    const searchParams = useSearchParams();
+    const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+    const seleccionAutomaticaRef = useRef(false);
+
+    const cuitQuery = searchParams?.get('cuit') ?? '';
+    const cuitDesdeQuery = normalizeDigits(cuitQuery);
+    const bloquearBusquedaPorCuit = Boolean(cuitDesdeQuery);
+    
+    // Seleccionar automáticamente si solo hay una empresa o fijar empresa por CUIT cuando viene desde comercializador
+    useEffect(() => {
+        if (isLoadingEmpresas) return;
+
+        if (cuitDesdeQuery) {
+            const match = empresas.find((e) => normalizeDigits(e.cuit) === cuitDesdeQuery);
+            if (match) {
+                setEmpresaSeleccionada(match);
+                seleccionAutomaticaRef.current = true;
+            }
+            return;
+        }
+            if (empresas.length === 1) {
+                setEmpresaSeleccionada(empresas[0]);
+                seleccionAutomaticaRef.current = true;
+            } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+                setEmpresaSeleccionada(null);
+                seleccionAutomaticaRef.current = false;
+            }
+        
+    }, [empresas, isLoadingEmpresas, cuitDesdeQuery]);
+
+    const handleEmpresaChange = (
+        _event: React.SyntheticEvent,
+        newValue: Empresa | null
+    ) => {
+        if (bloquearBusquedaPorCuit) return;
+        setEmpresaSeleccionada(newValue);
+        seleccionAutomaticaRef.current = false;
+    };
+
+    const getEmpresaLabel = (empresa: Empresa | null): string => {
+        if (!empresa) return "";
+        return `${empresa.razonSocial}`;
+    };
     
     // Consultar datos con ordenamiento por periodo descendente desde el backend
-    const { data: CtaCteRawData, isLoading: isCtaCteLoading } = gestionEmpleadorAPI.useGetVEmpleadorDDJJ({ 
-        sort: '-Periodo',
-        page: '0,1000'
-    });
+    const cuitEmpresaSeleccionada = empresaSeleccionada?.cuit? normalizeDigits(empresaSeleccionada.cuit): '';
+    const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
+    const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
+    const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
+        cuitFinal ? { CUIT: cuitFinal } : {}
+    );
+    const { data: CtaCteRawData, isLoading: isCtaCteLoading } = gestionEmpleadorAPI.useGetVEmpleadorDDJJ(
+        cuitFinal
+            ? { 
+                CUIT: cuitFinal,
+                sort: '-Periodo',
+                page: '0,1000'
+              }
+            : {
+                sort: '-Periodo',
+                page: '0,1000'
+              }
+    );
+    useEffect(() => {
+        if (!bloquearBusquedaPorCuit) return;
+        if (empresaSeleccionada) return;
+
+        const razonSocial = (polizaRawData as any)?.empleador_Denominacion;
+        if (!razonSocial) return;
+
+        setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as Empresa);
+    }, [bloquearBusquedaPorCuit, empresaSeleccionada, polizaRawData]);
     
     // Usar los datos directamente sin ordenar en el frontend
     const sortedData = useMemo(() => {
@@ -51,7 +149,7 @@ function CuentaCorrientePage() {
         setCurrentTab(newTabValue as number); 
     };
 
-    const sumarleUnMesAlPeriodo = (periodo: string | number | null | undefined) => {
+    const sumarleUnMesAlPeriodo = (periodo: unknown) => {
         const periodoStr = String(periodo ?? '');
 
         if (periodoStr.length < 6) {
@@ -72,21 +170,21 @@ function CuentaCorrientePage() {
     }
 
     const columns: ColumnDef<CuentaCorrienteRegistro>[] = useMemo(() => [
-        { id: 'periodoCobertura', header: 'Período Cobertura', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(sumarleUnMesAlPeriodo(info.getValue()),"MM-YYYY"), meta: { align: 'center'} }, //DEBO RESTAR UN MES AL VALOR
-        { id: 'periodoDDJJ', header: 'Período DDJJ', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} },
-        { header: 'Fecha de Presentación', accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue()), meta: { align: 'center'} },
+        { id: 'periodoCobertura', header: 'Período Cobertura', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(sumarleUnMesAlPeriodo(info.getValue() as any) as any,"MM-YYYY"), meta: { align: 'center'} }, //DEBO RESTAR UN MES AL VALOR
+        { id: 'periodoDDJJ', header: 'Período DDJJ', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue() as any,"MM-YYYY"), meta: { align: 'center'} },
+        { header: 'Fecha de Presentación', accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue() as any), meta: { align: 'center'} },
         { header: 'Tipo', accessorKey: 'origenDDJJ', meta: { align: 'center'} },
-        { header: 'Masa Salarial', accessorKey: 'masaSalarial', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        { header: 'Masa Salarial', accessorKey: 'masaSalarial', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: 'Cant. Trabajadores', accessorKey: 'cantidadTrabajadores', meta: { align: 'center'} },
-        { header: 'Alic. Fija', accessorKey: 'alicuotaFijaVigenteTrabajador', meta: { align: 'center'} },
-        { header: 'Alic. Var.', accessorKey: 'alicuotaVariableVigenteSobreMasaSalarial', meta: { align: 'center'} },
-        { header: 'Alic. Fija + FFEP Declarado', accessorKey: 'alicuotaFijaDeclaradaTrabajador', meta: { align: 'center'} },
-        { header: 'Alic. Var. Declarada', accessorKey: 'alicuotaVariableDeclaradaMasaSalarial', meta: { align: 'center'} },
-        { header: 'Premio A Pagar', accessorKey: 'primaAPagar', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'Total Devengado FFEP', accessorKey: 'totalDevengadoFFEP', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'FFEP S/Res', accessorKey: 'ffep', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'Total Cuota a Pagar', accessorKey: 'totalCuota', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'Total Pagado Cuota', accessorKey: 'totalPagadoCuota', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        { header: 'Alic. Fija', accessorKey: 'alicuotaFijaVigenteTrabajador', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: 'Alic. Var.', accessorKey: 'alicuotaVariableVigenteSobreMasaSalarial', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: 'Alic. Fija + FFEP Declarado', accessorKey: 'alicuotaFijaDeclaradaTrabajador', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: 'Alic. Var. Declarada', accessorKey: 'alicuotaVariableDeclaradaMasaSalarial', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: 'Premio A Pagar', accessorKey: 'primaAPagar', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: 'Total Devengado FFEP', accessorKey: 'totalDevengadoFFEP', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: 'FFEP S/Res', accessorKey: 'ffep', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: 'Total Cuota a Pagar', accessorKey: 'totalCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: 'Total Pagado Cuota', accessorKey: 'totalPagadoCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: 'Saldo Mensual', accessorKey: 'saldo', 
             cell: info => {
                 const saldo = info.getValue() as number;
@@ -95,17 +193,17 @@ function CuentaCorrientePage() {
                 return <span style={style}>{formatCurrency(mensual)}</span>;
             }
             , meta: { align: 'center'} },
-        { header: 'Saldo Acumulado', accessorKey: 'saldoAcumulado', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        { header: 'Saldo Acumulado', accessorKey: 'saldoAcumulado', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
     ], []);
 
     const columnsDDJJ: ColumnDef<DDJJRegistro>[] = useMemo(() => [
-        { header: 'Período DDJJ', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} },
-        { header: 'Presentación', accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue()), meta: { align: 'center'} },
+        { header: 'Período DDJJ', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue() as any,"MM-YYYY"), meta: { align: 'center'} },
+        { header: 'Presentación', accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue() as any), meta: { align: 'center'} },
         { header: 'Tipo', accessorKey: 'origenDDJJ', meta: { align: 'center'} },
-        { header: 'Alic. Fija', accessorKey: 'alicuotaFijaDeclaradaTrabajador', meta: { align: 'center'} },
-        { header: 'Alic. Variable', accessorKey: 'alicuotaVariableDeclaradaMasaSalarial', meta: { align: 'center'} },
+        { header: 'Alic. Fija', accessorKey: 'alicuotaFijaDeclaradaTrabajador', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: 'Alic. Variable', accessorKey: 'alicuotaVariableDeclaradaMasaSalarial', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
         { header: 'Cant. Trabajadores', accessorKey: 'cantidadTrabajadores', meta: { align: 'center'} },
-        { header: 'Masa Salarial', accessorKey: 'masaSalarial', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
+        { header: 'Masa Salarial', accessorKey: 'masaSalarial', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
     ], []);
 
     const tabItems = [
@@ -150,6 +248,26 @@ function CuentaCorrientePage() {
 
     return (
         <div style={{ padding: '20px' }}>
+            <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
+                <CustomSelectSearch<Empresa>
+                    options={empresas}
+                    getOptionLabel={getEmpresaLabel}
+                    value={empresaSeleccionada}
+                    onChange={handleEmpresaChange}
+                    label="Seleccionar Empresa"
+                    placeholder="Buscar empresa..."
+                    loading={isLoadingEmpresas}
+                    loadingText="Cargando empresas..."
+                    noOptionsText={
+                        isLoadingEmpresas
+                            ? "Cargando..."
+                            : empresas.length === 0
+                            ? "No hay empresas disponibles"
+                            : "No se encontraron empresas"
+                    }
+                            disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
+                />
+            </Box>
             
             <CustomTab 
                 tabs={tabItems} 

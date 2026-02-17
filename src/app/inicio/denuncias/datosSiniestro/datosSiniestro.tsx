@@ -12,8 +12,19 @@ import {
   DenunciaFormData,
 } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
-import ArtAPI, { formatEstablecimientoLabel } from "@/data/artAPI";
+import ArtAPI from "@/data/artAPI";
 import type { ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
+
+const formatEstablecimientoLabel = (est?: Partial<ApiEstablecimientoEmpresa> | null): string => {
+  if (!est) return "";
+  const nroSucursal = est.nroSucursal;
+  const domicilio = `${est.domicilioCalle || ""} ${est.domicilioNro || ""}`.trim();
+  const parts: string[] = [];
+  if (nroSucursal !== undefined && nroSucursal !== null) parts.push(String(nroSucursal));
+  if (domicilio) parts.push(domicilio);
+  if (parts.length === 0) return "";
+  return `Sucursal: ${parts.join(" - ")}`;
+};
 
 type DatosSiniestroProps = {
   form: DenunciaFormData;

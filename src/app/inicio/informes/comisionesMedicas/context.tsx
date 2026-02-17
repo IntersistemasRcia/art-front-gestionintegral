@@ -62,6 +62,8 @@ const numeroSiniestroFormatter: Formatter = (v) => Formato.Mascara(v, "####-####
 const fechaHoraFormatter: Formatter = (v) => Formato.FechaHora(v);
 const fechaFormatter: Formatter = (v) => Formato.Fecha(v);
 const numeroFormatter: Formatter = (v) => Formato.Numero(v);
+const monedaFormatter: Formatter = (v) => Formato.Moneda(v);
+const porcentajeFormatter: Formatter = (v) => v == null ? v : Formato.Porcentaje(v/100);
 const cuipFormatter: Formatter = (v) => Formato.CUIP(v);
 const valueOptionsFormatter: OptionsFormatter = (options) => ((v: string) => (options[v] ?? v));
 const blankOptionsFormatter: OptionsFormatter = (options) => ((v: string) => (options[v] ?? ""));
@@ -81,6 +83,7 @@ const optionsSelect = (options: any, formatter = valueOptionsFormatter, values =
 const SNOptions = { S: "Si", N: "No" };
 const tipoSiniestroOptions = { T: "Accidente Trabajo", P: "Enfermedad Profesional", I: "Accidente In-Itinere", R: "Reingreso" };
 const estadoOptions = { 1: "Pendiente", 2: "En gestión", 3: "Archivado" };
+const calculoAnticipadoOptions = { 0: "Pendiente", 1: "En gestión", 2: "Finalizado" };
 
 const CCMMContext = createContext<DataContextType | undefined>(undefined);
 //#endregion globales
@@ -101,6 +104,8 @@ export function CCMMContextProvider({ children }: { children: ReactNode }) {
       });
       addTable("View_ConsultaCCMM", (addField) => {
         addField({ name: "CCMMCas_Interno", label: "Interno", type: "number" });
+        addField({ name: "CCMMCas_NroCaso", label: "Nro. Caso", type: "number", formatter: numeroFormatter });
+        addField({ name: "CCMMCas_Expediente", label: "Expediente" });
         addField({ name: "Den_SiniestroNro", label: "Siniestro", type: "number", formatter: numeroSiniestroFormatter });
         addField({ name: "CCMMCas_MotivoCodigo", label: "Motivo de Expediente", type: "number" });
         addField({ name: "CCMMCas_TipoCodigo", label: "Tipo de Expediente", type: "number" });
@@ -119,6 +124,14 @@ export function CCMMContextProvider({ children }: { children: ReactNode }) {
         addField({ name: "CCMMCasTipValDan_AudHomoMontoHomologado", label: "Monto Homologado", type: "number", formatter: numeroFormatter });
         addField({ name: "CCMMCasTipValDan_AcuHomoNotificacionFecha", label: "Fecha de Acuerdo", type: "date", formatter: fechaFormatter });
         addField({ name: "CCMMCasTipValDan_AcuHomoPagoFecha", label: "Fecha de Pago", type: "date", formatter: fechaFormatter });
+        addField({ name: "CCMMCasTipValDan_AltaMedicaFecha", label: "Fecha alta médica", type: "date", formatter: fechaFormatter });
+        addField({ name: "CCMMCasTipValDan_InicioFecha", label: "Fecha inicio", type: "date", formatter: fechaFormatter });
+        addField({ name: "CCMMCasTipValDan_ILP1", label: "ILP 1%", type: "number", formatter: monedaFormatter });
+        addField({ name: "CCMMCasTipValDan_CalculoAnticipado", label: "Cálculo anticipado", ...optionsSelect(calculoAnticipadoOptions) });
+        addField({ name: "CCMMCasTipValDan_DefuncionFecha", label: "Fecha defunción", type: "date", formatter: fechaFormatter });
+        addField({ name: "CCMMCasTipValDan_FinalizadoFecha", label: "Fecha finalizado", type: "date", formatter: fechaFormatter });
+        addField({ name: "CCMMCasTipValDan_ILP", label: "% ILP", type: "number", formatter: porcentajeFormatter });
+        addField({ name: "CCMMCasTipValDan_MontoIndemnizatorio", label: "Monto indemnizatorio", type: "number", formatter: monedaFormatter });
       });
       setTables(tables);
       function addTable(table: TablesName, addFieldsCallback?: (addField: (field: TablesField) => boolean) => void) {
@@ -200,7 +213,7 @@ export function CCMMContextProvider({ children }: { children: ReactNode }) {
       columns.push({
         accessorKey: name,
         header: label ?? name,
-        cell: formatter ? (info) => formatter(info.getValue()) : undefined
+        cell: formatter ? (info) => formatter(info.getValue()) : (info) => info.getValue()
       });
       headers.columns[name] = { key: name, header: label ?? name };
       if (formatter) headers.options.formatters!.row![name] = formatter;

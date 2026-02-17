@@ -16,7 +16,9 @@ import DataTableImport from '@/utils/ui/table/DataTable';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 import ArtAPI from '@/data/artAPI';
-import styles from '../FormulariosRAR.module.css';
+import styles from './FormularioRARGenerar.module.css';
+
+import ExcelImportSection from './ExcelImportSection';
 
 dayjs.extend(customParseFormat);
 dayjs.extend(utc);
@@ -35,6 +37,7 @@ interface CrearProps {
   formulariosRAR?: any[]; // opcional
   editarId?: number; // interno del formulario a editar (si existe)
   replicaDe?: number; // interno del formulario a replicar (si existe)
+  razonSocial?: string; // razón social de la empresa seleccionada
 }
 
 type OpcionEstablecimiento = { interno: string; domicilioCalle: string; displayText: string };
@@ -47,10 +50,11 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   formulariosRAR = [],
   editarId = 0,
   replicaDe = 0,
+  razonSocial,
 }) => {
   // encabezado
   const [cuitActual, setCuitActual] = React.useState<string>(String(cuit || ''));
-  const [razonSocialActual, setRazonSocialActual] = React.useState<string>('');
+  const [razonSocialActual, setRazonSocialActual] = React.useState<string>(razonSocial || '');
 
   // establecimientos y agentes
   const [opcionesEstablecimientos, setOpcionesEstablecimientos] = React.useState<OpcionEstablecimiento[]>([]);
@@ -88,7 +92,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   // Modal de mensajes (errores/alertas)
   const [modalMessageOpen, setModalMessageOpen] = React.useState<boolean>(false);
   const [modalMessageText, setModalMessageText] = React.useState<string>('');
-  const [modalMessageType, setModalMessageType] = React.useState<'success' | 'error' | 'alert'>('error');
+  const [modalMessageType, setModalMessageType] = React.useState<'success' | 'error' | 'warning'>('error');
 
   // Estados para edición
   const [editandoIndex, setEditandoIndex] = React.useState<number>(-1);
@@ -117,6 +121,9 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     ultimoExamenMedico: '',
     codigoAgente: ''
   });
+
+    // Estado para mostrar errores
+  const [mensajeError, setMensajeError] = React.useState<string>('');
 
   const guardandoRef = React.useRef(false);
 
@@ -176,8 +183,9 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     },
     {
       accessorKey: 'Exposicion',
-      header: 'Exposición',
+      header: 'Horas de Exposición',
       size: 90,
+      meta: { align: 'center' }
     },
     {
       accessorKey: 'FechaFinExposicion',
@@ -187,7 +195,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
         const fecha = getValue();
         return fecha && fecha.trim() !== ''
           ? fecha
-          : <span style={{ color: '#888', fontStyle: 'italic' }}>No especif.</span>;
+          : null;
       }
     },
     {
@@ -211,7 +219,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
         );
 
         return (
-          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+          <div className={styles.accionesContainer}>
             <EditIcon
               onClick={() => handleEditarTrabajador(index)}
               style={{
@@ -340,21 +348,39 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     return filas.some((f) => normalizarCuil(f.CUIL) === cuilNum);
   }, [cuil, filas]);
 
+  // Verificar si el CUIL ya existe con exposición = 0
+  const cuilExisteConExposicionCero = React.useMemo(() => {
+    const cuilNum = normalizarCuil(cuil);
+    if (!cuilNum) return false;
+    return filas.some((f) => {
+      const cuilFila = normalizarCuil(f.CUIL);
+      const exposicionFila = Number(f.Exposicion || 0);
+      return cuilFila === cuilNum && exposicionFila === 0;
+    });
+  }, [cuil, filas]);
+
   const puedeCargarTrabajador = React.useMemo(() => {
 
     if (!cantidadesCompletas || !trabajadorCompleto) return false;
 
     if (totalTrabajadoresRequeridos <= 0) return false;
 
+    // Si el CUIL ya existe con exposición = 0, no se puede volver a cargar
+    if (cuilExisteConExposicionCero) return false;
+
+    // Si no se alcanzó el límite, puede cargar cualquier CUIL (nuevo o existente, excepto los que ya tienen exposición 0)
     if (trabajadoresCargados < totalTrabajadoresRequeridos) return true;
 
-    return esCuilRepetido;
+    // Si ya se alcanzó el límite, solo puede cargar si el CUIL ya existe (repetir con diferente agente)
+    // Pero no si ya tiene exposición = 0
+    return esCuilRepetido && !cuilExisteConExposicionCero;
   }, [
     cantidadesCompletas,
     trabajadorCompleto,
     totalTrabajadoresRequeridos,
     trabajadoresCargados,
     esCuilRepetido,
+    cuilExisteConExposicionCero,
   ]);
 
 
@@ -378,15 +404,24 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
 
   // ===== Carga inicial: encabezado + selects =====
   React.useEffect(() => {
-    // Encabezado: si tenés datos en el listado padre, tomamos el CUIT/Razón Social de ahí
-    const fila = formulariosRAR.find((f) => (f.cuit || f.CUIT) && (f.razonSocial || f.RazonSocial));
-    if (fila) {
-      setCuitActual(String(fila.cuit || fila.CUIT || cuit || ''));
-      setRazonSocialActual(String(fila.razonSocial || fila.RazonSocial || ''));
-    } else {
-      setCuitActual(String(cuit || ''));
+    // Prioridad 1: Si viene razonSocial como prop (empresa seleccionada), usarla
+    if (razonSocial) {
+      setRazonSocialActual(razonSocial);
     }
-  }, [cuit, formulariosRAR]);
+    
+    // Actualizar CUIT con el valor del prop (que puede venir de empresa seleccionada)
+    setCuitActual(String(cuit || ''));
+    
+    // Encabezado: si tenés datos en el listado padre, tomamos el CUIT/Razón Social de ahí
+    // (solo si no hay empresa seleccionada explícitamente)
+    if (!razonSocial) {
+      const fila = formulariosRAR.find((f) => (f.cuit || f.CUIT) && (f.razonSocial || f.RazonSocial));
+      if (fila) {
+        setCuitActual(String(fila.cuit || fila.CUIT || cuit || ''));
+        setRazonSocialActual(String(fila.razonSocial || fila.RazonSocial || ''));
+      }
+    }
+  }, [cuit, formulariosRAR, razonSocial]);
 
   React.useEffect(() => {
     let cancel = false;
@@ -394,12 +429,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
       if (!esModoEdicionFormulario || editarId <= 0) return;
       try {
         console.log(' MODO EDICIÓN: cargando formulario existente', editarId);
-        const r = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${editarId}`);
-        if (!r.ok) {
-          console.error(' No se pudo cargar el formulario para edición');
-          return;
-        }
-        const data = await r.json();
+        const data = await ArtAPI.getFormularioRARById(editarId);
         if (cancel) return;
 
         // Cantidades
@@ -493,37 +523,26 @@ React.useEffect(() => {
           return;
         }
 
-        // Establecimientos
-        const url = `http://arttest.intersistemas.ar:8302/api/Establecimientos/Empresa/${cuitParaUsar}`;
-
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          mode: 'cors',
-        });
-
-        const establecimientos = resp.ok ? await resp.json() : [];
+        // Establecimientos (por CUIT del usuario logueado)
+        const establecimientos = await ArtAPI.establecimientoList({ cuit: Number(cuitParaUsar), Activos: true });
 
         console.log(' Respuesta establecimientos:', establecimientos);
 
-        const estArr = Array.isArray(establecimientos)
-          ? establecimientos
-          : establecimientos?.data
-            ? (Array.isArray(establecimientos.data) ? establecimientos.data : [establecimientos.data])
-            : (establecimientos ? [establecimientos] : []);
+        const estArr = Array.isArray(establecimientos) ? establecimientos : [];
 
         console.log(' Array procesado:', estArr);
 
         const opciones: OpcionEstablecimiento[] = estArr
-          .filter((est: any) => est && (est.domicilioCalle || est.interno))
-          .map((est: any) => ({
-            interno: String(est.interno ?? ''),
-            domicilioCalle: String(est.domicilioCalle ?? ''),
-            displayText: `${est.domicilioCalle ?? 'Sin dirección'}`
-          }));
+          .filter((est: any) => est && (est.nroSucursal || est.domicilioCalle || est.interno))
+          .map((est: any) => {
+            const nro = est.nroSucursal ?? est.interno ?? '';
+            const direccion = [est.domicilioCalle, est.domicilioNro].filter(Boolean).join(' ');
+            return {
+              interno: String(est.interno ?? ''),
+              domicilioCalle: String(est.domicilioCalle ?? ''),
+              displayText: `${nro}${direccion ? ' - ' + direccion : ''}`.trim()
+            } as OpcionEstablecimiento;
+          });
 
         console.log(' Opciones finales:', opciones);
 
@@ -733,27 +752,30 @@ React.useEffect(() => {
     }
 
     const cuilNum = normalizarCuil(cuil);
-
     const yaExisteCuil = filas.some((f) => normalizarCuil(f.CUIL) === cuilNum);
-    const existeNoExpuesto = filas.some((f) => normalizarCuil(f.CUIL) === cuilNum && Number(String(f.Exposicion || '0')) === 0);
 
-    // Si ya existe un registro NO expuesto con ese CUIL, no permitir repetirlo
-    if (existeNoExpuesto) {
+    // Verificar si el CUIL ya existe con exposición = 0
+    const existeConExposicionCero = filas.some((f) => {
+      const cuilFila = normalizarCuil(f.CUIL);
+      const exposicionFila = Number(f.Exposicion || 0);
+      return cuilFila === cuilNum && exposicionFila === 0;
+    });
+
+    // Si el trabajador ya existe con exposición = 0, no se puede volver a cargar
+    if (existeConExposicionCero) {
       setModalMessageType('error');
-      setModalMessageText('No se puede agregar este CUIL: ya existe un trabajador marcado como NO expuesto con el mismo CUIL.');
+      setModalMessageText(`Este trabajador (CUIL: ${cuil}) ya fue cargado con horas de exposición = 0. No se puede volver a cargar un trabajador con exposición 0.`);
       setModalMessageOpen(true);
       return;
     }
 
-    // Si estamos intentando agregar este trabajador como NO expuesto y el CUIL ya existe en cualquier fila, bloquear
-    if (String(exposicion).trim() === '0' && yaExisteCuil) {
+    // Si ya se alcanzó el límite de trabajadores únicos y el CUIL no existe, bloquear
+    if (trabajadoresCargados >= totalTrabajadoresRequeridos && !yaExisteCuil) {
       setModalMessageType('error');
-      setModalMessageText('No se puede marcar como NO expuesto: el CUIL ya fue cargado anteriormente.');
+      setModalMessageText(`Ya se alcanzó el límite de ${totalTrabajadoresRequeridos} trabajadores únicos. Solo puede agregar trabajadores con CUILs ya cargados (con diferentes agentes causantes).`);
       setModalMessageOpen(true);
       return;
     }
-
-    const cuilsUnicosAntes = cuilsUnicos.size;
 
 
 
@@ -809,28 +831,54 @@ React.useEffect(() => {
 
     if (editandoIndex < 0) return;
 
-    const cuilNum = cuil.replace(/\D/g, '');
-    // Verificar CUIL duplicado (excluyendo el que estamos editando)
-    const duplicado = filas.some((f, idx) =>
-      idx !== editandoIndex && f.CUIL?.replace(/\D/g, '') === cuilNum
+    const cuilNum = normalizarCuil(cuil);
+    const yaExisteCuil = filas.some((f, idx) => 
+      idx !== editandoIndex && normalizarCuil(f.CUIL) === cuilNum
     );
 
-    // Si existe otro registro NO expuesto con este CUIL (distinto del que editamos), bloquear
-    const existeOtroNoExpuesto = filas.some((f, idx) =>
-      idx !== editandoIndex && f.CUIL?.replace(/\D/g, '') === cuilNum && Number(String(f.Exposicion || '0')) === 0
-    );
+    // Obtener el CUIL del trabajador que estamos editando
+    const trabajadorEditando = filas[editandoIndex];
+    const cuilEditando = trabajadorEditando ? normalizarCuil(trabajadorEditando.CUIL) : null;
+    const cuilCambio = cuilNum !== cuilEditando;
+    const exposicionActual = Number(exposicion || 0);
 
-    if (existeOtroNoExpuesto) {
+    // Verificar si el CUIL ya existe con exposición = 0 (excluyendo el trabajador que estamos editando)
+    const existeConExposicionCero = filas.some((f, idx) => {
+      if (idx === editandoIndex) return false; // Excluir el trabajador que estamos editando
+      const cuilFila = normalizarCuil(f.CUIL);
+      const exposicionFila = Number(f.Exposicion || 0);
+      return cuilFila === cuilNum && exposicionFila === 0;
+    });
+
+    // Si estamos intentando cambiar a un CUIL que ya tiene exposición = 0, bloquear
+    if (existeConExposicionCero) {
       setModalMessageType('error');
-      setModalMessageText('No se puede guardar: ya existe otro trabajador marcado como NO expuesto con este CUIL.');
+      setModalMessageText(`Este trabajador (CUIL: ${cuil}) ya fue cargado con horas de exposición = 0. No se puede editar para usar este CUIL.`);
       setModalMessageOpen(true);
       return;
     }
 
-    if (duplicado) {
-      // Mostrar mensaje de error usando modal en lugar de alert
+    // Si estamos intentando cambiar la exposición a 0 y el CUIL ya existe con exposición = 0, bloquear
+    if (exposicionActual === 0 && yaExisteCuil) {
+      const otroTrabajadorConExposicionCero = filas.some((f, idx) => {
+        if (idx === editandoIndex) return false;
+        const cuilFila = normalizarCuil(f.CUIL);
+        const exposicionFila = Number(f.Exposicion || 0);
+        return cuilFila === cuilNum && exposicionFila === 0;
+      });
+      
+      if (otroTrabajadorConExposicionCero) {
+        setModalMessageType('error');
+        setModalMessageText(`Ya existe otro trabajador con este CUIL (${cuil}) y horas de exposición = 0. No se puede editar para tener exposición 0.`);
+        setModalMessageOpen(true);
+        return;
+      }
+    }
+
+    // Si estamos cambiando el CUIL y ya se alcanzó el límite, verificar que el nuevo CUIT ya exista
+    if (cuilCambio && trabajadoresCargados >= totalTrabajadoresRequeridos && !yaExisteCuil) {
       setModalMessageType('error');
-      setModalMessageText('Este CUIL ya fue cargado por otro trabajador');
+      setModalMessageText(`Ya se alcanzó el límite de ${totalTrabajadoresRequeridos} trabajadores únicos. Solo puede usar CUILs ya cargados.`);
       setModalMessageOpen(true);
       return;
     }
@@ -906,13 +954,18 @@ React.useEffect(() => {
         filasCargadas: filas
       });
 
+      console.log('🔍 CRÍTICO - Estado de filas antes de map:', {
+        filasLength: filas.length,
+        filasCompletas: JSON.stringify(filas, null, 2)
+      });
+
       // USAR TODOS LOS TRABAJADORES DE LA TABLA, NO SOLO LOS CAMPOS DEL MODAL
       const formularioRARDetalle = filas.map((f, index) => {
         const rawHoras = String(f.Exposicion ?? '').replace(/[^\d]/g, '').trim();
         const nHoras = Number(rawHoras);
         const horasParsed = rawHoras === '' ? 0 : (Number.isFinite(nHoras) ? nHoras : 0);
 
-        const trabajador: any = {
+        const trabajador = {
           internoFormulariosRar: 0,
           cuil: Number(String(f.CUIL || '').replace(/\D/g, '') || 0),
           nombre: f.Nombre || '',
@@ -923,10 +976,10 @@ React.useEffect(() => {
           fechaInicioExposicion: dayjs(f.FechaInicio || fechaActual).toISOString(),
           fechaFinExposicion: f.FechaFinExposicion && f.FechaFinExposicion.trim() !== ''
             ? dayjs(f.FechaFinExposicion).toISOString()
-            : dayjs('2099-01-01').toISOString(), // Fecha por defecto: 01/01/2099 para indicar "no especificada"
+            : dayjs('2099-01-01').toISOString(),
+          horasExposicion: horasParsed
         };
 
-        trabajador.horasExposicion = horasParsed;
         console.log(`👤 DEBUG - Trabajador ${index + 1}:`, trabajador);
         return trabajador;
       });
@@ -944,29 +997,21 @@ React.useEffect(() => {
 
       console.log(' Payload completo:', JSON.stringify(payload, null, 2));
 
+      console.log('📤 CRÍTICO - Payload final antes de fetch:', {
+        formularioRARDetalle_length: payload.formularioRARDetalle.length,
+        payload_completo: JSON.stringify(payload, null, 2)
+      });
+
       console.log(' Enviando POST request...');
 
-      const urlGuardar = esModoEdicionFormulario ? `http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${editarId}` : 'http://arttest.intersistemas.ar:8302/api/FormulariosRAR';
-      const metodo = esModoEdicionFormulario ? 'PUT' : 'POST';
-      const resp = await fetch(urlGuardar, {
-        method: metodo,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let responseData: any = null;
 
-      console.log(' Respuesta del servidor:', {
-        status: resp.status,
-        statusText: resp.statusText,
-        ok: resp.ok
-      });
-
-      if (!resp.ok) {
-        const t = await resp.text();
-        console.log(' Error del servidor:', t);
-        throw new Error(`Error del servidor (${resp.status}): ${t}`);
+      if (esModoEdicionFormulario) {
+        responseData = await ArtAPI.putFormularioRAR(editarId, payload);
+      } else {
+        responseData = await ArtAPI.postFormularioRAR(payload);
       }
 
-      const responseData = await resp.json();
       console.log(' Respuesta exitosa:', responseData);
 
       // Mostrar mensaje de éxito y preguntar qué hacer
@@ -1021,7 +1066,7 @@ React.useEffect(() => {
           fechaIngreso: dayjs(f.Ingreso || fechaActual).toISOString(),
           fechaUltimoExamenMedico: dayjs(f.UltimoExamenMedico || fechaActual).toISOString(),
           codigoAgente: Number(f.CodigoAgente) || 1,
-          fechaInicioExposicion: dayjs(f.FechaFin || fechaActual).toISOString(),
+          fechaInicioExposicion: dayjs(f.FechaInicio || fechaActual).toISOString(),
           fechaFinExposicion: f.FechaFinExposicion && f.FechaFinExposicion.trim() !== ''
             ? dayjs(f.FechaFinExposicion).toISOString()
             : dayjs('2099-01-01').toISOString(), // Fecha por defecto: 01/01/2099 para indicar "no especificada"
@@ -1041,16 +1086,7 @@ React.useEffect(() => {
         formularioRARDetalle: formularioRARDetalle,
       };
 
-      const resp = await fetch('http://arttest.intersistemas.ar:8302/api/FormulariosRAR', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!resp.ok) {
-        const t = await resp.text();
-        throw new Error(`Error del servidor (${resp.status}): ${t}`);
-      }
+      await ArtAPI.postFormularioRAR(payload);
 
 
       finalizaCarga(true);
@@ -1092,20 +1128,24 @@ React.useEffect(() => {
       >
         <div className={styles.modalGridCol}>
           {/* SECCIÓN 0: INFORMACIÓN DEL EMPLEADOR */}
-          <div style={{ background: '#e3f2fd', padding: '15px', borderRadius: '5px', marginBottom: '20px' }}>
-            <h4 style={{ margin: '0 0 15px 0', color: '#1976d2' }}>Datos del Empleador</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', alignItems: 'center' }}>
-              <div style={{ fontSize: '14px' }}>
+          <div className={styles.empleadorInfo}>
+            <h4 className={styles.empleadorInfoTitle}>Datos del Empleador</h4>
+            <div className={styles.empleadorInfoGrid}>
+              <div className={styles.empleadorInfoItem}>
                 <strong>CUIT:</strong> {cuipFormatter(cuitActual) || 'No disponible'}
               </div>
-              <div style={{ fontSize: '14px' }}>
+              <div className={styles.empleadorInfoItem}>
                 <strong>Razón Social:</strong> {razonSocialActual || 'No disponible'}
               </div>
             </div>
           </div>
 
           {/* SECCIÓN 1: SELECTOR DE ESTABLECIMIENTO */}
-
+          <div className={styles.establecimientoSection}>
+            <h4 className={styles.establecimientoTitle}>
+              Selección de Establecimiento
+              <span className={styles.requiredAsterisk}>*</span>
+            </h4>
             <div className={styles.modalRow}>
               <FormControl fullWidth required className={styles.flex1}>
                 <InputLabel>Establecimiento</InputLabel>
@@ -1140,6 +1180,28 @@ React.useEffect(() => {
                 </Select>
               </FormControl>
             </div>
+            </div>
+
+                      {/* SECCIÓN 1.5: IMPORTACIÓN DE TRABAJADORES DESDE EXCEL */}
+          <ExcelImportSection
+            establecimientoSeleccionadoValido={establecimientoSeleccionadoValido}
+            agentesCausantes={agentesCausantes}
+            filas={filas}
+            cantExpuestos={cantExpuestos}
+            cantNoExpuestos={cantNoExpuestos}
+            onFilasActualizadas={setFilas}
+            onCantExpuestosActualizada={setCantExpuestos}
+            onCantNoExpuestosActualizada={setCantNoExpuestos}
+            onMensajeError={(mensaje) => {
+              setMensajeError(mensaje);
+              setModalMessageType('error');
+              setModalMessageText(mensaje);
+              setModalMessageOpen(true);
+            }}
+          />
+
+
+
 
           {/* SECCIÓN 2: CANTIDADES DE TRABAJADORES */}
             <div className={styles.modalRow}>
@@ -1171,32 +1233,23 @@ React.useEffect(() => {
               />
             </div>
             {(cantExpuestos || cantNoExpuestos) && (
-              <div style={{ background: '#bbdefb', padding: '10px', borderRadius: '3px', marginTop: '10px', textAlign: 'center' }}>
+              <div className={styles.totalResumen}>
                 <strong>Total de Trabajadores: {(Number(cantExpuestos) || 0) + (Number(cantNoExpuestos) || 0)}</strong>
               </div>
             )}
 
           {/* SECCIÓN 3: DATOS DEL TRABAJADOR */}
-          <div style={{
-            background: cantidadesCompletas ? '#f8f9fa' : '#f5f5f5',
-            padding: '15px',
-            borderRadius: '5px',
-            marginBottom: '20px',
-            opacity: cantidadesCompletas ? 1 : 0.6
-          }}>
-            <h4 style={{
-              margin: '0 0 15px 0',
-              color: cantidadesCompletas ? '#495057' : '#9e9e9e'
-            }}>
+          <div className={cantidadesCompletas ? styles.trabajadorSection : styles.trabajadorSectionDisabled}>
+            <h4 className={cantidadesCompletas ? styles.trabajadorTitle : styles.trabajadorTitleDisabled}>
               Datos del Trabajador
               {!cantidadesCompletas && (
-                <span style={{ fontSize: '14px', fontWeight: 'normal', marginLeft: '10px' }}>
+                <span className={styles.trabajadorSubtitle}>
                   (Completá primero las cantidades de trabajadores)
                 </span>
               )}
             </h4>
             {/* FILA 1: CUIL y Nombre */}
-            <div className={styles.modalRow} style={{ marginBottom: '20px' }}>
+            <div className={`${styles.modalRow} ${styles.modalRowSpaced}`}>
               <TextField
                 label="CUIL"
                 name="cuil"
@@ -1217,7 +1270,25 @@ React.useEffect(() => {
 
                     // Si el CUIL está completo (11 dígitos), consultar datos automáticamente
                     if (value.length === 11) {
-                      consultarDatosPorCuil(f);
+                      // Primero, verificar si ya existe en las filas cargadas
+                      const cuilDigits = value;
+                      const filaExistente = filas.find((fi) => normalizarCuil(fi.CUIL) === cuilDigits);
+
+                      if (filaExistente) {
+                        // Completar los demás campos con los datos previamente ingresados
+                        setNombre(filaExistente.Nombre || '');
+                        setSector(filaExistente.SectorTareas || '');
+                        setIngreso(filaExistente.Ingreso || '');
+                        //setFechaInicio(filaExistente.FechaInicio || '');
+                        //setExposicion(filaExistente.Exposicion != null ? String(filaExistente.Exposicion) : '0');
+                        //setFechaFinExposicion(filaExistente.FechaFinExposicion || '');
+                        setUltimoExamenMedico(filaExistente.UltimoExamenMedico || '');
+                        //setCodigoAgente(filaExistente.CodigoAgente != null ? String(filaExistente.CodigoAgente) : '');
+                        console.log('CUIL repetido detectado, campos autocompletados desde fila existente:', filaExistente);
+                      } else {
+                        // Si no existe localmente, consultar servicio externo para completar el nombre
+                        consultarDatosPorCuil(f);
+                      }
                     }
                   }
                 }}
@@ -1267,7 +1338,7 @@ React.useEffect(() => {
             </div>
 
             {/* FILA 2: Sector y Fecha de Ingreso */}
-            <div className={styles.modalRow} style={{ marginBottom: '20px' }}>
+            <div className={`${styles.modalRow} ${styles.modalRowSpaced}`}>
               <TextField
                 label="Sector/Tareas"
                 name="sector"
@@ -1315,7 +1386,7 @@ React.useEffect(() => {
             </div>
 
             {/* FILA 3: Fecha Inicio Exposición y Tipo de Exposición */}
-            <div className={styles.modalRow} style={{ marginBottom: '20px' }}>
+            <div className={`${styles.modalRow} ${styles.modalRowSpaced}`}>
               <TextField
                 label="Fecha Inicio Exposición"
                 name="fechaInicio"
@@ -1372,7 +1443,7 @@ React.useEffect(() => {
             </div>
 
             {/* FILA 4: Fecha Fin Exposición y Último Examen Médico */}
-            <div className={styles.modalRow} style={{ marginBottom: '20px' }}>
+            <div className={`${styles.modalRow} ${styles.modalRowSpaced}`}>
               <TextField
                 label="Fecha Fin Exposición (Opcional)"
                 name="fechaFinExposicion"
@@ -1411,7 +1482,7 @@ React.useEffect(() => {
             </div>
 
             {/* FILA 5: Agente Causante (ocupa todo el ancho) */}
-            <div className={styles.modalRow} style={{ marginBottom: '20px' }}>
+            <div className={`${styles.modalRow} ${styles.modalRowSpaced}`}>
               <FormControl fullWidth required className={styles.flex1} error={!!erroresCampos.codigoAgente}>
                 <InputLabel id="lbl-agente">
                   {!cantidadesCompletas
@@ -1538,8 +1609,8 @@ React.useEffect(() => {
 
           {/* TABLA DE TRABAJADORES CARGADOS */}
           {filas.length > 0 && (
-            <div style={{ background: 'white', padding: '15px', borderRadius: '5px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
-              <h4 style={{ margin: '0 0 15px 0', color: '#333' }}>
+            <div className={styles.tablaTrabajadoresContainer}>
+              <h4 className={styles.tablaTrabajadoresTitle}>
                 Trabajadores Cargados
               </h4>
 
@@ -1564,20 +1635,20 @@ React.useEffect(() => {
 
               {/* RESUMEN DE PROGRESO */}
               <div style={{
-                background: filas.length >= totalTrabajadoresRequeridos ? '#c8e6c9' : '#fff3cd',
+                background: trabajadoresCargados >= totalTrabajadoresRequeridos ? '#c8e6c9' : '#fff3cd',
                 padding: '10px',
                 borderRadius: '3px',
                 marginTop: '10px',
                 textAlign: 'center',
-                border: `1px solid ${filas.length >= totalTrabajadoresRequeridos ? '#4caf50' : '#ffc107'}`
+                border: `1px solid ${trabajadoresCargados >= totalTrabajadoresRequeridos ? '#4caf50' : '#ffc107'}`
               }}>
                 {trabajadoresCargados >= totalTrabajadoresRequeridos ? (
                   <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>
-                    Has cargado todos los trabajadores expuestos requeridos
+                    Has cargado {trabajadoresCargados} trabajadores únicos (límite alcanzado). Puedes seguir agregando registros con CUILs ya cargados (con diferentes agentes causantes).
                   </span>
                 ) : (
                   <span style={{ color: '#f57f17', fontWeight: 'bold' }}>
-                    Faltan {faltanTrabajadores} trabajadores por cargar
+                    Faltan {faltanTrabajadores} trabajadores únicos por cargar ({trabajadoresCargados}/{totalTrabajadoresRequeridos})
                   </span>
                 )}
               </div>

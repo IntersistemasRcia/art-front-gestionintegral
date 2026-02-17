@@ -153,11 +153,26 @@ export const token = Object.seal(new TokenConfigurator());
 const tokenizable = token.configure();
 
 export class UsuarioAPIClass extends ExternalAPI {
-  readonly basePath =
-    process.env.NEXT_PUBLIC_API_SEGURIDAD_URL || "http://fallback-prod.url";
+  readonly basePath = (() => {
+    const url = process.env.NEXT_PUBLIC_API_AUTH_URL || "http://fallback-prod.url";
+    // Normalizar: remover trailing slash y /api si existe
+    const normalized = url.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    // Log para depuración (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[UsuarioAPI] basePath configurado:', normalized);
+      console.log('[UsuarioAPI] NEXT_PUBLIC_API_AUTH_URL:', process.env.NEXT_PUBLIC_API_AUTH_URL);
+    }
+    return normalized;
+  })();
   //#region login
-  readonly loginURL = () =>
-    this.getURL({ path: "/api/Usuario/Login" }).toString();
+  readonly loginURL = () => {
+    const url = this.getURL({ path: "/api/Usuario/Login" }).toString();
+    // Log para depuración (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[UsuarioAPI] loginURL:', url);
+    }
+    return url;
+  };
   login = async (login: LoginCommand) =>
     axios.post<UsuarioVm>(this.loginURL(), login).then(
       ({ data }) => data,
@@ -281,7 +296,15 @@ export class UsuarioAPIClass extends ExternalAPI {
     }).toString();
   tareasUpdate = async (
     usuarioId: string,
-    data: Array<{ moduloId: number; habilitado: boolean }>
+    data: Array<{
+      moduloId: number;
+      habilitado: boolean;
+      tareas: Array<{
+        tareaId: number;
+        moduloId: number;
+        habilitada: boolean;
+      }>;
+    }>
   ) =>
     tokenizable
       .put(
@@ -296,7 +319,15 @@ export class UsuarioAPIClass extends ExternalAPI {
       });
   useTareasUpdate = (
     usuarioId: string,
-    data: Array<{ moduloId: number; habilitado: boolean }>
+    data: Array<{
+      moduloId: number;
+      habilitado: boolean;
+      tareas: Array<{
+        tareaId: number;
+        moduloId: number;
+        habilitada: boolean;
+      }>;
+    }>
   ) =>
     useSWR(
       [this.tareasUpdateURL(usuarioId), token.getToken(), JSON.stringify(data)],

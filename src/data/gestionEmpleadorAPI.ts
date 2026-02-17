@@ -11,7 +11,7 @@ import { AxiosError } from "axios";
 const tokenizable = token.configure();
 
 const getCurrentPeriodo = (): number => {
-    return Number(dayjs().subtract(2, 'month').format('YYYYMM'));
+  return Number(dayjs().subtract(2, 'month').format('YYYYMM'));
 };
 
 export interface UsuarioGetAllParams {
@@ -30,18 +30,32 @@ export type Pagination<T> = {
 
 //#region Types SVCC
 //#region Types common
-export type PresentacionDTO = {
-  interno?: number,
-  idMotivo?: number,
-  presentacionFecha?: string,
+export type PresentacionBaseDTO = {
   observaciones?: string,
 }
-export type EmpresaTercerizadaDTO = {
-  interno?: number;
+export type PresentacionCreateDTO = PresentacionBaseDTO & {
+  empleadorCUIT: number;
+  idMotivo?: number,
+}
+export type PresentacionFinalizaDTO = PresentacionBaseDTO & {
+  interno: number,
+}
+export type PresentacionDTO = PresentacionBaseDTO & {
+  interno: number,
+  idMotivo?: number,
+  presentacionFecha?: string,
+}
+export type EmpresaTercerizadaBaseDTO = {
   idEstablecimientoEmpresa?: number;
   cuit?: number;
   ciiu?: number;
   cantidadTrabajadores?: number;
+}
+export type EmpresaTercerizadaCreateDTO = EmpresaTercerizadaBaseDTO & {
+  presentacionId: number;
+}
+export type EmpresaTercerizadaDTO = EmpresaTercerizadaBaseDTO & {
+  interno: number;
 }
 export type PuestoDTO = {
   interno?: number;
@@ -68,8 +82,7 @@ export type ContratistaDTO = {
   ciiu?: number;
   cantidadTrabajadores?: number;
 }
-export type EstablecimientoDeclaradoDTO = {
-  interno?: number;
+export type EstablecimientoDeclaradoBaseDTO = {
   idEstablecimientoEmpresa?: number;
   descripcionActividad?: string;
   cantTrabEventualesProd: number;
@@ -85,6 +98,12 @@ export type EstablecimientoDeclaradoDTO = {
   sectores?: SectorDTO[];
   responsables?: ResponsableDTO[];
   contratistas?: ContratistaDTO[];
+}
+export type EstablecimientoDeclaradoCreateDTO = EstablecimientoDeclaradoBaseDTO & {
+  presentacionId: number;
+}
+export type EstablecimientoDeclaradoDTO = EstablecimientoDeclaradoBaseDTO & {
+  interno: number;
 }
 export type UtilizacionDTO = {
   interno?: number;
@@ -186,8 +205,7 @@ export type EstudioBiologicoDTO = {
   idUnidadFrecuencia?: number;
   analisisEstudiosComplementacion?: string;
 }
-export type SustanciaDTO = {
-  interno?: number;
+export type SustanciaBaseDTO = {
   idEstablecimientoEmpresa?: number;
   idSustancia?: number;
   nombreComercial?: string;
@@ -200,6 +218,12 @@ export type SustanciaDTO = {
   compradores?: CompradorDTO[];
   estudiosAmbientalesEspecificos?: EstudioAmbientalDTO[];
   estudiosBiologicosEspecificos?: EstudioBiologicoDTO[];
+}
+export type SustanciaCreateDTO = SustanciaBaseDTO & {
+  presentacionId: number;
+}
+export type SustanciaDTO = SustanciaBaseDTO & {
+  interno: number;
 }
 export type ExamenMedicoDTO = {
   interno?: number;
@@ -215,31 +239,57 @@ export type ActividadDTO = {
   fechaFinExposicion?: string;
   examenesMedicos?: ExamenMedicoDTO[];
 }
-export type TrabajadorDTO = {
-  interno?: number;
+export type TrabajadorBaseDTO = {
   cuil?: number;
   idEstablecimientoEmpresa?: number;
   fechaIngreso?: string;
   actividades?: ActividadDTO[];
 }
+export type TrabajadorCreateDTO = TrabajadorBaseDTO & {
+  presentacionId: number;
+}
+export type TrabajadorDTO = TrabajadorBaseDTO & {
+  interno: number;
+}
 //#endregion Types common
 
 //#region Types SVCC/Presentacion
+//#region Types SVCC/Presentacion/Todas
+export type SVCCPresentacionTodasParams = {
+  empleadorCUIT: number;
+  page?: string;
+  sort?: string;
+}
+export type SVCCPresentacionTodasSWRKey = [url: string, token: string, params: string];
+export type SVCCPresentacionTodasOptions = SWRConfiguration<Pagination<PresentacionDTO>, AxiosError, Fetcher<Pagination<PresentacionDTO>, SVCCPresentacionTodasSWRKey>>
+//#endregion Types SVCC/Presentacion/Todas
+
+//#region Types SVCC/Presentacion/Obtener
+export type SVCCPresentacionObtenerParams = {
+  id: number;
+}
+export type SVCCPresentacionObtenerSWRKey = [url: string, token: string, params: string];
+export type SVCCPresentacionObtenerOptions = SWRConfiguration<PresentacionDTO, AxiosError, Fetcher<PresentacionDTO, SVCCPresentacionObtenerSWRKey>>
+//#endregion Types SVCC/Presentacion/Obtener
+
 //#region Types SVCC/Presentacion/Ultima
-export type SVCCPresentacionUltimaSWRKey = [url: string, token: string];
+export type SVCCPresentacionUltimaParams = {
+  empleadorCUIT: number;
+}
+export type SVCCPresentacionUltimaSWRKey = [url: string, token: string, params: string];
 export type SVCCPresentacionUltimaOptions = SWRConfiguration<PresentacionDTO, AxiosError, Fetcher<PresentacionDTO, SVCCPresentacionUltimaSWRKey>>
 //#endregion Types SVCC/Presentacion/Ultima
 
 //#region Types SVCC/Presentacion/Nueva
 export type SVCCPresentacionNuevaSWRKey = [url: string, token: string];
-export type SVCCPresentacionNuevaOptions = SWRMutationConfiguration<PresentacionDTO, AxiosError, SVCCPresentacionNuevaSWRKey, PresentacionDTO, PresentacionDTO> & {
+export type SVCCPresentacionNuevaOptions = SWRMutationConfiguration<PresentacionDTO, AxiosError, SVCCPresentacionNuevaSWRKey, PresentacionCreateDTO, PresentacionDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/Presentacion/Nueva
 
 //#region Types SVCC/Presentacion/Finaliza
 export type SVCCPresentacionFinalizaSWRKey = [url: string, token: string];
-export type SVCCPresentacionFinalizaOptions = SWRMutationConfiguration<PresentacionDTO, AxiosError, SVCCPresentacionNuevaSWRKey, PresentacionDTO, PresentacionDTO> & {
+export type SVCCPresentacionFinalizaOptions = SWRMutationConfiguration<PresentacionDTO, AxiosError, SVCCPresentacionNuevaSWRKey, PresentacionFinalizaDTO, PresentacionDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/Presentacion/Finaliza
@@ -256,6 +306,7 @@ export type SVCCPresentacionConstanciaOptions = SWRConfiguration<File, AxiosErro
 //#region Types SVCC/EmpresaTercerizada
 //#region Types SVCC/EmpresaTercerizada - List
 export type SVCCEmpresaTercerizadaListParams = {
+  presentacionId: number;
   ciiu?: number;
   cantidadTrabajadores?: number;
   page?: string;
@@ -267,7 +318,7 @@ export type SVCCEmpresaTercerizadaListOptions = SWRConfiguration<Pagination<Empr
 
 //#region Types SVCC/EmpresaTercerizada - Create
 export type SVCCEmpresaTercerizadaCreateSWRKey = [url: string, token: string];
-export type SVCCEmpresaTercerizadaCreateOptions = SWRMutationConfiguration<EmpresaTercerizadaDTO, AxiosError, SVCCEmpresaTercerizadaCreateSWRKey, EmpresaTercerizadaDTO, EmpresaTercerizadaDTO> & {
+export type SVCCEmpresaTercerizadaCreateOptions = SWRMutationConfiguration<EmpresaTercerizadaDTO, AxiosError, SVCCEmpresaTercerizadaCreateSWRKey, EmpresaTercerizadaCreateDTO, EmpresaTercerizadaDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/EmpresaTercerizada - Create
@@ -277,7 +328,7 @@ export type SVCCEmpresaTercerizadaUpdateParams = {
   id: number;
 }
 export type SVCCEmpresaTercerizadaUpdateSWRKey = [url: string, token: string, params: string];
-export type SVCCEmpresaTercerizadaUpdateOptions = SWRMutationConfiguration<EmpresaTercerizadaDTO, AxiosError, SVCCEmpresaTercerizadaUpdateSWRKey | null, EmpresaTercerizadaDTO, EmpresaTercerizadaDTO> & {
+export type SVCCEmpresaTercerizadaUpdateOptions = SWRMutationConfiguration<EmpresaTercerizadaDTO, AxiosError, SVCCEmpresaTercerizadaUpdateSWRKey | null, EmpresaTercerizadaBaseDTO, EmpresaTercerizadaDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/EmpresaTercerizada - Update
@@ -296,6 +347,7 @@ export type SVCCEmpresaTercerizadaDeleteOptions = SWRMutationConfiguration<Empre
 //#region Types SVCC/EstablecimientoDeclarado
 //#region Types SVCC/EstablecimientoDeclarado - List
 export type SVCCEstablecimientoDeclaradoListParams = {
+  presentacionId: number;
   idEstablecimientoEmpresa?: number;
   descripcionActividad?: string;
   cantTrabEventualesProd?: number;
@@ -316,7 +368,7 @@ export type SVCCEstablecimientoDeclaradoListOptions = SWRConfiguration<Paginatio
 
 //#region Types SVCC/EstablecimientoDeclarado - Create
 export type SVCCEstablecimientoDeclaradoCreateSWRKey = [url: string, token: string];
-export type SVCCEstablecimientoDeclaradoCreateOptions = SWRMutationConfiguration<EstablecimientoDeclaradoDTO, AxiosError, SVCCEstablecimientoDeclaradoCreateSWRKey, EstablecimientoDeclaradoDTO, EstablecimientoDeclaradoDTO> & {
+export type SVCCEstablecimientoDeclaradoCreateOptions = SWRMutationConfiguration<EstablecimientoDeclaradoDTO, AxiosError, SVCCEstablecimientoDeclaradoCreateSWRKey, EstablecimientoDeclaradoCreateDTO, EstablecimientoDeclaradoDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/EstablecimientoDeclarado - Create
@@ -326,7 +378,7 @@ export type SVCCEstablecimientoDeclaradoUpdateParams = {
   id: number;
 }
 export type SVCCEstablecimientoDeclaradoUpdateSWRKey = [url: string, token: string, params: string];
-export type SVCCEstablecimientoDeclaradoUpdateOptions = SWRMutationConfiguration<EstablecimientoDeclaradoDTO, AxiosError, SVCCEstablecimientoDeclaradoUpdateSWRKey | null, EstablecimientoDeclaradoDTO, EstablecimientoDeclaradoDTO> & {
+export type SVCCEstablecimientoDeclaradoUpdateOptions = SWRMutationConfiguration<EstablecimientoDeclaradoDTO, AxiosError, SVCCEstablecimientoDeclaradoUpdateSWRKey | null, EstablecimientoDeclaradoBaseDTO, EstablecimientoDeclaradoDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/EstablecimientoDeclarado - Update
@@ -345,6 +397,7 @@ export type SVCCEstablecimientoDeclaradoDeleteOptions = SWRMutationConfiguration
 //#region Types SVCC/Sustancia
 //#region Types SVCC/Sustancia - List
 export type SVCCSustanciaListParams = {
+  presentacionId: number;
   idEstablecimientoEmpresa?: number;
   idSustancia?: number;
   nombreComercial?: string;
@@ -359,7 +412,7 @@ export type SVCCSustanciaListOptions = SWRConfiguration<Pagination<SustanciaDTO>
 
 //#region Types SVCC/Sustancia - Create
 export type SVCCSustanciaCreateSWRKey = [url: string, token: string];
-export type SVCCSustanciaCreateOptions = SWRMutationConfiguration<SustanciaDTO, AxiosError, SVCCSustanciaCreateSWRKey, SustanciaDTO, SustanciaDTO> & {
+export type SVCCSustanciaCreateOptions = SWRMutationConfiguration<SustanciaDTO, AxiosError, SVCCSustanciaCreateSWRKey, SustanciaCreateDTO, SustanciaDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/Sustancia - Create
@@ -377,7 +430,7 @@ export type SVCCSustanciaUpdateParams = {
   id: number;
 }
 export type SVCCSustanciaUpdateSWRKey = [url: string, token: string, params: string];
-export type SVCCSustanciaUpdateOptions = SWRMutationConfiguration<SustanciaDTO, AxiosError, SVCCSustanciaUpdateSWRKey | null, SustanciaDTO, SustanciaDTO> & {
+export type SVCCSustanciaUpdateOptions = SWRMutationConfiguration<SustanciaDTO, AxiosError, SVCCSustanciaUpdateSWRKey | null, SustanciaBaseDTO, SustanciaDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/Sustancia - Update
@@ -396,6 +449,7 @@ export type SVCCSustanciaDeleteOptions = SWRMutationConfiguration<SustanciaDTO, 
 //#region Types SVCC/Trabajador
 //#region Types SVCC/Trabajador - List
 export type SVCCTrabajadorListParams = {
+  presentacionId: number;
   cuil?: number;
   idEstablecimientoEmpresa?: number;
   page?: string;
@@ -407,7 +461,7 @@ export type SVCCTrabajadorListOptions = SWRConfiguration<Pagination<TrabajadorDT
 
 //#region Types SVCC/Trabajador - Create
 export type SVCCTrabajadorCreateSWRKey = [url: string, token: string];
-export type SVCCTrabajadorCreateOptions = SWRMutationConfiguration<TrabajadorDTO, AxiosError, SVCCTrabajadorCreateSWRKey, TrabajadorDTO, TrabajadorDTO> & {
+export type SVCCTrabajadorCreateOptions = SWRMutationConfiguration<TrabajadorDTO, AxiosError, SVCCTrabajadorCreateSWRKey, TrabajadorCreateDTO, TrabajadorDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/Trabajador - Create
@@ -425,7 +479,7 @@ export type SVCCTrabajadorUpdateParams = {
   id: number;
 }
 export type SVCCTrabajadorUpdateSWRKey = [url: string, token: string, params: string];
-export type SVCCTrabajadorUpdateOptions = SWRMutationConfiguration<TrabajadorDTO, AxiosError, SVCCTrabajadorUpdateSWRKey | null, TrabajadorDTO, TrabajadorDTO> & {
+export type SVCCTrabajadorUpdateOptions = SWRMutationConfiguration<TrabajadorDTO, AxiosError, SVCCTrabajadorUpdateSWRKey | null, TrabajadorBaseDTO, TrabajadorDTO> & {
   throwOnError?: boolean;
 }
 //#endregion Types SVCC/Trabajador - Update
@@ -498,11 +552,11 @@ export type RefCIIUReadOptions = SWRConfiguration<RefCIIU, AxiosError, Fetcher<R
 
 export class GestionEmpleadorAPIClass extends ExternalAPI {
 
-  readonly basePath = process.env.NEXT_PUBLIC_API_EMPLEADOR_URL || 'http://fallback-prod.url'; 
+  readonly basePath = process.env.NEXT_PUBLIC_API_EMPLEADOR_URL || 'http://fallback-prod.url';
 
   //#region AfiliadoCuentaCorriente
   readonly getPersonalURL = (params: Parameters = {}) => {
-      
+
     params.CUIT ??= useAuth().user?.empresaCUIT ?? 0;
     params.periodo ??= getCurrentPeriodo();
     params.page ??= "1,1";
@@ -514,13 +568,13 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   useGetPersonal = (params: Parameters = {}) => useSWR(
     [this.getPersonalURL(params), token.getToken()], () => this.getPersonal(params),
-     {
+    {
       revalidateOnFocus: false,// No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
       revalidateOnReconnect: false,
       //revalidateOnMount: false,
       //dedupingInterval: // Tiempo en ms durante el cual SWR deduplica solicitudes iguales (evita re-fetch frecuente) 1000 * 60 * 60, // 1 hora (ajusta si hace falta)
       // Si quieres que la clave no dispare fetch hasta que exista token, puedes usar: (token.getToken() ? key : null)
-    }    
+    }
   );
   //#endregion
 
@@ -533,13 +587,13 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
   ).then(({ data }) => data[0]);
   useGetPoliza = (params: Parameters = {}) => useSWR(
     [this.getPolizaURL(params), token.getToken()], () => this.getPoliza(params),
-     {
+    {
       revalidateOnFocus: false,// No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
       revalidateOnReconnect: false,
       //revalidateOnMount: false,
       //dedupingInterval: // Tiempo en ms durante el cual SWR deduplica solicitudes iguales (evita re-fetch frecuente) 1000 * 60 * 60, // 1 hora (ajusta si hace falta)
       // Si quieres que la clave no dispare fetch hasta que exista token, puedes usar: (token.getToken() ? key : null)
-    }  
+    }
   );
   //#endregion
 
@@ -550,9 +604,19 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
   getVEmpleadorSiniestros = async (params: Parameters = {}) => tokenizable.get(
     this.getVEmpleadorSiniestrosURL(params),
   ).then(({ data }) => data);
-  useGetVEmpleadorSiniestros = (params: Parameters = {}) => useSWR(
-    [this.getVEmpleadorSiniestrosURL(params), token.getToken()], () => this.getVEmpleadorSiniestros(params) 
-  );
+  useGetVEmpleadorSiniestros = (params: Parameters = {}) => {
+    // Solo hacer fetch si hay CUIT en los parámetros
+    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
+    const swrKey = hasCUIT ? [this.getVEmpleadorSiniestrosURL(params), token.getToken()] : null;
+    return useSWR(
+      swrKey,
+      () => this.getVEmpleadorSiniestros(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  };
   //#endregion
 
   //#region CtaCTe y DDJJ
@@ -565,14 +629,14 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
   ).then(({ data }) => data);
   useGetVEmpleadorDDJJ = (params: Parameters = {}) => useSWR(
     [this.getVEmpleadorDDJJURL(params), token.getToken()], () => this.getVEmpleadorDDJJ(params),
-     {
+    {
       // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       //revalidateOnMount: false,
       //dedupingInterval: 1000 * 60 * 60, // 1 hora (ajusta si hace falta) // Tiempo en ms durante el cual SWR deduplica solicitudes iguales (evita re-fetch frecuente)
       // Si quieres que la clave no dispare fetch hasta que exista token, puedes usar: (token.getToken() ? key : null)
-    }     
+    }
   );
   //#endregion
 
@@ -584,65 +648,123 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
   getVEmpleadorSiniestrosInstancias = async (params: Parameters = {}) => tokenizable.get(
     this.getVEmpleadorSiniestrosInstanciasURL(params),
   ).then(({ data }) => data);
-  useGetVEmpleadorSiniestrosInstancias = (params: Parameters = {}) => useSWR(
-    [this.getVEmpleadorSiniestrosInstanciasURL(params), token.getToken()], () => this.getVEmpleadorSiniestrosInstancias(params),
-    {
-      // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      
-      //revalidateOnMount: false,
-      //dedupingInterval: 1000 * 60 * 60, // 1 hora (ajusta si hace falta) // Tiempo en ms durante el cual SWR deduplica solicitudes iguales (evita re-fetch frecuente)
-      // Si quieres que la clave no dispare fetch hasta que exista token, puedes usar: (token.getToken() ? key : null)
-    }  
-  );
+  useGetVEmpleadorSiniestrosInstancias = (params: Parameters = {}) => {
+    // Solo hacer fetch si hay CUIT en los parámetros
+    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
+    const swrKey = hasCUIT ? [this.getVEmpleadorSiniestrosInstanciasURL(params), token.getToken()] : null;
+    return useSWR(
+      swrKey,
+      () => this.getVEmpleadorSiniestrosInstancias(params),
+      {
+        // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  };
   //#endregion
 
   //#region AvisoObra
   readonly getAvisoObraURL = (params: UsuarioGetAllParams = {}) => {
-    params.CUIT ??= useAuth().user?.empresaCUIT ?? 0;
     return this.getURL({ path: "/api/AvisoObra/ultimos/?Sort=-ObraNumero&Page=0,1000", search: toURLSearch(params) }).toString();
   };
   getAvisoObra = async (params: UsuarioGetAllParams = {}) => tokenizable.get(
     this.getAvisoObraURL(params),
   ).then(({ data }) => data);
-  useGetAvisoObra = (params: UsuarioGetAllParams = {}) => useSWR(
-    [this.getAvisoObraURL(params), token.getToken()], () => this.getAvisoObra(params),
+  useGetAvisoObra = (params: UsuarioGetAllParams = {}) => {
+    // Solo hacer fetch si hay CUIT en los parámetros
+    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
+    const swrKey = hasCUIT ? [this.getAvisoObraURL(params), token.getToken()] : null;
+    return useSWR(
+      swrKey,
+      () => this.getAvisoObra(params),
       {
-      // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      
+        // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
       }
-  );
+    );
+  };
+
+  // Métodos de mutación para AvisoObra
+  readonly avisoObraInsertURL = this.getURL({ path: "/api/AvisoObra" }).toString();
+  avisoObraInsert = async (data: any) => tokenizable.post(
+    this.avisoObraInsertURL,
+    data
+  ).then(({ data }) => data);
+
+  readonly avisoObraUpdateURL = (interno: number) => this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
+  avisoObraUpdate = async (interno: number, data: any) => tokenizable.put(
+    this.avisoObraUpdateURL(interno),
+    data
+  ).then(({ data }) => data);
+
+  readonly avisoObraDeleteURL = (interno: number) => this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
+  avisoObraDelete = async (interno: number) => tokenizable.delete(
+    this.avisoObraDeleteURL(interno)
+  ).then(({ data }) => data);
   //#endregion
 
   //#region SVCC
   //#region SVCC/Presentacion
+  //#region SVCC/Presentacion/Todas
+  readonly svccPresentacionTodasURL = (params?: SVCCPresentacionTodasParams) =>
+    this.getURL({ path: "/api/SVCC/Presentacion", search: toURLSearch(params) }).toString();
+  svccPresentacionTodas = async (params?: SVCCPresentacionTodasParams) => tokenizable.get<Pagination<PresentacionDTO>>(
+    this.svccPresentacionTodasURL(params)
+  ).then(({ data }) => data);
+  swrSVCCPresentacionTodas: {
+    key: (params?: SVCCPresentacionTodasParams) => SVCCPresentacionTodasSWRKey,
+    fetcher: (key: SVCCPresentacionTodasSWRKey) => Promise<Pagination<PresentacionDTO>>
+  } = Object.freeze({
+    key: (params) => [this.svccPresentacionTodasURL(params), token.getToken(), JSON.stringify(params)],
+    fetcher: ([_url, _token, params]) => this.svccPresentacionTodas(JSON.parse(params)),
+  });
+  useSVCCPresentacionTodas = (params?: SVCCPresentacionTodasParams, options?: SVCCPresentacionTodasOptions) =>
+    useSWR<Pagination<PresentacionDTO>, AxiosError>(params ? this.swrSVCCPresentacionTodas.key(params) : null, this.swrSVCCPresentacionTodas.fetcher, options);
+  //#endregion SVCC/Presentacion/Todas
+
+  //#region SVCC/Presentacion/Obtener
+  readonly svccPresentacionObtenerURL = ({ id }: SVCCPresentacionObtenerParams) => this.getURL({ path: `/api/SVCC/Presentacion/${id}` }).toString();
+  svccPresentacionObtener = async (params: SVCCPresentacionObtenerParams) => tokenizable.get<PresentacionDTO>(
+    this.svccPresentacionObtenerURL(params)
+  ).then(({ data }) => data);
+  swrSVCCPresentacionObtener: {
+    key: (params: SVCCPresentacionObtenerParams) => SVCCPresentacionObtenerSWRKey,
+    fetcher: (key: SVCCPresentacionObtenerSWRKey) => Promise<PresentacionDTO>
+  } = Object.freeze({
+    key: (params) => [this.svccPresentacionObtenerURL(params), token.getToken(), JSON.stringify(params)],
+    fetcher: ([_url, _token, params]) => this.svccPresentacionObtener(JSON.parse(params)),
+  });
+  useSVCCPresentacionObtener = (params?: SVCCPresentacionObtenerParams, options?: SVCCPresentacionObtenerOptions) =>
+    useSWR<PresentacionDTO, AxiosError>(params ? this.swrSVCCPresentacionObtener.key(params) : null, this.swrSVCCPresentacionObtener.fetcher, options);
+  //#endregion SVCC/Presentacion/Obtener
+
   //#region SVCC/Presentacion/Ultima
-  readonly svccPresentacionUltimaURL = this.getURL({ path: "/api/SVCC/Presentacion/Ultima" }).toString();
-  svccPresentacionUltima = async () => tokenizable.get<PresentacionDTO>(
-    this.svccPresentacionUltimaURL
+  readonly svccPresentacionUltimaURL = (params: SVCCPresentacionUltimaParams) =>
+    this.getURL({ path: "/api/SVCC/Presentacion/Ultima", search: toURLSearch(params) }).toString();
+  svccPresentacionUltima = async (params: SVCCPresentacionUltimaParams) => tokenizable.get<PresentacionDTO>(
+    this.svccPresentacionUltimaURL(params)
   ).then(({ data }) => data);
   swrSVCCPresentacionUltima: {
-    key: SVCCPresentacionUltimaSWRKey,
+    key: (params: SVCCPresentacionUltimaParams) => SVCCPresentacionUltimaSWRKey,
     fetcher: (key: SVCCPresentacionUltimaSWRKey) => Promise<PresentacionDTO>
   } = Object.freeze({
-    key: [this.svccPresentacionUltimaURL, token.getToken()],
-    fetcher: (_key) => this.svccPresentacionUltima(),
+    key: (params) => [this.svccPresentacionUltimaURL(params), token.getToken(), JSON.stringify(params)],
+    fetcher: ([_url, _token, params]) => this.svccPresentacionUltima(JSON.parse(params)),
   });
-  useSVCCPresentacionUltima = (options?: SVCCPresentacionUltimaOptions) =>
-    useSWR<PresentacionDTO, AxiosError>(this.swrSVCCPresentacionUltima.key, this.swrSVCCPresentacionUltima.fetcher, options);
+  useSVCCPresentacionUltima = (params?: SVCCPresentacionUltimaParams, options?: SVCCPresentacionUltimaOptions) =>
+    useSWR<PresentacionDTO, AxiosError>(params ? this.swrSVCCPresentacionUltima.key(params) : null, this.swrSVCCPresentacionUltima.fetcher, options);
   //#endregion SVCC/Presentacion/Ultima
 
   //#region SVCC/Presentacion/Nueva
   readonly svccPresentacionNuevaURL = this.getURL({ path: "/api/SVCC/Presentacion/Nueva" }).toString();
-  svccPresentacionNueva = async (presentacion: PresentacionDTO) => tokenizable.post<PresentacionDTO>(
+  svccPresentacionNueva = async (presentacion: PresentacionCreateDTO) => tokenizable.post<PresentacionDTO>(
     this.svccPresentacionNuevaURL, presentacion
   ).then(({ data }) => data);
   swrSVCCPresentacionNueva: {
     key: SVCCPresentacionNuevaSWRKey,
-    fetcher: (key: SVCCPresentacionNuevaSWRKey, options: { arg: PresentacionDTO }) => Promise<PresentacionDTO>,
+    fetcher: (key: SVCCPresentacionNuevaSWRKey, options: { arg: PresentacionCreateDTO }) => Promise<PresentacionDTO>,
   } = Object.freeze({
     key: [this.svccPresentacionNuevaURL, token.getToken()],
     fetcher: (_key, { arg }) => this.svccPresentacionNueva(arg),
@@ -653,12 +775,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/Presentacion/Finaliza
   readonly svccPresentacionFinalizaURL = this.getURL({ path: "/api/SVCC/Presentacion/Finaliza" }).toString();
-  svccPresentacionFinaliza = async (presentacion: PresentacionDTO) => tokenizable.put<PresentacionDTO>(
+  svccPresentacionFinaliza = async (presentacion: PresentacionFinalizaDTO) => tokenizable.put<PresentacionDTO>(
     this.svccPresentacionFinalizaURL, presentacion
   ).then(({ data }) => data);
   swrSVCCPresentacionFinaliza: {
     key: SVCCPresentacionFinalizaSWRKey,
-    fetcher: (key: SVCCPresentacionFinalizaSWRKey, options: { arg: PresentacionDTO }) => Promise<PresentacionDTO>,
+    fetcher: (key: SVCCPresentacionFinalizaSWRKey, options: { arg: PresentacionFinalizaDTO }) => Promise<PresentacionDTO>,
   } = Object.freeze({
     key: [this.svccPresentacionFinalizaURL, token.getToken()],
     fetcher: (_key, { arg }) => this.svccPresentacionFinaliza(arg),
@@ -666,7 +788,7 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
   useSVCCPresentacionFinaliza = (options?: SVCCPresentacionFinalizaOptions) =>
     useSWRMutation(this.swrSVCCPresentacionFinaliza.key, this.swrSVCCPresentacionFinaliza.fetcher, options);
   //#endregion SVCC/Presentacion/Finaliza
-  
+
   //#region SVCC/Presentacion/Constancia
   readonly svccPresentacionConstanciaURL = ({ id }: SVCCPresentacionConstanciaParams) => this.getURL({ path: `/api/SVCC/Presentacion/Constancia/${id}` }).toString();
   svccPresentacionConstancia = async (params: SVCCPresentacionConstanciaParams) => tokenizable.get<Blob>(
@@ -676,7 +798,7 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
     const header = headers['content-disposition'];
     const fname = header.split('filename=')[1].split('.')[0];
     const ext = header.split('.')[1].split(';')[0];
-    const filename = [fname.replace(`"`,``), ext.replace(`"`,``)].filter(e => e).join(".") || "constancia.pdf";
+    const filename = [fname.replace(`"`, ``), ext.replace(`"`, ``)].filter(e => e).join(".") || "constancia.pdf";
     return new File([data], filename, { type: data.type });
   });
   swrSVCCPresentacionConstancia: {
@@ -711,12 +833,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/EmpresaTercerizada - Create
   readonly svccEmpresaTercerizadaCreateURL = this.getURL({ path: "/api/SVCC/EmpresaTercerizada" }).toString();
-  svccEmpresaTercerizadaCreate = async (data?: EmpresaTercerizadaDTO) => tokenizable.post<EmpresaTercerizadaDTO>(
+  svccEmpresaTercerizadaCreate = async (data?: EmpresaTercerizadaCreateDTO) => tokenizable.post<EmpresaTercerizadaDTO>(
     this.svccEmpresaTercerizadaCreateURL, data
   ).then(({ data }) => data);
   swrSVCCEmpresaTercerizadaCreate: {
     key: SVCCEmpresaTercerizadaCreateSWRKey,
-    fetcher: (key: SVCCEmpresaTercerizadaCreateSWRKey, options: { arg: EmpresaTercerizadaDTO }) => Promise<EmpresaTercerizadaDTO>
+    fetcher: (key: SVCCEmpresaTercerizadaCreateSWRKey, options: { arg: EmpresaTercerizadaCreateDTO }) => Promise<EmpresaTercerizadaDTO>
   } = Object.freeze({
     key: [this.svccEmpresaTercerizadaCreateURL, token.getToken()],
     fetcher: (_key, { arg }) => this.svccEmpresaTercerizadaCreate(arg),
@@ -727,12 +849,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/EmpresaTercerizada - Update
   readonly svccEmpresaTercerizadaUpdateURL = ({ id }: SVCCEmpresaTercerizadaUpdateParams) => this.getURL({ path: `/api/SVCC/EmpresaTercerizada/${id}` }).toString();
-  svccEmpresaTercerizadaUpdate = async (params: SVCCEmpresaTercerizadaUpdateParams, data?: EmpresaTercerizadaDTO) => tokenizable.put<EmpresaTercerizadaDTO>(
+  svccEmpresaTercerizadaUpdate = async (params: SVCCEmpresaTercerizadaUpdateParams, data?: EmpresaTercerizadaBaseDTO) => tokenizable.put<EmpresaTercerizadaDTO>(
     this.svccEmpresaTercerizadaUpdateURL(params), data
   ).then(({ data }) => data);
   swrSVCCEmpresaTercerizadaUpdate: {
     key: (params: SVCCEmpresaTercerizadaUpdateParams) => SVCCEmpresaTercerizadaUpdateSWRKey,
-    fetcher: (key: SVCCEmpresaTercerizadaUpdateSWRKey, options: { arg: EmpresaTercerizadaDTO }) => Promise<EmpresaTercerizadaDTO>
+    fetcher: (key: SVCCEmpresaTercerizadaUpdateSWRKey, options: { arg: EmpresaTercerizadaBaseDTO }) => Promise<EmpresaTercerizadaDTO>
   } = Object.freeze({
     key: (params) => [this.svccEmpresaTercerizadaUpdateURL(params), token.getToken(), JSON.stringify(params)],
     fetcher: ([_url, _token, params], { arg }) => this.svccEmpresaTercerizadaUpdate(JSON.parse(params), arg),
@@ -778,12 +900,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/EstablecimientoDeclarado - Create
   readonly svccEstablecimientoDeclaradoCreateURL = this.getURL({ path: "/api/SVCC/EstablecimientoDeclarado" }).toString();
-  svccEstablecimientoDeclaradoCreate = async (data?: EstablecimientoDeclaradoDTO) => tokenizable.post<EstablecimientoDeclaradoDTO>(
+  svccEstablecimientoDeclaradoCreate = async (data?: EstablecimientoDeclaradoCreateDTO) => tokenizable.post<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoCreateURL, data
   ).then(({ data }) => data);
   swrSVCCEstablecimientoDeclaradoCreate: {
     key: SVCCEstablecimientoDeclaradoCreateSWRKey,
-    fetcher: (key: SVCCEstablecimientoDeclaradoCreateSWRKey, options: { arg: EstablecimientoDeclaradoDTO }) => Promise<EstablecimientoDeclaradoDTO>
+    fetcher: (key: SVCCEstablecimientoDeclaradoCreateSWRKey, options: { arg: EstablecimientoDeclaradoCreateDTO }) => Promise<EstablecimientoDeclaradoDTO>
   } = Object.freeze({
     key: [this.svccEstablecimientoDeclaradoCreateURL, token.getToken()],
     fetcher: (_key, { arg }) => this.svccEstablecimientoDeclaradoCreate(arg),
@@ -794,12 +916,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/EstablecimientoDeclarado - Update
   readonly svccEstablecimientoDeclaradoUpdateURL = ({ id }: SVCCEstablecimientoDeclaradoUpdateParams) => this.getURL({ path: `/api/SVCC/EstablecimientoDeclarado/${id}` }).toString();
-  svccEstablecimientoDeclaradoUpdate = async (params: SVCCEstablecimientoDeclaradoUpdateParams, data?: EstablecimientoDeclaradoDTO) => tokenizable.put<EstablecimientoDeclaradoDTO>(
+  svccEstablecimientoDeclaradoUpdate = async (params: SVCCEstablecimientoDeclaradoUpdateParams, data?: EstablecimientoDeclaradoBaseDTO) => tokenizable.put<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoUpdateURL(params), data
   ).then(({ data }) => data);
   swrSVCCEstablecimientoDeclaradoUpdate: {
     key: (params: SVCCEstablecimientoDeclaradoUpdateParams) => SVCCEstablecimientoDeclaradoUpdateSWRKey,
-    fetcher: (key: SVCCEstablecimientoDeclaradoUpdateSWRKey, options: { arg: EstablecimientoDeclaradoDTO }) => Promise<EstablecimientoDeclaradoDTO>
+    fetcher: (key: SVCCEstablecimientoDeclaradoUpdateSWRKey, options: { arg: EstablecimientoDeclaradoBaseDTO }) => Promise<EstablecimientoDeclaradoDTO>
   } = Object.freeze({
     key: (params) => [this.svccEstablecimientoDeclaradoUpdateURL(params), token.getToken(), JSON.stringify(params)],
     fetcher: ([_url, _token, params], { arg }) => this.svccEstablecimientoDeclaradoUpdate(JSON.parse(params), arg),
@@ -845,12 +967,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/Sustancia - Create
   readonly svccSustanciaCreateURL = this.getURL({ path: "/api/SVCC/Sustancia" }).toString();
-  svccSustanciaCreate = async (data?: SustanciaDTO) => tokenizable.post<SustanciaDTO>(
+  svccSustanciaCreate = async (data?: SustanciaCreateDTO) => tokenizable.post<SustanciaDTO>(
     this.svccSustanciaCreateURL, data
   ).then(({ data }) => data);
   swrSVCCSustanciaCreate: {
     key: SVCCSustanciaCreateSWRKey,
-    fetcher: (key: SVCCSustanciaCreateSWRKey, options: { arg: SustanciaDTO }) => Promise<SustanciaDTO>
+    fetcher: (key: SVCCSustanciaCreateSWRKey, options: { arg: SustanciaCreateDTO }) => Promise<SustanciaDTO>
   } = Object.freeze({
     key: [this.svccSustanciaCreateURL, token.getToken()],
     fetcher: (_key, { arg }) => this.svccSustanciaCreate(arg),
@@ -877,12 +999,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/Sustancia - Update
   readonly svccSustanciaUpdateURL = ({ id }: SVCCSustanciaUpdateParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
-  svccSustanciaUpdate = async (params: SVCCSustanciaUpdateParams, data?: SustanciaDTO) => tokenizable.put<SustanciaDTO>(
+  svccSustanciaUpdate = async (params: SVCCSustanciaUpdateParams, data?: SustanciaBaseDTO) => tokenizable.put<SustanciaDTO>(
     this.svccSustanciaUpdateURL(params), data
   ).then(({ data }) => data);
   swrSVCCSustanciaUpdate: {
     key: (params: SVCCSustanciaUpdateParams) => SVCCSustanciaUpdateSWRKey,
-    fetcher: (key: SVCCSustanciaUpdateSWRKey, options: { arg: SustanciaDTO }) => Promise<SustanciaDTO>
+    fetcher: (key: SVCCSustanciaUpdateSWRKey, options: { arg: SustanciaBaseDTO }) => Promise<SustanciaDTO>
   } = Object.freeze({
     key: (params) => [this.svccSustanciaUpdateURL(params), token.getToken(), JSON.stringify(params)],
     fetcher: ([_url, _token, params], { arg }) => this.svccSustanciaUpdate(JSON.parse(params), arg),
@@ -928,12 +1050,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/Trabajador - Create
   readonly svccTrabajadorCreateURL = this.getURL({ path: "/api/SVCC/Trabajador" }).toString();
-  svccTrabajadorCreate = async (data?: TrabajadorDTO) => tokenizable.post<TrabajadorDTO>(
+  svccTrabajadorCreate = async (data?: TrabajadorCreateDTO) => tokenizable.post<TrabajadorDTO>(
     this.svccTrabajadorCreateURL, data
   ).then(({ data }) => data);
   swrSVCCTrabajadorCreate: {
     key: SVCCTrabajadorCreateSWRKey,
-    fetcher: (key: SVCCTrabajadorCreateSWRKey, options: { arg: TrabajadorDTO }) => Promise<TrabajadorDTO>
+    fetcher: (key: SVCCTrabajadorCreateSWRKey, options: { arg: TrabajadorCreateDTO }) => Promise<TrabajadorDTO>
   } = Object.freeze({
     key: [this.svccTrabajadorCreateURL, token.getToken()],
     fetcher: (_key, { arg }) => this.svccTrabajadorCreate(arg),
@@ -960,12 +1082,12 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
 
   //#region SVCC/Trabajador - Update
   readonly svccTrabajadorUpdateURL = ({ id }: SVCCTrabajadorUpdateParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
-  svccTrabajadorUpdate = async (params: SVCCTrabajadorUpdateParams, data?: TrabajadorDTO) => tokenizable.put<TrabajadorDTO>(
+  svccTrabajadorUpdate = async (params: SVCCTrabajadorUpdateParams, data?: TrabajadorBaseDTO) => tokenizable.put<TrabajadorDTO>(
     this.svccTrabajadorUpdateURL(params), data
   ).then(({ data }) => data);
   swrSVCCTrabajadorUpdate: {
     key: (params: SVCCTrabajadorUpdateParams) => SVCCTrabajadorUpdateSWRKey,
-    fetcher: (key: SVCCTrabajadorUpdateSWRKey, options: { arg: TrabajadorDTO }) => Promise<TrabajadorDTO>
+    fetcher: (key: SVCCTrabajadorUpdateSWRKey, options: { arg: TrabajadorBaseDTO }) => Promise<TrabajadorDTO>
   } = Object.freeze({
     key: (params) => [this.svccTrabajadorUpdateURL(params), token.getToken(), JSON.stringify(params)],
     fetcher: ([_url, _token, params], { arg }) => this.svccTrabajadorUpdate(JSON.parse(params), arg),

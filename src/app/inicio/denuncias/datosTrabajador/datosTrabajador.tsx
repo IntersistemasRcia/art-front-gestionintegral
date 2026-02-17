@@ -122,7 +122,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   const [afiLoading, setAfiLoading] = useState(false);
   const [afiModalOpen, setAfiModalOpen] = useState(false);
   const [afiModalMessage, setAfiModalMessage] = useState("");
-  const [afiModalType, setAfiModalType] = useState<MessageType>("alert");
+  const [afiModalType, setAfiModalType] = useState<MessageType>("warning");
   const lastAfiCuilRef = useRef<string>("");
   // CUIL inicial proveniente de la base (solo se setea una vez)
   const initialCuilRef = useRef<string | null>(null);
@@ -262,7 +262,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
           const data: AfiApiResponse = await ArtAPI.getAfiliadoCuil({ CUIL: Number(digits) });
           if (!data) {
             setAfiModalMessage("El trabajador no se encuentra registrado como afiliado.");
-            setAfiModalType("alert");
+            setAfiModalType("warning");
             setAfiModalOpen(true);
             const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
             onTextFieldChange(syntheticClear);
@@ -322,7 +322,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
           lastAfiCuilRef.current = digits;
         } catch (err) {
           setAfiModalMessage("No se pudo verificar el CUIL del trabajador.");
-          setAfiModalType("alert");
+          setAfiModalType("warning");
           setAfiModalOpen(true);
           const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
           onTextFieldChange(syntheticClear);
@@ -347,7 +347,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         const data: AfiApiResponse = await ArtAPI.getAfiliadoCuil({ CUIL: Number(digits) });
         if (!data) {
           setAfiModalMessage("El trabajador no se encuentra registrado como afiliado.");
-          setAfiModalType("alert");
+          setAfiModalType("warning");
           setAfiModalOpen(true);
           const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
           onTextFieldChange(syntheticClear);
@@ -409,7 +409,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         lastAfiCuilRef.current = digits;
       } catch (err) {
         setAfiModalMessage("No se pudo verificar el CUIL del trabajador.");
-        setAfiModalType("alert");
+        setAfiModalType("warning");
         setAfiModalOpen(true);
         const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
         onTextFieldChange(syntheticClear);
@@ -430,7 +430,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         type={afiModalType}
         message={afiModalMessage}
         onClose={() => setAfiModalOpen(false)}
-        title={afiModalType === 'alert' ? 'CUIL no afiliado' : undefined}
+        title={afiModalType === 'warning' ? 'CUIL no afiliado' : undefined}
       />
       {/* Trabajador */}
       <div className={styles.formSection}>

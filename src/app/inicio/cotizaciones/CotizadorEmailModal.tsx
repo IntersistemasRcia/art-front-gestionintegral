@@ -8,7 +8,7 @@ import { CIIUIndicesDTO, ARTSellosIIBBDTO, EmpleadoresPadronDTO, CotizacionesDTO
 import UsuarioAPI from '@/data/usuarioAPI';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomButton from '@/utils/ui/button/CustomButton';
-import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
+import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 import { CotizadorPDFContent } from './CotizadorPDFContent';
 import { CotizadorPDFFormData } from './types';
 
@@ -43,11 +43,11 @@ export const CotizadorEmailModal = ({
   const [messageModal, setMessageModal] = useState<{
     open: boolean;
     message: string;
-    type: 'success' | 'error' | 'alert';
+    type: MessageType;
   }>({
     open: false,
     message: '',
-    type: 'success',
+    type: 'success' as MessageType,
   });
 
   // Preparar PDF cuando se abre el modal y resetear estado cuando se cierra
@@ -58,7 +58,7 @@ export const CotizadorEmailModal = ({
       setNombre(empleadoresPadron?.denominacion || formData.nombre || '');
       setPdfBase64('');
       setEmailError('');
-      setMessageModal({ open: false, message: '', type: 'success' });
+      setMessageModal({ open: false, message: '', type: 'success' as MessageType });
       
       // Preparar PDF después de un pequeño delay para asegurar que el DOM esté listo
       setTimeout(() => {
@@ -144,7 +144,7 @@ export const CotizadorEmailModal = ({
       setMessageModal({
         open: true,
         message: 'Error al preparar el PDF para envío',
-        type: 'error',
+        type: 'error' as MessageType,
       });
     } finally {
       setPreparingPDF(false);
@@ -169,7 +169,7 @@ export const CotizadorEmailModal = ({
     const value = event.target.value;
     setEmail(value);
     setEmailError('');
-    setMessageModal({ open: false, message: '', type: 'success' });
+      setMessageModal({ open: false, message: '', type: 'success' as MessageType });
   };
 
   const handleEnviarCorreo = async () => {
@@ -188,14 +188,14 @@ export const CotizadorEmailModal = ({
       setMessageModal({
         open: true,
         message: 'El PDF aún se está preparando. Por favor, espere un momento.',
-        type: 'alert',
+        type: 'warning' as MessageType,
       });
       return;
     }
 
     setLoading(true);
     setEmailError('');
-    setMessageModal({ open: false, message: '', type: 'success' });
+      setMessageModal({ open: false, message: '', type: 'success' as MessageType });
 
     try {
       await UsuarioAPI.enviarCorreo({
@@ -225,7 +225,7 @@ export const CotizadorEmailModal = ({
       setMessageModal({
         open: true,
         message: errorMessage,
-        type: 'error',
+        type: 'error' as MessageType,
       });
     } finally {
       setLoading(false);
@@ -233,7 +233,7 @@ export const CotizadorEmailModal = ({
   };
 
   const handleCloseMessage = () => {
-    setMessageModal({ open: false, message: '', type: 'success' });
+      setMessageModal({ open: false, message: '', type: 'success' as MessageType });
   };
 
   if (!open) return null;

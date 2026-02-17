@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
 import gestionEmpleadorAPI, { EstablecimientoDeclaradoDTO } from "@/data/gestionEmpleadorAPI";
+import { useSVCCPresentacionContext } from "../../context";
 
 type SustanciaContextType = {
   establecimientoDeclarado: {
@@ -29,7 +30,8 @@ export function SustanciaContextProvider({
   idEstablecimientoEmpresa?: number;
   children: ReactNode;
 }) {
-  const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList({ page: "1,1", idEstablecimientoEmpresa }, {});
+  const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
+  const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList({ presentacionId: presentacion?.interno ?? 0, page: "1,1", idEstablecimientoEmpresa }, {});
   const establecimientoDeclarado = establecimientosDeclarados.data?.data.find(e => e.idEstablecimientoEmpresa === idEstablecimientoEmpresa);
 
   return (

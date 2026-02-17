@@ -22,8 +22,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Verificación de si el usuario está autenticado
     const isAuthenticated = status === 'authenticated';
-    const userModules: Modulo[] = user?.modulos || [];
-    const userTasks: Tarea[] = userModules.map(m => m?.tareas).flat() || [];
+    const userModules: Modulo[] = (user?.modulos || []).filter(modulo => modulo?.habilitado);
+    const userTasks: Tarea[] = userModules
+        .flatMap(modulo => modulo?.tareas || [])
+        .filter(tarea => tarea?.habilitada);
 
 
     const hasTask = (taskName: string): boolean => {
@@ -36,7 +38,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // Si no es Administrador, verifica la tarea específica.
-            return userTasks.some(tarea => tarea.tareaDescripcion.toLowerCase() === taskName.toLowerCase());
+            const normalizedTaskName = taskName.trim().toLowerCase();
+            return userTasks.some(tarea => (tarea?.tareaDescripcion || '').toLowerCase() === normalizedTaskName);
         }
 
         return false;
@@ -56,6 +59,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
+        // Durante el build/SSR, retornar valores por defecto en lugar de lanzar error
+        if (typeof window === 'undefined') {
+            return {
+                session: null,
+                status: 'loading' as const,
+                user: null,
+                hasTask: () => false,
+            };
+        }
         throw new Error('useAuth debe ser usado dentro de un AuthProvider');
     }
     return context;

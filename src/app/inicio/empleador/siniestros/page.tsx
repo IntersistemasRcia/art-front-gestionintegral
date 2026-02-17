@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
@@ -10,10 +10,16 @@ import type { Parameters } from '@/app/inicio/empleador/cobertura/types/persona'
 
 import DataTable from '@/utils/ui/table/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
-
+import { Box } from '@mui/material';
 
 import CondicionesTabla from './table';
 import type { SiniestroItem, InstanciaSiniestro } from './types/tipos';
+import { useEmpresasStore } from '@/data/empresasStore';
+import { Empresa } from '@/data/authAPI';
+import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
+import Formato from '@/utils/Formato';
+import styles from './siniestros.module.css';
+import { useSearchParams } from 'next/navigation';
 
 
 const fmtDateTime = (v?: string | null) => {
@@ -65,23 +71,101 @@ const cols: ColumnDef<SiniestroItem>[] = [
   },
 ];
 
+const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+
 
 export default function SiniestrosPage() {
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const searchParams = useSearchParams();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
   const [selectedDenuncia, setSelectedDenuncia] = useState<number | null>(null);
 
+  const cuitQuery = searchParams.get('cuit') ?? searchParams.get('cuil') ?? '';
+  const cuitDesdeQuery = normalizeDigits(cuitQuery);
+  const bloquearBusquedaPorCuit = Boolean(cuitDesdeQuery);
 
-  const params: Parameters = {};
+  const cuitEmpresaSeleccionada = normalizeDigits((empresaSeleccionada as any)?.cuit);
+  const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
+  const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
 
+  const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
+    cuitDesdeQuery ? { CUIT: Number(cuitDesdeQuery) } : {}
+  );
 
-  const { data, error, isLoading } =  gestionEmpleadorAPI.useGetVEmpleadorSiniestros(params);
+  // Si viene CUIT por query param, forzar selección por CUIT y bloquear el selector
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+    if (!cuitDesdeQuery) return;
 
+    const match = empresas.find((e) => normalizeDigits((e as any)?.cuit) === cuitDesdeQuery);
+    if (match) {
+      setEmpresaSeleccionada(match);
+      seleccionAutomaticaRef.current = true;
+    }
+  }, [cuitDesdeQuery, empresas, isLoadingEmpresas]);
+
+  // Si está bloqueado por CUIT y no hay match en el store, igual mostrar la Razón Social en el combo
+  useEffect(() => {
+    if (!cuitDesdeQuery) return;
+    if (empresaSeleccionada) return;
+
+    const razonSocial = (polizaRawData as any)?.empleador_Denominacion;
+    if (!razonSocial) return;
+    setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as any);
+  }, [cuitDesdeQuery, empresaSeleccionada, polizaRawData]);
+
+  // Seleccionar automáticamente si solo hay una empresa (salvo que venga CUIT por query)
+  useEffect(() => {
+    if (bloquearBusquedaPorCuit) return;
+    if (!isLoadingEmpresas) {
+      if (empresas.length === 1) {
+        setEmpresaSeleccionada(empresas[0]);
+        seleccionAutomaticaRef.current = true;
+      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+        setEmpresaSeleccionada(null);
+        seleccionAutomaticaRef.current = false;
+      }
+    }
+  }, [empresas.length, isLoadingEmpresas, bloquearBusquedaPorCuit]);
+
+  // Limpiar la denuncia seleccionada cuando cambia el CUIT (empresa/forzado)
+  useEffect(() => {
+    setSelectedDenuncia(null);
+  }, [cuitFinalStr]);
+
+  const handleEmpresaChange = (
+    _event: React.SyntheticEvent,
+    newValue: Empresa | null
+  ) => {
+    if (bloquearBusquedaPorCuit) return;
+    setEmpresaSeleccionada(newValue);
+    seleccionAutomaticaRef.current = false;
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
+    return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
+  };
+
+  const params: Parameters = cuitFinal ? { CUIT: cuitFinal } : {};
+
+  // El hook solo hará fetch si hay CUIT en los parámetros
+  const { data, error, isLoading } = gestionEmpleadorAPI.useGetVEmpleadorSiniestros(params);
+
+  const instanciasParams: Parameters = cuitFinal ? { CUIT: cuitFinal } : {};
+  
+  if (selectedDenuncia != null && cuitFinal) {
+    (instanciasParams as any).Denuncia = selectedDenuncia;
+  }
+
+  // El hook solo hará fetch si hay CUIT y Denuncia en los parámetros
   const {
     data: instanciasData,
     isLoading: isLoadingInst,
     error: errorInst,
-  } = gestionEmpleadorAPI.useGetVEmpleadorSiniestrosInstancias(
-    selectedDenuncia != null ? ({ Denuncia: selectedDenuncia } as any) : ({} as any)
-  );
+  } = gestionEmpleadorAPI.useGetVEmpleadorSiniestrosInstancias(instanciasParams);
 
   // Log con token enmascarado y URL (debug)
   const url = useMemo(
@@ -126,6 +210,18 @@ export default function SiniestrosPage() {
 
   return (
     <div style={{ padding: 16 }}>
+      <Box className={styles.empresaSelectorContainer}>
+        <CustomSelectSearch<Empresa>
+          label="Seleccionar Empresa"
+          options={empresas}
+          value={empresaSeleccionada}
+          onChange={handleEmpresaChange}
+          getOptionLabel={getEmpresaLabel}
+          isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
+          loading={isLoadingEmpresas}
+          disabled={isLoadingEmpresas || empresas.length === 0 || bloquearBusquedaPorCuit}
+        />
+      </Box>
 
       {error && (
         <p style={{ color: 'crimson' }}>

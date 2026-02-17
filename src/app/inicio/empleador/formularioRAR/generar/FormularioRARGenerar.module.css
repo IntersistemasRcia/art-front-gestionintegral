@@ -1,0 +1,227 @@
+/* ================ UTILIDADES DE LAYOUT ================ */
+.wrapperCol { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; flex-direction: row; gap: 12px; }
+.row20 { display: flex; flex-direction: row; gap: 20px; }
+.col { display: flex; flex-direction: column; gap: 20px; }
+
+.flex { display: flex; }
+.flex1 { flex: 1; }
+.justifyCenter { justify-content: center; }
+.alignCenter { align-items: center; }
+.spaceBetween { justify-content: space-between; }
+
+.gap8 { gap: 8px; }
+.gap12 { gap: 12px; }
+.gap20 { gap: 20px; }
+
+.mb16 { margin-bottom: 16px; }
+.mb20 { margin-bottom: 20px; }
+.mt20 { margin-top: 20px; }
+.mt40 { margin-top: 40px; }
+.mt60 { margin-top: 60px; }
+
+.w100 { width: 100%; }
+.bold { font-weight: bold; }
+.fs20 { font-size: 20px; }
+.center { text-align: center; }
+.p24 { padding: 24px; }
+
+/* Centrado del texto del input de MUI */
+.centeredInput :global(.MuiInputBase-input) {
+  text-align: center;
+}
+
+/* ================ MODAL GRIDS ================ */
+.modalGridCol { display: flex; flex-direction: column; gap: 20px; }
+.modalRow { display: flex; flex-direction: row; gap: 20px; }
+
+/* ================ BOTONES ================ */
+.modalButtons { display: flex; gap: 12px; justify-content: center; margin-top: 20px; }
+
+/* Sección de información del empleador */
+.empleadorInfo {
+  background: var(--verdeClaroClaro);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.empleadorInfoTitle {
+  margin: 0 0 15px 0;
+  color: var(--verde);
+}
+
+.empleadorInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  align-items: center;
+}
+
+.empleadorInfoItem {
+  font-size: 14px;
+}
+
+/* Sección de selección de establecimiento */
+.establecimientoSection {
+  background: var(--grisClaroClaro);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.establecimientoTitle {
+  margin: 0 0 15px 0;
+  color: var(--grisOscuro);
+}
+
+.requiredAsterisk {
+  color: var(--rojo);
+  font-size: 16px;
+}
+
+/* Resumen de totales */
+.totalResumen {
+  background: var(--verdeClaro);
+  padding: 10px;
+  border-radius: 3px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Sección de datos del trabajador */
+.trabajadorSection {
+  background: var(--grisClaroClaro);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.trabajadorSectionDisabled {
+  background: var(--grisClaroClaro);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.trabajadorTitle {
+  margin: 0 0 15px 0;
+  color: var(--grisOscuro);
+}
+
+.trabajadorTitleDisabled {
+  margin: 0 0 15px 0;
+  color: var(--gris);
+}
+
+.trabajadorSubtitle {
+  font-size: 14px;
+  font-weight: normal;
+  margin-left: 10px;
+}
+
+/* Filas de formulario con margin */
+.modalRowSpaced {
+  margin-bottom: 20px;
+}
+
+/* Tabla de trabajadores cargados */
+.tablaTrabajadoresContainer {
+  background: var(--blanco);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  border: 1px solid var(--grisClaro);
+}
+
+.tablaTrabajadoresTitle {
+  margin: 0 0 15px 0;
+  color: var(--grisOscuro);
+}
+
+/* Estado de trabajadores */
+.estadoTrabajadores {
+  background: var(--verdeClaroClaro);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  border: 1px solid var(--verdeClaro);
+}
+
+.estadoTrabajadoresIncompleto {
+  background: var(--naranjaClaroClaro);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  border: 1px solid var(--naranjaClaro);
+}
+
+.estadoContador {
+  color: var(--verdeOscuro);
+  font-weight: bold;
+}
+
+.estadoContadorAdvertencia {
+  color: var(--naranjaOscuro);
+  font-weight: bold;
+}
+
+/* Botones de acción */
+.botonesAccion {
+  background: var(--blanco);
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  border-top: 2px solid var(--grisClaro);
+}
+
+.botonGuardar {
+  background: var(--verde);
+  color: var(--blanco);
+}
+
+.botonGuardarDisabled {
+  background: var(--grisClaro);
+  color: var(--blanco);
+}
+
+.botonCancelar {
+  background: var(--rojo);
+  color: var(--blanco);
+}
+
+/* Span de fecha sin especificar */
+.fechaNoEspecificada {
+  color: var(--gris);
+  font-style: italic;
+}
+
+/* Contenedor de acciones en fila */
+.accionesContainer {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Validación de código de agente */
+.validacionAgente {
+  background: var(--naranjaClaroClaro);
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--naranjaOscuro);
+  border-left: 4px solid var(--naranja);
+}
+
+.validacionAgenteCompleto {
+  background: var(--verdeClaroClaro);
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--verdeOscuro);
+  border-left: 4px solid var(--verde);
+}

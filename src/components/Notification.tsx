@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { GoBellFill } from 'react-icons/go';
 import styles from './Navbar.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
-import ArtAPI, { formatEstablecimientoLabel } from '@/data/artAPI';
+import ArtAPI from '@/data/artAPI';
 
 type Props = {
   empresaCUIT?: number | string | null;
@@ -28,7 +28,7 @@ export default function Notification({ empresaCUIT }: Props) {
           return;
         }
         const [ests, forms] = await Promise.all([
-          ArtAPI.getEstablecimientosEmpresa(c),
+          ArtAPI.getEstablecimientosEmpresa(c, "True"),
           ArtAPI.getFormulariosRGRL(c, true),
         ]);
 
@@ -66,17 +66,10 @@ export default function Notification({ empresaCUIT }: Props) {
                 <div className={styles.bellItem}>Cargando...</div>
               ) : (
                 <>
-                  {missingList.length === 0 ? (
+                  {missingCount === 0 ? (
                     <div className={styles.bellItem}>No hay notificaciones</div>
                   ) : (
-                    <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                      {missingList.map((m, i) => (
-                        <div className={styles.bellItem} key={i}>
-                          <div className={styles.bellItemTitle}>Falta formulario RGRL en:</div>
-                          <div className={styles.bellItemName}>{formatEstablecimientoLabel(m)}</div>
-                        </div>
-                      ))}
-                    </div>
+                    <div className={styles.bellItem}>Faltan presentar formularios RGRL</div>
                   )}
                   <div className={styles.bellFooter}>
                     <CustomButton onClick={() => { setCampanaOpen(false); window.location.href = '/inicio/empleador/formularioRGRL'; }}>Ver Formularios</CustomButton>

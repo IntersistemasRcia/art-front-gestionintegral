@@ -18,6 +18,7 @@ const permissionMap: { [key: string]: string | null } = {
   "/inicio/empleador/credenciales": "empleador_Credenciales",
   "/inicio/comercializador/cuentaCorriente": "Comercializador_CuentaCorriente",
   "/inicio/comercializador/polizas": "Comercializador_Polizas",
+  "/inicio/comercializador/administracionComercializadores": "Comercializador_Administracion",
   "/inicio/cotizaciones": "Cotizaciones",
   "/inicio/denuncias": "Denuncias",
   "/inicio/informes/comisionesMedicas": "Informes_ComisionesMedicas",
@@ -58,8 +59,10 @@ export async function middleware(req: NextRequest) {
 
   // 2. Control de Roles, Modulos y Tareas
   const userRol = (token as any)?.user?.rol || "";
-  const userModules: Module[] = (token as any)?.user?.modulos || [];
-  const userTasks: Task[] = userModules.map(m => m?.tareas).flat() || [];
+  const userModules: Module[] = ((token as any)?.user?.modulos || []).filter((modulo: Module) => modulo?.habilitado);
+  const userTasks: Task[] = userModules
+    .flatMap((modulo: Module) => modulo?.tareas || [])
+    .filter((tarea: Task) => tarea?.habilitada);
 
   if (userRol?.toLowerCase() == 'administrador') { // Si es Admin, acceso ilimitado
         return NextResponse.next();
@@ -76,7 +79,8 @@ export async function middleware(req: NextRequest) {
     }
 
     // Si la ruta requiere una tarea, verifica si el usuario la tiene
-    if (!userTasks.some(tarea => tarea.tareaDescripcion.toLowerCase() === requiredTask.toLowerCase())) {
+    const normalizedRequiredTask = requiredTask.toLowerCase();
+    if (!userTasks.some(tarea => (tarea?.tareaDescripcion || '').toLowerCase() === normalizedRequiredTask)) {
         // Redirige a una página de "acceso denegado"
         return NextResponse.redirect(new URL('/accesoDenegado', req.url));
     }

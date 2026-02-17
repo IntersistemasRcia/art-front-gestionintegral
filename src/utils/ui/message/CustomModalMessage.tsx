@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogTitle, Typography, Box } from '@mui/materi
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import InfoOutlineIcon from '@mui/icons-material/InfoOutline';
 import styles from './CustomModalMessage.module.css';
-export type MessageType = 'success' | 'error' | 'alert';
+export type MessageType = 'success' | 'error' | 'warning' | 'info';
 interface CustomModalMessageProps {
   open: boolean;
   message: string;
@@ -37,7 +38,16 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
           Icon: ErrorOutlineIcon, 
           defaultTitle: 'Error' 
         };
-      case 'alert':
+      case 'warning':
+        return { 
+          Icon: WarningAmberIcon, 
+          defaultTitle: 'Advertencia' 
+        };
+      case 'info':
+        return { 
+          Icon: InfoOutlineIcon, 
+          defaultTitle: 'Información' 
+        };
       default:
         return { 
           Icon: WarningAmberIcon, 

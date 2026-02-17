@@ -30,7 +30,38 @@ export type EstablecimientoById = {
 
 export type ParametersEstablecimientoByCUIT = {
   CUIT?: number;
+  Activos?: string;
 }
+
+
+//#region Types Formularios RAR (POST)
+export type FormularioRARDetallePostRequest = {
+  internoFormulariosRar: number;
+  cuil: number;
+  nombre: string;
+  sectorTarea: string;
+  fechaIngreso: string;
+  horasExposicion: number;
+  fechaUltimoExamenMedico: string;
+  codigoAgente: number;
+  fechaInicioExposicion: string;
+  fechaFinExposicion: string;
+};
+
+export type FormularioRARPostRequest = {
+  cantTrabajadoresExpuestos: number;
+  cantTrabajadoresNoExpuestos: number;
+  fechaCreacion: string;
+  fechaPresentacion: string | null;
+  internoPresentacion: number;
+  internoEstablecimiento: number;
+  formularioRARDetalle: FormularioRARDetallePostRequest[];
+};
+
+export type FormularioRARPutRequest = FormularioRARPostRequest;
+
+export type FormulariosRARApiResponse = unknown;
+//#endregion Types Formularios RAR (POST)
 
 
 export default FormularioRAR;

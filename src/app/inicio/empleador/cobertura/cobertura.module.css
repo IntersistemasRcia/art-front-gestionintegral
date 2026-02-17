@@ -15,6 +15,17 @@
     margin-top: 5px;
 }
 
+.empresaSelectorContainer {
+    max-width: 500px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .empresaSelectorContainer {
+        max-width: 100%;
+    }
+}
+
 .tableTitle{
     font-size: 1.5rem;
     font-weight: bold;

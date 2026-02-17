@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import gestionEmpleadorAPI, {
-  SustanciaDTO, SVCCSustanciaUpdateParams, SVCCSustanciaDeleteParams
+  SustanciaBaseDTO,
+  SustanciaCreateDTO,
+  SustanciaDTO,
+  SVCCSustanciaUpdateParams,
+  SVCCSustanciaDeleteParams,
 } from "@/data/gestionEmpleadorAPI";
 import { Data } from "@/utils/ui/table/Browse";
 import { FormProps } from "@/utils/ui/form/Form";
@@ -30,7 +34,7 @@ export default function SustanciaHandler() {
   const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
   const [data, setData] = useState<Data<SustanciaDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCSustanciaList(
-    { page: `${index + 1},${size}` },
+    { presentacionId: presentacion?.interno ?? 0, page: `${index + 1},${size}` },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
@@ -135,7 +139,7 @@ export default function SustanciaHandler() {
   function handleEditOnConfirm() {
     switch (edit.action) {
       case "create": {
-        triggerCreate(edit.data as SustanciaDTO)
+        triggerCreate({ presentacionId: presentacion?.interno ?? 0, ...edit.data } as SustanciaCreateDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();
@@ -146,7 +150,7 @@ export default function SustanciaHandler() {
         break;
       }
       case "update": {
-        triggerUpdate(edit.data as SustanciaDTO)
+        triggerUpdate(edit.data as SustanciaBaseDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();

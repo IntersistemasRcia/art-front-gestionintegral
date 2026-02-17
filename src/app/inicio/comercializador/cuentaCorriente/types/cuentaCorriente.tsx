@@ -28,4 +28,20 @@ export type ViewCuentaCorrienteDetalle = {
     TotalConIVA: number;
 }
 
+export type ParametersEmpleadorPagosComercializador = {
+    Periodo?: number;
+    ComercializadoresInternos?: string;
+    OrderBy?: string;
+    PageIndex?: number;
+    PageSize?: number;
+}
+
+export type ParametersAfipTranferencia = {
+    Periodo?: number;
+    CuitContribuyente?: string;
+    // OrderBy?: string;
+    // PageIndex?: number;
+    // PageSize?: number;
+}
+
 export default ViewCuentaCorriente;

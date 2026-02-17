@@ -13,13 +13,34 @@ import Image from 'next/image';
 import Formato from '@/utils/Formato';
 import Cobertura_PDF from './Cobertura_PDF';
 import ExcelJS from 'exceljs';
+import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useSearchParams } from "next/navigation";
 
 const { useGetPersonal, useGetPoliza } = gestionEmpleadorAPI;
 
 export default function CoberturaPage() {
+    const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+    const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+    const seleccionAutomaticaRef = useRef(false);
+    const [bloquearBusquedaPorCuit, setBloquearBusquedaPorCuit] = useState(false);
+    const searchParams = useSearchParams();
+    const cuitQuery = searchParams.get("cuit") ?? searchParams.get("cuil");
+    const cuitDesdeQuery = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
+
+    const cuitEmpresaActual = Number.isFinite(cuitDesdeQuery) && cuitDesdeQuery > 0
+        ? cuitDesdeQuery
+        : (empresaSeleccionada?.cuit ?? NaN);
    
-    const { data: personalRawData, isLoading: isPersonalLoading } = useGetPersonal(); 
-    const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza();
+    // Obtener personal y póliza usando el CUIT de la empresa seleccionada o, si viene por query, ese CUIT
+    const paramsCUIT = Number.isFinite(cuitEmpresaActual) && cuitEmpresaActual > 0
+        ? { CUIT: cuitEmpresaActual }
+        : {};
+
+    const { data: personalRawData, isLoading: isPersonalLoading } = useGetPersonal(paramsCUIT); 
+    const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza(paramsCUIT);
     
     // Estados para las dos tablas: Pendiente (Origen) y Cubierto (Destino)
     const [personalPendiente, setPersonalPendiente] = useState<Persona[]>([]);
@@ -30,6 +51,19 @@ export default function CoberturaPage() {
     const [presentadoA, setPresentadoA] = useState<string>('');
     const [abrirPDF, setAbrirPDF] = useState<boolean>(false);
     const [clausula, setClausula] = useState<boolean>(false);
+
+    // Estado para mensajes (formato unificado como en RGRL)
+    const [msgOpen, setMsgOpen] = useState<boolean>(false);
+    const [msgText, setMsgText] = useState<string>('');
+    const [msgType, setMsgType] = useState<MessageType>('warning');
+    const [msgTitle, setMsgTitle] = useState<string | undefined>(undefined);
+
+    const showMessage = useCallback((message: string, type: MessageType = 'warning', title?: string) => {
+        setMsgText(message);
+        setMsgType(type);
+        setMsgTitle(title);
+        setMsgOpen(true);
+    }, []);
 
     // Fecha y hora actuales (formato local es-AR) - Solo se calcula en el cliente para evitar errores de hidratación
     const [dia, setDia] = useState<string>('');
@@ -43,6 +77,66 @@ export default function CoberturaPage() {
         setDia(now.toLocaleDateString('es-AR')); // ej. "07/11/2025"
         setHora(now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })); // ej. "14:35"
     }, []);
+
+    // Seleccionar automáticamente si solo hay una empresa (salvo que venga CUIT por query)
+    useEffect(() => {
+        if (Number.isFinite(cuitDesdeQuery) && cuitDesdeQuery > 0) return;
+        if (!isLoadingEmpresas) {
+            if (empresas.length === 1) {
+                setEmpresaSeleccionada(empresas[0]);
+                seleccionAutomaticaRef.current = true;
+            } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+                setEmpresaSeleccionada(null);
+                seleccionAutomaticaRef.current = false;
+            }
+        }
+    }, [empresas.length, isLoadingEmpresas, cuitDesdeQuery]);
+
+    // Si viene CUIT por query param, bloquear combo y seleccionar empresa (o al menos la razón social)
+    useEffect(() => {
+        if (!Number.isFinite(cuitDesdeQuery) || cuitDesdeQuery <= 0) return;
+
+        setBloquearBusquedaPorCuit(true);
+        if (isLoadingEmpresas || empresaSeleccionada) return;
+
+        const match = empresas.find((e) => {
+            const digits = Number(String((e as any)?.cuit ?? "").replace(/\D/g, ""));
+            return Number.isFinite(digits) && digits === cuitDesdeQuery;
+        });
+
+        if (match) {
+            setEmpresaSeleccionada(match);
+            seleccionAutomaticaRef.current = true;
+            return;
+        }
+
+        const razonSocial = (polizaData as any)?.empleador_Denominacion;
+        if (!razonSocial) return;
+
+        setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as Empresa);
+    }, [cuitDesdeQuery, empresas, isLoadingEmpresas, empresaSeleccionada, polizaData]);
+
+    // Limpiar las tablas cuando cambia la empresa seleccionada
+    useEffect(() => {
+        setPersonalPendiente([]);
+        setPersonalCubierto([]);
+        setSelectedPendiente([]);
+        setSelectedCubierto([]);
+    }, [empresaSeleccionada?.cuit]);
+
+    const handleEmpresaChange = (
+        _event: React.SyntheticEvent,
+        newValue: Empresa | null
+    ) => {
+        if (bloquearBusquedaPorCuit) return;
+        setEmpresaSeleccionada(newValue);
+        seleccionAutomaticaRef.current = false;
+    };
+
+    const getEmpresaLabel = (empresa: Empresa | null): string => {
+        if (!empresa) return "";
+        return String(empresa.razonSocial ?? "");
+    };
 
     // Estados para las selecciones de filas en cada tabla
     const [selectedPendiente, setSelectedPendiente] = useState<Persona[]>([]);
@@ -66,6 +160,10 @@ export default function CoberturaPage() {
     useEffect(() => {
         if (personalRawData && personalRawData.length > 0) {
             setPersonalPendiente(personalRawData);
+        } else if (personalRawData && personalRawData.length === 0) {
+            // Si la respuesta es un array vacío, limpiar las tablas
+            setPersonalPendiente([]);
+            setPersonalCubierto([]);
         }
     }, [personalRawData]);
 
@@ -160,7 +258,7 @@ export default function CoberturaPage() {
     // FUNCIÓN PARA AGREGAR FILA A LA TABLA CUBIERTO
     const handleAddFila = () => {
         if (newCuil === null || !newNombre.trim()) {
-            alert("Por favor, ingrese CUIT/CUIL y Nombre válidos.");
+            showMessage('Por favor, ingrese CUIT/CUIL y Nombre válidos.', 'warning', 'Datos faltantes');
             return;
         }
 
@@ -168,7 +266,7 @@ export default function CoberturaPage() {
         const isDuplicate = personalCubierto.some(p => p.cuil === newCuil) || personalPendiente.some(p => p.cuil === newCuil);
         
         if (isDuplicate) {
-            alert(`El CUIT/CUIL ${newCuil} ya existe en las listas.`);
+            showMessage(`El CUIT/CUIL ${newCuil} ya existe en las listas.`, 'warning', 'Registro duplicado');
             return;
         }
 
@@ -200,7 +298,7 @@ export default function CoberturaPage() {
             
             const worksheet = workbook.worksheets[0];
             if (!worksheet) {
-                alert('El archivo Excel está vacío');
+                showMessage('El archivo Excel está vacío.', 'warning', 'Importación de Excel');
                 return;
             }
 
@@ -240,14 +338,14 @@ export default function CoberturaPage() {
 
             if (importedData.length > 0) {
                 setPersonalCubierto(prev => [...prev, ...importedData]);
-                alert(`Se importaron ${importedData.length} registros exitosamente.${duplicados.length > 0 ? `\n${duplicados.length} duplicados omitidos.` : ''}`);
+                showMessage(`Se importaron ${importedData.length} registros exitosamente.${duplicados.length > 0 ? `\n${duplicados.length} duplicados omitidos.` : ''}`, 'success', 'Importación exitosa');
             } else {
-                alert('No se encontraron datos válidos en el archivo.');
+                showMessage('No se encontraron datos válidos en el archivo.', 'warning', 'Importación de Excel');
             }
 
         } catch (error) {
             console.error('Error al importar Excel:', error);
-            alert('Error al leer el archivo Excel. Asegúrese de que tenga el formato correcto (Columna 1: CUIL, Columna 2: Nombre).');
+            showMessage('Error al leer el archivo Excel. Asegúrese de que tenga el formato correcto (Columna 1: CUIL, Columna 2: Nombre).', 'error', 'Error de importación');
         }
 
         // Limpiar el input para permitir reimportar el mismo archivo
@@ -276,16 +374,40 @@ export default function CoberturaPage() {
             cuit: Formato.CUIP(polizaData.cuit) || "",
             vigenciaDesde: Formato.Fecha(polizaData.vigencia_Desde) || "",
             vigenciaHasta: Formato.Fecha(polizaData.vigencia_Hasta) || "",
-            empleadorDenominacion: polizaData.empleador_Denominacion || "",
+            empleadorDenominacion: polizaData.empleador_Denoominacion || "",
             numero: polizaData.numero || ""
         };
     }, [polizaData, isMounted]);
+
+    // Mostrar destinatario específico en la cláusula si fue ingresado, sino uso el genérico
+    const destinatarioEnClausula = presentadoA?.trim() ? presentadoA : 'A quien corresponda';
 
     return ( 
         <div className={styles.inicioContainer}>
             <div className={styles.header}>
                 <h1 className={styles.mainTitle}>Gestión de Cobertura de Personal</h1>
             </div>
+
+            <Box className={styles.empresaSelectorContainer}>
+                <CustomSelectSearch<Empresa>
+                    options={empresas}
+                    getOptionLabel={getEmpresaLabel}
+                    value={empresaSeleccionada}
+                    onChange={handleEmpresaChange}
+                    label="Seleccionar Empresa"
+                    placeholder="Buscar empresa..."
+                    loading={isLoadingEmpresas}
+                    loadingText="Cargando empresas..."
+                    noOptionsText={
+                        isLoadingEmpresas
+                            ? "Cargando..."
+                            : empresas.length === 0
+                            ? "No hay empresas disponibles"
+                            : "No se encontraron empresas"
+                    }
+                    disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
+                />
+            </Box>
 
             <div className={styles.dualTableContainer}>
                 
@@ -462,7 +584,7 @@ export default function CoberturaPage() {
                     <>
                         <p>
                             Consta por la presente que <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>, renuncia en forma expresa a reclamar o iniciar toda acción de 
-                            repetición o de regreso contra: A quien corresponda, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley 
+                                repetición o de regreso contra: {destinatarioEnClausula}, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley 
                             N° 24.557, sea en cualquier otra norma jurídica, con motivo de las prestaciones en especie o dinerarias que se vea obligada a abonar, contratar
                             u otorgar al personal dependiente o ex dependiente de <strong>{formattedValues.empleadorDenominacion}</strong>, amparados por la cobertura del Contrato de
                             Afiliación N° <strong>{formattedValues.numero}</strong>, por accidentes del trabajo o enfermedades profesionales, ocurridos o contraídos por el hecho 
@@ -519,9 +641,18 @@ export default function CoberturaPage() {
                     fechaHasta={polizaData?.vigencia_Hasta}             // opcional
                     clausula={clausula}       // opcional
                     nominasSeleccionadas={selectedCubierto} // si aplicable
+                cuitEmpresa={Number.isFinite(cuitEmpresaActual) ? cuitEmpresaActual : undefined}
                 />
                 ) : null}
           </div>
-        </div>
+                {/* Modal de mensajes estandarizado (formato RGRL) */}
+                <CustomModalMessage
+                        open={msgOpen}
+                        onClose={() => setMsgOpen(false)}
+                        message={msgText}
+                        type={msgType}
+                        title={msgTitle}
+                />
+                </div>
     );
 }
