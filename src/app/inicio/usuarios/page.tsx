@@ -32,6 +32,11 @@ interface PermisosModulo {
   moduloId: number;
   moduloDescripcion: string;
   habilitado: boolean;
+  tareas: {
+    tareaId: number;
+    moduloId: number;
+    habilitada: boolean;
+  }[];
 }
 
 export default function UsuariosPage() {

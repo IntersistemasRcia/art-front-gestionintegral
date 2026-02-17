@@ -296,7 +296,15 @@ export class UsuarioAPIClass extends ExternalAPI {
     }).toString();
   tareasUpdate = async (
     usuarioId: string,
-    data: Array<{ moduloId: number; habilitado: boolean }>
+    data: Array<{
+      moduloId: number;
+      habilitado: boolean;
+      tareas: Array<{
+        tareaId: number;
+        moduloId: number;
+        habilitada: boolean;
+      }>;
+    }>
   ) =>
     tokenizable
       .put(
@@ -311,7 +319,15 @@ export class UsuarioAPIClass extends ExternalAPI {
       });
   useTareasUpdate = (
     usuarioId: string,
-    data: Array<{ moduloId: number; habilitado: boolean }>
+    data: Array<{
+      moduloId: number;
+      habilitado: boolean;
+      tareas: Array<{
+        tareaId: number;
+        moduloId: number;
+        habilitada: boolean;
+      }>;
+    }>
   ) =>
     useSWR(
       [this.tareasUpdateURL(usuarioId), token.getToken(), JSON.stringify(data)],

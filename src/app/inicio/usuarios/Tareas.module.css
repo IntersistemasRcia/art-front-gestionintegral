@@ -1,0 +1,20 @@
+.toggleBadge {
+  display: inline-block;
+  width: 30px;
+  height: 20px;
+  border-radius: 3px;
+  color: white;
+  text-align: center;
+  line-height: 20px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.enabled {
+  background-color: #4CAF50;
+}
+
+.disabled {
+  background-color: #f44336;
+}
