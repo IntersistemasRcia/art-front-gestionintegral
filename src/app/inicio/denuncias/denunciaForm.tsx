@@ -306,9 +306,9 @@ export default function DenunciaForm({
       case "fechaNac":
         return validateRequired(value, "Fecha de Nacimiento");
       case "sexo":
-        return validateRequired(value, "Sexo");
+        return undefined;
       case "estadoCivil":
-        return validateRequired(value, "Estado Civil");
+        return undefined;
       case "nacionalidad":
         return validateRequired(value, "Nacionalidad");
       case "domicilioCalle":
@@ -347,8 +347,8 @@ export default function DenunciaForm({
       }
     } else if (currentTab === 1) {
       fieldsToValidate = [
-        "cuil", "docTipo", "docNumero", "nombre", "fechaNac", 
-        "sexo", "estadoCivil", "nacionalidad", "domicilioCalle", "telefono", "email"
+        "cuil", "docTipo", "docNumero", "nombre", "fechaNac",
+        "nacionalidad", "domicilioCalle", "telefono", "email"
       ];
     } else if (currentTab === 3) {
       fieldsToValidate = [
@@ -510,7 +510,29 @@ export default function DenunciaForm({
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    // Permitir navegación libre entre pestañas
+    // Validar las pestañas intermedias antes de permitir navegar hacia adelante
+    if (newValue > activeTab) {
+      // marcar todos los campos como tocados para mostrar errores
+      const allTouched: TouchedFields = Object.keys(form).reduce((acc, key) => {
+        acc[key as keyof TouchedFields] = true;
+        return acc;
+      }, {} as TouchedFields);
+      setTouched(allTouched);
+
+      // validar cada solapa intermedia (desde la actual hasta la objetivo - 1)
+      for (let t = activeTab; t < newValue; t++) {
+        const tabErrors = validateAllFields(form, t);
+        if (Object.keys(tabErrors).length > 0) {
+          setErrors((prev) => ({ ...prev, ...tabErrors }));
+          if (onValidationError) {
+            const firstFew = Object.values(tabErrors).filter(Boolean).slice(0, 5).join('\n');
+            onValidationError('Complete los campos obligatorios de la(s) solapa(s) anterior(es).' + (firstFew ? `\n\nDetalle:\n${firstFew}` : ''));
+          }
+          return;
+        }
+      }
+    }
+
     setActiveTab(newValue);
   };
 
@@ -577,6 +599,22 @@ export default function DenunciaForm({
   };
 
   const handleNext = () => {
+    // Validar la solapa actual antes de avanzar
+    const tabErrors = validateAllFields(form, activeTab);
+    if (Object.keys(tabErrors).length > 0) {
+      const allTouched: TouchedFields = Object.keys(form).reduce((acc, key) => {
+        acc[key as keyof TouchedFields] = true;
+        return acc;
+      }, {} as TouchedFields);
+      setTouched(allTouched);
+      setErrors((prev) => ({ ...prev, ...tabErrors }));
+      if (onValidationError) {
+        const firstFew = Object.values(tabErrors).filter(Boolean).slice(0, 5).join('\n');
+        onValidationError('Complete los campos obligatorios antes de avanzar.' + (firstFew ? `\n\nDetalle:\n${firstFew}` : ''));
+      }
+      return;
+    }
+
     const next = activeTab + 1;
     setActiveTab(next);
     setMaxVisitedTab((prev) => Math.max(prev, next));

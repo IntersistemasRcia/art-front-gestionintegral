@@ -444,6 +444,20 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               <MenuItem value="No">No</MenuItem>
             </Select>
           </FormControl>
+          
+          <TextField
+            label="Fecha en la que se informa a la ART"
+            name="fechaInformacionArt"
+            type="date"
+            value={form.fechaInformacionArt}
+            onChange={onTextFieldChange}
+            onBlur={() => onBlur('fechaInformacionArt')}
+            error={touched.fechaInformacionArt && !!errors.fechaInformacionArt}
+            helperText={touched.fechaInformacionArt && errors.fechaInformacionArt}
+            fullWidth
+            disabled={isDisabled}
+            InputLabelProps={{ shrink: true }}
+          />
         </div>
       </div>
 

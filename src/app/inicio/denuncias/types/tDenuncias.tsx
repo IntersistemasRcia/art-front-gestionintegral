@@ -102,6 +102,8 @@ export interface DenunciaFormData {
   tipoDenuncia: 'AccidenteTrabajo' | 'Enfermedad' | '';
   tipoSiniestro: string;
   enViaPublica: 'Si' | 'No' | '';
+  // Fecha en la que se informa a la ART
+  fechaInformacionArt: string;
 
   // Accidente de Trabajo
   fechaOcurrencia: string;
@@ -258,6 +260,7 @@ export const initialDenunciaFormData: DenunciaFormData = {
   entreCalle: '',
   entreCalleY: '',
   descripcion: '',
+  fechaInformacionArt: '',
   codLocalidad: '',
   codPostal: '',
   localidadAccidente: '',

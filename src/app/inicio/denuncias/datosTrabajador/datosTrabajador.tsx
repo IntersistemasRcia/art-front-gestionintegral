@@ -542,7 +542,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
 
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.sexo && !!errors.sexo}
             disabled={isDisabled}
             className={styles.compactField}
@@ -567,7 +567,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
 
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.estadoCivil && !!errors.estadoCivil}
             disabled={isDisabled}
             className={styles.compactField}
