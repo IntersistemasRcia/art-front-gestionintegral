@@ -801,4 +801,7 @@ export interface TouchedFields {
 
 export type ParametersEmpleadorT = {
   CUIL?: number;
+  PageIndex?: number;
+  PageSize?: number;
+  Perido?: number;
 };

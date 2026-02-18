@@ -19,3 +19,10 @@
   width: 100%;
   min-width: 0;
 }
+
+.notice {
+  display: block;
+  margin-top: 12px;
+  font-size: 2rem;
+  color: rgba(0, 0, 0, 0.6);
+}

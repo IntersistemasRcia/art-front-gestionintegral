@@ -15,3 +15,9 @@
 .actionIcon {
 	font-size: 22px;
 }
+
+.filterInfoText {
+	margin-bottom: 10px;
+	font-weight: 600;
+	font-size: 1.55rem;
+}

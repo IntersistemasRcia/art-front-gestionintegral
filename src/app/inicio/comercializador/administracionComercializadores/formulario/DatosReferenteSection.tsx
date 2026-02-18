@@ -15,6 +15,7 @@ import {
 
 interface Props {
   form: UsuarioFormFields;
+  creationRole?: string | null;
   errors: ValidationErrors;
   touched: TouchedFields;
   busqueda: string;
@@ -23,6 +24,17 @@ interface Props {
   localidadesOptions: any[];
   isValidating: boolean;
   isDisabled: boolean;
+  isCreating: boolean;
+  isEditing: boolean;
+  isViewing: boolean;
+  isGrupoOrganizador: boolean;
+  isOrganizadorComercializador: boolean;
+  grupoOptions: { value: string; label: string }[];
+  organizadorOptions: { value: string; label: string; gOrgInterno?: number }[];
+  selectedGrupoId: string;
+  selectedOrganizadorId: string;
+  onGrupoChange: (value: string) => void;
+  onOrganizadorChange: (value: string) => void;
   onTextFieldChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectChange: (e: SelectChangeEvent<string>) => void;
   onBlur: (field: keyof TouchedFields) => void;
@@ -30,6 +42,7 @@ interface Props {
 
 export default function DatosReferenteSection({
   form,
+  creationRole = null,
   errors,
   touched,
   busqueda,
@@ -38,15 +51,27 @@ export default function DatosReferenteSection({
   localidadesOptions,
   isValidating,
   isDisabled,
+  isCreating,
+  isEditing,
+  isViewing,
+  isGrupoOrganizador,
+  isOrganizadorComercializador,
+  grupoOptions,
+  organizadorOptions,
+  selectedGrupoId,
+  selectedOrganizadorId,
+  onGrupoChange,
+  onOrganizadorChange,
   onTextFieldChange,
   onSelectChange,
   onBlur,
 }: Props) {
+  const roleKey = String(creationRole ?? form.rol ?? "").toLowerCase();
+  const showGrupoAutocomplete = !(isCreating && roleKey.includes("grupo"));
+  const showOrganizadorAutocomplete = !(isCreating && roleKey.includes("organizador"));
+
   return (
     <div className={styles.formSection}>
-      <Typography variant="h6" className={styles.sectionTitle}>
-        Datos Referente
-      </Typography>
 
       <div className={styles.formRow}>
         <TextField
@@ -234,6 +259,48 @@ export default function DatosReferenteSection({
           placeholder="Ingrese calle 2"
         />
       </div>
+
+      {(isCreating || isEditing || isViewing) && (showGrupoAutocomplete || showOrganizadorAutocomplete) && (
+        <div className={styles.formRow}>
+          {showGrupoAutocomplete && (
+            <Autocomplete
+              disabled={isDisabled || isGrupoOrganizador || isOrganizadorComercializador}
+              options={[{ value: "", label: "Todos" }, ...grupoOptions]}
+              getOptionLabel={(opt) => String(opt?.label ?? "")}
+              isOptionEqualToValue={(opt, val) => String(opt?.value) === String(val?.value)}
+              value={
+                [{ value: "", label: "Todos" }, ...grupoOptions].find(
+                  (grupo) => String(grupo.value) === String(selectedGrupoId)
+                ) ?? { value: "", label: "Todos" }
+              }
+              onChange={(_e, newValue) => onGrupoChange(String(newValue?.value ?? ""))}
+              renderInput={(params) => (
+                <TextField {...params} label="Grupo" placeholder="Seleccione grupo" />
+              )}
+              fullWidth
+            />
+          )}
+
+          {showOrganizadorAutocomplete && (
+            <Autocomplete
+              disabled={isDisabled || isOrganizadorComercializador}
+              options={[{ value: "", label: "Todos" }, ...organizadorOptions]}
+              getOptionLabel={(opt) => String(opt?.label ?? "")}
+              isOptionEqualToValue={(opt, val) => String(opt?.value) === String(val?.value)}
+              value={
+                [{ value: "", label: "Todos" }, ...organizadorOptions].find(
+                  (org) => String(org.value) === String(selectedOrganizadorId)
+                ) ?? { value: "", label: "Todos" }
+              }
+              onChange={(_e, newValue) => onOrganizadorChange(String(newValue?.value ?? ""))}
+              renderInput={(params) => (
+                <TextField {...params} label="Organizador" placeholder="Seleccione organizador" />
+              )}
+              fullWidth
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

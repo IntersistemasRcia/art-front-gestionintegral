@@ -4,7 +4,7 @@ import React, { useMemo, SyntheticEvent } from "react";
 import DataTable from '@/utils/ui/table/DataTable';
 import { ColumnDef } from '@tanstack/react-table';
 import CustomTab from '@/utils/ui/tab/CustomTab';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography } from '@mui/material';
 import { IoMdEye } from "react-icons/io";
 import { MdEdit, MdGroupRemove } from "react-icons/md";
 import { CUIP } from "@/utils/Formato";
@@ -14,6 +14,8 @@ import styles from "./administracionUsuarios.module.css";
 interface AdministracionTableProps {
   currentTab: number;
   onTabChange: (_event: SyntheticEvent, newTabValue: string | number) => void;
+  organizadorFilterText: string;
+  comercializadorFilterText: string;
   grupoRows: ComercializadoresGOrganizadoresRow[];
   organizadorRows: ComercializadoresOrganizadoresRow[];
   comercializadorRows: VComercializadorRow[];
@@ -38,6 +40,8 @@ interface AdministracionTableProps {
 export default function AdministracionTable({
   currentTab,
   onTabChange,
+  organizadorFilterText,
+  comercializadorFilterText,
   grupoRows,
   organizadorRows,
   comercializadorRows,
@@ -259,6 +263,9 @@ export default function AdministracionTable({
       value: 1,
       content: (
         <>
+          <Typography className={styles.filterInfoText}>
+            {organizadorFilterText}
+          </Typography>
           <DataTable<ComercializadoresOrganizadoresRow>
             data={organizadorRows}
             columns={columnsOrganizador}
@@ -279,6 +286,9 @@ export default function AdministracionTable({
       value: 2,
       content: (
         <>
+          <Typography className={styles.filterInfoText}>
+            {comercializadorFilterText}
+          </Typography>
           <DataTable<VComercializadorRow>
             data={comercializadorRows}
             columns={columnsComercializador}

@@ -659,7 +659,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region EmpleadorTrabajadores
   readonly getEmpleadorTrabajadoresURL = (params: ParametersEmpleadorT = {}) => {
     //params.CUIT ??= useAuth().user?.empresaCUIT ?? 0; este parametro lo paso desde el componente que lo usa
-    return this.getURL({ path: "/api/EmpleadorTrabajadores/CUIL", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/EmpleadorTrabajadores/CUIT", search: toURLSearch(params) }).toString();
   };
   getEmpleadorTrabajadores = async (params: ParametersEmpleadorT = {}) => tokenizable.get(
     this.getEmpleadorTrabajadoresURL(params),

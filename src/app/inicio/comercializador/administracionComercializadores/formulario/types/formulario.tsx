@@ -14,6 +14,8 @@ export type UsuarioFormFields = BaseUsuarioFormFields;
 
 export type Props = UsuarioFormProps & {
   creationRole?: string | null; // rol determinado por el contexto (tabla) desde donde se crea
+  initialSelectedGrupoId?: string;
+  initialSelectedOrganizadorId?: string;
 };
 
 // Interfaces completas para errores y campos tocados

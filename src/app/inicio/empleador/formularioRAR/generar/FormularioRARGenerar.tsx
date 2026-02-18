@@ -93,6 +93,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   const [modalMessageOpen, setModalMessageOpen] = React.useState<boolean>(false);
   const [modalMessageText, setModalMessageText] = React.useState<string>('');
   const [modalMessageType, setModalMessageType] = React.useState<'success' | 'error' | 'warning'>('error');
+  const [modalMessageTitle, setModalMessageTitle] = React.useState<string>('');
 
   // Estados para edición
   const [editandoIndex, setEditandoIndex] = React.useState<number>(-1);
@@ -286,10 +287,10 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     const nombreCompleto = nombre && nombre.trim() !== '';
     const sectorCompleto = sector && sector.trim() !== '';
     const ingresoCompleto = ingreso && ingreso.trim() !== '';
-    const fechaInicioCompleto = fechaInicio && fechaInicio.trim() !== '';
+    const fechaInicioCompleto = (fechaInicio && fechaInicio.trim() !== '') || (Number(exposicion) === 0 && Number(cantNoExpuestos) > 0);
     const exposicionCompleto = exposicion && exposicion.trim() !== '';
     const ultimoExamenMedicoCompleto = ultimoExamenMedico && ultimoExamenMedico.trim() !== '';
-    const codigoAgenteCompleto = codigoAgente && codigoAgente.trim() !== '';
+    const codigoAgenteCompleto = (codigoAgente && codigoAgente.trim() !== '') || (Number(exposicion) === 0 && Number(cantNoExpuestos) > 0);
 
     const resultado = cuilCompleto && nombreCompleto && sectorCompleto &&
       ingresoCompleto && fechaInicioCompleto && exposicionCompleto &&
@@ -308,7 +309,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     });
 
     return resultado;
-  }, [cuil, nombre, sector, ingreso, fechaInicio, exposicion, ultimoExamenMedico, codigoAgente]);
+  }, [cuil, nombre, sector, ingreso, fechaInicio, exposicion, ultimoExamenMedico, codigoAgente, cantNoExpuestos]);
 
   const puedeGenerar =
     (establecimientoSeleccionado || '').trim() !== '' &&
@@ -689,8 +690,10 @@ React.useEffect(() => {
     }
 
     // Validar Fecha Inicio Exposición
-    if (!fechaInicio || fechaInicio.trim() === '') {
-      nuevosErrores.fechaInicio = 'La fecha de inicio de exposición es requerida';
+    if (!(Number(exposicion) === 0 && Number(cantNoExpuestos) > 0)) {
+      if (!fechaInicio || fechaInicio.trim() === '') {
+        nuevosErrores.fechaInicio = 'La fecha de inicio de exposición es requerida';
+      }
     }
 
     // Validar Nivel de Exposición
@@ -714,7 +717,7 @@ React.useEffect(() => {
 
     // Retornar si hay errores
     return Object.values(nuevosErrores).some(error => error !== '');
-  }, [cuil, nombre, sector, ingreso, fechaInicio, exposicion, ultimoExamenMedico, codigoAgente]);
+  }, [cuil, nombre, sector, ingreso, fechaInicio, exposicion, ultimoExamenMedico, codigoAgente, cantNoExpuestos]);
 
   // ===== Handlers =====
 
@@ -764,14 +767,31 @@ React.useEffect(() => {
     // Si el trabajador ya existe con exposición = 0, no se puede volver a cargar
     if (existeConExposicionCero) {
       setModalMessageType('error');
-      setModalMessageText(`Este trabajador (CUIL: ${cuil}) ya fue cargado con horas de exposición = 0. No se puede volver a cargar un trabajador con exposición 0.`);
+      setModalMessageTitle('CUIL en uso');
+      setModalMessageText(`El cuil ${normalizarCuil(cuil)} ya fue cargado como trabajador no expuesto`);
       setModalMessageOpen(true);
+      // Reiniciar todos los campos del formulario según la solicitud
+      setCuil('');
+      setNombre('');
+      setSector('');
+      setIngreso('');
+      setFechaInicio('');
+      setExposicion('0');
+      setFechaFinExposicion('');
+      setUltimoExamenMedico('');
+      setCodigoAgente('');
+      setErroresCampos({
+        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
+      });
+      setModoEdicion(false);
+      setEditandoIndex(-1);
       return;
     }
 
     // Si ya se alcanzó el límite de trabajadores únicos y el CUIL no existe, bloquear
     if (trabajadoresCargados >= totalTrabajadoresRequeridos && !yaExisteCuil) {
       setModalMessageType('error');
+      setModalMessageTitle('');
       setModalMessageText(`Ya se alcanzó el límite de ${totalTrabajadoresRequeridos} trabajadores únicos. Solo puede agregar trabajadores con CUILs ya cargados (con diferentes agentes causantes).`);
       setModalMessageOpen(true);
       return;
@@ -853,8 +873,24 @@ React.useEffect(() => {
     // Si estamos intentando cambiar a un CUIL que ya tiene exposición = 0, bloquear
     if (existeConExposicionCero) {
       setModalMessageType('error');
-      setModalMessageText(`Este trabajador (CUIL: ${cuil}) ya fue cargado con horas de exposición = 0. No se puede editar para usar este CUIL.`);
+      setModalMessageTitle('CUIL en uso');
+      setModalMessageText(`El cuil ${normalizarCuil(cuil)} ya fue cargado como trabajador no expuesto`);
       setModalMessageOpen(true);
+      // Reiniciar campos al intentar editar hacia un CUIL no expuesto ya existente
+      setCuil('');
+      setNombre('');
+      setSector('');
+      setIngreso('');
+      setFechaInicio('');
+      setExposicion('0');
+      setFechaFinExposicion('');
+      setUltimoExamenMedico('');
+      setCodigoAgente('');
+      setErroresCampos({
+        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
+      });
+      setModoEdicion(false);
+      setEditandoIndex(-1);
       return;
     }
 
@@ -1275,16 +1311,33 @@ React.useEffect(() => {
                       const filaExistente = filas.find((fi) => normalizarCuil(fi.CUIL) === cuilDigits);
 
                       if (filaExistente) {
-                        // Completar los demás campos con los datos previamente ingresados
-                        setNombre(filaExistente.Nombre || '');
-                        setSector(filaExistente.SectorTareas || '');
-                        setIngreso(filaExistente.Ingreso || '');
-                        //setFechaInicio(filaExistente.FechaInicio || '');
-                        //setExposicion(filaExistente.Exposicion != null ? String(filaExistente.Exposicion) : '0');
-                        //setFechaFinExposicion(filaExistente.FechaFinExposicion || '');
-                        setUltimoExamenMedico(filaExistente.UltimoExamenMedico || '');
-                        //setCodigoAgente(filaExistente.CodigoAgente != null ? String(filaExistente.CodigoAgente) : '');
-                        console.log('CUIL repetido detectado, campos autocompletados desde fila existente:', filaExistente);
+                        const exposicionFila = Number(filaExistente.Exposicion || 0);
+                        if (exposicionFila === 0) {
+                          // Mostrar mensaje con título personalizado y reiniciar campos si ya existe como NO expuesto
+                          setModalMessageType('error');
+                          setModalMessageTitle('CUIL en uso');
+                          setModalMessageText(`El cuil ${cuilDigits} ya fue cargado como trabajador no expuesto`);
+                          setModalMessageOpen(true);
+                          setCuil('');
+                          setNombre('');
+                          setSector('');
+                          setIngreso('');
+                          setFechaInicio('');
+                          setExposicion('0');
+                          setFechaFinExposicion('');
+                          setUltimoExamenMedico('');
+                          setCodigoAgente('');
+                          setErroresCampos({ cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: '' });
+                          setModoEdicion(false);
+                          setEditandoIndex(-1);
+                        } else {
+                          // Completar los demás campos con los datos previamente ingresados
+                          setNombre(filaExistente.Nombre || '');
+                          setSector(filaExistente.SectorTareas || '');
+                          setIngreso(filaExistente.Ingreso || '');
+                          setUltimoExamenMedico(filaExistente.UltimoExamenMedico || '');
+                          console.log('CUIL repetido detectado, campos autocompletados desde fila existente:', filaExistente);
+                        }
                       } else {
                         // Si no existe localmente, consultar servicio externo para completar el nombre
                         consultarDatosPorCuil(f);
@@ -1300,10 +1353,6 @@ React.useEffect(() => {
                 className={styles.flex1}
                 style={{ marginRight: '15px' }}
                 error={!!erroresCampos.cuil}
-                helperText={
-                  erroresCampos.cuil ||
-                  (cantidadesCompletas ? "El nombre se completará automáticamente al ingresar el CUIL completo" : "")
-                }
               />
               <TextField
                 label={consultandoCuil ? "Nombre Completo (Consultando...)" : "Nombre Completo"}
@@ -1402,13 +1451,13 @@ React.useEffect(() => {
                   }
                 }}
                 fullWidth
-                required
+                required={!(Number(exposicion) === 0 && Number(cantNoExpuestos) > 0)}
                 disabled={!cantidadesCompletas}
                 InputLabelProps={{ shrink: true }}
                 className={styles.flex1}
                 style={{ marginRight: '15px' }}
                 error={!!erroresCampos.fechaInicio}
-                helperText={erroresCampos.fechaInicio}
+
               />
               <TextField
                 label="Horas de Exposición"
@@ -1731,7 +1780,11 @@ React.useEffect(() => {
         open={modalMessageOpen}
         message={modalMessageText}
         type={modalMessageType}
-        onClose={() => setModalMessageOpen(false)}
+        title={modalMessageTitle}
+        onClose={() => {
+          setModalMessageOpen(false);
+          setModalMessageTitle('');
+        }}
       />
 
     </div>

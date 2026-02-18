@@ -8,6 +8,8 @@ import {
 } from "@mui/material";
 import { Checkbox, FormControlLabel } from "@mui/material";
 import { SelectChangeEvent } from "@mui/material/Select";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/material.css";
 import styles from "./formulario.module.css";
 import {
   UsuarioFormFields,
@@ -30,14 +32,6 @@ interface Props {
   isEditing: boolean;
   isViewing: boolean;
   isDisabled: boolean;
-  isGrupoOrganizador: boolean;
-  isOrganizadorComercializador: boolean;
-  grupoOptions: SelectOption[];
-  organizadorOptions: (SelectOption & { gOrgInterno?: number })[];
-  selectedGrupoId: string;
-  selectedOrganizadorId: string;
-  onGrupoChange: (value: string) => void;
-  onOrganizadorChange: (value: string) => void;
   onTextFieldChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectChange: (e: SelectChangeEvent<string>) => void;
   onBlur: (field: keyof TouchedFields) => void;
@@ -54,20 +48,17 @@ export default function DatosUsuarioSection({
   isEditing,
   isViewing,
   isDisabled,
-  isGrupoOrganizador,
-  isOrganizadorComercializador,
-  grupoOptions,
-  organizadorOptions,
-  selectedGrupoId,
-  selectedOrganizadorId,
-  onGrupoChange,
-  onOrganizadorChange,
   onTextFieldChange,
   onSelectChange,
   onBlur,
   onToggleAplicaIva,
   creationRole = null,
 }: Props) {
+  const roleKey = String(creationRole ?? form.rol ?? "").toLowerCase();
+  const hideFechaNacimientoInCreateEdit =
+    (isCreating || isEditing) &&
+    (roleKey.includes("grupo") || roleKey.includes("organizador"));
+
   const roleLabel = (() => {
     const r = String(creationRole ?? form.rol ?? '').toLowerCase();
     if (!r) return 'Usuario';
@@ -82,7 +73,7 @@ export default function DatosUsuarioSection({
   return (
     <div className={styles.formSection}>
       <Typography variant="h6" className={styles.sectionTitle}>
-        {`Datos del usuario ${roleLabel}`}
+        {`Datos del ${roleLabel}`}
       </Typography>
 
       <div className={styles.formRow}>
@@ -135,76 +126,47 @@ export default function DatosUsuarioSection({
           disabled={isDisabled}
           placeholder="Ingrese CUIT (11 dígitos)"
         />
-        <TextField
-          label="Teléfono"
-          name="phoneNumber"
-          value={form.phoneNumber}
-          onChange={onTextFieldChange}
-          onBlur={() => onBlur("phoneNumber")}
-          error={touched.phoneNumber && !!errors.phoneNumber}
-          helperText={touched.phoneNumber && errors.phoneNumber}
-          fullWidth
-          disabled={isDisabled}
-          placeholder="Ingrese teléfono"
-        />
-        <TextField
-          label="Fecha Nacimiento"
-          name="fechaNacimiento"
-          type="date"
-          value={form.fechaNacimiento ?? ""}
-          onChange={onTextFieldChange}
-          onBlur={() => onBlur("fechaNacimiento")}
-          error={touched.fechaNacimiento && !!errors.fechaNacimiento}
-          helperText={touched.fechaNacimiento && errors.fechaNacimiento}
-          fullWidth
-          disabled={isDisabled}
-          InputLabelProps={{ shrink: true }}
-        />
+        <div className={styles.phoneField}>
+          <PhoneInput
+            country="ar"
+            value={form.phoneNumber}
+            onChange={(value) =>
+              onTextFieldChange({
+                target: { name: "phoneNumber", value },
+              } as React.ChangeEvent<HTMLInputElement>)
+            }
+            onBlur={() => onBlur("phoneNumber")}
+            disabled={isDisabled}
+            specialLabel="Teléfono"
+            containerClass={styles.phoneContainer}
+            inputClass={styles.phoneInput}
+            buttonClass={styles.phoneButton}
+            inputProps={{ name: "phoneNumber" }}
+          />
+          {touched.phoneNumber && errors.phoneNumber && (
+            <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
+              {errors.phoneNumber}
+            </Typography>
+          )}
+        </div>
+        {!hideFechaNacimientoInCreateEdit && (
+          <TextField
+            label="Fecha Nacimiento"
+            name="fechaNacimiento"
+            type="date"
+            value={form.fechaNacimiento ?? ""}
+            onChange={onTextFieldChange}
+            onBlur={() => onBlur("fechaNacimiento")}
+            error={touched.fechaNacimiento && !!errors.fechaNacimiento}
+            helperText={touched.fechaNacimiento && errors.fechaNacimiento}
+            fullWidth
+            disabled={isDisabled}
+            InputLabelProps={{ shrink: true }}
+          />
+        )}
       </div>
 
       {/* Rol removido: se determina desde el contexto donde se crea el usuario */}
-
-      {(isCreating || isEditing || isViewing) && (
-        <div className={styles.formRow}>
-          <FormControl
-            fullWidth
-            disabled={isDisabled || isGrupoOrganizador || isOrganizadorComercializador}
-          >
-            <InputLabel>Grupo</InputLabel>
-            <Select
-              value={selectedGrupoId}
-              label="Grupo"
-              onChange={(e) => onGrupoChange(String(e.target.value))}
-            >
-              <MenuItem value="">Todos</MenuItem>
-              {grupoOptions.map((grupo) => (
-                <MenuItem key={grupo.value} value={grupo.value}>
-                  {grupo.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl
-            fullWidth
-            disabled={isDisabled || isOrganizadorComercializador}
-          >
-            <InputLabel>Organizador</InputLabel>
-            <Select
-              value={selectedOrganizadorId}
-              label="Organizador"
-              onChange={(e) => onOrganizadorChange(String(e.target.value))}
-            >
-              <MenuItem value="">Todos</MenuItem>
-              {organizadorOptions.map((org) => (
-                <MenuItem key={org.value} value={org.value}>
-                  {org.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </div>
-      )}
 
       {(isCreating || isEditing || isViewing) &&
         String(form.rol ?? "").toLowerCase() === "comercializador" && (

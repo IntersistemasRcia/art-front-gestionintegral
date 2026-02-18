@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaFilePdf } from "react-icons/fa";
 import styles from "./Credenciales.module.css";
 import DataTable from '@/utils/ui/table/DataTable';
 import type { ColumnDef } from "@tanstack/react-table";
-import gestionEmpleadorAPI from '@/data/gestionEmpleadorAPI';
 import { useAuth } from '@/data/AuthContext';
 import ArtAPI from '@/data/artAPI';
+import { useEmpresasStore } from '@/data/empresasStore';
+import { Empresa } from '@/data/authAPI';
+import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import Formato from '@/utils/Formato';
 import { downloadCredencialPdf } from "./PDF/pdfCredencial";
 import type { AfiliadoCredencial, PolizaCredencial } from "./types/pdf";
@@ -15,15 +17,104 @@ import CustomButton from '@/utils/ui/button/CustomButton';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 import dayjs from "dayjs";
+import { TextField } from '@mui/material';
 
 const getPeriodo = (): string => dayjs().subtract(2, "month").format("YYYYMM");
 
 function CredencialesPage() {
   const { user } = useAuth();
-  const empresaCUIT = Number((user as any)?.cuit ?? 0);
-  const { data: apiData, error } = gestionEmpleadorAPI.useGetPersonal({ CUIT: empresaCUIT, periodo: Number(getPeriodo()) });
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) setEmpresaSeleccionada(empresas[0]);
+  }, [empresas, isLoadingEmpresas]);
+
+  const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+
+  const selectedEmpresaCUIT = Number(normalizeDigits(empresaSeleccionada?.cuit ?? 0));
+  const empresaCUIT = selectedEmpresaCUIT || Number(normalizeDigits((user as any)?.cuit ?? 0));
+  const [PageIndex, setPageIndex] = useState<number>(1);
+  const [PageSize, setPageSize] = useState<number>(10);
+  const [pageCount, setPageCount] = useState<number>(1);
+  const [apiRows, setApiRows] = useState<any[]>([]);
+  const [isLoadingRows, setIsLoadingRows] = useState<boolean>(false);
+  const [rowsError, setRowsError] = useState<any>(null);
   const [localRows, setLocalRows] = useState<any[]>([]);
-  const data: any[] = [...(apiData || []).map((r: any) => ({ cuil: r.cuil, nombre: r.nombreEmpleador })), ...localRows];
+
+  useEffect(() => {
+    setPageIndex(1);
+    setPageCount(1);
+  }, [selectedEmpresaCUIT]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    if (!selectedEmpresaCUIT) {
+      setApiRows([]);
+      setPageCount(1);
+      setRowsError(null);
+      setIsLoadingRows(false);
+      return;
+    }
+
+    const fetchTrabajadores = async () => {
+      setIsLoadingRows(true);
+      setRowsError(null);
+      try {
+        const response = await ArtAPI.getEmpleadorTrabajadores({
+          CUIL: selectedEmpresaCUIT,
+          PageIndex,
+          PageSize,
+          Perido: Number(getPeriodo()),
+        });
+
+        if (canceled) return;
+
+        const rawItems = response?.data ?? response?.DATA ?? response?.items ?? response?.Items ?? response;
+        const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+
+        const mappedRows = items.map((row: any) => ({
+          cuil: row?.cuil ?? row?.CUIL ?? row?.cuit ?? row?.CUIT ?? row?.trabCUIL,
+          nombre: row?.nombre ?? row?.Nombre ?? row?.nombreEmpleador ?? row?.NombreEmpleador ?? row?.apellidoNombre ?? row?.ApellidoNombre ?? '',
+        }));
+
+        setApiRows(mappedRows);
+
+        const total =
+          typeof response?.total === 'number' ? response.total :
+            typeof response?.totalCount === 'number' ? response.totalCount :
+              typeof response?.TotalCount === 'number' ? response.TotalCount :
+                typeof response?.TOTAL === 'number' ? response.TOTAL :
+                  typeof response?.count === 'number' ? response.count :
+                    typeof response?.Count === 'number' ? response.Count :
+                      typeof response?.meta?.total === 'number' ? response.meta.total :
+                        undefined;
+
+        if (typeof total === 'number' && PageSize > 0) {
+          setPageCount(Math.max(1, Math.ceil(total / PageSize)));
+        } else {
+          setPageCount(items.length > 0 ? Math.ceil(items.length / PageSize) : 1);
+        }
+      } catch (err) {
+        if (canceled) return;
+        setRowsError(err);
+        setApiRows([]);
+        setPageCount(1);
+      } finally {
+        if (!canceled) setIsLoadingRows(false);
+      }
+    };
+
+    fetchTrabajadores();
+
+    return () => {
+      canceled = true;
+    };
+  }, [selectedEmpresaCUIT, PageIndex, PageSize]);
+
+  const data: any[] = PageIndex === 1 ? [...localRows, ...apiRows] : apiRows;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newCuil, setNewCuil] = useState("");
@@ -41,7 +132,7 @@ function CredencialesPage() {
   const nombreError = !newNombre.trim() ? "Nombre es requerido" : "";
 
   const columns: ColumnDef<any>[] = [
-    { accessorKey: "cuil", header: "CUIL", cell: (info: any) => Formato.CUIP(info.getValue()) },
+    { accessorKey: "cuil", header: "CUIL", cell: (info: any) => info.getValue() ? Formato.CUIP(info.getValue()) : '-' },
     { accessorKey: "nombre", header: "Nombre" },
     {
       id: "accion",
@@ -87,35 +178,52 @@ function CredencialesPage() {
     },
   ];
 
+  const handlePageChange = (newPageIndex: number) => {
+    setPageIndex(newPageIndex);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setPageIndex(1);
+  };
+
   return (
     <div>
       <div className={styles.toolbar}>
-        <CustomButton onClick={() => setModalOpen(true)}>
-          Agregar nuevo personal
-        </CustomButton>
-      </div>
-      <DataTable data={data} columns={columns} pageSize={10} isLoading={!apiData && !error} />
-      <div className={styles.legendContainer}>
-        <p className={styles.legend}>
-          <span className={styles.legendBold}>
-            Sr empleador, le recordamos que cualquier modificación a la nómina presentada es considerada una DDJJ.
-          </span>{" "}
-          <span>
-            Los datos se recolectan únicamente para ser utilizados con motivo de la relación comercial que lo vincula con la compañía (art. 6° ley 25.326).
-          </span>
-        </p>
-      </div>
-      <CustomModal open={modalOpen} onClose={() => setModalOpen(false)} title="Agregar personal" size="small" actions={
-        <div style={{ display: 'flex', gap: 8 }}>
-          <CustomButton variant="outlined" onClick={() => {
-            setNewCuil("");
-            setNewNombre("");
-            setTouchedCuil(false);
-            setTouchedNombre(false);
-            setModalOpen(false);
-          }}>
-            Cancelar
+        <div className={styles.toolbarInner}>
+          <div className={styles.selectWrap}>
+            <CustomSelectSearch<Empresa>
+              options={empresas}
+              getOptionLabel={(e) => e ? String(e.razonSocial) : ''}
+              value={empresaSeleccionada}
+              onChange={(_ev, newVal) => setEmpresaSeleccionada(newVal)}
+              label="Seleccionar Empresa"
+              placeholder="Buscar empresa..."
+              loading={isLoadingEmpresas}
+              loadingText="Cargando empresas..."
+              noOptionsText={isLoadingEmpresas ? 'Cargando...' : empresas.length === 0 ? 'No hay empresas disponibles' : 'No se encontraron empresas'}
+            />
+          </div>
+          <CustomButton onClick={() => setModalOpen(true)}>
+            Agregar nuevo personal
           </CustomButton>
+        </div>
+      </div>
+      <DataTable
+        data={data}
+        columns={columns}
+        manualPagination={true}
+        pageIndex={PageIndex}
+        pageSize={PageSize}
+        pageCount={pageCount}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        pageSizeOptions={[10]}
+        isLoading={isLoadingRows}
+      />
+      {/* Leyenda movida dentro del modal */}
+      <CustomModal open={modalOpen} onClose={() => setModalOpen(false)} title="Agregar personal" size="large" actions={
+        <div className={styles.actionsRow}>
           <CustomButton disabled={!(cuilDigits.length === 11) || !newNombre.trim()} onClick={() => {
             // agregar fila mínima (guardar CUIL sin guiones)
             setLocalRows(rows => [{ cuil: cuilDigits, nombre: newNombre }, ...rows]);
@@ -128,16 +236,22 @@ function CredencialesPage() {
           }}>
             Guardar
           </CustomButton>
+          <CustomButton variant="outlined" onClick={() => {
+            setNewCuil("");
+            setNewNombre("");
+            setTouchedCuil(false);
+            setTouchedNombre(false);
+            setModalOpen(false);
+          }}>
+            Cancelar
+          </CustomButton>
         </div>
       }>
         <div className={styles.modalForm}>
           <div className={styles.formRow}>
-            <label className={styles.formLabel}>CUIL</label>
-            <div className={styles.formField}>
-              <input
-                className={styles.formInput}
-                inputMode="numeric"
-                pattern="\d*"
+            <div className={styles.cuilField}>
+              <TextField
+                label="CUIL"
                 value={newCuil}
                 onBlur={() => setTouchedCuil(true)}
                 onChange={e => {
@@ -150,25 +264,33 @@ function CredencialesPage() {
                   }
                   setNewCuil(formatted);
                 }}
+                inputProps={{ inputMode: 'numeric', pattern: '\\d*' }}
+                error={touchedCuil && !!cuilError}
+                helperText={touchedCuil && cuilError ? cuilError : ''}
+                fullWidth
               />
-              {touchedCuil && cuilError && (
-                <span className={styles.fieldError}>{cuilError}</span>
-              )}
             </div>
-          </div>
-          <div className={styles.formRow}>
-            <label className={styles.formLabel}>Nombre</label>
-            <div className={styles.formField}>
-              <input
-                className={styles.formInput}
+            <div className={styles.nombreField}>
+              <TextField
+                label="Nombre del Trabajador"
                 value={newNombre}
                 onBlur={() => setTouchedNombre(true)}
                 onChange={e => setNewNombre(e.target.value)}
+                error={touchedNombre && !!nombreError}
+                helperText={touchedNombre && nombreError ? nombreError : ''}
+                fullWidth
               />
-              {touchedNombre && nombreError && (
-                <span className={styles.fieldError}>{nombreError}</span>
-              )}
             </div>
+          </div>
+          <div className={styles.modalLegend}>
+            <p className={styles.legend}>
+              <span className={styles.legendBold}>
+                Sr empleador, le recordamos que cualquier modificación a la nómina presentada es considerada una DDJJ.
+              </span>{" "}
+              <span>
+                Los datos se recolectan únicamente para ser utilizados con motivo de la relación comercial que lo vincula con la compañía (art. 6° ley 25.326).
+              </span>
+            </p>
           </div>
         </div>
       </CustomModal>

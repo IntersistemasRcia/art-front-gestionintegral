@@ -90,3 +90,33 @@
   color: #d32f2f;
   margin-top: 4px;
 }
+
+/* Nuevas clases para reemplazar estilos en línea en page.tsx */
+.toolbarInner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.selectWrap {
+  min-width: 300px;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+}
+
+.cuilField {
+  width: 160px;
+  margin-right: 12px;
+}
+
+.nombreField {
+  flex: 1;
+}
+
+.modalLegend {
+  margin-top: 12px;
+}

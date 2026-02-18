@@ -320,8 +320,8 @@ function CuentaCorrienteComercializador() {
     const columns: ColumnDef<ViewCuentaCorriente>[] = useMemo(() => [
         { id: 'periodoCtaCte', header: 'Período', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} }, 
         { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        { header: 'Comisión(*)', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        // { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
         { header: 'Total Sin IVA', accessorKey: 'totalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
         { header: 'Total Con IVA', accessorKey: 'totalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
@@ -616,6 +616,10 @@ function CuentaCorrienteComercializador() {
                 currentTab={currentTab} 
                 onTabChange={handleTabChange}
             /> 
+
+            <Typography variant="body1" className={styles.notice}>
+                (*)Monto de la comision sujeto a retenciones, la liquidacion final le sera enviada a su correo
+            </Typography>
 
         </div>
     );
