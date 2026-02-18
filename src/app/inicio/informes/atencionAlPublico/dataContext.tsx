@@ -198,7 +198,7 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       inputType: type ? (type === "dateTime" ? "datetime-local" : type) : undefined,
     }));
 
-    return { columns, fields, headers, fieldsForSelect };
+    return { columns, fields, headers };
   }, [tables.vw_AtencionAlPublico]);
 
   const [rows, setRows] = useState<Row[]>([]);
