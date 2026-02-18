@@ -43,6 +43,7 @@ export default function DenunciaForm({
   const lastFetchedEmpCuitRef = useRef<string>("");
   const lastAutoValuesRef = useRef<Record<string, string>>({});
   const { user } = useAuth();
+  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
   const [empCuitReadOnly, setEmpCuitReadOnly] = useState(false);
   const [empModalOpen, setEmpModalOpen] = useState(false);
   const [empModalType, setEmpModalType] = useState<MessageType>('warning');
@@ -125,6 +126,48 @@ export default function DenunciaForm({
       setEmpCuitReadOnly(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (isAdmin) return; // no precargar para administradores
+    const empFromForm = String(form.empCuit || "").replace(/\D/g, '');
+    if (empFromForm.length === 11) {
+      setForm(prev => ({ ...prev, establecimientoCuit: Formato.CUIP(empFromForm) }));
+      return;
+    }
+    const empresaCUIT = Number((user as any)?.empresaCUIT ?? 0);
+    if (empresaCUIT && String(empresaCUIT).length === 11) {
+      setForm(prev => ({ ...prev, establecimientoCuit: Formato.CUIP(String(empresaCUIT)) }));
+    }
+  }, [open, user?.empresaCUIT, isAdmin]);
+
+  // Al abrir el formulario, si empCuit ya tiene 11 dígitos, pre-cargar datos del empleador
+  useEffect(() => {
+    if (!open) return;
+    const raw = String(form.empCuit || "").replace(/\D/g, "");
+    if (raw.length !== 11 || lastFetchedEmpCuitRef.current === raw) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const empresa: any = await ArtAPI.getEmpresaByCUIT({ CUIT: Number(raw) });
+        if (!empresa || cancelled) return;
+        setForm((prev) => ({ ...prev,
+          empPoliza: String(empresa.polizaNro ?? empresa.poliza ?? ""),
+          empRazonSocial: String(empresa.razonSocial ?? empresa.RazonSocial ?? ""),
+          empDomicilioCalle: String(empresa.domicilioCalle ?? empresa.domicilio ?? ""),
+          empDomicilioNro: String(empresa.domicilioNro ?? ""),
+          empCodLocalidad: String(empresa.codLocalidadSrt ?? empresa.codLocalidad ?? ""),
+          empCodPostal: String(empresa.codLocalidadPostal ?? empresa.cp ?? ""),
+          empTelefonos: String(empresa.telefonos ?? empresa.telefono ?? ""),
+          empEmail: String(empresa.eMail ?? empresa.email ?? ""),
+        }));
+        lastFetchedEmpCuitRef.current = raw;
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   const modalTitle = useMemo(() => {
     switch (method) {
@@ -222,7 +265,7 @@ export default function DenunciaForm({
 
   // Funciones de Validación
   const validateRequired = (value: string, fieldName: string): string | undefined => {
-    if (!value.trim()) return `${fieldName} es requerido`;
+    if (!value.trim()) return `${fieldName}, `;
     return undefined;
   };
 
@@ -526,7 +569,7 @@ export default function DenunciaForm({
           setErrors((prev) => ({ ...prev, ...tabErrors }));
           if (onValidationError) {
             const firstFew = Object.values(tabErrors).filter(Boolean).slice(0, 5).join('\n');
-            onValidationError('Complete los campos obligatorios de la(s) solapa(s) anterior(es).' + (firstFew ? `\n\nDetalle:\n${firstFew}` : ''));
+            onValidationError('Complete los campos obligatorios de la solapa.' + (firstFew ? `\n\nDetalle:\n${firstFew}` : ''));
           }
           return;
         }

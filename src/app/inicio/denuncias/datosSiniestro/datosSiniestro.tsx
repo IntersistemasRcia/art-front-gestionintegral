@@ -12,6 +12,7 @@ import {
   DenunciaFormData,
 } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
+import { useAuth } from '@/data/AuthContext';
 import ArtAPI from "@/data/artAPI";
 import type { ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 
@@ -65,6 +66,9 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     }
     establecimientoCuitInitialFormattedRef.current = true;
   }, [form.establecimientoCuit]);
+
+  const { user } = useAuth();
+  const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
 
   // Establecimientos por CUIT
   const [establecimientos, setEstablecimientos] = useState<ApiEstablecimientoEmpresa[]>([]);
@@ -136,6 +140,24 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     };
   }, [form.establecimientoCuit, isDisabled]);
 
+  // Si el usuario no es administrador, fijar CUIT de establecimiento al CUIT de la empresa del usuario (no editable)
+  useEffect(() => {
+    if (isUserAdmin) return;
+    if (!user) return;
+    const empresaCuitRaw = String(user.empresaCUIT ?? "");
+    const digits = empresaCuitRaw.replace(/\D/g, '');
+    if (!digits) return;
+    try {
+      const formatted = Formato.CUIP(digits);
+      if (formatted && formatted !== String(form.establecimientoCuit || "")) {
+        const synthetic = { target: { name: 'establecimientoCuit', value: formatted } } as any;
+        onTextFieldChange(synthetic);
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [user?.empresaCUIT, isUserAdmin]);
+
   return (
     <>
       {/* Establecimiento */}
@@ -154,14 +176,14 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               error={touched.establecimientoCuit && !!errors.establecimientoCuit}
               helperText={touched.establecimientoCuit ? errors.establecimientoCuit : undefined}
               fullWidth
-              required={!isDisabled}
-              disabled={isDisabled}
+              required={!isDisabled && isUserAdmin}
+              disabled={isDisabled || !isUserAdmin}
               placeholder="CUIT del establecimiento"
             />
 
             <Autocomplete
               className={styles.wideField}
-              disabled={isDisabled || establecimientos.length === 0}
+              disabled={isDisabled}
               options={establecimientos}
               loading={establecimientosLoading}
               getOptionLabel={(option: ApiEstablecimientoEmpresa) =>

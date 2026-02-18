@@ -925,7 +925,7 @@ function DenunciasPage() {
         onClose={handleClose}
         title={
           modalMessage.type === 'error'
-            ? 'Error al cargar denuncia'
+            ? 'Faltan cargar datos obligatorios'
             : modalMessage.type === 'success'
               ? 'Pre-Denuncia Registrada con Éxito'
               : undefined
