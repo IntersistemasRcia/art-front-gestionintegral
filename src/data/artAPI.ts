@@ -4,11 +4,13 @@ import { useSession } from "next-auth/react";
 import { ExternalAPI } from "./api";
 import { token } from "./usuarioAPI";
 import RefEmpleador from "@/app/inicio/usuarios/interfaces/RefEmpleador";
-import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
+import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse  } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
-import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador } from "@/app/inicio/comercializador/polizas/types/poliza";
+import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador} from "@/app/inicio/comercializador/polizas/types/poliza";
+import {ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
+import {ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia} from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 
@@ -39,10 +41,18 @@ export type EstablecimientoVm = {
 }
 export type EstablecimientoListParams = {
   cuit: number;
+  Activos?: boolean;
 }
 export type EstablecimientoListSWRKey = [url: string, token: string, params: string];
 export type EstablecimientoListOptions = SWRConfiguration<EstablecimientoVm[], AxiosError, Fetcher<EstablecimientoVm[], EstablecimientoListSWRKey>>
 //#endregion Types Establecimiento
+
+export type EmpresaParametroPutRequest = {
+  nombre: string;
+  valor: string;
+};
+
+export type EmpresaParametroPutResponse = unknown;
 
 //#endregion Types
 
@@ -130,9 +140,12 @@ export class ArtAPIClass extends ExternalAPI {
     );
   //#endregion
 
-  //#region Establecimiento
-  readonly establecimientoListURL = ({ cuit }: EstablecimientoListParams) =>
-    this.getURL({ path: `/api/Establecimientos/empresa/${cuit}` }).toString();
+  //#region Establecimiento CUIT
+  readonly establecimientoListURL = (params: EstablecimientoListParams) =>
+    this.getURL({
+      path: `/api/Establecimientos/Empresa/${params.cuit}`,
+      search: toURLSearch({ Activos: params.Activos }),
+    }).toString();
   establecimientoList = async (params: EstablecimientoListParams) => tokenizable.get<EstablecimientoVm[]>(
     this.establecimientoListURL(params)
   ).then(({ data }) => data);
@@ -157,7 +170,7 @@ export class ArtAPIClass extends ExternalAPI {
       }
     );
   };
-  //#endregion Establecimiento
+  //#endregion Establecimiento CUIT
 
   //#region FormulariosRAR
   readonly getFormulariosRARURL = (params: ParametersFormularioRar = {}) => {
@@ -171,14 +184,14 @@ export class ArtAPIClass extends ExternalAPI {
     // Obtener el token de la sesión de forma confiable
     const { data: session } = useSession();
     const accessToken = session?.accessToken;
-    
+
     // Construir la clave SWR de forma estable
     // La clave debe cambiar cuando cambia el CUIT para que SWR detecte el cambio automáticamente
     // SWR detectará el cambio en la clave y ejecutará el query automáticamente
     const key = params && params.CUIT && params.CUIT > 0 && accessToken
       ? [this.getFormulariosRARURL(params), accessToken, params.CUIT, params.PageIndex ?? 0, params.PageSize ?? 10]
       : null;
-    
+
     // Log para debug en desarrollo
     if (process.env.NODE_ENV === 'development') {
       if (key) {
@@ -188,7 +201,7 @@ export class ArtAPIClass extends ExternalAPI {
         console.log('[useGetFormulariosRARURL] Clave SWR es null - params:', params, 'accessToken:', !!accessToken);
       }
     }
-    
+
     return useSWR(
       key,
       key ? () => {
@@ -229,6 +242,52 @@ export class ArtAPIClass extends ExternalAPI {
     }
   );
   //#endregion
+
+  // #region Formulario RAR POST
+  readonly postFormularioRARURL = this.getURL({ path: "/api/FormulariosRAR" }).toString();
+
+  postFormularioRAR = async (payload: FormularioRARPostRequest) =>
+    tokenizable.post<FormulariosRARApiResponse>(this.postFormularioRARURL, payload).then(({ data }) => data);
+
+  swrPostFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: FormularioRARPostRequest }) => Promise<FormulariosRARApiResponse>;
+  } = Object.freeze({
+    key: [this.postFormularioRARURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postFormularioRAR(arg),
+  });
+
+  usePostFormularioRAR = () =>
+    useSWRMutation<FormulariosRARApiResponse, Error, [url: string, token: string], FormularioRARPostRequest>(
+      this.swrPostFormularioRAR.key,
+      this.swrPostFormularioRAR.fetcher
+    );
+  //#endregion
+
+  //#region RAR PUT
+  readonly putFormularioRARBaseURL = this.getURL({ path: "/api/FormulariosRAR" }).toString();
+
+  readonly putFormularioRARURL = (id: number | string) =>
+    this.getURL({ path: `/api/FormulariosRAR/${id}` }).toString();
+
+  putFormularioRAR = async (id: number | string, data: FormularioRARPutRequest) =>
+    tokenizable.put<FormulariosRARApiResponse>(this.putFormularioRARURL(id), data).then(({ data }) => data);
+
+  swrPutFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: FormularioRARPutRequest } }) => Promise<FormulariosRARApiResponse>;
+  } = Object.freeze({
+    key: [this.putFormularioRARBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putFormularioRAR(arg.id, arg.data),
+  });
+
+  usePutFormularioRAR = () =>
+    useSWRMutation<FormulariosRARApiResponse, Error, [url: string, token: string], { id: number | string; data: FormularioRARPutRequest }>(
+      this.swrPutFormularioRAR.key,
+      this.swrPutFormularioRAR.fetcher
+    );
+  //#endregion
+
 
   //#region FormulariosRGRL
   getFormulariosRGRL = async (cuit: number, all: boolean = false): Promise<ApiFormularioRGRL[]> => {
@@ -536,10 +595,12 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region Establecimientos por CUIT
-  getEstablecimientosEmpresa = async (cuit: number): Promise<ApiEstablecimientoEmpresa[]> => {
-    const url = this.getURL({
+  getEstablecimientosEmpresa = async (cuit: number, activos?: string): Promise<ApiEstablecimientoEmpresa[]> => {
+    const opts: any = {
       path: `/api/Establecimientos/Empresa/${encodeURIComponent(cuit)}`,
-    });
+    };
+    if (activos !== undefined) opts.search = toURLSearch({ Activos: activos });
+    const url = this.getURL(opts);
     const res = await fetch(url.toString(), { cache: "no-store", headers: { Accept: "application/json" } });
     if (res.status === 404) return [];
     if (!res.ok) {
@@ -569,6 +630,32 @@ export class ArtAPIClass extends ExternalAPI {
   );
   //#endregion
 
+
+  //#region Empresa PUT
+  readonly putEmpresaParametroBaseURL = this.getURL({ path: "/api/Empresas" }).toString();
+
+  readonly putEmpresaParametroURL = (id: number | string) =>
+    this.getURL({ path: `/api/Empresas/${id}/Parametro` }).toString();
+
+  putEmpresaParametro = async (id: number | string, data: EmpresaParametroPutRequest) =>
+    tokenizable.put<EmpresaParametroPutResponse>(this.putEmpresaParametroURL(id), data).then(({ data }) => data);
+
+  swrPutEmpresaParametro: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: EmpresaParametroPutRequest } }) => Promise<EmpresaParametroPutResponse>;
+  } = Object.freeze({
+    key: [this.putEmpresaParametroBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putEmpresaParametro(arg.id, arg.data),
+  });
+
+  usePutEmpresaParametro = () =>
+    useSWRMutation<EmpresaParametroPutResponse, Error, [url: string, token: string], { id: number | string; data: EmpresaParametroPutRequest }>(
+      this.swrPutEmpresaParametro.key,
+      this.swrPutEmpresaParametro.fetcher
+    );
+  //#endregion
+
+
   //#region EmpleadorTrabajadores
   readonly getEmpleadorTrabajadoresURL = (params: ParametersEmpleadorT = {}) => {
     //params.CUIT ??= useAuth().user?.empresaCUIT ?? 0; este parametro lo paso desde el componente que lo usa
@@ -587,7 +674,7 @@ export class ArtAPIClass extends ExternalAPI {
 
 
 
-   //#region Polizas Comercializador
+  //#region Polizas Comercializador
   readonly getpolizaComercializadorURL = (params: ParametersPoliza = {}) => {
     return this.getURL({ path: "/api/SRTPolizas", search: toURLSearch(params) }).toString();
   };
@@ -605,50 +692,377 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region Comercializador
+
+  //GET comercializador
   readonly getComercializadorURL = (params: ParametersComercializador = {}) => {
-   return this.getURL({ path: "/api/SRTComercializadores", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/SRTComercializadores", search: toURLSearch(params) }).toString();
   };
   getComercializador = async (params: ParametersComercializador = {}) => tokenizable.get(
-   this.getComercializadorURL(params),
+    this.getComercializadorURL(params),
   ).then(({ data }) => data);
   useGetComercializadorURL = (params: ParametersComercializador = {}) => useSWR(
-   [this.getComercializadorURL(params), token.getToken()], () => this.getComercializador(params),
-   {
-     revalidateOnFocus: false,
-     revalidateOnReconnect: false,
-   }
+    [this.getComercializadorURL(params), token.getToken()], () => this.getComercializador(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
   );
 
-    //#region Organizador Comercializador
+  //POST
+  readonly postComercializadorURL = this.getURL({ path: "/api/SRTComercializadores" }).toString();
+
+  postComercializador = async (data: ComercializadorPostRequest) =>
+    tokenizable.post<ComercializadorPostResponse>(this.postComercializadorURL, data).then(({ data }) => data);
+
+  swrPostComercializador: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: ComercializadorPostRequest }) => Promise<ComercializadorPostResponse>;
+  } = Object.freeze({
+    key: [this.postComercializadorURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postComercializador(arg),
+  });
+
+  usePostComercializador = () =>
+    useSWRMutation<ComercializadorPostResponse, Error, [url: string, token: string], ComercializadorPostRequest>(
+      this.swrPostComercializador.key,
+      this.swrPostComercializador.fetcher
+    );
+  //#endregion
+
+  //#region Comercializador PUT
+  readonly putComercializadorBaseURL = this.getURL({ path: "/api/SRTComercializadores" }).toString();
+
+  readonly putComercializadorURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadores/${id}` }).toString();
+
+  putComercializador = async (id: number | string, data: ComercializadorPutRequest) =>
+    tokenizable.put<ComercializadorPutResponse>(this.putComercializadorURL(id), data).then(({ data }) => data);
+
+  swrPutComercializador: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: ComercializadorPutRequest } }) => Promise<ComercializadorPutResponse>;
+  } = Object.freeze({
+    key: [this.putComercializadorBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putComercializador(arg.id, arg.data),
+  });
+
+  usePutComercializador = () =>
+    useSWRMutation<ComercializadorPutResponse, Error, [url: string, token: string], { id: number | string; data: ComercializadorPutRequest }>(
+      this.swrPutComercializador.key,
+      this.swrPutComercializador.fetcher
+    );
+  //#endregion
+
+  //#region Comercializador DELETE
+  readonly deleteComercializadorBaseURL = this.getURL({ path: "/api/SRTComercializadores" }).toString();
+
+  readonly deleteComercializadorURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadores/${id}` }).toString();
+
+  deleteComercializador = async (id: number | string) =>
+    tokenizable.delete<ComercializadorDeleteResponse>(this.deleteComercializadorURL(id)).then(({ data }) => data);
+
+  swrDeleteComercializador: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: ComercializadorDeleteParams }) => Promise<ComercializadorDeleteResponse>;
+  } = Object.freeze({
+    key: [this.deleteComercializadorBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.deleteComercializador(arg.id),
+  });
+
+  useDeleteComercializador = () =>
+    useSWRMutation<ComercializadorDeleteResponse, Error, [url: string, token: string], ComercializadorDeleteParams>(
+      this.swrDeleteComercializador.key,
+      this.swrDeleteComercializador.fetcher
+    );
+  //#endregion
+
+
+    //#region Comercializador por Id
+  readonly getComercializadorByIdURL = (params: ComercializadorById) => {
+    return this.getURL({
+      path: `/api/SRTComercializadores/${params.id}`,
+    }).toString();
+  };
+
+  getComercializadorById = async (params: ComercializadorById) =>
+    tokenizable
+      .get(this.getComercializadorByIdURL(params))
+      .then(({ data }) => data);
+
+  useGetComercializadorById = (params?: ComercializadorById) =>
+    useSWR(
+      params && params.id && token.getToken()
+        ? [this.getComercializadorByIdURL(params), token.getToken()]
+        : null,
+      () => this.getComercializadorById(params as ComercializadorById),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
+
+
+  //End Region Comercializador
+
+  //#region Organizador Comercializador
+
+  //GET Organizador Comercializador
   readonly getOrganizadorURL = (params: OrganizadorComercializador = {}) => {
-   return this.getURL({ path: "/api/SRTComercializadoresOrganizadores", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/SRTComercializadoresOrganizadores", search: toURLSearch(params) }).toString();
   };
   getOrganizador = async (params: OrganizadorComercializador = {}) => tokenizable.get(
-   this.getOrganizadorURL(params),
+    this.getOrganizadorURL(params),
   ).then(({ data }) => data);
   useGetOrganizadorURL = (params: OrganizadorComercializador = {}) => useSWR(
-   [this.getOrganizadorURL(params), token.getToken()], () => this.getOrganizador(params),
-   {
-     revalidateOnFocus: false,
-     revalidateOnReconnect: false,
-   }
+    [this.getOrganizadorURL(params), token.getToken()], () => this.getOrganizador(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
   );
 
-  
-      //#region Grupo Organizador Comercializador
+  //POST Organizador Comercializador
+  readonly postComercializadororganizadoresURL = this.getURL({ path: "/api/SRTComercializadoresOrganizadores" }).toString();
+
+  postComercializadorOrganizadores = async (data: ComercializadorOrganizadoresPostRequest) =>
+    tokenizable.post<ComercializadorPostResponse>(this.postComercializadororganizadoresURL, data).then(({ data }) => data);
+
+  swrPostComercializadororganizadores: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: ComercializadorOrganizadoresPostRequest }) => Promise<ComercializadorPostResponse>;
+  } = Object.freeze({
+    key: [this.postComercializadororganizadoresURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postComercializadorOrganizadores(arg),
+  });
+
+  usePostComercializadorOrganizadores = () =>
+    useSWRMutation<ComercializadorPostResponse, Error, [url: string, token: string], ComercializadorOrganizadoresPostRequest>(
+      this.swrPostComercializadororganizadores.key,
+      this.swrPostComercializadororganizadores.fetcher
+    );
+  //#endregion
+
+
+  //#region Comercializador Organizador PUT
+  readonly putComercializadorOrganizadoresBaseURL = this.getURL({ path: "/api/SRTComercializadoresOrganizadores" }).toString();
+
+  readonly putComercializadorOrganizadoresURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadoresOrganizadores/${id}` }).toString();
+
+  putComercializadorOrganizadores = async (id: number | string, data: ComercializadorOrganizadoresPutRequest) =>
+    tokenizable.put<ComercializadorPutResponse>(this.putComercializadorOrganizadoresURL(id), data).then(({ data }) => data);
+
+  swrPutComercializadorOrganizadores: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: ComercializadorOrganizadoresPutRequest } }) => Promise<ComercializadorPutResponse>;
+  } = Object.freeze({
+    key: [this.putComercializadorOrganizadoresBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putComercializadorOrganizadores(arg.id, arg.data),
+  });
+
+  usePutComercializadorOrganizadores = () =>
+    useSWRMutation<ComercializadorPutResponse, Error, [url: string, token: string], { id: number | string; data: ComercializadorOrganizadoresPutRequest }>(
+      this.swrPutComercializadorOrganizadores.key,
+      this.swrPutComercializadorOrganizadores.fetcher
+    );
+  //#endregion
+
+  // //#region Comercializador organizadores DELETE
+  readonly deleteComercializadoresOrganizadoresBaseURL = this.getURL({ path: "/api/SRTComercializadoresOrganizadores" }).toString();
+
+  readonly deleteComercializadoresOrganizadoresURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadoresOrganizadores/${id}` }).toString();
+
+  deleteComercializadoresOrganizadores = async (id: number | string) =>
+    tokenizable.delete<ComercializadorDeleteResponse>(this.deleteComercializadoresOrganizadoresURL(id)).then(({ data }) => data);
+
+  swrDeleteComercializadoresOrganizadores: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: ComercializadorDeleteParams }) => Promise<ComercializadorDeleteResponse>;
+  } = Object.freeze({
+    key: [this.deleteComercializadoresOrganizadoresBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.deleteComercializadoresOrganizadores(arg.id),
+  });
+
+  useDeleteComercializadoresOrganizadores = () =>
+    useSWRMutation<ComercializadorDeleteResponse, Error, [url: string, token: string], ComercializadorDeleteParams>(
+      this.swrDeleteComercializadoresOrganizadores.key,
+      this.swrDeleteComercializadoresOrganizadores.fetcher
+    );
+  // //#endregion
+
+
+    //#region Organizador comercializador por Id
+  readonly getOrganizadorByIdURL = (params: ComercializadorOrganizadorById) => {
+    return this.getURL({
+      path: `/api/SRTComercializadoresOrganizadores/${params.id}`,
+    }).toString();
+  };
+
+  getOrganizadorById = async (params: ComercializadorOrganizadorById) =>
+    tokenizable
+      .get(this.getOrganizadorByIdURL(params))
+      .then(({ data }) => data);
+
+  useGetOrganizadorById = (params?: ComercializadorOrganizadorById) =>
+    useSWR(
+      params && params.id && token.getToken()
+        ? [this.getOrganizadorByIdURL(params), token.getToken()]
+        : null,
+      () => this.getOrganizadorById(params as ComercializadorOrganizadorById),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
+
+  //#Endregion OrgComercializador
+
+
+  //#region Grupo Organizador Comercializador
+
+  //GET Grupo Organizador Comercializador
   readonly getGOrganizadorURL = (params: GrupoOrganizadorComercializador = {}) => {
-   return this.getURL({ path: "/api/SRTComercializadoresGOrganizadores", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/SRTComercializadoresGOrganizadores", search: toURLSearch(params) }).toString();
   };
   getGOrganizador = async (params: GrupoOrganizadorComercializador = {}) => tokenizable.get(
-   this.getGOrganizadorURL(params),
+    this.getGOrganizadorURL(params),
   ).then(({ data }) => data);
   useGetGOrganizadorURL = (params: GrupoOrganizadorComercializador = {}) => useSWR(
-   [this.getGOrganizadorURL(params), token.getToken()], () => this.getGOrganizador(params),
-   {
-     revalidateOnFocus: false,
-     revalidateOnReconnect: false,
-   }
+    [this.getGOrganizadorURL(params), token.getToken()], () => this.getGOrganizador(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
   );
+
+  //POST Organizador Grupo Comercializador
+  readonly postComercializadorGOrganizadoresURL = this.getURL({ path: "/api/SRTComercializadoresGOrganizadores" }).toString();
+
+  postComercializadorGOrganizadores = async (data: ComercializadorGOrganizadoresPostRequest) =>
+    tokenizable.post<ComercializadorPostResponse>(this.postComercializadorGOrganizadoresURL, data).then(({ data }) => data);
+  swrPostComercializadorGOrganizadores: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: ComercializadorGOrganizadoresPostRequest }) => Promise<ComercializadorPostResponse>;
+  } = Object.freeze({
+    key: [this.postComercializadorGOrganizadoresURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postComercializadorGOrganizadores(arg),
+  });
+
+  usePostComercializadorGOrganizadores = () =>
+    useSWRMutation<ComercializadorPostResponse, Error, [url: string, token: string], ComercializadorGOrganizadoresPostRequest>(
+      this.swrPostComercializadorGOrganizadores.key,
+      this.swrPostComercializadorGOrganizadores.fetcher
+    );
+  //#endregion
+
+
+  //#region Grupo Organizador Comercializador PUT
+  readonly putComercializadorGOrganizadoresBaseURL = this.getURL({ path: "/api/SRTComercializadoresGOrganizadores" }).toString();
+
+  readonly putComercializadorGOrganizadoresURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadoresGOrganizadores/${id}` }).toString();
+
+  putComercializadorGOrganizadores = async (id: number | string, data: ComercializadorGOrganizadoresPutRequest) =>
+    tokenizable.put<ComercializadorPutResponse>(this.putComercializadorGOrganizadoresURL(id), data).then(({ data }) => data);
+  swrPutComercializadorGOrganizadores: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: ComercializadorGOrganizadoresPutRequest } }) => Promise<ComercializadorPutResponse>;
+  } = Object.freeze({
+    key: [this.putComercializadorGOrganizadoresBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putComercializadorGOrganizadores(arg.id, arg.data),
+  });
+
+  usePutComercializadorGOrganizadores = () =>
+    useSWRMutation<ComercializadorPutResponse, Error, [url: string, token: string], { id: number | string; data: ComercializadorGOrganizadoresPutRequest }>(
+      this.swrPutComercializadorGOrganizadores.key,
+      this.swrPutComercializadorGOrganizadores.fetcher
+    );
+  //#endregion
+
+  //#region Comercializador Grupo organizadores DELETE
+  readonly deleteComercializadoresGOrganizadoresBaseURL = this.getURL({ path: "/api/SRTComercializadoresGOrganizadores" }).toString();
+
+  readonly deleteComercializadoresGOrganizadoresURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadoresGOrganizadores/${id}` }).toString();
+
+  deleteComercializadoresGOrganizadores = async (id: number | string) =>
+    tokenizable.delete<ComercializadorDeleteResponse>(this.deleteComercializadoresGOrganizadoresURL(id)).then(({ data }) => data);
+
+  swrDeleteComercializadoresGOrganizadores: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: ComercializadorDeleteParams }) => Promise<ComercializadorDeleteResponse>;
+  } = Object.freeze({
+    key: [this.deleteComercializadoresOrganizadoresBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.deleteComercializadoresOrganizadores(arg.id),
+  });
+
+  useDeleteComercializadoresGOrganizadores = () =>
+    useSWRMutation<ComercializadorDeleteResponse, Error, [url: string, token: string], ComercializadorDeleteParams>(
+      this.swrDeleteComercializadoresGOrganizadores.key,
+      this.swrDeleteComercializadoresGOrganizadores.fetcher
+    );
+  //#endregion
+
+  //#region Grupo Organizador por Id
+  readonly getGOrganizadorByIdURL = (params: ComercializadorGOrganizadorById) => {
+    return this.getURL({
+      path: `/api/SRTComercializadoresGOrganizadores/${params.id}`,
+    }).toString();
+  };
+
+  getGOrganizadorById = async (params: ComercializadorGOrganizadorById) =>
+    tokenizable
+      .get(this.getGOrganizadorByIdURL(params))
+      .then(({ data }) => data);
+
+  useGetGOrganizadorById = (params?: ComercializadorGOrganizadorById) =>
+    useSWR(
+      params && params.id && token.getToken()
+        ? [this.getGOrganizadorByIdURL(params), token.getToken()]
+        : null,
+      () => this.getGOrganizadorById(params as ComercializadorGOrganizadorById),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
+
+  // # Region Empleador Pago Comercializador
+  readonly getEmpleadorPagoComercializadorURL = (params: ParametersEmpleadorPagosComercializador = {}) => {
+    return this.getURL({ path: "/api/EmpleadorPagosComercializador", search: toURLSearch(params) }).toString();
+  };
+  getEmpleadorPagoComercializador = async (params: ParametersEmpleadorPagosComercializador = {}) => tokenizable.get(
+    this.getEmpleadorPagoComercializadorURL(params),
+  ).then(({ data }) => data);
+  useGetEmpleadorPagoComercializadorURL = (params: ParametersEmpleadorPagosComercializador = {}) => useSWR(
+    [this.getEmpleadorPagoComercializadorURL(params), token.getToken()], () => this.getEmpleadorPagoComercializador(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+// # End Region Empleador Pago Comercializador
+
+// # Region afipTransferencia
+  readonly getAfipTransferenciaURL = (params: ParametersAfipTranferencia = {}) => {
+    return this.getURL({ path: "/api/AfipTransferencias", search: toURLSearch(params) }).toString();
+  };
+  getAfipTransferencia = async (params: ParametersAfipTranferencia = {}) => tokenizable.get(
+    this.getAfipTransferenciaURL(params),
+  ).then(({ data }) => data);
+  useGetAfipTransferenciaURL = (params: ParametersAfipTranferencia = {}) => useSWR(
+    [this.getAfipTransferenciaURL(params), token.getToken()], () => this.getAfipTransferencia(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+  // # End Region afipTransferencia
 
 
 
@@ -660,22 +1074,3 @@ const ArtAPI = Object.seal(new ArtAPIClass()) as ArtAPIClass;
 
 export default ArtAPI;
 
-export const formatEstablecimientoLabel = (est?: Partial<ApiEstablecimientoEmpresa> | null): string => {
-  if (!est) return "";
-  const nroSucursal =
-    (est as any).nroSucursal ?? (est as any).NroSucursal ?? (est as any).nroSucursalEmpresa ?? (est as any).sucursal ?? "";
-  const domicilioCalle =
-    (est as any).domicilioCalle ?? (est as any).domicilio ?? (est as any).calle ?? (est as any).direccion ?? "";
-  const domicilioNro =
-    (est as any).domicilioNro ?? (est as any).domicilioNroEmpresa ?? (est as any).domicilioNroString ?? (est as any).domicilioNroStr ?? (est as any).domicilioNumero ?? "";
-
-  const domicilio = `${String(domicilioCalle || "").trim()} ${String(domicilioNro || "").trim()}`.trim();
-
-  const parts: string[] = [];
-  parts.push(String(nroSucursal));
-  parts.push(domicilio);
-
-  const filled = parts.map(p => (p && p !== "undefined" && p !== "null" ? p : "")).filter(p => p && p.trim().length > 0);
-  if (filled.length === 0) return "";
-  return `Sucursal: ${filled.join(" - ")}`;
-};

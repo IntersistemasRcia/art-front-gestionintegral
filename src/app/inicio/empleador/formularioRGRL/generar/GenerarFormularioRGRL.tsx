@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 //import { Box, Grid, TextField, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
-import { TextField, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Alert, Typography } from '@mui/material';
+import { TextField, FormControl, InputLabel, Select, MenuItem, Autocomplete } from '@mui/material';
 import { useSearchParams, useRouter } from 'next/navigation';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import dayjs from 'dayjs';
@@ -16,6 +16,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 import DataTableImport from '@/utils/ui/table/DataTable';
+
+import ArtAPI from '@/data/artAPI';
 
 
 import type {
@@ -66,11 +68,21 @@ const fetchRazonSocial = async (cuit: number): Promise<string> => {
 };
 
 const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> => {
-  const url = `${API_BASE}/Establecimientos/Empresa/${encodeURIComponent(cuit)}`;
-  const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json, text/json' } });
-  if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
-  return (await res.json()) as Establecimiento[];
+  const data = await ArtAPI.getEstablecimientosEmpresa(cuit, "True");
+  return data.map((e) => ({
+    interno: e.interno,
+    cuit: e.cuit,
+    nroSucursal: e.nroSucursal,
+    nombre: e.nombre,
+    domicilioCalle: e.domicilioCalle,
+    domicilioNro: e.domicilioNro,
+    superficie: e.superficie,
+    cantTrabajadores: e.cantTrabajadores,
+    localidad: e.localidad,
+    provincia: e.provincia,
+    numero: e.numero,
+    ciiu: e.ciiu,
+  }));
 };
 
 const fetchTipos = async (): Promise<TipoFormulario[]> => {
@@ -160,15 +172,7 @@ const GenerarFormularioRGRL: React.FC<{
       setEstCantTrab('');
     }
   }, [estActual]);
-
-  const labelEst = (e: Establecimiento) => {
-    const num = e.numero ?? e.nroSucursal;
-    const calle = e.domicilioCalle ?? '';
-    const nro = e.domicilioNro ?? '';
-    const loc = e.localidad ?? '';
-    const prov = e.provincia ?? '';
-    return `${num ?? ''} - ${calle} ${nro}`.trim() + (loc || prov ? ` - ${loc}${prov ? ` (${prov})` : ''}` : '');
-  };
+  
 
   const canBuscar = !!cuit && !Number.isNaN(cuit);
 
@@ -1230,33 +1234,23 @@ const GenerarFormularioRGRL: React.FC<{
         />
       </Box>
       <Box className={styles.establecimientoBox}>
-        <FormControl fullWidth>
-          <InputLabel>Establecimiento</InputLabel>
-          <Select
-            label="Establecimiento"
-            value={establecimientoSel ?? ''}
-            onChange={(e) => setEstablecimientoSel(Number(e.target.value) || undefined)}
-
-            MenuProps={{
-              PaperProps: {
-                sx: {
-                  height: 'auto',
-                  maxHeight: 320,
-                  overflowY: 'auto',
-                },
-              },
-            }}
-          >
-            <MenuItem value="" disabled>
-              Seleccioná...
-            </MenuItem>
-            {establecimientos.map((e) => (
-              <MenuItem key={e.interno} value={e.interno}>
-                {labelEst(e)}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          <FormControl fullWidth disabled={esReplica} title={esReplica ? 'Tipo fijado por replicación' : undefined}>
+            <Autocomplete
+              options={establecimientos}
+              getOptionLabel={(opt) => {
+                const suc = String(opt.nroSucursal ?? '').trim();
+                const calle = String(opt.domicilioCalle ?? '').trim();
+                const nro = String(opt.domicilioNro ?? '').trim();
+                const dir = [calle, nro].filter(Boolean).join(' ').trim();
+                return [suc, dir].filter(Boolean).join(' - ').trim();
+              }}
+              value={estActual ?? null}
+              onChange={(_e, newVal) => setEstablecimientoSel(newVal ? newVal.interno : undefined)}
+              isOptionEqualToValue={(option, value) => option.interno === value.interno}
+              renderInput={(params) => <TextField {...params} label="Establecimiento" />}
+              disabled={esReplica}
+            />
+          </FormControl>
       </Box>
       {estActual && (
         <Box className={styles.estDatosGrid}>

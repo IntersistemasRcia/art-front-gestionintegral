@@ -14,40 +14,65 @@ import {
   Checkbox,
   FormControlLabel,
 } from "@mui/material";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import RefEmpleador from "./interfaces/RefEmpleador";
+import UsuarioRow from "./interfaces/UsuarioRow";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 import CargoInterface from "./interfaces/CargoInterface";
 import Formato from "@/utils/Formato";
 
 // Definición del modo de operación (replicada desde UsuariosPage)
-type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
+export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
 
 export interface UsuarioFormFields {
   nombre: string;
   email: string;
   cuit: string; // Keep as string for form input, will convert to number on submit
   phoneNumber: string;
+  matricula?: string;
+  fechaNacimiento?: string;
+  canalInterviniente?: string;
+  inicioFecha?: string;
+  bajaFecha?: string | null;
+  domicilioCalle?: string;
+  domicilioNro?: string;
+  domicilioPiso?: string;
+  domicilioEntreCalle1?: string;
+  domicilioEntreCalle2?: string;
+  domicilioCodPostal?: string;
+  domicilioCodLocalidad?: string;
+  domicilioLocalidad?: string;
+  domicilioProvincia?: string;
   cargoId?: number;
   password?: string;
   confirmPassword?: string;
   rol: string;
+  maxUsuarios?: number;
+  cantidadUsuarios?: number;
   // tipo: string;
   userName: string;
   empresaId: number;
   id?: string;
+  comision?: number;
+  serviciosAdicionales?: number;
+  aplicaIva?: number;
+  srtComercializadorOrganizadorInterno?: number;
 }
 
-interface Props {
+export interface Props {
   open: boolean;
   onClose: () => void;
   onSubmit: (formData: UsuarioFormFields) => void;
   roles: RolesInterface[];
   cargos: CargoInterface[];
   refEmpleadores: RefEmpleador[];
+  usuarios?: UsuarioRow[];
   initialData?: UsuarioFormFields;
   errorMsg?: string | null;
   method: RequestMethod; // MODO DE OPERACIÓN
@@ -64,17 +89,30 @@ const initialFormState: UsuarioFormFields = {
   password: "",
   confirmPassword: "",
   rol: "",
+  maxUsuarios: 0,
+  cantidadUsuarios: 0,
   // tipo: "",
   userName: "",
   empresaId: 0,
 };
 
 // Interfaces completas para errores y campos tocados
-interface ValidationErrors {
+export interface ValidationErrors {
   nombre?: string;
   email?: string;
   cuit?: string;
   phoneNumber?: string;
+  matricula?: string;
+  fechaNacimiento?: string;
+  domicilioCalle?: string;
+  domicilioNro?: string;
+  domicilioPiso?: string;
+  domicilioEntreCalle1?: string;
+  domicilioEntreCalle2?: string;
+  domicilioCodPostal?: string;
+  domicilioCodLocalidad?: string;
+  domicilioLocalidad?: string;
+  domicilioProvincia?: string;
   cargoId?: string;
   password?: string;
   confirmPassword?: string;
@@ -83,13 +121,29 @@ interface ValidationErrors {
   // userName?: string;
   empresaId?: string;
   id?: string;
+  maxUsuarios?: string;
+  cantidadUsuarios?: string;
 }
 
-interface TouchedFields {
+export interface TouchedFields {
   nombre?: boolean;
   email?: boolean;
   cuit?: boolean;
   phoneNumber?: boolean;
+  matricula?: boolean;
+  fechaNacimiento?: boolean;
+  canalInterviniente?: boolean;
+  inicioFecha?: boolean;
+  bajaFecha?: boolean;
+  domicilioCalle?: boolean;
+  domicilioNro?: boolean;
+  domicilioPiso?: boolean;
+  domicilioEntreCalle1?: boolean;
+  domicilioEntreCalle2?: boolean;
+  domicilioCodPostal?: boolean;
+  domicilioCodLocalidad?: boolean;
+  domicilioLocalidad?: boolean;
+  domicilioProvincia?: boolean;
   cargoId?: boolean;
   password?: boolean;
   confirmPassword?: boolean;
@@ -98,6 +152,11 @@ interface TouchedFields {
   // userName?: boolean;
   empresaId?: boolean;
   id?: boolean;
+  comision?: boolean;
+  serviciosAdicionales?: boolean;
+  aplicaIva?: boolean;
+  maxUsuarios?: boolean;
+  cantidadUsuarios?: boolean;
 }
 
 export default function UsuarioForm({
@@ -107,6 +166,7 @@ export default function UsuarioForm({
   roles,
   cargos,
   refEmpleadores,
+  usuarios = [],
   initialData,
   errorMsg,
   method,
@@ -117,6 +177,10 @@ export default function UsuarioForm({
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<TouchedFields>({});
   const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [modalMsgOpen, setModalMsgOpen] = useState<boolean>(false);
+  const [modalMsgText, setModalMsgText] = useState<string>("");
+  const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
@@ -159,6 +223,17 @@ export default function UsuarioForm({
         processedData.password = "";
         processedData.confirmPassword = "";
       }
+
+      if (processedData.empresaId) {
+        const empresa = refEmpleadores.find(
+          (item) => item.interno === processedData.empresaId
+        );
+        if (empresa?.cantidadUsuariosMaxima !== undefined) {
+          processedData.maxUsuarios = empresa.cantidadUsuariosMaxima;
+        }
+        const currentCountFromList = usuarios.filter((u) => u.empresaId === processedData.empresaId).length;
+        processedData.cantidadUsuarios = empresa?.cantidadUsuarios ?? currentCountFromList;
+      }
       
       setForm(processedData);
     } else {
@@ -168,7 +243,8 @@ export default function UsuarioForm({
     setErrors({});
     setTouched({});
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
-  }, [initialData, open, isEditing, isCreating, cargos]);
+    setShowPassword(false); // Resetear la visibilidad de contraseña
+  }, [initialData, open, isEditing, isCreating, cargos, refEmpleadores]);
 
   const modalTitle = useMemo(() => {
     switch (method) {
@@ -336,6 +412,19 @@ export default function UsuarioForm({
       }
     });
 
+    // Si estamos creando un usuario para una empresa, validar el límite de usuarios
+    const max = Number(form.maxUsuarios ?? 0);
+    const current = Number(form.cantidadUsuarios ?? 0);
+    if (max > 0 && current >= max) {
+      const msg = "Se alcanzó el límite de usuarios para esta empresa. Por favor comunicarse con un operador de la ART";
+      newErrors.maxUsuarios = msg;
+      // mostrar modal de error
+      setModalMsgText(msg);
+      setModalMsgType('error');
+      setModalMsgOpen(true);
+      hasErrors = true;
+    }
+
     setErrors(newErrors);
     return !hasErrors;
   };
@@ -419,6 +508,8 @@ export default function UsuarioForm({
         ...prev,
         empresaId: 0,
         rol: "Administrador",
+        maxUsuarios: 0,
+        cantidadUsuarios: 0,
       }));
       
       // Limpiar errores de empresa y rol si existen
@@ -426,6 +517,8 @@ export default function UsuarioForm({
         ...prev,
         empresaId: undefined,
         rol: undefined,
+        maxUsuarios: undefined,
+        cantidadUsuarios: undefined,
       }));
     } else {
       // Si se desmarca, limpiar el rol y validar empresa y rol si ya fueron tocados
@@ -449,6 +542,10 @@ export default function UsuarioForm({
         }));
       }
     }
+  };
+
+  const handleShowPasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowPassword(event.target.checked);
   };
 
   const handleBlur = (fieldName: keyof UsuarioFormFields) => {
@@ -552,7 +649,7 @@ export default function UsuarioForm({
                 />
               </div>
 
-              {isCreating && (
+              {(isCreating || isEditing) && (
                 <div className={styles.formRow}>
                   <TextField
                     label="Email"
@@ -574,7 +671,7 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
-                  label="CUIT"
+                  label="CUIT/CUIL"
                   name="cuit"
                   value={form.cuit}
                   onChange={handleTextFieldChange}
@@ -586,18 +683,30 @@ export default function UsuarioForm({
                   disabled={isDisabled}
                   placeholder="Ingrese CUIT (11 dígitos)"
                 />
-                <TextField
-                  label="Teléfono"
-                  name="phoneNumber"
-                  value={form.phoneNumber}
-                  onChange={handleTextFieldChange}
-                  onBlur={() => handleBlur("phoneNumber")}
-                  error={touched.phoneNumber && !!errors.phoneNumber}
-                  helperText={touched.phoneNumber && errors.phoneNumber}
-                  fullWidth
-                  disabled={isDisabled}
-                  placeholder="Ingrese teléfono"
-                />
+                <div className={styles.phoneField}>
+                  <PhoneInput
+                    country="ar"
+                    value={form.phoneNumber}
+                    onChange={(value) =>
+                      setForm((prev: UsuarioFormFields) => ({
+                        ...prev,
+                        phoneNumber: value,
+                      }))
+                    }
+                    onBlur={() => handleBlur("phoneNumber")}
+                    disabled={isDisabled}
+                    specialLabel="Teléfono"
+                    containerClass={styles.phoneContainer}
+                    inputClass={styles.phoneInput}
+                    buttonClass={styles.phoneButton}
+                    inputProps={{ name: "phoneNumber" }}
+                  />
+                  {touched.phoneNumber && errors.phoneNumber && (
+                    <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
+                      {errors.phoneNumber}
+                    </Typography>
+                  )}
+                </div>
               </div>
 
               <div className={styles.formRow}>
@@ -633,42 +742,41 @@ export default function UsuarioForm({
                     </Typography>
                   )}
                 </FormControl>
+
+                <FormControl
+                  fullWidth
+                  required={!isDisabled && !isAdminUser}
+                  error={touched.rol && !!errors.rol && !isAdminUser}
+                  disabled={isDisabled || isAdminUser}
+                >
+                  <InputLabel>Rol</InputLabel>
+                  <Select
+                    name="rol"
+                    value={form.rol}
+                    label="Rol"
+                    onChange={handleSelectChange}
+                    onBlur={() => handleBlur("rol")}
+                  >
+                    {roles.map((rol) => (
+                      <MenuItem key={rol.id} value={rol.nombre}>
+                        {rol.nombre}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {touched.rol && errors.rol && !isAdminUser && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ ml: 2, mt: 0.5 }}
+                    >
+                      {errors.rol}
+                    </Typography>
+                  )}
+                </FormControl>
               </div>
 
               {isCreating && (
                 <div className={styles.formRow}>
-                  {/* Rol (Select) */}
-                  <FormControl
-                    fullWidth
-                    required={!isDisabled && !isAdminUser}
-                    error={touched.rol && !!errors.rol && !isAdminUser}
-                    disabled={isDisabled || isAdminUser}
-                  >
-                    <InputLabel>Rol</InputLabel>
-                    <Select
-                      name="rol"
-                      value={form.rol}
-                      label="Rol"
-                      onChange={handleSelectChange}
-                      onBlur={() => handleBlur("rol")}
-                    >
-                      {roles.map((rol) => (
-                        <MenuItem key={rol.id} value={rol.nombre}>
-                          {rol.nombre}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {touched.rol && errors.rol && !isAdminUser && (
-                      <Typography
-                        variant="caption"
-                        color="error"
-                        sx={{ ml: 2, mt: 0.5 }}
-                      >
-                        {errors.rol}
-                      </Typography>
-                    )}
-                  </FormControl>
-
                   {/* Empresa (Autocomplete con búsqueda) */}
                   <Autocomplete
                     fullWidth
@@ -680,6 +788,8 @@ export default function UsuarioForm({
                       setForm((prev: UsuarioFormFields) => ({
                         ...prev,
                         empresaId: empresaId,
+                        maxUsuarios: newValue?.cantidadUsuariosMaxima ?? prev.maxUsuarios ?? 0,
+                        cantidadUsuarios: newValue?.cantidadUsuarios ?? usuarios.filter(u => u.empresaId === empresaId).length,
                       }));
                       
                       if (touched.empresaId) {
@@ -708,25 +818,48 @@ export default function UsuarioForm({
                     }}
                     noOptionsText="No se encontraron empresas"
                   />
-                  
-                  {/* Checkbox Es Administrador - solo en modo crear */}
-                  {isAdmin && (
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={isAdminUser}
-                          onChange={handleIsAdminUserChange}
-                          disabled={isDisabled}
-                          color="primary"
-                        />
-                      }
-                      label="Es Administrador"
-                      sx={{ mt: 2 }}
-                    />
-                  )}
                 </div>
               )}
             </div>
+
+            {isCreating && (
+              <div className={styles.formRow}>
+                <TextField
+                  label="Núm. Máx. de Usuarios"
+                  name="maxUsuarios"
+                  type="number"
+                  value={form.maxUsuarios ?? ""}
+                  fullWidth
+                  disabled={true}
+                  inputProps={{ min: 0, readOnly: true }}
+                />
+
+                <TextField
+                  label="Cantidad Actual de Usuarios"
+                  name="cantidadUsuarios"
+                  type="number"
+                  value={form.cantidadUsuarios ?? 0}
+                  onChange={() => {}}
+                  fullWidth
+                  disabled
+                />
+              </div>
+            )}
+            {isAdmin && (
+              <div className={styles.formRow}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isAdminUser}
+                      onChange={handleIsAdminUserChange}
+                      disabled={isDisabled}
+                      color="primary"
+                    />
+                  }
+                  label="Es Administrador"
+                />
+              </div>
+            )}
 
             {/* Credenciales de Acceso (Ocultas en View y Deleted)*/}
             {(isCreating || isEditing) && (
@@ -743,7 +876,7 @@ export default function UsuarioForm({
                           : "Nueva contraseña (opcional)"
                       }
                       name="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={handleTextFieldChange}
                       onBlur={() => handleBlur("password")}
@@ -763,7 +896,7 @@ export default function UsuarioForm({
                           : "Confirmar nueva contraseña"
                       }
                       name="confirmPassword"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={form.confirmPassword}
                       onChange={handleTextFieldChange}
                       onBlur={() => handleBlur("confirmPassword")}
@@ -780,6 +913,20 @@ export default function UsuarioForm({
                         isCreating ? "••••••••" : "Dejar vacío para no cambiar"
                       }
                     />
+
+                    <div className={styles.showPasswordRow}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={showPassword}
+                            onChange={handleShowPasswordChange}
+                            disabled={isDisabled}
+                            color="primary"
+                          />
+                        }
+                        label="Mostrar contraseña"
+                      />
+                    </div>
                   </div>
 
                   <Typography variant="body2" className={styles.passwordHelp}>
@@ -847,6 +994,13 @@ export default function UsuarioForm({
           )}
         </div>
       </Box>
+      <CustomModalMessage
+        open={modalMsgOpen}
+        onClose={() => setModalMsgOpen(false)}
+        message={modalMsgText}
+        type={modalMsgType}
+        title="Atención"
+      />
     </CustomModal>
   );
 }

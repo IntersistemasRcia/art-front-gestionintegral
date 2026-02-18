@@ -209,7 +209,7 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       inputType: type ? (type === "dateTime" ? "datetime-local" : type) : undefined,
     }));
 
-    return { columns, fields, headers };
+    return { columns, fields, headers, fieldsForSelect };
   }, [tables.vw_AtencionAlPublico]);
 
   const [rows, setRows] = useState<Row[]>([]);

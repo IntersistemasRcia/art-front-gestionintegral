@@ -7,14 +7,13 @@ import type { ColumnDef } from '@tanstack/react-table';
 import ArtAPI from '@/data/artAPI';
 import Formato from '@/utils/Formato';
 import styles from './poliza.module.css';
-import { Box } from "@mui/material";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 'react-icons/bs';
 import Link from 'next/link';
 import type { Poliza, EmpresaOption } from "./types/poliza";
 
 const columns: ColumnDef<Poliza>[] = [
-  { accessorKey: 'numero', header: 'Nro. Poliza', meta: { align: 'left' } },
+  { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
   {
     accessorKey: 'CUIT',
     header: 'CUIT',
@@ -115,55 +114,26 @@ function digits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
-function arr(data: any): any[] {
-  if (Array.isArray(data?.DATA)) return data.DATA;
-  if (Array.isArray(data?.data)) return data.data;
-  return Array.isArray(data) ? data : [];
-}
+function PolizasListado({ params, groupSelect, organizadorSelect, comercializadorSelect, emptyMessage, forceEmpty, }: { params: any; groupSelect?: React.ReactNode; organizadorSelect?: React.ReactNode; comercializadorSelect?: React.ReactNode; emptyMessage?: string; forceEmpty?: boolean; }) {
+  const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
 
-function firstInterno(data: any): number | undefined {
-  const first = arr(data)[0];
-  const n = Number(first?.interno ?? first?.Interno);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
+  const apiData = forceEmpty ? [] : (apiDataRaw ?? []);
+  const error = forceEmpty ? undefined : apiError;
+  const isLoading = forceEmpty ? false : apiIsLoading;
 
-function uniqueInternosCsv(data: any): string | undefined {
-  const set = new Set<number>();
-  for (const x of arr(data)) {
-    const n = Number(x?.interno ?? x?.Interno);
-    if (Number.isFinite(n) && n > 0) set.add(n);
-  }
-  return set.size ? Array.from(set).join(',') : undefined;
-}
-
-function mapPolizasToRows(apiData: any): Poliza[] {
-  const arr = Array.isArray(apiData?.DATA)
-    ? apiData.DATA
-    : Array.isArray(apiData?.data)
-      ? apiData.data
-      : Array.isArray(apiData)
-        ? apiData
-        : [];
-
-  return (arr as any[]).map((item, index) => {
-    const interno = item?.interno;
-    const numero = String(item?.numero ?? '');
-    return {
-      interno: String(interno),
-      numero: String(item?.numero ?? ''),
-      NroPoliza: numero,
-      CUIT: String(item?.cuit),
-      Empleador_Denominacion: String(item?.empleadorDenominacion),
-      Vigencia_Desde: String(item?.vigenciaDesde),
-      Vigencia_Hasta: String(item?.vigenciaHasta),
-      fecha: String(item?.movimientoFecha),
-    };
-  });
-}
-
-function PolizasListado({ params }: { params: any }) {
-  const { data: apiData, error, isLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
-  const rows = useMemo(() => mapPolizasToRows(apiData), [apiData]);
+  const rows = useMemo(() => {
+    const list = (apiData ?? []) as any[];
+    return list.map((item) => ({
+      interno: String(item.interno),
+      numero: String(item.numero ?? ''),
+      NroPoliza: String(item.numero ?? ''),
+      CUIT: String(item.cuit ?? ''),
+      Empleador_Denominacion: String(item.empleadorDenominacion ?? ''),
+      Vigencia_Desde: String(item.vigenciaDesde ?? ''),
+      Vigencia_Hasta: String(item.vigenciaHasta ?? ''),
+      fecha: String(item.movimientoFecha ?? ''),
+    }));
+  }, [apiData]);
 
   const empresas = useMemo(() => {
     const map = new Map<string, EmpresaOption>();
@@ -179,6 +149,14 @@ function PolizasListado({ params }: { params: any }) {
     );
   }, [rows]);
 
+  const formatEmpresaLabel = (e?: EmpresaOption | null) => {
+    if (!e) return '';
+    const razon = String(e.razonSocial ?? '').trim();
+    const cuit = String(e.cuit ?? '').trim();
+    const cuitForm = cuit ? Formato.CUIP(cuit) || cuit : '';
+    return cuit ? `${razon}${cuitForm ? ' - ' + cuitForm : ''}` : razon;
+  };
+
   const [empresa, setEmpresa] = useState<EmpresaOption | null>(null);
 
   const filteredRows = useMemo(() => {
@@ -191,29 +169,59 @@ function PolizasListado({ params }: { params: any }) {
   if (error) {
     return (
       <div className={styles.container}>
-        <p>No se pudieron cargar las pólizas.</p>
+        <div className={styles.topRow}>
+          <div className={styles.selectItem}>
+            <CustomSelectSearch<EmpresaOption>
+            options={empresas}
+            getOptionLabel={(e) => formatEmpresaLabel(e)}
+              value={empresa}
+              onChange={(_event, newValue) => {
+                setEmpresa(newValue);
+              }}
+              label="Empresa"
+              placeholder="Filtrar por razón social..."
+              loading={isLoading}
+              loadingText="Cargando..."
+              noOptionsText={isLoading ? "Cargando..." : "No se encontraron empresas"}
+              disabled={isLoading || empresas.length === 0}
+            />
+          </div>
+          <div className={styles.selectItem}>{groupSelect}</div>
+          <div className={styles.selectItem}>{organizadorSelect}</div>
+          <div className={styles.selectItem}>{comercializadorSelect}</div>
+        </div>
+        <p>No se encontraron pólizas.</p>
       </div>
     );
   }
 
   return (
     <div className={styles.container}>
-      <Box sx={{ maxWidth: 650, marginBottom: 2 }}>
-        <CustomSelectSearch<EmpresaOption>
-          options={empresas}
-          getOptionLabel={(e) => String(e?.razonSocial ?? '')}
-          value={empresa}
-          onChange={(_event, newValue) => {
-            setEmpresa(newValue);
-          }}
-          label="Empresa"
-          placeholder="Filtrar por razón social..."
-          loading={isLoading}
-          loadingText="Cargando..."
-          noOptionsText={isLoading ? "Cargando..." : "No se encontraron empresas"}
-          disabled={isLoading || empresas.length === 0}
-        />
-      </Box>
+      <div className={styles.topRow}>
+        <div className={styles.selectItem}>
+          <CustomSelectSearch<EmpresaOption>
+            options={empresas}
+            getOptionLabel={(e) => formatEmpresaLabel(e)}
+            value={empresa}
+            onChange={(_event, newValue) => {
+              setEmpresa(newValue);
+            }}
+            label="Empresa"
+            placeholder="Filtrar por razón social..."
+            loading={isLoading}
+            loadingText="Cargando..."
+            noOptionsText={isLoading ? "Cargando..." : "No se encontraron empresas"}
+            disabled={isLoading || empresas.length === 0}
+          />
+        </div>
+        <div className={styles.selectItem}>{groupSelect}</div>
+        <div className={styles.selectItem}>{organizadorSelect}</div>
+        <div className={styles.selectItem}>{comercializadorSelect}</div>
+      </div>
+
+      {!isLoading && emptyMessage && filteredRows.length === 0 ? (
+        <p>{emptyMessage}</p>
+      ) : null}
 
       <DataTable
         columns={columns}
@@ -225,182 +233,187 @@ function PolizasListado({ params }: { params: any }) {
   );
 }
 
-function PolizasComercializador() {
+function PolizasPage() {
   const { user } = useAuth();
-  const userRol = String((user as any)?.rol ?? '');
-  const isComercializador = userRol.toLowerCase() === 'comercializador';
-  const userCUIL = Number(
-    digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0)
+  const rol = String((user as any)?.rol ?? '').toLowerCase();
+  const cuil = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
+
+  const isAdmin = rol === 'administrador';
+  const isGrupoOrganizador = rol === 'grupoorganizador';
+  const isOrganizadorComercializador = rol === 'organizadorcomercializador';
+  const isComercializador = rol === 'comercializador';
+
+  const [grupo, setGrupo] = useState<any>(null);
+  const [organizador, setOrganizador] = useState<any>(null);
+  const [comercializador, setComercializador] = useState<any>(null);
+
+  const { data: gOrgData } = ArtAPI.useGetGOrganizadorURL(
+    isAdmin ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
   );
 
-  const {
-    data: comercializadorData,
-    error: comercializadorError,
-    isLoading: isLoadingComercializador,
-  } = ArtAPI.useGetComercializadorURL(
-    isComercializador && Number.isFinite(userCUIL) && userCUIL > 0
-      ? ({ CUIL: userCUIL } as any)
+  const { data: organizadorMeData } = ArtAPI.useGetOrganizadorURL(
+    isOrganizadorComercializador ? ({ CUIL: cuil } as any) : ({} as any)
+  );
+
+  const { data: comercializadorMeData } = ArtAPI.useGetComercializadorURL(
+    isComercializador ? ({ CUIL: cuil } as any) : ({} as any)
+  );
+
+
+  const comercializadorMe = useMemo(() => (comercializadorMeData?.[0] ?? null) as any, [comercializadorMeData]);
+  const organizadorMe = useMemo(() => (organizadorMeData?.[0] ?? null) as any, [organizadorMeData]);
+
+ const grupoById = ArtAPI.useGetGOrganizadorById(
+   isOrganizadorComercializador && organizadorMe
+     ? { id: organizadorMe.srtComercializadorGOrganizadorInterno }
+     : undefined
+ ).data;
+
+  const grupoFromComercializador = isComercializador
+    ? ({
+      interno: Number((comercializadorMe as any)?.srtComercializadorGOrganizadorInterno ?? 0),
+      descripcion: String((comercializadorMe as any)?.comercializadorGOrganizadorDescripcion ?? ''),
+    } as any)
+    : null;
+
+  const organizadorFromComercializador = isComercializador
+    ? ({
+      interno: Number((comercializadorMe as any)?.srtComercializadorOrganizadorInterno ?? 0),
+      descripcion: String((comercializadorMe as any)?.comercializadorOrganizadorDescripcion ?? ''),
+    } as any)
+    : null;
+
+  const grupoValue = isAdmin
+    ? grupo
+    : isGrupoOrganizador
+      ? (gOrgData?.[0] ?? null)
+      : isComercializador
+        ? grupoFromComercializador
+        : isOrganizadorComercializador
+          ? grupoById
+          : null;
+
+  const grupoInterno = Number((grupoValue as any)?.interno ?? 0);
+
+  const organizadorValue = isAdmin
+    ? organizador
+    : isOrganizadorComercializador
+      ? organizadorMe
+      : isComercializador
+        ? organizadorFromComercializador
+        : organizador;
+
+  const { data: organizadoresData } = ArtAPI.useGetOrganizadorURL(
+    grupoValue && !isOrganizadorComercializador && !isComercializador
+      ? ({ SRTComercializadorGOrganizadorInterno: grupoInterno || 0 } as any)
       : ({} as any)
   );
 
-  const comercializadorInterno = useMemo(() => {
-    return firstInterno(comercializadorData);
-  }, [comercializadorData]);
-
-  if (comercializadorError) {
-    return (
-      <div className={styles.container}>
-        <p>No se pudo cargar el comercializador.</p>
-      </div>
-    );
-  }
-
-  if (isLoadingComercializador) {
-    return (
-      <DataTable
-        columns={columns}
-        data={[]}
-        pageSizeOptions={[5, 10, 20]}
-        isLoading={true}
-      />
-    );
-  }
-
-  if (!comercializadorInterno) {
-    return (
-      <div className={styles.container}>
-        <p>No se encontró el comercializador asociado al usuario.</p>
-      </div>
-    );
-  }
-
-  return (
-    <PolizasListado
-      params={{
-        ComercializadoresInternos: String(comercializadorInterno),
-      } as any}
-    />
-  );
-}
-
-function PolizasOrganizadorComercializador() {
-  const { user } = useAuth();
-  const userCUIL = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
-  const userCUILValid = Number.isFinite(userCUIL) && userCUIL > 0 ? userCUIL : undefined;
-
-  const { data: organizadorData, error: organizadorError, isLoading: isLoadingOrganizador } =
-    ArtAPI.useGetOrganizadorURL(userCUILValid ? ({ CUIL: userCUILValid } as any) : ({} as any));
-
-  const organizadorInterno = useMemo(() => firstInterno(organizadorData), [organizadorData]);
-
-  const { data: comercializadoresData, error: comercializadoresError, isLoading: isLoadingComercializadores } =
-    ArtAPI.useGetComercializadorURL(
-      organizadorInterno
-        ? ({ ComercializadoresOrganizadoresInternos: organizadorInterno } as any)
-        : ({} as any)
-    );
-
-  const comercializadoresInternos = useMemo(
-    () => uniqueInternosCsv(comercializadoresData),
-    [comercializadoresData]
+const organizadoresInternos = useMemo(() => {
+  const list = (organizadoresData ?? []) as any[];
+  return list.length ? list.map((x) => String(x.interno)).join(',') : undefined;
+}, [organizadoresData]);
+  const { data: comercializadoresData, isLoading: comercializadoresLoading } = ArtAPI.useGetComercializadorURL(
+    isComercializador
+      ? ({ CUIL: cuil } as any)
+      : (organizadorValue
+        ? ({ ComercializadoresOrganizadoresInternos: String((organizadorValue as any)?.interno ?? 0) } as any)
+        : (grupoValue
+          ? ({ ComercializadoresOrganizadoresInternos: organizadoresInternos || '0' } as any)
+          : ({} as any)))
   );
 
-  if (!userCUILValid) return <div className={styles.container}><p>Falta el CUIL del usuario.</p></div>;
+ const comercializadoresInternos = useMemo(() => {
+   const list = (comercializadoresData ?? []) as any[];
+   return list.length ? list.map((x) => String(x.interno)).join(',') : undefined;
+ }, [comercializadoresData]);
+  
+  
+  const comercializadorValue = isComercializador ? comercializadorMe : comercializador;
 
-  if (isLoadingOrganizador || isLoadingComercializadores) {
-    return <DataTable columns={columns} data={[]} pageSizeOptions={[5, 10, 20]} isLoading={true} />;
-  }
+  const hasAnyFiltro =
+    isGrupoOrganizador ||
+    isOrganizadorComercializador ||
+    isComercializador ||
+    !!grupoValue ||
+    !!organizadorValue ||
+    !!comercializadorValue;
 
-  if (organizadorError || comercializadoresError || !organizadorInterno || !comercializadoresInternos) {
-    return <div className={styles.container}><p>No se pudieron resolver las pólizas del organizador.</p></div>;
-  }
+  const forceEmpty = hasAnyFiltro && !comercializadoresLoading && !comercializadoresInternos;
 
-  return (
-    <PolizasListado
-      params={{
-        ComercializadoresInternos: comercializadoresInternos,
-      } as any}
-    />
-  );
-}
-
-
-function PolizasGrupoOrganizador() {
-  const { user } = useAuth();
-  const userCUIL = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
-  const userCUILValid = Number.isFinite(userCUIL) && userCUIL > 0 ? userCUIL : undefined;
-
-  const { data: gOrgData, error: gOrgError, isLoading: isLoadingGOrg } =
-    ArtAPI.useGetGOrganizadorURL(userCUILValid ? ({ CUIL: userCUILValid } as any) : ({} as any));
-
-  const gOrganizadorInterno = useMemo(() => firstInterno(gOrgData), [gOrgData]);
-
-  const { data: organizadoresData, error: organizadoresError, isLoading: isLoadingOrganizadores } =
-    ArtAPI.useGetOrganizadorURL(
-      gOrganizadorInterno
-        ? ({ SRTComercializadorGOrganizadorInterno: gOrganizadorInterno } as any)
-        : ({} as any)
-    );
-
-  const organizadoresInternos = useMemo(() => uniqueInternosCsv(organizadoresData), [organizadoresData]);
-
-  const { data: comercializadoresData, error: comercializadoresError, isLoading: isLoadingComercializadores } =
-    ArtAPI.useGetComercializadorURL(
-      organizadoresInternos
-        ? ({ ComercializadoresOrganizadoresInternos: organizadoresInternos } as any)
-        : ({} as any)
-    );
-
-  const comercializadoresInternos = useMemo(
-    () => uniqueInternosCsv(comercializadoresData),
-    [comercializadoresData]
-  );
-
-  if (!userCUILValid) return <div className={styles.container}><p>Falta el CUIL del usuario.</p></div>;
-
-  if (isLoadingGOrg || isLoadingOrganizadores || isLoadingComercializadores) {
-    return <DataTable columns={columns} data={[]} pageSizeOptions={[5, 10, 20]} isLoading={true} />;
-  }
-
-  if (gOrgError || organizadoresError || comercializadoresError || !gOrganizadorInterno || !comercializadoresInternos) {
-    return <div className={styles.container}><p>No se pudieron resolver las pólizas del Grupo Organizador.</p></div>;
-  }
-
-  return (
-    <PolizasListado
-      params={{
-        ComercializadoresInternos: comercializadoresInternos,
-      } as any}
-    />
-  );
-}
-
-function PolizasDefault() {
-  const { user } = useAuth();
-  const role = String((user as any)?.rol ?? '').toLowerCase();
-  const isAdmin = role === 'administrador';
-
-  const userEmpresaCuit = Number(digits((user as any)?.empresaCUIT ?? (user as any)?.cuit ?? 0));
   const params = useMemo(() => {
-    if (isAdmin) return {} as any;
-    return Number.isFinite(userEmpresaCuit) && userEmpresaCuit > 0 ? ({ CUIT: userEmpresaCuit } as any) : ({} as any);
-  }, [isAdmin, userEmpresaCuit]);
+    const interno = Number((comercializadorValue as any)?.interno ?? 0);
+    if (interno) return { ComercializadoresInternos: String(interno) } as any;
+    const hasFiltro =
+      isGrupoOrganizador ||
+      isOrganizadorComercializador ||
+      isComercializador ||
+      !!grupoValue ||
+      !!organizadorValue ||
+      !!comercializadorValue;
+    if (hasFiltro && !comercializadoresInternos) return { ComercializadoresInternos: '0' } as any;
+    return comercializadoresInternos ? ({ ComercializadoresInternos: comercializadoresInternos } as any) : ({} as any);
+  }, [
+    comercializadorValue,
+    comercializadoresInternos,
+    grupoValue,
+    organizadorValue,
+    isGrupoOrganizador,
+    isOrganizadorComercializador,
+    isComercializador,
+  ]);
 
-  return <PolizasListado params={params} />;
-}
+  const groupSelect = (
+    <CustomSelectSearch<any>
+      options={isAdmin ? (gOrgData ?? []) : grupoValue ? [grupoValue] : []}
+      getOptionLabel={(x) => String((x as any)?.comercializadorGOrganizadorDescripcion ?? (x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')}
+      value={grupoValue ?? null}
+      onChange={(_e, v) => {
+        setGrupo(v);
+        setOrganizador(null);
+        setComercializador(null);
+      }}
+      label="Grupo Organizador"
+      disabled={!isAdmin}
+    />
+  );
 
-function PolizasPage() {
-  const { user } = useAuth();
-  const userRol = String((user as any)?.rol ?? '').toLowerCase();
-  const isComercializador = userRol === 'comercializador';
-  const isOrganizadorComercializador = userRol === 'organizadorcomercializador';
-  const isGrupoOrganizador = userRol === 'grupoorganizador';
+  const organizadorSelect = (
+    <CustomSelectSearch<any>
+      options={isAdmin || isGrupoOrganizador ? (organizadoresData ?? []) : organizadorValue ? [organizadorValue] : []}
+      getOptionLabel={(x) => String((x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')}
+      value={organizadorValue ?? null}
+      onChange={(_e, v) => {
+        setOrganizador(v);
+        setComercializador(null);
+      }}
+      label="Organizador"
+      disabled={isOrganizadorComercializador || isComercializador || (!grupoValue && !isAdmin)}
+    />
+  );
 
-  if (isComercializador) return <PolizasComercializador />;
-  if (isOrganizadorComercializador) return <PolizasOrganizadorComercializador />;
-  if (isGrupoOrganizador) return <PolizasGrupoOrganizador />;
+  const comercializadorSelect = (
+    <CustomSelectSearch<any>
+      options={isComercializador ? (comercializadorValue ? [comercializadorValue] : []) : (comercializadoresData ?? [])}
 
-  return <PolizasDefault />;
+      getOptionLabel={(x) =>
+        isComercializador
+          ? String((x as any)?.referenteRazonSocial ?? '')
+          : String((x as any)?.referenteRazonSocial ?? (x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')
+      }
+      value={comercializadorValue ?? null}
+      onChange={(_e, v) => setComercializador(v)}
+      label="Comercializador"
+      disabled={isComercializador || ((!grupoValue && !isOrganizadorComercializador) && !isAdmin)}
+    />
+  );
+
+  const emptyMessage =
+    (isGrupoOrganizador || isOrganizadorComercializador || isComercializador || !!grupoValue || !!organizadorValue || !!comercializadorValue)
+      ? 'No hay pólizas para el filtro seleccionado.'
+      : undefined;
+
+  return <PolizasListado params={params} groupSelect={groupSelect} organizadorSelect={organizadorSelect} comercializadorSelect={comercializadorSelect} emptyMessage={emptyMessage} forceEmpty={forceEmpty} />;
 }
 
 export default PolizasPage;

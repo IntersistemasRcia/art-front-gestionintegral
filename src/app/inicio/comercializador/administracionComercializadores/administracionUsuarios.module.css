@@ -1,0 +1,17 @@
+.actionButtons {
+	display: flex;
+	gap: 8px;
+}
+
+.createButtonWrapper {
+	margin-bottom: 16px;
+}
+
+.actionTooltip {
+	font-size: 1.1rem;
+	padding: 8px 12px;
+}
+
+.actionIcon {
+	font-size: 22px;
+}

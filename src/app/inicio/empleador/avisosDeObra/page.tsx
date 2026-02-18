@@ -15,7 +15,7 @@ import Formato from "@/utils/Formato";
 import { useAuth } from "@/data/AuthContext";
 import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
-const { useGetAvisoObra } = gestionEmpleadorAPI;
+const { useGetAvisoObra, avisoObraInsert, avisoObraUpdate, avisoObraDelete } = gestionEmpleadorAPI;
 import { getDefaultAvisoObra } from "./data/defaultAvisoObra";
 import AvisosObraPdfGenerator from "./AvisoObraPdfGenerator";
 
@@ -104,8 +104,6 @@ const AvisosObraHandler: React.FC = () => {
 
         if ([Request.Insert, Request.Change, Request.Delete].includes(action as Request)) {
             const isInsert = action === Request.Insert;
-            const method = isInsert ? "post" : action === Request.Change ? "put" : "delete";
-            const urlSuffix = isInsert ? "AvisoObra" : `AvisoObra/${data.interno}`;
             
             // Preparar payload: NO enviar 'interno' en INSERT
             const payload: Partial<AvisoObraRecord> = { ...data };
@@ -113,24 +111,35 @@ const AvisosObraHandler: React.FC = () => {
                  // El casting a any permite eliminar la propiedad opcional
                 delete (payload as any).interno;
             }
-            // Lógica de Petición HTTP
-            axios.request({
-                method: method,
-                url: `http://arttest.intersistemas.ar:8670/api/${urlSuffix}`,
-                headers: {
-                    "Content-Type": "application/json",
-                    // Aquí va el Authorization Bearer si fuera necesario
-                },
-                data: action === Request.Delete ? undefined : payload,
-            })
-            .then(async (response) => {
-                // Si hay confirmación (la fecha no es null), abrimos el PDF
-                if (data.confirmacionFecha != null) await abrirPDFAvisoDeObra(response.data);
-                cerrarFormulario(true);
-            })
-            .catch(async (error: AxiosError | any) => {
-                abrirError(error);
-            });
+            
+            // Lógica de Petición HTTP usando gestionEmpleadorAPI
+            let requestPromise: Promise<any>;
+            
+            if (isInsert) {
+                requestPromise = avisoObraInsert(payload);
+            } else if (action === Request.Change) {
+                if (!data.interno) {
+                    abrirError({ title: "Error", message: "El interno es requerido para actualizar" });
+                    return;
+                }
+                requestPromise = avisoObraUpdate(data.interno, payload);
+            } else { // Request.Delete
+                if (!data.interno) {
+                    abrirError({ title: "Error", message: "El interno es requerido para eliminar" });
+                    return;
+                }
+                requestPromise = avisoObraDelete(data.interno);
+            }
+            
+            requestPromise
+                .then(async (response) => {
+                    // Si hay confirmación (la fecha no es null), abrimos el PDF
+                    if (data.confirmacionFecha != null) await abrirPDFAvisoDeObra(response);
+                    cerrarFormulario(true);
+                })
+                .catch(async (error: AxiosError | any) => {
+                    abrirError(error);
+                });
         }
         
     }, [apiQuery, refetchAvisos]); // Dependencias: apiQuery y la función de recarga de SWR

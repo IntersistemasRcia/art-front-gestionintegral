@@ -20,6 +20,14 @@ const formatTitleFromPath = (pathname: string): string => {
     return 'Póliza';
   }
 
+  if (pathname === '/inicio/comercializador/polizas') {
+    return 'Pólizas';
+  }
+
+  if (pathname === '/inicio/comercializador/administracionComercializadores') {
+    return 'Administración Comercializadores';
+  }
+
   if (pathname === '/inicio/informes/comisionesMedicas') {
     return 'Comisiones Médicas';
   }
@@ -47,7 +55,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   // Cargar empresas automáticamente cuando el usuario esté autenticado
   useEmpresasLoader();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const pathname = usePathname();
   const pageTitle = formatTitleFromPath(pathname);
 
