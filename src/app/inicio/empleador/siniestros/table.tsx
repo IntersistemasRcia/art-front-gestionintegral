@@ -3,6 +3,8 @@
 import React from 'react';
 import dayjs from 'dayjs';
 import type { InstanciasTablaProps, InstanciaSiniestro } from './types/tipos';
+import { useAuth } from '@/data/AuthContext';
+
 
 type Props = {
 
@@ -19,12 +21,20 @@ const fmtDateTime = (v?: string | null) => {
   return d.isValid() ? d.format('DD-MM-YYYY HH:mm') : String(v ?? '');
 };
 
+
 const CondicionesTabla: React.FC<InstanciasTablaProps> = ({ rows, loading = false, hasAny = true }) => {
+  const { user, hasTask } = useAuth();
+
   return (
     <div style={{ marginTop: 18 }}>
 
-
-      {loading ? (
+    
+      {!hasTask("Empleador_Siniestros_EvolucionesMedicas") ? 
+      <div style={{ padding: 12, textAlign: 'center', opacity: 0.7 }}>
+         
+      </div>
+      :
+      loading ? (
         <div style={{ padding: 16, textAlign: 'center' }}>cargando detalle...</div>
       ) : !hasAny ? (
         <div style={{ padding: 12, textAlign: 'center', opacity: 0.7 }}>
