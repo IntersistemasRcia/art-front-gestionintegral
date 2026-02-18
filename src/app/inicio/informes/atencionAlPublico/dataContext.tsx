@@ -22,13 +22,17 @@ import {
   DialogContentText,
   DialogTitle,
 } from "@mui/material";
-import QueriesAPI, { type Query } from "@/data/queryAPI";
+import QueriesAPI, { type FiltroVm, type Query } from "@/data/queryAPI";
 import Formato from "@/utils/Formato";
 import propositionFormat from "@/utils/PropositionFormatQuery";
 import { operators } from "@/utils/ui/queryBuilder/QueryBuilderDefaults";
 import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { saveTable, type TableColumn, type AddTableOptions } from "@/utils/excelUtils";
+import { FiltrosTable, FiltrosTableContextProvider } from "@/components/filtros/FiltrosTable";
+import CustomModal from "@/utils/ui/form/CustomModal";
+import parsePropositionGroup from "@/utils/PropositionParseQuery";
+import FiltroForm from "@/components/filtros/FiltroForm";
 
 // ===== Tipos =====
 type Row = Record<string, any>;
@@ -51,8 +55,16 @@ interface DataContextType {
   rows: Row[];
   query: { state: RuleGroupType; setState: React.Dispatch<React.SetStateAction<RuleGroupType>> };
   dialog?: React.ReactNode;
-  onAplica: () => void;
-  onLimpia: () => void;
+
+  proposition?: string;
+  filtro?: FiltroVm;
+  onLookupFiltro: () => void;
+  onGuardaFiltro: () => void;
+  onEliminaFiltro: () => void;
+
+  onAplicaFiltro: () => void;
+  onLimpiaFiltro: () => void;
+  onLimpiaTabla: () => void;
   onExport: () => void;
 }
 
@@ -121,6 +133,7 @@ const display = (v: any) => (typeof v === "string" ? v.trim() : v);
 const { execute, analyze } = QueriesAPI;
 const defaultQuery: RuleGroupType = { combinator: "and", rules: [] };
 const DataContext = createContext<DataContextType | undefined>(undefined);
+const MODULO_FILTROS = "Informes_AtencionAlPublico";
 
 // ===== Provider =====
 export function DataContextProvider({ children }: { children: ReactNode }) {
@@ -156,13 +169,11 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
 
 
 
-  // Columnas + campos para QB (excluyo Interno del QB)
+  // Columnas + campos para QB (excluyo Interno y campos calculados del QB)
   const { columns, fields, headers } = useMemo(() => {
     const all = tables.vw_AtencionAlPublico;
-    const fieldsForQB = all.filter(c => c.name !== "Interno");
-    // Excluyo campos calculados del SELECT (no existen en la DB)
     const camposCalculados = ["Estado", "DiasTrans"];
-    const fieldsForSelect = all.filter(c => !camposCalculados.includes(c.name));
+    const fieldsForQB = all.filter(c => c.name !== "Interno" && !camposCalculados.includes(c.name));
 
     const columns: ColumnDef<Row>[] = [];
     const headers: Headers = { columns: {}, options: { formatters: { row: {} } } };
@@ -204,6 +215,13 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [query, setQuery] = useState(defaultQuery);
   const [dialog, setDialog] = useState<React.ReactNode>();
+  const [filtro, setFiltro] = useState<FiltroVm | undefined>();
+  const [moduloFiltros, setModuloFiltros] = useState<string>(MODULO_FILTROS);
+
+  const proposition = useMemo(
+    () => formatQuery(query, propositionFormat({ fields })),
+    [query, fields]
+  );
 
   const onCloseDialog = () => setDialog(null);
   const errorDialog = (prop: { title?: string; message: any }) =>
@@ -221,9 +239,58 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       </Dialog>
     );
 
-  const onAplica = useCallback(() => {
-    const proposition = formatQuery(query, propositionFormat({ fields }));
+  const onLookupFiltro = useCallback(() => {
+    setDialog(
+      <FiltrosLookup
+        modulo={moduloFiltros}
+        onClose={onCloseDialog}
+        onSelect={(f) => {
+          setFiltro(f);
+          if (f?.modulo) setModuloFiltros(f.modulo);
+          setQuery(parsePropositionGroup(f.proposition));
+          onCloseDialog();
+        }}
+      />
+    );
+  }, [moduloFiltros]);
 
+  const onGuardaFiltro = useCallback(() => {
+    setDialog(
+      <FiltroForm
+        action={filtro == null ? "Create" : "Update"}
+        title="Guardando filtro"
+        init={{
+          ...filtro,
+          modulo: filtro?.modulo ?? moduloFiltros,
+          proposition,
+        }}
+        onClose={(completed, filtroGuardado) => {
+          if (completed && filtroGuardado) {
+            setFiltro(filtroGuardado);
+            if (filtroGuardado.modulo) setModuloFiltros(filtroGuardado.modulo);
+          }
+          onCloseDialog();
+        }}
+      />
+    );
+  }, [filtro, proposition, moduloFiltros]);
+
+  const onEliminaFiltro = useCallback(() => {
+    setDialog(
+      <FiltroForm
+        action="Delete"
+        title="Borrando filtro"
+        init={filtro}
+        disabled={{ nombre: true, ambito: true }}
+        onClose={(completed) => {
+          if (completed) setFiltro(undefined);
+          onCloseDialog();
+        }}
+      />
+    );
+  }, [filtro]);
+
+  const onAplicaFiltro = useCallback(() => {
     return (async function procesar() {
       const table = "vw_AtencionAlPublico" as const;
       const camposCalculados = ["Estado", "DiasTrans"];
@@ -305,12 +372,14 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
           })
         );
     })();
-  }, [query, fields, tables]);
+  }, [proposition, tables]);
 
-  const onLimpia = useCallback(() => {
+  const onLimpiaFiltro = useCallback(() => {
+    setFiltro(undefined);
     setQuery(defaultQuery);
-    setRows([]);
   }, []);
+
+  const onLimpiaTabla = useCallback(() => setRows([]), []);
 
   const onExport = useCallback(async () => {
     const now = dayjs();
@@ -351,9 +420,15 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
     columns,
     rows,
     dialog,
+    proposition,
+    filtro,
     query: { state: query, setState: setQuery },
-    onAplica,
-    onLimpia,
+    onLookupFiltro,
+    onGuardaFiltro,
+    onEliminaFiltro,
+    onAplicaFiltro,
+    onLimpiaFiltro,
+    onLimpiaTabla,
     onExport,
   };
 
@@ -367,4 +442,22 @@ export function useDataContext() {
     throw new Error("useDataContext must be used within a DataContextProvider");
   }
   return context;
+}
+
+function FiltrosLookup({
+  modulo,
+  onSelect,
+  onClose,
+}: {
+  modulo: string;
+  onSelect: (filtro: FiltroVm) => void;
+  onClose: () => void;
+}) {
+  return (
+    <CustomModal open={true} onClose={onClose} title="Elige filtro">
+      <FiltrosTableContextProvider deleted={false} modulo={modulo}>
+        <FiltrosTable onSelect={onSelect} />
+      </FiltrosTableContextProvider>
+    </CustomModal>
+  );
 }
