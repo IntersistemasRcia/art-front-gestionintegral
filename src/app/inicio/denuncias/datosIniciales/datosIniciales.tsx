@@ -15,6 +15,7 @@ import ArtAPI from "@/data/artAPI";
 import Formato from "@/utils/Formato";
 import {
   DenunciaFormData,
+  PrestadorResponse,
   RELACION_ACCIDENTADO,
   DatosInicialesProps,
 } from "../types/tDenuncias";
@@ -31,6 +32,38 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
   onSelectChange,
   onBlur,
 }) => {
+
+  const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
+
+  const [prestadorLoading, setPrestadorLoading] = useState(false);
+  const lastPrestadorCuitRef = useRef<string>("");
+
+  // Generador de handlers para campos numéricos.
+  const numericChange = (
+    name: string,
+    options?: { format?: (digits: string) => string; formatWhenLen?: number; maxDigits?: number }
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    let digits = onlyDigits(e.target.value || "");
+    if (options?.maxDigits != null) {
+      digits = digits.slice(0, options.maxDigits);
+    }
+    const synthetic = { target: { name, value: digits } } as any;
+    onTextFieldChange(synthetic);
+    try {
+      if (
+        options?.format &&
+        options.formatWhenLen != null &&
+        digits.length === options.formatWhenLen &&
+        !isDisabled
+      ) {
+        const formatted = options.format(digits);
+        const syntheticEvent = { target: { name, value: formatted } } as any;
+        onTextFieldChange(syntheticEvent);
+      }
+    } catch (err) {
+      // Ignorar errores de formateo
+    }
+  };
 
 
   // CP que se usó para buscar localidades
@@ -79,6 +112,51 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
   const isValidating = isValidatingNombre || isValidatingCP;
 
   const telInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Formateo inicial de CUIT de Prestador Inicial si viene desde la base
+  const prestadorCuitInitialFormattedRef = useRef(false);
+  React.useEffect(() => {
+    if (prestadorCuitInitialFormattedRef.current) return;
+    const digits = onlyDigits(String(form.prestadorInicialCuit || ""));
+    if (digits.length === 11) {
+      try {
+        const formatted = Formato.CUIP(digits);
+        if (formatted && formatted !== String(form.prestadorInicialCuit || "")) {
+          const synthetic = { target: { name: "prestadorInicialCuit", value: formatted } } as any;
+          onTextFieldChange(synthetic);
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    prestadorCuitInitialFormattedRef.current = true;
+  }, [form.prestadorInicialCuit, onTextFieldChange]);
+
+  // Autocompleestador al ingresar 11 dígitos dtar Razón Social Pre CUIT
+  React.useEffect(() => {
+    const digits = onlyDigits(String(form.prestadorInicialCuit || ""));
+    if (isDisabled) return;
+    if (digits.length !== 11) return;
+    if (lastPrestadorCuitRef.current === digits) return;
+
+    const fetchPrestador = async () => {
+      try {
+        setPrestadorLoading(true);
+        const data: PrestadorResponse = await ArtAPI.getPrestador({ CUIT: Number(digits) });
+        if (!data) return;
+        const razonSocial = data.razonSocial ?? "";
+        const synthetic = { target: { name: "prestadorInicialRazonSocial", value: razonSocial } } as any;
+        onTextFieldChange(synthetic);
+        lastPrestadorCuitRef.current = digits;
+      } catch (_err) {
+        // Silenciar errores (no encontrado u otros)
+      } finally {
+        setPrestadorLoading(false);
+      }
+    };
+
+    fetchPrestador();
+  }, [form.prestadorInicialCuit, isDisabled, isEditing, onTextFieldChange]);
 
   // En edición: autocompletar provincia, CP y nombre de localidad
   React.useEffect(() => {
@@ -196,6 +274,7 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
 
   // Si el tipo de denuncia es "Enfermedad Profesional", bloquear campos relacionados con "Accidente de Trabajo"
   const bloquearPorEnfermedad = String(form.tipoDenuncia ?? "") === "Enfermedad";
+  const tituloAccidenteTrabajo = bloquearPorEnfermedad ? "Enfermedad Profesional" : "Accidente de Trabajo";
 
   const tipoDenunciaKey = String(form.tipoDenuncia ?? "");
   const tipoSiniestroOptions = React.useMemo(() => {
@@ -256,24 +335,22 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
           />
           <FormControl
             fullWidth
-            required={!isDisabled && !bloquearPorEnfermedad}
+            required={false}
             error={touched.relacionAccidentado && !!errors.relacionAccidentado}
-            disabled={isDisabled || bloquearPorEnfermedad}
-            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
+            disabled={true}
+            className={styles.disabledOpacity}
           >
             <InputLabel>Relación c/accidentado</InputLabel>
             <Select
               name="relacionAccidentado"
-              value={form.relacionAccidentado}
+              value={"EMPLEADOR"}
               label="Relación c/accidentado"
-              onChange={onSelectChange}
               onBlur={() => onBlur("relacionAccidentado")}
+              inputProps={{ readOnly: true }}
             >
-              {RELACION_ACCIDENTADO.map((relacion) => (
-                <MenuItem key={relacion.value} value={relacion.value}>
-                  {relacion.label}
-                </MenuItem>
-              ))}
+              <MenuItem key={"EMPLEADOR"} value={"EMPLEADOR"}>
+                Empleador
+              </MenuItem>
             </Select>
             {touched.relacionAccidentado && errors.relacionAccidentado && (
               <Typography
@@ -367,13 +444,27 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               <MenuItem value="No">No</MenuItem>
             </Select>
           </FormControl>
+          
+          <TextField
+            label="Fecha en la que se informa a la ART"
+            name="fechaInformacionArt"
+            type="date"
+            value={form.fechaInformacionArt}
+            onChange={onTextFieldChange}
+            onBlur={() => onBlur('fechaInformacionArt')}
+            error={touched.fechaInformacionArt && !!errors.fechaInformacionArt}
+            helperText={touched.fechaInformacionArt && errors.fechaInformacionArt}
+            fullWidth
+            disabled={isDisabled}
+            InputLabelProps={{ shrink: true }}
+          />
         </div>
       </div>
 
       {/* Accidente de Trabajo */}
       <div className={styles.formSection}>
         <Typography variant="h5" component="h2" className={styles.sectionTitle}>
-          Accidente de Trabajo
+          {tituloAccidenteTrabajo}
         </Typography>
 
         <div className={styles.formRow}>
@@ -599,6 +690,52 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             InputProps={{ readOnly: true }}
             className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Provincia"
+          />
+        </div>
+      </div>
+
+      {/* Prestador Inicial */}
+      <div className={styles.formSection}>
+        <Typography variant="h6" className={styles.sectionTitle}>
+          Prestador Inicial
+        </Typography>
+
+        <div className={styles.formRow}>
+          <TextField
+            label="CUIT Prestador Inicial"
+            name="prestadorInicialCuit"
+            value={form.prestadorInicialCuit}
+            onChange={numericChange("prestadorInicialCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11, maxDigits: 11 })}
+            inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+            onBlur={() => onBlur("prestadorInicialCuit")}
+            error={touched.prestadorInicialCuit && !!errors.prestadorInicialCuit}
+            helperText={
+              prestadorLoading
+                ? "Buscando prestador inicial..."
+                : touched.prestadorInicialCuit
+                ? errors.prestadorInicialCuit
+                : undefined
+            }
+            fullWidth
+            disabled={isDisabled}
+            placeholder="CUIT del prestador inicial"
+          />
+
+          <TextField
+            label="Razón Social Prestador"
+            name="prestadorInicialRazonSocial"
+            value={form.prestadorInicialRazonSocial}
+            onChange={onTextFieldChange}
+            onBlur={() => onBlur("prestadorInicialRazonSocial")}
+            InputProps={{ readOnly: true }}
+            error={touched.prestadorInicialRazonSocial && !!errors.prestadorInicialRazonSocial}
+            helperText={
+              touched.prestadorInicialRazonSocial &&
+              errors.prestadorInicialRazonSocial
+            }
+            fullWidth
+            disabled={isDisabled}
+            placeholder="Razón social del prestador"
           />
         </div>
       </div>

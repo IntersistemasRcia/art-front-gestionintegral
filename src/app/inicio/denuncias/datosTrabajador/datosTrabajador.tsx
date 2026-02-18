@@ -21,8 +21,6 @@ import {
 } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
 import ArtAPI from "@/data/artAPI";
-import DataTable from "@/utils/ui/table/DataTable";
-import { ColumnDef } from "@tanstack/react-table";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import dayjs from "dayjs";
 
@@ -165,89 +163,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     onBlur("telefono");
   };
 
-  // EmpleadorTrabajadores por CUIL
-  const [empTrabList, setEmpTrabList] = useState<any[]>([]);
-  const [empTrabLoading, setEmpTrabLoading] = useState<boolean>(false);
-  const lastEmpTrabCuilRef = useRef<string>("");
-
-  useEffect(() => {
-    const digits = onlyDigits(form.cuil);
-    if (isDisabled) return;
-
-    if (digits.length !== 11) {
-      if (empTrabList.length) setEmpTrabList([]);
-      lastEmpTrabCuilRef.current = "";
-      return;
-    }
-    if (lastEmpTrabCuilRef.current === digits) return;
-
-    let cancelled = false;
-    const fetchEmpTrab = async () => {
-      try {
-        setEmpTrabLoading(true);
-        const list = await ArtAPI.getEmpleadorTrabajadores({ CUIL: Number(digits) });
-        if (cancelled) return;
-        setEmpTrabList(Array.isArray(list) ? list : []);
-        lastEmpTrabCuilRef.current = digits;
-      } catch {
-        if (!cancelled) setEmpTrabList([]);
-      } finally {
-        if (!cancelled) setEmpTrabLoading(false);
-      }
-    };
-
-    fetchEmpTrab();
-    return () => { cancelled = true; };
-  }, [form.cuil, isDisabled]);
-
-  const empTrabColumns = useMemo<ColumnDef<any>[]>(() => ([
-    {
-      accessorKey: 'cuil',
-      header: 'Trabajador',
-      size: 130,
-      cell: (info) => Formato.CUIP(String(info.getValue() ?? '')),
-    },
-    {
-      accessorKey: 'cuit',
-      header: 'Empresa',
-      size: 130,
-      cell: (info) => Formato.CUIP(String(info.getValue() ?? '')),
-    },
-    {
-      accessorKey: 'periodo',
-      header: 'Periodo',
-      size: 100,
-      cell: (info) => {
-        const raw = String(info.getValue() ?? '');
-        const digits = raw.replace(/\D/g, '');
-        if (digits.length >= 6) {
-          const six = digits.slice(0, 6);
-          return `${six.slice(0, 4)}-${six.slice(4, 6)}`;
-        }
-        return raw;
-      },
-    },
-    {
-      accessorKey: 'origenTipo',
-      header: 'Origen',
-      size: 120,
-      cell: (info) => {
-        const v = String(info.getValue() ?? '').toUpperCase();
-        if (v === 'N') return 'DDJJ';
-        if (v === 'R') return 'RL';
-        return v;
-      },
-    },
-    {
-      accessorKey: 'empresaRazonSocial',
-      header: 'Razón Social',
-      size: 260,
-      cell: (info) => {
-        const v = String(info.getValue() ?? '');
-        return v && v.length > 60 ? `${v.substring(0, 60)}...` : v;
-      },
-    },
-  ]), []);
 
   const handleBuscarLocalidades = () => {
     const text = busqueda.trim();
@@ -627,7 +542,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
 
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.sexo && !!errors.sexo}
             disabled={isDisabled}
             className={styles.compactField}
@@ -652,7 +567,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
 
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.estadoCivil && !!errors.estadoCivil}
             disabled={isDisabled}
             className={styles.compactField}
@@ -902,21 +817,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         </div>
       </div>
 
-      {/* EmpleadorTrabajadores por CUIL */}
-      <div className={styles.formSection}>
-        <Typography variant="h6" className={styles.sectionTitle}>
-          Historial de Relación Empleador-Trabajador
-        </Typography>
-        <div className={styles.compactTable}>
-          <DataTable
-            columns={empTrabColumns}
-            data={Array.isArray(empTrabList) ? empTrabList : []}
-            isLoading={empTrabLoading}
-            enableFiltering={false}
-            pageSize={5}
-          />
-        </div>
-      </div>
     </>
   );
 };

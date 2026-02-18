@@ -43,6 +43,7 @@ export default function DenunciaForm({
   const lastFetchedEmpCuitRef = useRef<string>("");
   const lastAutoValuesRef = useRef<Record<string, string>>({});
   const { user } = useAuth();
+  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
   const [empCuitReadOnly, setEmpCuitReadOnly] = useState(false);
   const [empModalOpen, setEmpModalOpen] = useState(false);
   const [empModalType, setEmpModalType] = useState<MessageType>('warning');
@@ -67,7 +68,7 @@ export default function DenunciaForm({
         // Trabajador
         "cuil", "docNumero", "domicilioNro", "domicilioPiso", "codLocalidadTrabajador", "codPostalTrabajador",
         // Dat Siniestros
-        "roamNro", "roamAno", "roamCodigo", "prestadorInicialCuit",
+        "prestadorInicialCuit",
         "establecimientoCuit", "establecimientoNumero", "establecimientoCodLocalidad", "establecimientoCodPostal",
         // (Empleador)
         "empCuit", "empPoliza", "empDomicilioNro", "empDomicilioPiso", "empCodLocalidad", "empCodPostal",
@@ -125,6 +126,48 @@ export default function DenunciaForm({
       setEmpCuitReadOnly(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (isAdmin) return; // no precargar para administradores
+    const empFromForm = String(form.empCuit || "").replace(/\D/g, '');
+    if (empFromForm.length === 11) {
+      setForm(prev => ({ ...prev, establecimientoCuit: Formato.CUIP(empFromForm) }));
+      return;
+    }
+    const empresaCUIT = Number((user as any)?.empresaCUIT ?? 0);
+    if (empresaCUIT && String(empresaCUIT).length === 11) {
+      setForm(prev => ({ ...prev, establecimientoCuit: Formato.CUIP(String(empresaCUIT)) }));
+    }
+  }, [open, user?.empresaCUIT, isAdmin]);
+
+  // Al abrir el formulario, si empCuit ya tiene 11 dígitos, pre-cargar datos del empleador
+  useEffect(() => {
+    if (!open) return;
+    const raw = String(form.empCuit || "").replace(/\D/g, "");
+    if (raw.length !== 11 || lastFetchedEmpCuitRef.current === raw) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const empresa: any = await ArtAPI.getEmpresaByCUIT({ CUIT: Number(raw) });
+        if (!empresa || cancelled) return;
+        setForm((prev) => ({ ...prev,
+          empPoliza: String(empresa.polizaNro ?? empresa.poliza ?? ""),
+          empRazonSocial: String(empresa.razonSocial ?? empresa.RazonSocial ?? ""),
+          empDomicilioCalle: String(empresa.domicilioCalle ?? empresa.domicilio ?? ""),
+          empDomicilioNro: String(empresa.domicilioNro ?? ""),
+          empCodLocalidad: String(empresa.codLocalidadSrt ?? empresa.codLocalidad ?? ""),
+          empCodPostal: String(empresa.codLocalidadPostal ?? empresa.cp ?? ""),
+          empTelefonos: String(empresa.telefonos ?? empresa.telefono ?? ""),
+          empEmail: String(empresa.eMail ?? empresa.email ?? ""),
+        }));
+        lastFetchedEmpCuitRef.current = raw;
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
 
   const modalTitle = useMemo(() => {
     switch (method) {
@@ -222,7 +265,7 @@ export default function DenunciaForm({
 
   // Funciones de Validación
   const validateRequired = (value: string, fieldName: string): string | undefined => {
-    if (!value.trim()) return `${fieldName} es requerido`;
+    if (!value.trim()) return `${fieldName}, `;
     return undefined;
   };
 
@@ -306,9 +349,9 @@ export default function DenunciaForm({
       case "fechaNac":
         return validateRequired(value, "Fecha de Nacimiento");
       case "sexo":
-        return validateRequired(value, "Sexo");
+        return undefined;
       case "estadoCivil":
-        return validateRequired(value, "Estado Civil");
+        return undefined;
       case "nacionalidad":
         return validateRequired(value, "Nacionalidad");
       case "domicilioCalle":
@@ -317,25 +360,6 @@ export default function DenunciaForm({
         return validateRequired(value, "Teléfono");
       case "email":
         return validateRequired(value, "eMail");
-      // Accident data validation
-      case "estaConsciente":
-        return validateRequired(value, "¿Está Consciente?");
-      case "color":
-        return validateRequired(value, "Color");
-      case "habla":
-        return validateRequired(value, "¿Habla?");
-      case "gravedad":
-        return validateRequired(value, "Gravedad");
-      case "respira":
-        return validateRequired(value, "¿Respira?");
-      case "tieneHemorragia":
-        return validateRequired(value, "¿Tiene Hemorragia?");
-      case "contextoDenuncia":
-        return validateRequired(value, "Contexto de Denuncia");
-      case "prestadorInicialCuit":
-        return validateRequired(value, "CUIT Prestador Inicial");
-      case "prestadorInicialRazonSocial":
-        return validateRequired(value, "Razón Social Prestador");
       case "aceptoTerminos":
         if (!formData.aceptoTerminos) return "Debe aceptar los términos y condiciones";
         return undefined;
@@ -366,13 +390,8 @@ export default function DenunciaForm({
       }
     } else if (currentTab === 1) {
       fieldsToValidate = [
-        "cuil", "docTipo", "docNumero", "nombre", "fechaNac", 
-        "sexo", "estadoCivil", "nacionalidad", "domicilioCalle", "telefono", "email"
-      ];
-    } else if (currentTab === 2) {
-      fieldsToValidate = [
-        "estaConsciente", "color", "habla", "gravedad", "respira", 
-        "tieneHemorragia", "contextoDenuncia", "prestadorInicialCuit", "prestadorInicialRazonSocial"
+        "cuil", "docTipo", "docNumero", "nombre", "fechaNac",
+        "nacionalidad", "domicilioCalle", "telefono", "email"
       ];
     } else if (currentTab === 3) {
       fieldsToValidate = [
@@ -534,7 +553,29 @@ export default function DenunciaForm({
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    // Permitir navegación libre entre pestañas
+    // Validar las pestañas intermedias antes de permitir navegar hacia adelante
+    if (newValue > activeTab) {
+      // marcar todos los campos como tocados para mostrar errores
+      const allTouched: TouchedFields = Object.keys(form).reduce((acc, key) => {
+        acc[key as keyof TouchedFields] = true;
+        return acc;
+      }, {} as TouchedFields);
+      setTouched(allTouched);
+
+      // validar cada solapa intermedia (desde la actual hasta la objetivo - 1)
+      for (let t = activeTab; t < newValue; t++) {
+        const tabErrors = validateAllFields(form, t);
+        if (Object.keys(tabErrors).length > 0) {
+          setErrors((prev) => ({ ...prev, ...tabErrors }));
+          if (onValidationError) {
+            const firstFew = Object.values(tabErrors).filter(Boolean).slice(0, 5).join('\n');
+            onValidationError('Complete los campos obligatorios de la solapa.' + (firstFew ? `\n\nDetalle:\n${firstFew}` : ''));
+          }
+          return;
+        }
+      }
+    }
+
     setActiveTab(newValue);
   };
 
@@ -601,6 +642,22 @@ export default function DenunciaForm({
   };
 
   const handleNext = () => {
+    // Validar la solapa actual antes de avanzar
+    const tabErrors = validateAllFields(form, activeTab);
+    if (Object.keys(tabErrors).length > 0) {
+      const allTouched: TouchedFields = Object.keys(form).reduce((acc, key) => {
+        acc[key as keyof TouchedFields] = true;
+        return acc;
+      }, {} as TouchedFields);
+      setTouched(allTouched);
+      setErrors((prev) => ({ ...prev, ...tabErrors }));
+      if (onValidationError) {
+        const firstFew = Object.values(tabErrors).filter(Boolean).slice(0, 5).join('\n');
+        onValidationError('Complete los campos obligatorios antes de avanzar.' + (firstFew ? `\n\nDetalle:\n${firstFew}` : ''));
+      }
+      return;
+    }
+
     const next = activeTab + 1;
     setActiveTab(next);
     setMaxVisitedTab((prev) => Math.max(prev, next));

@@ -552,3 +552,7 @@
 .noUnderlineLink {
   text-decoration: none;
 }
+
+.formContainer :global(.MuiFormLabel-asterisk) {
+  color: #d32f2f;
+}

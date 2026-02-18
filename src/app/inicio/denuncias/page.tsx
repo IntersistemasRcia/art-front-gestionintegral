@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Box, IconButton, Tooltip } from "@mui/material";
 import styles from './denuncias.module.css';
 import ArtAPI from '@/data/artAPI';
-import { DenunciaGetAll, DenunciaQueryParams, DenunciaFormData, initialDenunciaFormData, DenunciaPostRequest, DenunciaQueryParamsID, COLORES, DenunciaPutRequest, DenunciaPatchRequest } from './types/tDenuncias';
+import { DenunciaGetAll, DenunciaQueryParams, DenunciaFormData, initialDenunciaFormData, DenunciaPostRequest, DenunciaQueryParamsID, DenunciaPutRequest, DenunciaPatchRequest } from './types/tDenuncias';
 import { useAuth } from '@/data/AuthContext';
 import DataTable from '@/utils/ui/table/DataTable';
 import Formato from '@/utils/Formato';
@@ -56,27 +56,6 @@ const buildAfiNacimientoYear = (fechaNac?: string): number => {
   return fechaNac ? dayjs(fechaNac).year() : 0;
 };
 
-const mapGravedadToApi = (v: string | undefined): string => {
-  if (!v) return '';
-  const s = v.trim().toLowerCase();
-  if (s === 'ignora') return 'I';
-  if (s === 'leve') return 'l';
-  if (s === 'grave') return 'g';
-  if (s === 'critico' || s === 'crítico') return 'c';
-  if (s.length === 1) return s;
-  return '';
-};
-
-const mapContextoDenunciaToApi = (v: string | undefined): string => {
-  if (!v) return '';
-  const s = v.trim().toLowerCase();
-  if (s === 'ignora') return 'I';
-  if (s === 'urgente') return 'u';
-  if (s === 'normal') return 'n';
-  if (s.length === 1) return s;
-  return '';
-};
-
 const mapSiNoToApi = (v: string | undefined): string => {
   if (!v) return '';
   const s = v.trim().toLowerCase();
@@ -101,49 +80,7 @@ const mapEstadoCivilToApi = (v: string | undefined): string => {
 /* Helpers */
 const cuipFormatter = (v: any) => Formato.CUIP(v);
 
-// Mapeos para color: select <-> API
-const COLOR_LETTER_MAP: Record<string, string> = {
-  n: 'NORMAL',
-  p: 'PALIDO',
-  c: 'CIANÓTICO',
-  r: 'RUBICUNDO',
-};
 
-const normalizeApiColorToSelect = (apiColor: any): string => {
-  if (apiColor == null || apiColor === '') return initialDenunciaFormData.color;
-  if (typeof apiColor === 'string') {
-    const s = apiColor.trim();
-    if (s.length === 1) return COLOR_LETTER_MAP[s.toLowerCase()] ?? initialDenunciaFormData.color;
-    return s;
-  }
-  if (typeof apiColor === 'number') {
-    return COLORES[apiColor]?.value ?? initialDenunciaFormData.color;
-  }
-  if (apiColor && typeof apiColor.value === 'string') return String(apiColor.value);
-  return initialDenunciaFormData.color;
-};
-
-const mapColorToApiLetter = (formColor: string): string => {
-  if (!formColor) return '';
-  const v = formColor.trim().toUpperCase();
-  if (v.length === 1) return v.toLowerCase();
-  if (v.includes('NORMAL')) return 'n';
-  if (v.includes('PALID')) return 'p';
-  if (v.includes('CIAN')) return 'c';
-  if (v.includes('RUBIC')) return 'r';
-  return '';
-};
-
-// Normaliza valores de la API a selects del formulario (Si/No/Ignora)
-const normalizeApiSiNoToSelect = (apiValue: any): 'Si' | 'No' | 'Ignora' | '' => {
-  if (apiValue == null || apiValue === '') return '';
-  if (typeof apiValue === 'boolean') return apiValue ? 'Si' : 'No';
-  const s = String(apiValue).trim().toLowerCase();
-  if (s === 's' || s === 'si' || s === 'true' || s === '1') return 'Si';
-  if (s === 'n' || s === 'no' || s === 'false' || s === '0') return 'No';
-  if (s === 'i' || s === 'ignora') return 'Ignora';
-  return '';
-};
 
 // Variante binaria
 const normalizeApiSiNoBinary = (apiValue: any): 'Si' | 'No' | '' => {
@@ -155,26 +92,8 @@ const normalizeApiSiNoBinary = (apiValue: any): 'Si' | 'No' | '' => {
   return '';
 };
 
-// Normaliza gravedad de la API (l/g/c/I) a texto del select
-const normalizeApiGravedadToSelect = (apiValue: any): 'Ignora' | 'Leve' | 'Grave' | 'Critico' | '' => {
-  if (apiValue == null || apiValue === '') return '';
-  const s = String(apiValue).trim().toLowerCase();
-  if (s === 'i' || s === 'ignora') return 'Ignora';
-  if (s === 'l' || s === 'leve') return 'Leve';
-  if (s === 'g' || s === 'grave') return 'Grave';
-  if (s === 'c' || s === 'critico' || s === 'crítico') return 'Critico';
-  return '';
-};
 
-// Normaliza contexto de denuncia (u/n/I) a texto del select
-const normalizeApiContextoToSelect = (apiValue: any): 'Ignora' | 'Urgente' | 'Normal' | '' => {
-  if (apiValue == null || apiValue === '') return '';
-  const s = String(apiValue).trim().toLowerCase();
-  if (s === 'i' || s === 'ignora') return 'Ignora';
-  if (s === 'u' || s === 'urgente') return 'Urgente';
-  if (s === 'n' || s === 'normal') return 'Normal';
-  return '';
-};
+
 
 // Normaliza estado civil de la API (S/C/D/V/O) al valor del select
 const normalizeApiEstadoCivilToSelect = (apiValue: any): string => {
@@ -314,17 +233,12 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     afiTelefono: formData.telefono,
     afiObraSocial: formData.obraSocial,
 
-    comentario: formData.observaciones,
+    comentario: '',
     origenIngreso: 'web',
-    trasladoTipo: formData.tipoTraslado,
     descripcion: formData.descripcion,
     fechaHoraSiniestro,
 
     enViaPublica: mapSiNoToApi(formData.enViaPublica || ''),
-    roam: mapSiNoToApi(formData.roam || ''),
-    roamNumero: onlyDigits(formData.roamNro),
-    roamInterno: onlyDigits(formData.roamCodigo),
-    roamAnio: onlyDigits(formData.roamAno),
 
     tipoAccidente: formData.tipoSiniestro || '',
     conIniTelefono: formData.telefonos || '',
@@ -342,16 +256,6 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     conIniDomicilioEntreCalle: String(formData.entreCalle ?? ''),
     conIniDomicilioYCalle: String(formData.entreCalleY ?? ''),
 
-    estTrabEstaConsciente: mapSiNoToApi(formData.estaConsciente || ''),
-    estTrabColor: mapColorToApiLetter(formData.color),
-    estTrabHabla: mapSiNoToApi(formData.habla || ''),
-    estTrabGravedad: mapGravedadToApi(formData.gravedad || ''),
-    estTrabRespira: mapSiNoToApi(formData.respira || ''),
-    estTrabObservaciones: formData.observaciones || '',
-    estTrabTieneHemorragia: mapSiNoToApi(formData.tieneHemorragia || ''),
-    estTrabVerificaContactoInicial: 'NCAMBIAR',
-    estTrabPrestadorTraslado: formData.prestadorTraslado || '',
-    estTrabContextoDenuncia: mapContextoDenunciaToApi(formData.contextoDenuncia || ''),
   };
 };
 
@@ -444,7 +348,6 @@ const transformFormDataToPutRequest = async (
     denunciaCanalIngresoInterno: Number(existing?.denunciaCanalIngresoInterno ?? 0),
     estadoDenunciaSiniestro: String(existing?.estadoDenunciaSiniestro ?? ''),
 
-    estTrabContextoDenuncia: mapContextoDenunciaToApi(formData.contextoDenuncia || ''),
     avisoEmpleadorSinContratoVigente: false,
     avisoTrabajadorFueraNomina: 0,
 
@@ -655,10 +558,6 @@ function DenunciasPage() {
 
         // Preferir valores anidados si existen, con fallback a top-level
         const enViaPublicaSel = normalizeApiSiNoBinary(sin?.enViaPublica ?? api.enViaPublica) || initialDenunciaFormData.enViaPublica;
-        const roamSel = normalizeApiSiNoBinary(sin?.roam ?? api.roam) || initialDenunciaFormData.roam;
-        const roamNumeroVal = (sin?.roamNumero ?? api.roamNumero) != null ? String(sin?.roamNumero ?? api.roamNumero) : initialDenunciaFormData.roamNro;
-        const roamInternoVal = (sin?.roamInterno ?? api.roamInterno) != null ? String(sin?.roamInterno ?? api.roamInterno) : initialDenunciaFormData.roamCodigo;
-        const roamAnioVal = (sin?.roamAnio ?? api.roamAnio) != null ? String(sin?.roamAnio ?? api.roamAnio) : initialDenunciaFormData.roamAno;
         const descripcionVal = (sin?.descripcion ?? api.descripcion) ?? initialDenunciaFormData.descripcion;
 
         // Fecha y hora: usar ISO (top-level o anidado en denunciaSiniestros[0])
@@ -720,18 +619,10 @@ function DenunciasPage() {
           email: api.afieMail ?? initialDenunciaFormData.email,
           telefono: api.afiTelefono ?? initialDenunciaFormData.telefono,
           obraSocial: api.afiObraSocial ?? initialDenunciaFormData.obraSocial,
-          observaciones: api.estTrabObservaciones ?? api.comentario ?? initialDenunciaFormData.observaciones,
-          tipoTraslado: api.trasladoTipo ?? initialDenunciaFormData.tipoTraslado,
           descripcion: descripcionVal,
           fechaOcurrencia: fechaCalc || initialDenunciaFormData.fechaOcurrencia,
           hora: horaCalc || initialDenunciaFormData.hora,
           enViaPublica: enViaPublicaSel,
-          roam: roamSel,
-          roamNro: roamNumeroVal,
-          roamCodigo: roamInternoVal,
-          roamAno: roamAnioVal,
-          roamDescripcion: api.roamDescripcion ?? initialDenunciaFormData.roamDescripcion,
-          color: normalizeApiColorToSelect(api.estTrabColor ?? api.color),
           // Datos del Establecimiento (para poder editarlos)
           establecimientoCuit: api.empEstCuit != null ? String(api.empEstCuit) : initialDenunciaFormData.establecimientoCuit,
           establecimientoNombre: api.empEstEstablecimiento ?? api.empEstRazonSocial ?? initialDenunciaFormData.establecimientoNombre,
@@ -750,16 +641,8 @@ function DenunciasPage() {
           obraSocialCodigo: api.afiObraSocialCodigo ? String(api.afiObraSocialCodigo) : initialDenunciaFormData.obraSocialCodigo,
           localidad: api.afiLocalidad ?? initialDenunciaFormData.localidad,
           trabajadoresRelacionados: Array.isArray(api.trabajadoresRelacionados) ? api.trabajadoresRelacionados : initialDenunciaFormData.trabajadoresRelacionados,
-          prestadorTraslado: api.estTrabPrestadorTraslado ?? api.prestadorTraslado ?? initialDenunciaFormData.prestadorTraslado,
           prestadorInicialRazonSocial: api.prestadorInicialRazonSocial ?? initialDenunciaFormData.prestadorInicialRazonSocial,
-          verificaContactoInicial: api.estTrabVerificaContactoInicial ?? api.verificaContactoInicial ?? initialDenunciaFormData.verificaContactoInicial,
-          // Estado del Trabajador
-          estaConsciente: normalizeApiSiNoToSelect(api.estTrabEstaConsciente) || initialDenunciaFormData.estaConsciente,
-          habla: normalizeApiSiNoToSelect(api.estTrabHabla) || initialDenunciaFormData.habla,
-          gravedad: normalizeApiGravedadToSelect(api.estTrabGravedad) || initialDenunciaFormData.gravedad,
-          respira: normalizeApiSiNoToSelect(api.estTrabRespira) || initialDenunciaFormData.respira,
-          tieneHemorragia: normalizeApiSiNoToSelect(api.estTrabTieneHemorragia) || initialDenunciaFormData.tieneHemorragia,
-          contextoDenuncia: normalizeApiContextoToSelect(api.estTrabContextoDenuncia) || initialDenunciaFormData.contextoDenuncia,
+          verificaContactoInicial: api.verificaContactoInicial ?? initialDenunciaFormData.verificaContactoInicial,
           archivosAdjuntos: initialDenunciaFormData.archivosAdjuntos,
           aceptoTerminos: false,
         };
@@ -1042,7 +925,7 @@ function DenunciasPage() {
         onClose={handleClose}
         title={
           modalMessage.type === 'error'
-            ? 'Error al cargar denuncia'
+            ? 'Faltan cargar datos obligatorios'
             : modalMessage.type === 'success'
               ? 'Pre-Denuncia Registrada con Éxito'
               : undefined

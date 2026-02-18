@@ -22,7 +22,8 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   const lockAllFields = isDisabled || empresaId > 0;
   const lockNonCuitFields = empresaId === 0; // admin: solo CUIT editable
   const nonCuitLocked = lockAllFields || lockNonCuitFields;
-  const cuitLocked = lockAllFields || readonlyEmpCuit;
+  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const cuitLocked = (lockAllFields || readonlyEmpCuit) && !isAdmin;
   const cuitEnabled = !cuitLocked;
   const nonCuitEnabled = !nonCuitLocked;
   // Helper para mantener sólo dígitos
