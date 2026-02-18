@@ -485,6 +485,53 @@ export default function AdminUserPage() {
     setSelectedOrganizadorInterno(Number.isFinite(interno) && interno > 0 ? interno : undefined);
   };
 
+  const selectedGrupoNombre = useMemo(() => {
+    if (!selectedGrupoInterno) return "";
+    const selected = grupoRows.find((row) => Number(row.interno) === Number(selectedGrupoInterno));
+    return String(selected?.razonSocial ?? selected?.descripcion ?? "").trim();
+  }, [grupoRows, selectedGrupoInterno]);
+
+  const selectedOrganizadorNombre = useMemo(() => {
+    if (!selectedOrganizadorInterno) return "";
+    const selected = organizadorRows.find((row) => Number(row.interno) === Number(selectedOrganizadorInterno));
+    return String(selected?.razonSocial ?? selected?.observacion ?? "").trim();
+  }, [organizadorRows, selectedOrganizadorInterno]);
+
+  const selectedOrganizadorGrupoInterno = useMemo(() => {
+    if (!selectedOrganizadorInterno) return undefined;
+    const selected = organizadorRows.find((row) => Number(row.interno) === Number(selectedOrganizadorInterno));
+    const interno = Number(selected?.srtComercializadorGOrganizadorInterno ?? NaN);
+    return Number.isFinite(interno) && interno > 0 ? interno : undefined;
+  }, [organizadorRows, selectedOrganizadorInterno]);
+
+  const organizadorFilterText = selectedGrupoInterno && selectedGrupoNombre
+    ? `Organizadores filtrados por el grupo: ${selectedGrupoNombre}`
+    : "Todos los organizadores";
+
+  const comercializadorFilterText = selectedOrganizadorInterno && selectedOrganizadorNombre
+    ? `Comercializadores filtrados por el organizador: ${selectedOrganizadorNombre}`
+    : "Todos los comercializadores";
+
+  const createDefaultGrupoId = useMemo(() => {
+    if (formMethod !== "create") return "";
+    if (currentTab === 1) {
+      return selectedGrupoInterno ? String(selectedGrupoInterno) : "";
+    }
+    if (currentTab === 2) {
+      const interno = selectedOrganizadorGrupoInterno ?? selectedGrupoInterno;
+      return interno ? String(interno) : "";
+    }
+    return "";
+  }, [formMethod, currentTab, selectedGrupoInterno, selectedOrganizadorGrupoInterno]);
+
+  const createDefaultOrganizadorId = useMemo(() => {
+    if (formMethod !== "create") return "";
+    if (currentTab === 2) {
+      return selectedOrganizadorInterno ? String(selectedOrganizadorInterno) : "";
+    }
+    return "";
+  }, [formMethod, currentTab, selectedOrganizadorInterno]);
+
   return (
     <div>
 
@@ -503,6 +550,8 @@ export default function AdminUserPage() {
       <AdministracionTable
         currentTab={currentTab}
         onTabChange={handleTabChange}
+        organizadorFilterText={organizadorFilterText}
+        comercializadorFilterText={comercializadorFilterText}
         grupoRows={grupoRows}
         organizadorRows={organizadorRows}
         comercializadorRows={comercializadorRows}
@@ -531,6 +580,8 @@ export default function AdminUserPage() {
         cargos={cargos}
         refEmpleadores={refEmpleadores}
         creationRole={formMethod === 'create' ? creationRoleForTab(currentTab).role : null}
+        initialSelectedGrupoId={createDefaultGrupoId}
+        initialSelectedOrganizadorId={createDefaultOrganizadorId}
         onSubmit={async (data: UsuarioFormFields) => {
           setIsSubmitting(true);
           setFormError(null);

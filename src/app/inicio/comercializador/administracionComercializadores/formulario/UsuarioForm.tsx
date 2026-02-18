@@ -75,6 +75,8 @@ export default function UsuarioForm({
   isSubmitting = false,
   isAdmin = false,
   creationRole = null,
+  initialSelectedGrupoId,
+  initialSelectedOrganizadorId,
 }: Props) {
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -179,6 +181,7 @@ export default function UsuarioForm({
   }, [isOrganizadorComercializador, grupoOptions, selectedGrupoId]);
 
   useEffect(() => {
+    if (!organizadorOptions.length) return;
     if (selectedGrupoId && selectedOrganizadorId && !organizadorOptions.some((o) => o.value === selectedOrganizadorId)) {
       setSelectedOrganizadorId("");
     }
@@ -292,15 +295,15 @@ export default function UsuarioForm({
     } else {
       setForm(initialFormState);
       // Al abrir en modo crear, asegurarse de limpiar selects dependientes
-      setSelectedGrupoId("");
-      setSelectedOrganizadorId("");
+      setSelectedGrupoId(initialSelectedGrupoId ?? "");
+      setSelectedOrganizadorId(initialSelectedOrganizadorId ?? "");
       // Limpiar campo de búsqueda de localidad / C.P.
       setBusqueda("");
     }
     
     setErrors({});
     setTouched({});
-  }, [initialData, open, isEditing, isCreating]);
+  }, [initialData, open, isEditing, isCreating, initialSelectedGrupoId, initialSelectedOrganizadorId]);
 
   const submitRoleLabel = (() => {
     const r = String(creationRole ?? form.rol ?? '').toLowerCase();
@@ -314,7 +317,7 @@ export default function UsuarioForm({
   const modalTitle = useMemo(() => {
     switch (method) {
       case "create":
-        return `Crear nuevo usuario${submitRoleLabel ? '  ' + submitRoleLabel : ''}`;
+        return `Crear nuevo ${submitRoleLabel ? '  ' + submitRoleLabel : ''}`;
       case "edit":
         return `Editar Usuario`;
       case "view":
@@ -598,15 +601,7 @@ export default function UsuarioForm({
               isEditing={isEditing}
               isViewing={isViewing}
               isDisabled={isDisabled}
-              isGrupoOrganizador={isGrupoOrganizador}
-              isOrganizadorComercializador={isOrganizadorComercializador}
               creationRole={creationRole}
-              grupoOptions={grupoOptions}
-              organizadorOptions={organizadorOptions}
-              selectedGrupoId={selectedGrupoId}
-              selectedOrganizadorId={selectedOrganizadorId}
-              onGrupoChange={handleGrupoChange}
-              onOrganizadorChange={handleOrganizadorChange}
               onTextFieldChange={handleTextFieldChange}
               onSelectChange={handleSelectChange}
               onBlur={handleBlur}
@@ -615,6 +610,7 @@ export default function UsuarioForm({
 
             <DatosReferenteSection
               form={form}
+              creationRole={creationRole}
               errors={errors}
               touched={touched}
               busqueda={busqueda}
@@ -623,6 +619,17 @@ export default function UsuarioForm({
               localidadesOptions={localidadesOptions}
               isValidating={isValidating}
               isDisabled={isDisabled}
+              isCreating={isCreating}
+              isEditing={isEditing}
+              isViewing={isViewing}
+              isGrupoOrganizador={isGrupoOrganizador}
+              isOrganizadorComercializador={isOrganizadorComercializador}
+              grupoOptions={grupoOptions}
+              organizadorOptions={organizadorOptions}
+              selectedGrupoId={selectedGrupoId}
+              selectedOrganizadorId={selectedOrganizadorId}
+              onGrupoChange={handleGrupoChange}
+              onOrganizadorChange={handleOrganizadorChange}
               onTextFieldChange={handleTextFieldChange}
               onSelectChange={handleSelectChange}
               onBlur={handleBlur}
