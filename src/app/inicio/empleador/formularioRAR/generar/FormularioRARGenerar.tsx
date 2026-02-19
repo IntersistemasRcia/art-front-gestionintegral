@@ -343,6 +343,19 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   const trabajadoresCargados = cuilsUnicos.size;
   const faltanTrabajadores = totalTrabajadoresRequeridos - trabajadoresCargados;
 
+  // Contadores únicos por tipo (expuestos / no expuestos)
+  const contadoresUnicosPorTipo = React.useMemo(() => {
+    const expSet = new Set<string>();
+    const noExpSet = new Set<string>();
+    filas.forEach((f) => {
+      const n = normalizarCuil(f.CUIL);
+      if (!n) return;
+      const horas = Number(f.Exposicion || 0);
+      if (horas === 0) noExpSet.add(n); else expSet.add(n);
+    });
+    return { expuestosUnicos: expSet.size, noExpuestosUnicos: noExpSet.size, expSet, noExpSet } as any;
+  }, [filas]);
+
   const esCuilRepetido = React.useMemo(() => {
     const cuilNum = normalizarCuil(cuil);
     if (!cuilNum) return false;
@@ -797,6 +810,35 @@ React.useEffect(() => {
       return;
     }
 
+    // Validación por tipo (expuestos / no expuestos) contando trabajadores únicos por CUIL
+    try {
+      const { expuestosUnicos, noExpuestosUnicos, expSet, noExpSet } = contadoresUnicosPorTipo as any;
+      const horasNum = Number(exposicion || 0);
+      // Si es NO expuesto
+      if (horasNum === 0) {
+        const yaEnNoExp = noExpSet.has(cuilNum);
+        if (!yaEnNoExp && Number(cantNoExpuestos) >= 0 && noExpuestosUnicos >= Number(cantNoExpuestos)) {
+          setModalMessageType('error');
+          setModalMessageTitle('Límite alcanzado');
+          setModalMessageText(`Ya se alcanzó la cantidad indicada de ${cantNoExpuestos} trabajadores NO expuestos.`);
+          setModalMessageOpen(true);
+          return;
+        }
+      } else {
+        // Expuesto
+        const yaEnExp = expSet.has(cuilNum);
+        if (!yaEnExp && Number(cantExpuestos) >= 0 && expuestosUnicos >= Number(cantExpuestos)) {
+          setModalMessageType('error');
+          setModalMessageTitle('Límite alcanzado');
+          setModalMessageText(`Ya se alcanzó la cantidad indicada de ${cantExpuestos} trabajadores expuestos.`);
+          setModalMessageOpen(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Error validación por tipo:', e);
+    }
+
 
 
     const agente = agentesCausantes.find((a) => String(a.codigo) === (codigoAgente || '').trim());
@@ -917,6 +959,59 @@ React.useEffect(() => {
       setModalMessageText(`Ya se alcanzó el límite de ${totalTrabajadoresRequeridos} trabajadores únicos. Solo puede usar CUILs ya cargados.`);
       setModalMessageOpen(true);
       return;
+    }
+
+    // Validación por tipo al editar (si se cambia tipo o CUIL único)
+    try {
+      const { expuestosUnicos, noExpuestosUnicos, expSet, noExpSet } = contadoresUnicosPorTipo as any;
+      const prevHoras = trabajadorEditando ? Number(trabajadorEditando.Exposicion || 0) : 0;
+      const newHoras = Number(exposicion || 0);
+
+      // Si estamos pasando de expuesto a NO expuesto y el CUIL sería uno nuevo en NO expuestos
+      if (prevHoras > 0 && newHoras === 0) {
+        const yaEnNoExp = noExpSet.has(cuilNum);
+        if (!yaEnNoExp && noExpuestosUnicos >= Number(cantNoExpuestos)) {
+          setModalMessageType('error');
+          setModalMessageText(`No se puede editar: ya se alcanzó la cantidad de ${cantNoExpuestos} NO expuestos.`);
+          setModalMessageOpen(true);
+          return;
+        }
+      }
+
+      // Si estamos pasando de NO expuesto a expuesto y el CUIL sería uno nuevo en expuestos
+      if (prevHoras === 0 && newHoras > 0) {
+        const yaEnExp = expSet.has(cuilNum);
+        if (!yaEnExp && expuestosUnicos >= Number(cantExpuestos)) {
+          setModalMessageType('error');
+          setModalMessageText(`No se puede editar: ya se alcanzó la cantidad de ${cantExpuestos} expuestos.`);
+          setModalMessageOpen(true);
+          return;
+        }
+      }
+
+      // Si el CUIL cambia y el nuevo CUIL sería uno nuevo en su tipo, validar límites
+      if (cuilCambio) {
+        const newIsNoExp = newHoras === 0;
+        if (newIsNoExp) {
+          const yaEnNoExp = noExpSet.has(cuilNum);
+          if (!yaEnNoExp && noExpuestosUnicos >= Number(cantNoExpuestos)) {
+            setModalMessageType('error');
+            setModalMessageText(`No se puede cambiar el CUIL: límite de NO expuestos alcanzado (${cantNoExpuestos}).`);
+            setModalMessageOpen(true);
+            return;
+          }
+        } else {
+          const yaEnExp = expSet.has(cuilNum);
+          if (!yaEnExp && expuestosUnicos >= Number(cantExpuestos)) {
+            setModalMessageType('error');
+            setModalMessageText(`No se puede cambiar el CUIL: límite de expuestos alcanzado (${cantExpuestos}).`);
+            setModalMessageOpen(true);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error validación por tipo en edición:', e);
     }
 
     const agente = agentesCausantes.find((a) => String(a.codigo) === codigoAgente.trim());
