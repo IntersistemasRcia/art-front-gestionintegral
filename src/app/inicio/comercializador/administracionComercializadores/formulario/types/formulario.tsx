@@ -10,7 +10,9 @@ import type {
 } from "@/app/inicio/usuarios/UsuarioForm";
 
 export type RequestMethod = UsuarioRequestMethod;
-export type UsuarioFormFields = BaseUsuarioFormFields;
+export type UsuarioFormFields = BaseUsuarioFormFields & {
+  srtComercializadorGOrganizadorInterno?: number;
+};
 
 export type Props = UsuarioFormProps & {
   creationRole?: string | null; // rol determinado por el contexto (tabla) desde donde se crea

@@ -111,7 +111,8 @@ export type ComercializadorPutRequest = {
     comision: number;
     aplicaIva: number;
     serviciosAdicionales: number;
-    srtComercializadorOrganizadorInterno: number;
+  srtComercializadorOrganizadorInterno: number;
+  srtComercializadorGOrganizadorInterno?: number;
 }
 
 export type ComercializadorPutResponse = unknown;

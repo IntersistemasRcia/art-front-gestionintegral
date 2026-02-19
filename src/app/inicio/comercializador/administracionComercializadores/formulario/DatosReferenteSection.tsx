@@ -67,8 +67,10 @@ export default function DatosReferenteSection({
   onBlur,
 }: Props) {
   const roleKey = String(creationRole ?? form.rol ?? "").toLowerCase();
-  const showGrupoAutocomplete = !(isCreating && roleKey.includes("grupo"));
-  const showOrganizadorAutocomplete = !(isCreating && roleKey.includes("organizador"));
+  const isRoleGrupo = roleKey.includes("grupo");
+  const isRoleOrganizador = roleKey.includes("organizador");
+  const showGrupoAutocomplete = !((isCreating || isEditing) && isRoleGrupo);
+  const showOrganizadorAutocomplete = !(((isCreating || isEditing) && isRoleOrganizador) || (isEditing && isRoleGrupo));
 
   return (
     <div className={styles.formSection}>
@@ -265,13 +267,13 @@ export default function DatosReferenteSection({
           {showGrupoAutocomplete && (
             <Autocomplete
               disabled={isDisabled || isGrupoOrganizador || isOrganizadorComercializador}
-              options={[{ value: "", label: "Todos" }, ...grupoOptions]}
+              options={grupoOptions}
               getOptionLabel={(opt) => String(opt?.label ?? "")}
               isOptionEqualToValue={(opt, val) => String(opt?.value) === String(val?.value)}
               value={
-                [{ value: "", label: "Todos" }, ...grupoOptions].find(
+                grupoOptions.find(
                   (grupo) => String(grupo.value) === String(selectedGrupoId)
-                ) ?? { value: "", label: "Todos" }
+                ) ?? null
               }
               onChange={(_e, newValue) => onGrupoChange(String(newValue?.value ?? ""))}
               renderInput={(params) => (
@@ -284,13 +286,13 @@ export default function DatosReferenteSection({
           {showOrganizadorAutocomplete && (
             <Autocomplete
               disabled={isDisabled || isOrganizadorComercializador}
-              options={[{ value: "", label: "Todos" }, ...organizadorOptions]}
+              options={organizadorOptions}
               getOptionLabel={(opt) => String(opt?.label ?? "")}
               isOptionEqualToValue={(opt, val) => String(opt?.value) === String(val?.value)}
               value={
-                [{ value: "", label: "Todos" }, ...organizadorOptions].find(
+                organizadorOptions.find(
                   (org) => String(org.value) === String(selectedOrganizadorId)
-                ) ?? { value: "", label: "Todos" }
+                ) ?? null
               }
               onChange={(_e, newValue) => onOrganizadorChange(String(newValue?.value ?? ""))}
               renderInput={(params) => (

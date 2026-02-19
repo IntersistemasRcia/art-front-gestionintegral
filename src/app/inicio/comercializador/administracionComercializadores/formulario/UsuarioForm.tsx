@@ -62,6 +62,7 @@ const initialFormState: UsuarioFormFields = {
   serviciosAdicionales: 0,
   aplicaIva: 0,
   srtComercializadorOrganizadorInterno: 0,
+  srtComercializadorGOrganizadorInterno: 0,
 };
 
 export default function UsuarioForm({
@@ -319,13 +320,13 @@ export default function UsuarioForm({
       case "create":
         return `Crear nuevo ${submitRoleLabel ? '  ' + submitRoleLabel : ''}`;
       case "edit":
-        return `Editar Usuario`;
+        return `Editar ${submitRoleLabel ? '  ' + submitRoleLabel : ''}`;
       case "view":
-        return `Detalles del usuario`;
+        return `Detalles del ${submitRoleLabel ? '  ' + submitRoleLabel : 'usuario'}`;
       case "delete":
-        return `Dar de baja Usuario`;
+        return `Dar de baja ${submitRoleLabel ? '  ' + submitRoleLabel : 'Usuario'}`;
       default:
-        return "Formulario de Usuario";
+        return "Formulario.";
     }
   }, [method, form.nombre, submitRoleLabel]);
 
@@ -543,6 +544,7 @@ export default function UsuarioForm({
       password: cleanCuit,
       confirmPassword: cleanCuit,
       srtComercializadorOrganizadorInterno: Number.isFinite(organizadorInternoSelected) ? organizadorInternoSelected : 0,
+      srtComercializadorGOrganizadorInterno: Number.isFinite(Number(selectedGrupoId || form.srtComercializadorGOrganizadorInterno || 0)) ? Number(selectedGrupoId || form.srtComercializadorGOrganizadorInterno || 0) : 0,
     };
 
     // // Mark all fields as touched
@@ -561,6 +563,10 @@ export default function UsuarioForm({
   const handleGrupoChange = (value: string) => {
     setSelectedGrupoId(value);
     setSelectedOrganizadorId("");
+    setForm((prev) => ({
+      ...prev,
+      srtComercializadorGOrganizadorInterno: value ? Number(value) : 0,
+    }));
   };
 
   const handleOrganizadorChange = (value: string) => {

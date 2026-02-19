@@ -91,7 +91,7 @@ export default function AdminUserPage() {
   const gOrganizadorInterno = useMemo(() => {
     const first = asArray(gOrgData)?.[0];
     const interno = Number(first?.interno ?? first?.Interno ?? NaN);
-    return Number.isFinite(interno) && interno > 0 ? interno : undefined;
+    return Number.isFinite(interno) && interno >= 0 ? interno : undefined;
   }, [gOrgData]);
 
   const organizadorKey = isGrupoOrganizador || isAdministrador
@@ -101,7 +101,7 @@ export default function AdminUserPage() {
       : undefined;
 
   const { data: organizadorData, isLoading: isLoadingOrganizador, mutate: mutateOrganizador } = useSWR(
-    canLoadComercializadores && (isAdministrador || organizadorKey)
+    canLoadComercializadores && (isAdministrador || organizadorKey !== undefined)
       ? ['SRTComercializadoresOrganizadores', isAdministrador ? 'ALL' : isGrupoOrganizador ? 'GO' : 'OC', organizadorKey ?? 'ALL']
       : null,
     () =>
@@ -109,7 +109,7 @@ export default function AdminUserPage() {
         ? ArtAPI.getOrganizador({ SRTComercializadorGOrganizadorInterno: selectedGrupoInterno ?? gOrganizadorInterno } as any)
         : isOrganizadorComercializador
           ? ArtAPI.getOrganizador({ CUIL: userCuitValid } as any)
-          : selectedGrupoInterno
+          : selectedGrupoInterno !== undefined
             ? ArtAPI.getOrganizador({ SRTComercializadorGOrganizadorInterno: selectedGrupoInterno } as any)
             : ArtAPI.getOrganizador({} as any),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
@@ -138,18 +138,18 @@ export default function AdminUserPage() {
   const organizadorInternosCSV = useMemo(() => {
     const internos = asArray(organizadorData)
       .map((x: any) => Number(x?.interno ?? x?.Interno ?? NaN))
-      .filter((n: number) => Number.isFinite(n) && n > 0);
+      .filter((n: number) => Number.isFinite(n) && n >= 0);
     const unique = Array.from(new Set(internos));
     return unique.length ? unique.join(',') : undefined;
   }, [organizadorData]);
 
-  const comercializadorInternosCSV = selectedOrganizadorInterno
+  const comercializadorInternosCSV = selectedOrganizadorInterno !== undefined
     ? String(selectedOrganizadorInterno)
     : isAdministrador
       ? undefined
       : organizadorInternosCSV;
 
-  const comercializadorKey = selectedOrganizadorInterno
+  const comercializadorKey = selectedOrganizadorInterno !== undefined
     ? String(selectedOrganizadorInterno)
     : isAdministrador
       ? 'ALL'
@@ -160,7 +160,7 @@ export default function AdminUserPage() {
       ? ['SRTComercializadores', comercializadorKey]
       : null,
     () =>
-      isAdministrador && !selectedOrganizadorInterno
+      isAdministrador && selectedOrganizadorInterno === undefined
         ? ArtAPI.getComercializador({} as any)
         : ArtAPI.getComercializador({ ComercializadoresOrganizadoresInternos: comercializadorInternosCSV } as any),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
@@ -194,12 +194,12 @@ export default function AdminUserPage() {
   }, [gOrgData, gOrgByIdData, isAdministrador, isGrupoOrganizador, isOrganizadorComercializador]);
 
   useEffect(() => {
-    if (!selectedGrupoInterno) return;
+    if (selectedGrupoInterno === undefined) return;
     // Para rol OrganizadorComercializador, la tabla de Grupo se arma por Id (gOrgByIdData)
     if (isOrganizadorComercializador) return;
     const internos = asArray(gOrgData)
       .map((x: any) => Number(x?.interno ?? x?.Interno ?? NaN))
-      .filter((n: number) => Number.isFinite(n) && n > 0);
+      .filter((n: number) => Number.isFinite(n) && n >= 0);
     if (!internos.includes(selectedGrupoInterno)) {
       setSelectedGrupoInterno(undefined);
       setSelectedGrupoRowKey(null);
@@ -239,10 +239,10 @@ export default function AdminUserPage() {
   }, [canLoadComercializadores, organizadorData]);
 
   useEffect(() => {
-    if (!selectedOrganizadorInterno) return;
+    if (selectedOrganizadorInterno === undefined) return;
     const internos = asArray(organizadorData)
       .map((x: any) => Number(x?.interno ?? x?.Interno ?? NaN))
-      .filter((n: number) => Number.isFinite(n) && n > 0);
+      .filter((n: number) => Number.isFinite(n) && n >= 0);
     if (!internos.includes(selectedOrganizadorInterno)) {
       setSelectedOrganizadorInterno(undefined);
       setSelectedOrganizadorRowKey(null);
@@ -347,7 +347,8 @@ export default function AdminUserPage() {
         comision: Number(rowAny?.comision ?? 0),
         aplicaIva: Number(rowAny?.aplicaIva ?? 0),
         serviciosAdicionales: Number(rowAny?.serviciosAdicionales ?? 0),
-        srtComercializadorOrganizadorInterno: Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0),
+            srtComercializadorOrganizadorInterno: Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0),
+            srtComercializadorGOrganizadorInterno: Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0),
       });
     } else {
       setEditComercializadorBase(null);
@@ -431,6 +432,8 @@ export default function AdminUserPage() {
       domicilioEntreCalle2: kind === "organizador" ? String(rowAny?.domicilioEntreCalle2 ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.domicilioYCalle ?? rowAny?.referenteDomicilioEntreCalle2 ?? "") : undefined,
       domicilioCodLocalidad: kind === "organizador" ? String(rowAny?.codLocalidadSrt ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.codLocalidad ?? rowAny?.referenteCodLocalidadSrt ?? "") : undefined,
       domicilioCodPostal: kind === "organizador" ? String(rowAny?.codLocalidadPostal ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.codPostal ?? rowAny?.referenteCodLocalidadPostal ?? "") : undefined,
+      srtComercializadorOrganizadorInterno: kind === "comercializador" ? Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0) : undefined,
+      srtComercializadorGOrganizadorInterno: kind === "comercializador" ? Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0) : undefined,
     } as UsuarioFormFields);
     setFormOpen(true);
   };
@@ -456,7 +459,7 @@ export default function AdminUserPage() {
 
   const handleGrupoRowSelect = (key: string | number | null, row?: ComercializadoresGOrganizadoresRow) => {
     if (!row) return;
-    const normalizedKey = key ? String(key) : null;
+    const normalizedKey = key === null || key === undefined ? null : String(key);
     if (normalizedKey && normalizedKey === selectedGrupoRowKey) {
       setSelectedGrupoRowKey(null);
       setSelectedGrupoInterno(undefined);
@@ -467,59 +470,64 @@ export default function AdminUserPage() {
 
     const interno = Number((row as any)?.interno ?? NaN);
     setSelectedGrupoRowKey(normalizedKey);
-    setSelectedGrupoInterno(Number.isFinite(interno) && interno > 0 ? interno : undefined);
+    setSelectedGrupoInterno(Number.isFinite(interno) && interno >= 0 ? interno : undefined);
     setSelectedOrganizadorInterno(undefined);
     setSelectedOrganizadorRowKey(null);
   };
 
   const handleOrganizadorRowSelect = (key: string | number | null, row?: ComercializadoresOrganizadoresRow) => {
     if (!row) return;
-    if (key && key === selectedOrganizadorRowKey) {
+    const normalizedKey = key === null || key === undefined ? null : String(key);
+    if (normalizedKey && normalizedKey === selectedOrganizadorRowKey) {
       setSelectedOrganizadorRowKey(null);
       setSelectedOrganizadorInterno(undefined);
       return;
     }
 
     const interno = Number((row as any)?.interno ?? NaN);
-    setSelectedOrganizadorRowKey(key ? String(key) : null);
-    setSelectedOrganizadorInterno(Number.isFinite(interno) && interno > 0 ? interno : undefined);
+    setSelectedOrganizadorRowKey(normalizedKey);
+    setSelectedOrganizadorInterno(Number.isFinite(interno) && interno >= 0 ? interno : undefined);
   };
 
   const selectedGrupoNombre = useMemo(() => {
-    if (!selectedGrupoInterno) return "";
+    if (selectedGrupoInterno === undefined) return "";
     const selected = grupoRows.find((row) => Number(row.interno) === Number(selectedGrupoInterno));
     return String(selected?.razonSocial ?? selected?.descripcion ?? "").trim();
   }, [grupoRows, selectedGrupoInterno]);
 
   const selectedOrganizadorNombre = useMemo(() => {
-    if (!selectedOrganizadorInterno) return "";
+    if (selectedOrganizadorInterno === undefined) return "";
     const selected = organizadorRows.find((row) => Number(row.interno) === Number(selectedOrganizadorInterno));
     return String(selected?.razonSocial ?? selected?.observacion ?? "").trim();
   }, [organizadorRows, selectedOrganizadorInterno]);
 
   const selectedOrganizadorGrupoInterno = useMemo(() => {
-    if (!selectedOrganizadorInterno) return undefined;
+    if (selectedOrganizadorInterno === undefined) return undefined;
     const selected = organizadorRows.find((row) => Number(row.interno) === Number(selectedOrganizadorInterno));
     const interno = Number(selected?.srtComercializadorGOrganizadorInterno ?? NaN);
-    return Number.isFinite(interno) && interno > 0 ? interno : undefined;
+    return Number.isFinite(interno) && interno >= 0 ? interno : undefined;
   }, [organizadorRows, selectedOrganizadorInterno]);
 
-  const organizadorFilterText = selectedGrupoInterno && selectedGrupoNombre
-    ? `Organizadores filtrados por el grupo: ${selectedGrupoNombre}`
-    : "Todos los organizadores";
+  const organizadorFilterText = selectedGrupoInterno === 0
+    ? "Organizadores sin grupo asignado"
+    : selectedGrupoInterno !== undefined && selectedGrupoNombre
+      ? `Organizadores filtrados por el grupo: ${selectedGrupoNombre}`
+      : "Todos los organizadores";
 
-  const comercializadorFilterText = selectedOrganizadorInterno && selectedOrganizadorNombre
-    ? `Comercializadores filtrados por el organizador: ${selectedOrganizadorNombre}`
-    : "Todos los comercializadores";
+  const comercializadorFilterText = selectedOrganizadorInterno === 0
+    ? "Comercializadores sin Organizador asignado"
+    : selectedOrganizadorInterno !== undefined && selectedOrganizadorNombre
+      ? `Comercializadores filtrados por el organizador: ${selectedOrganizadorNombre}`
+      : "Todos los comercializadores";
 
   const createDefaultGrupoId = useMemo(() => {
     if (formMethod !== "create") return "";
     if (currentTab === 1) {
-      return selectedGrupoInterno ? String(selectedGrupoInterno) : "";
+      return selectedGrupoInterno !== undefined ? String(selectedGrupoInterno) : "";
     }
     if (currentTab === 2) {
       const interno = selectedOrganizadorGrupoInterno ?? selectedGrupoInterno;
-      return interno ? String(interno) : "";
+      return interno !== undefined ? String(interno) : "";
     }
     return "";
   }, [formMethod, currentTab, selectedGrupoInterno, selectedOrganizadorGrupoInterno]);
@@ -527,7 +535,7 @@ export default function AdminUserPage() {
   const createDefaultOrganizadorId = useMemo(() => {
     if (formMethod !== "create") return "";
     if (currentTab === 2) {
-      return selectedOrganizadorInterno ? String(selectedOrganizadorInterno) : "";
+      return selectedOrganizadorInterno !== undefined ? String(selectedOrganizadorInterno) : "";
     }
     return "";
   }, [formMethod, currentTab, selectedOrganizadorInterno]);
@@ -647,8 +655,11 @@ export default function AdminUserPage() {
                 const fechaNacimientoIso = (data as any)?.fechaNacimiento
                   ? new Date(String((data as any)?.fechaNacimiento)).toISOString()
                   : "";
+                  
+                  const srtOrgInternoFromData = Number((data as any)?.srtComercializadorOrganizadorInterno ?? editComercializadorBase.srtComercializadorOrganizadorInterno ?? 0);
+                  const srtGOrgInternoFromData = Number((data as any)?.srtComercializadorGOrganizadorInterno ?? editComercializadorBase.srtComercializadorGOrganizadorInterno ?? selectedGrupoInterno ?? gOrganizadorInterno ?? 0);
 
-                const putPayload = {
+                  const putPayload = {
                   interno: editComercializadorBase.interno,
                   cuil: Number.isFinite(cuilNumber) ? cuilNumber : editComercializadorBase.cuil,
                   matricula: String((data as any)?.matricula ?? editComercializadorBase.matricula ?? ""),
@@ -661,7 +672,8 @@ export default function AdminUserPage() {
                   comision: Number((data as any)?.comision ?? editComercializadorBase.comision ?? 0),
                   aplicaIva: Number((data as any)?.aplicaIva ?? editComercializadorBase.aplicaIva ?? 0),
                   serviciosAdicionales: Number((data as any)?.serviciosAdicionales ?? editComercializadorBase.serviciosAdicionales ?? 0),
-                  srtComercializadorOrganizadorInterno: Number(editComercializadorBase.srtComercializadorOrganizadorInterno ?? 0),
+                    srtComercializadorOrganizadorInterno: Number.isFinite(srtOrgInternoFromData) ? srtOrgInternoFromData : 0,
+                    srtComercializadorGOrganizadorInterno: Number.isFinite(srtGOrgInternoFromData) ? srtGOrgInternoFromData : 0,
 
                   razonSocial: String((data as any)?.nombre ?? ""),
                   fechaNacimiento: fechaNacimientoIso,
@@ -689,8 +701,11 @@ export default function AdminUserPage() {
                 const cuilNumber = Number(digits((data as any)?.cuit ?? (data as any)?.userName ?? "") || 0);
                 const codPostalNumber = Number(digits((data as any)?.domicilioCodPostal ?? '') || 0);
 
+                const srtGOrgForOrganizador = Number((data as any)?.srtComercializadorGOrganizadorInterno ?? editOrganizadorBase.srtComercializadorGOrganizadorInterno ?? selectedGrupoInterno ?? gOrganizadorInterno ?? 0);
+
                 const putPayload: ComercializadorOrganizadoresPutRequest = {
                   ...editOrganizadorBase,
+                  srtComercializadorGOrganizadorInterno: Number.isFinite(srtGOrgForOrganizador) ? srtGOrgForOrganizador : 0,
                   cuil: Number.isFinite(cuilNumber) ? cuilNumber : editOrganizadorBase.cuil,
                   email: String((data as any)?.email ?? editOrganizadorBase.email ?? ""),
                   telefono: String((data as any)?.phoneNumber ?? editOrganizadorBase.telefono ?? ""),
