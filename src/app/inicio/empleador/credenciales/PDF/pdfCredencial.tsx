@@ -191,9 +191,9 @@ export async function buildCredencialPdf(input: CredencialPdfInput): Promise<jsP
       const srtH = 8;  // altura rectangular
       const srtX = backX + halfW - srtW - 4; // posicionar a la derecha con pequeño margen
       const srtY = footerY - 2; // mover logo SRT 4mm hacia abajo (solo el logo)
-      const qrSize = 16; // ajustar QR para no sobresalir
+      const qrSize = 20; 
       const qrX = srtX + (srtW - qrSize) / 2; // centrar QR sobre el logo
-      const qrY = srtY - qrSize - 14;
+      const qrY = srtY - qrSize - 10; 
 
       // intentar agregar QR encima (si existe)
       try {
