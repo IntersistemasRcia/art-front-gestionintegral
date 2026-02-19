@@ -120,6 +120,8 @@ function CredencialesPage() {
   const [newCuil, setNewCuil] = useState("");
   const [newNombre, setNewNombre] = useState("");
   const [msgOpen, setMsgOpen] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [touchedCuil, setTouchedCuil] = useState(false);
   const [touchedNombre, setTouchedNombre] = useState(false);
 
@@ -160,15 +162,21 @@ function CredencialesPage() {
                   numero: empresa.contratoNro,
                 },
               ];
-              downloadCredencialPdf({
-                afiliado,
-                poliza: pol,
-                assets: {
-                  srtImageUrl: "/icons/SRT.png",
-                  frontImageUrl: "/images/frente_Credencial.png",
-                  // qrImageUrl: "/images/qr.png",
-                },
-              });
+              try {
+                await downloadCredencialPdf({
+                  afiliado,
+                  poliza: pol,
+                  assets: {
+                    srtImageUrl: "/icons/SRT.png",
+                    frontImageUrl: "/images/frente_Credencial.png",
+                    // qrImageUrl: "/images/qr.png",
+                  },
+                });
+              } catch (e: any) {
+                console.error('Error generando credencial:', e);
+                setErrorMessage('No se pudo descargar la credencial, por favor vuelva a intentar');
+                setErrorOpen(true);
+              }
             }}
           >
             <FaFilePdf />
@@ -295,6 +303,7 @@ function CredencialesPage() {
         </div>
       </CustomModal>
       <CustomModalMessage open={msgOpen} onClose={() => setMsgOpen(false)} message="Atención: los datos que ingreses son temporales y no se guardarán de forma permanente." type="info" />
+      <CustomModalMessage open={errorOpen} onClose={() => setErrorOpen(false)} message={errorMessage} type="error" />
     </div>
   );
 }
