@@ -154,6 +154,19 @@ export type GetDisponibilidadSWRKey = [url: string, token: string, params: strin
 
 //#endregion filters
 
+//#region dashboard
+export type IndicadorDTO = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  valor: number;
+  link: string;
+  opcionAsociada?: string;
+  filtroId?: number;
+};
+export type GetIndicadoresSWRKey = [url: string, token: string];
+//#endregion dashboard
+
 //#endregion Types
 
 const tokenizable = token.configure();
@@ -270,6 +283,23 @@ export class QueriesAPIClass extends ExternalAPI {
   //#endregion getDisponibilidad
 
   //#endregion filters
+
+  //#region dashboard
+
+  //#region getIndicadores
+  readonly getIndicadoresURL = this.getURL({ path: "/api/Dashboard/Indicadores" }).toString();
+  getIndicadores = async () => tokenizable.get<IndicadorDTO[]>(
+    this.getIndicadoresURL
+  ).then(({ data }) => data, (error) => reject<IndicadorDTO[]>(error));
+  swrGetIndicadores = Object.freeze({
+    key: (): GetIndicadoresSWRKey => [this.getIndicadoresURL, token.getToken()],
+    fetcher: (key: GetIndicadoresSWRKey) => this.getIndicadores(),
+  });
+  useGetIndicadores = () =>
+    useSWR<IndicadorDTO[], APIError>(this.swrGetIndicadores.key(), this.swrGetIndicadores.fetcher);
+  //#endregion getIndicadores
+
+  //#endregion dashboard
 }
 
 const QueriesAPI = Object.freeze(new QueriesAPIClass());
