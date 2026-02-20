@@ -142,9 +142,9 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
 
       { name: "Interno", label: "Número", type: "number", formatter: numeroFormatter },
 
-      { name: "OrigenDescripcion", label: "Origen", type: "text"},
-      
-      { name: "ContactoTrabajadorEmpleador", label: "Trab./Emp.", type: "text"},
+      { name: "OrigenDescripcion", label: "Origen", type: "text" },
+
+      { name: "ContactoTrabajadorEmpleador", label: "Trab./Emp.", type: "text" },
       { name: "ContactoDocNro", label: "CUIT/DNI", type: "text", formatter: cuipFormatter },
       { name: "ContactoNombre", label: "Contacto Nombre", type: "text" },
 
@@ -153,17 +153,17 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       { name: "TipoTramiteDescripcion", label: "Trámite", type: "text" },
       /////////////////////////////////////////////////////////////////////
       //Nuevos campos [Estado, Dias.Trans, Sector] 
-      { name: "Estado", label: "Estado", type: "text",  formatter: estadoFormatter },
+      { name: "Estado", label: "Estado", type: "text", formatter: estadoFormatter },
       { name: "DiasTrans", label: "T. Trans.", type: "number", formatter: diasTranscurridosFormatter },
       { name: "SectorDescripcion", label: "Sector", type: "text" },
-     
-      
+
+
       { name: "MedioDireccion", label: "Email", type: "text" },
 
-      { name: "Apertura", label: "Fecha Contacto", type: "date", formatter: fechaFormatter },
-      { name: "Cierre", label: "Fecha Último Estado", type: "date", formatter: fechaFormatter },
+      { name: "Apertura", label: "Fecha Contacto", type: "dateTime", formatter: fechaFormatter },
+      { name: "Cierre", label: "Fecha Último Estado", type: "dateTime", formatter: fechaFormatter },
       //{ name: "AfiliadoComentario", label: "Departamento", type: "text" },
-       
+
     ],
   });
 
@@ -172,8 +172,9 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
   // Columnas + campos para QB (excluyo Interno y campos calculados del QB)
   const { columns, fields, headers } = useMemo(() => {
     const all = tables.vw_AtencionAlPublico;
+    // Permitimos filtrar por `Interno` (Número) y por los campos calculados `Estado` y `DiasTrans`.
     const camposCalculados = ["Estado", "DiasTrans"];
-    const fieldsForQB = all.filter(c => c.name !== "Interno" && !camposCalculados.includes(c.name));
+    const fieldsForQB = all; // incluir todos los campos para que el QueryBuilder permita filtrarlos
 
     const columns: ColumnDef<Row>[] = [];
     const headers: Headers = { columns: {}, options: { formatters: { row: {} } } };
@@ -218,10 +219,14 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
   const [filtro, setFiltro] = useState<FiltroVm | undefined>();
   const [moduloFiltros, setModuloFiltros] = useState<string>(MODULO_FILTROS);
 
-  const proposition = useMemo(
-    () => formatQuery(query, propositionFormat({ fields })),
-    [query, fields]
-  );
+  const proposition = useMemo<string | undefined>(() => {
+    const result = formatQuery(
+      query,
+      propositionFormat({ fields }) as any
+    );
+
+    return typeof result === "string" ? result : undefined;
+  }, [query, fields]);
 
   const onCloseDialog = () => setDialog(null);
   const errorDialog = (prop: { title?: string; message: any }) =>
@@ -348,19 +353,19 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
         .then(async (ok) =>
           ok.count > 90
             ? setDialog(
-                <Dialog open scroll="paper" onClose={onCloseDialog}>
-                  <DialogTitle>Consulta con muchos registros</DialogTitle>
-                  <DialogContent dividers>
-                    <DialogContentText tabIndex={-1}>
-                      La consulta generará {ok.count} registros.
-                    </DialogContentText>
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={onCloseDialog}>Cancela</Button>
-                    <Button onClick={onConfirm}>Continúa</Button>
-                  </DialogActions>
-                </Dialog>
-              )
+              <Dialog open scroll="paper" onClose={onCloseDialog}>
+                <DialogTitle>Consulta con muchos registros</DialogTitle>
+                <DialogContent dividers>
+                  <DialogContentText tabIndex={-1}>
+                    La consulta generará {ok.count} registros.
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={onCloseDialog}>Cancela</Button>
+                  <Button onClick={onConfirm}>Continúa</Button>
+                </DialogActions>
+              </Dialog>
+            )
             : onConfirm()
         )
         .catch((error) =>
