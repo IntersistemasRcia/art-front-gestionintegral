@@ -16,6 +16,7 @@ const borderColors = ['border-blue', 'border-pink', 'border-purple', 'border-yel
 
 const InicioPage = () => {
   const { data: session, status } = useSession();
+  // Solo hacer la petición si el usuario está autenticado
   const { data: indicadores, isLoading, error } = useGetIndicadores();
 
   const { nombre } = session?.user as any || " ";

@@ -295,8 +295,14 @@ export class QueriesAPIClass extends ExternalAPI {
     key: (): GetIndicadoresSWRKey => [this.getIndicadoresURL, token.getToken()],
     fetcher: (key: GetIndicadoresSWRKey) => this.getIndicadores(),
   });
-  useGetIndicadores = () =>
-    useSWR<IndicadorDTO[], APIError>(this.swrGetIndicadores.key(), this.swrGetIndicadores.fetcher);
+  useGetIndicadores = () => {
+    const tokenValue = token.getToken();
+    // Solo hacer la petición si hay token (usuario autenticado)
+    return useSWR<IndicadorDTO[], APIError>(
+      tokenValue ? this.swrGetIndicadores.key() : null,
+      this.swrGetIndicadores.fetcher
+    );
+  };
   //#endregion getIndicadores
 
   //#endregion dashboard
