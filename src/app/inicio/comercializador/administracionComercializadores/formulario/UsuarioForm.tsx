@@ -8,6 +8,7 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
+import dayjs from 'dayjs';
 import {
   UsuarioFormFields,
   Props,
@@ -91,6 +92,8 @@ export default function UsuarioForm({
 
   const [selectedGrupoId, setSelectedGrupoId] = useState<string>("");
   const [selectedOrganizadorId, setSelectedOrganizadorId] = useState<string>("");
+
+  const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
 
   const { data: organizadorSelfData } = useSWR(
     isOrganizadorComercializador && userCuitValid
@@ -220,6 +223,13 @@ export default function UsuarioForm({
     ? localidadCodigoData[0]
     : localidadCodigoData || null;
 
+  // Llamada ARCA: usar useSWR con key null hasta completar 11 dígitos
+  const { data: arcaData, isValidating: isLoadingArca, error: arcaError } = useSWR(
+    arcaCUIL ? ArtAPI.getARCAURL({ CUIL: arcaCUIL }) : null,
+    () => ArtAPI.getARCA({ CUIL: arcaCUIL }),
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+
   let localidadesOptions: any[] = [];
   if (nombreBuscado) {
     localidadesOptions = Array.isArray(localidadesByNombre) ? localidadesByNombre : [];
@@ -304,6 +314,7 @@ export default function UsuarioForm({
     
     setErrors({});
     setTouched({});
+    setArcaCUIL(undefined);
   }, [initialData, open, isEditing, isCreating, initialSelectedGrupoId, initialSelectedOrganizadorId]);
 
   const submitRoleLabel = (() => {
@@ -411,11 +422,21 @@ export default function UsuarioForm({
     if (name === "cuit") {
       const cleanValue = (value || '').replace(/[^0-9]/g, '');
       if (cleanValue.length <= 11) {
-        const formattedCuit = CUIP(cleanValue);
-        setForm((prev: UsuarioFormFields) => ({
-          ...prev,
-          [name]: formattedCuit,
-        }));
+        // Si completó 11 dígitos, formatear y disparar ARCA; si no, mantener el input sin formatear
+        if (cleanValue.length === 11) {
+          const formattedCuit = CUIP(cleanValue);
+          setForm((prev: UsuarioFormFields) => ({
+            ...prev,
+            [name]: formattedCuit,
+          }));
+          setArcaCUIL(Number(cleanValue));
+        } else {
+          setForm((prev: UsuarioFormFields) => ({
+            ...prev,
+            [name]: value,
+          }));
+          setArcaCUIL(undefined);
+        }
       }
     } else {
       setForm((prev: UsuarioFormFields) => ({
@@ -682,18 +703,48 @@ export default function UsuarioForm({
             </div>
           </div>
           {isCreating && (
-            <div className={styles.infoPanel}>
-              <Typography variant="h6" className={styles.infoPanelTitle}>
-                Información Importante
-              </Typography>
-              <ul className={styles.infoList}>
-                <li>Al registrar este formulario automáticamente se creará un nuevo usuario y podrá acceder a ART Gestión Integral.</li>
-                <li>El usuario recibirá un email para activar su cuenta.</li>
-                <li>La contraseña temporal será el CUIT/CUIL ingresado.</li>
-                <li>La contraseña temporal deberá ser cambiada en el primer ingreso.</li>
-                <li>Posteriormente se podrán configurar los permisos.</li>
-                <li>Los campos marcados con * son obligatorios.</li>
-              </ul>
+            <div className={styles.infoColumn}>
+              <div className={styles.infoPanel}>
+                <Typography variant="h6" className={styles.infoPanelTitle}>
+                  Información Importante
+                </Typography>
+                <ul className={styles.infoList}>
+                  <li>Al registrar este formulario automáticamente se creará un nuevo usuario y podrá acceder a ART Gestión Integral.</li>
+                  <li>El usuario recibirá un email para activar su cuenta.</li>
+                  <li>La contraseña temporal será el CUIT/CUIL ingresado.</li>
+                  <li>La contraseña temporal deberá ser cambiada en el primer ingreso.</li>
+                  <li>Posteriormente se podrán configurar los permisos.</li>
+                  <li>Los campos marcados con * son obligatorios.</li>
+                </ul>
+              </div>
+
+              <div className={styles.infoPanel}>
+                <Typography variant="h6" className={styles.infoPanelTitle}>
+                  Informacion ARCA
+                </Typography>
+                <div style={{ marginTop: 8 }}>
+                  {isLoadingArca ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CircularProgress size={18} />
+                      <Typography variant="body2">Consultando ARCA...</Typography>
+                    </div>
+                  ) : arcaError ? (
+                    <Typography variant="body2" color="error">No se pudo consultar ARCA</Typography>
+                  ) : arcaData ? (
+                    <ul className={styles.infoList}>
+                      <li><strong>Nombre:</strong> {arcaData.nombre || ''}</li>
+                      <li><strong>Apellido:</strong> {arcaData.apellido || ''}</li>
+                      <li><strong>Fecha de Nac.:</strong> {arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : ''}</li>
+                    </ul>
+                  ) : (
+                    <ul className={styles.infoList}>
+                      <li><strong>Nombre:</strong> </li>
+                      <li><strong>Apellido:</strong> </li>
+                      <li><strong>Fecha de Nac.:</strong> </li>
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

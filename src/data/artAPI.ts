@@ -4,13 +4,14 @@ import { useSession } from "next-auth/react";
 import { ExternalAPI } from "./api";
 import { token } from "./usuarioAPI";
 import RefEmpleador from "@/app/inicio/usuarios/interfaces/RefEmpleador";
-import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse  } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
+import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador} from "@/app/inicio/comercializador/polizas/types/poliza";
 import {ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
-import {ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia} from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
+import {ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
+import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 
@@ -778,7 +779,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion
 
 
-    //#region Comercializador por Id
+  //#region Comercializador por Id
   readonly getComercializadorByIdURL = (params: ComercializadorById) => {
     return this.getURL({
       path: `/api/SRTComercializadores/${params.id}`,
@@ -894,7 +895,7 @@ export class ArtAPIClass extends ExternalAPI {
   // //#endregion
 
 
-    //#region Organizador comercializador por Id
+  //#region Organizador comercializador por Id
   readonly getOrganizadorByIdURL = (params: ComercializadorOrganizadorById) => {
     return this.getURL({
       path: `/api/SRTComercializadoresOrganizadores/${params.id}`,
@@ -1046,9 +1047,9 @@ export class ArtAPIClass extends ExternalAPI {
       revalidateOnReconnect: false,
     }
   );
-// # End Region Empleador Pago Comercializador
+  // # End Region Empleador Pago Comercializador
 
-// # Region afipTransferencia
+  // # Region afipTransferencia
   readonly getAfipTransferenciaURL = (params: ParametersAfipTranferencia = {}) => {
     return this.getURL({ path: "/api/AfipTransferencias", search: toURLSearch(params) }).toString();
   };
@@ -1065,9 +1066,30 @@ export class ArtAPIClass extends ExternalAPI {
   // # End Region afipTransferencia
 
 
+  //#region ARCA GET
+    readonly getARCAURL = (params: ARCAparams = {}) => {
+    return this.getURL({
+      path: "/api/Arca/ConsultaPadron",
+      search: toURLSearch(params),
+    }).toString();
+  };
+  getARCA = async (params: ARCAparams = {}) =>
+    tokenizable.get<ARCAApiResponse>(this.getARCAURL(params)).then(({ data }) => data);
+  useGetARCA = (params: ARCAparams = {}) =>
+    useSWR(
+      [this.getARCAURL(params), token.getToken()],
+      () => this.getARCA(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
 
 
+  
 }
+
 
 
 const ArtAPI = Object.seal(new ArtAPIClass()) as ArtAPIClass;
