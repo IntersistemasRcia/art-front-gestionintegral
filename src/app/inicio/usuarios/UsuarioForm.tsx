@@ -28,6 +28,7 @@ import CargoInterface from "./interfaces/CargoInterface";
 import Formato from "@/utils/Formato";
 import ArtAPI from '@/data/artAPI';
 import useSWR from 'swr';
+import AuthAPI from '@/data/authAPI';
 import dayjs from 'dayjs';
 
 // Definición del modo de operación (replicada desde UsuariosPage)
@@ -67,6 +68,7 @@ export interface UsuarioFormFields {
   serviciosAdicionales?: number;
   aplicaIva?: number;
   srtComercializadorOrganizadorInterno?: number;
+  sectorId?: number;
 }
 
 export interface Props {
@@ -99,6 +101,7 @@ const initialFormState: UsuarioFormFields = {
   // tipo: "",
   userName: "",
   empresaId: 0,
+  sectorId: undefined,
 };
 
 // Interfaces completas para errores y campos tocados
@@ -129,6 +132,7 @@ export interface ValidationErrors {
   id?: string;
   maxUsuarios?: string;
   cantidadUsuarios?: string;
+  sectorId?: string;
 }
 
 export interface TouchedFields {
@@ -164,6 +168,7 @@ export interface TouchedFields {
   aplicaIva?: boolean;
   maxUsuarios?: boolean;
   cantidadUsuarios?: boolean;
+  sectorId?: boolean;
 }
 
 export default function UsuarioForm({
@@ -513,6 +518,24 @@ export default function UsuarioForm({
     }
   };
 
+  const handleSectorChange = (e: SelectChangeEvent<number | "">) => {
+    const { value } = e.target;
+    const sectorId = value === "" ? undefined : Number(value);
+
+    setForm((prev: UsuarioFormFields) => ({
+      ...prev,
+      sectorId: sectorId,
+    }));
+
+    if (touched.sectorId) {
+      const error = validateField("sectorId", String(sectorId || ""));
+      setErrors((prev) => ({
+        ...prev,
+        sectorId: error,
+      }));
+    }
+  };
+
   const handleIsAdminUserChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     setIsAdminUser(checked);
@@ -578,6 +601,8 @@ export default function UsuarioForm({
     () => ArtAPI.getARCA({ CUIL: arcaCUIL }),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   );
+
+  const { data: sectores, isValidating: isLoadingSectores, error: sectoresError } = AuthAPI.useGetRefSectores();
 
   useEffect(() => {
     if (!arcaData) return;
@@ -815,6 +840,44 @@ export default function UsuarioForm({
                       sx={{ ml: 2, mt: 0.5 }}
                     >
                       {errors.rol}
+                    </Typography>
+                  )}
+                </FormControl>
+                <FormControl
+                  fullWidth
+                  required={!isDisabled}
+                  error={touched.sectorId && !!errors.sectorId}
+                  disabled={isDisabled}
+                >
+                  <InputLabel>Sector</InputLabel>
+                  <Select
+                    name="sectorId"
+                    value={form.sectorId ?? ""}
+                    label="Sector"
+                    onChange={handleSectorChange}
+                    onBlur={() => handleBlur("sectorId")}
+                  >
+                    {isLoadingSectores ? (
+                      <MenuItem value="">
+                        <em>Cargando...</em>
+                      </MenuItem>
+                    ) : sectores && sectores.length > 0 ? (
+                      sectores.map((s) => (
+                        <MenuItem key={s.id} value={s.id}>
+                          {s.descripcion}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem value="">No hay sectores</MenuItem>
+                    )}
+                  </Select>
+                  {touched.sectorId && errors.sectorId && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ ml: 2, mt: 0.5 }}
+                    >
+                      {errors.sectorId}
                     </Typography>
                   )}
                 </FormControl>

@@ -1087,7 +1087,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion
 
 
-  
+
 }
 
 
