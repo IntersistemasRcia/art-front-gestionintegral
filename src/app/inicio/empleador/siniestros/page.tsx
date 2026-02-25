@@ -5,7 +5,6 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
 import gestionEmpleadorAPI from '@/data/gestionEmpleadorAPI';
-import { token } from '@/data/usuarioAPI';
 import type { Parameters } from '@/app/inicio/empleador/cobertura/types/persona';
 
 import DataTable from '@/utils/ui/table/DataTable';
@@ -20,6 +19,7 @@ import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import Formato from '@/utils/Formato';
 import styles from './siniestros.module.css';
 import { useSearchParams } from 'next/navigation';
+import { EmpleadorSiniestrosContextProvider, useEmpleadorSiniestrosContext } from './context';
 
 
 const fmtDateTime = (v?: string | null) => {
@@ -51,8 +51,10 @@ const cols: ColumnDef<SiniestroItem>[] = [
     header: 'Fecha y Hora Siniestro',
     accessorKey: 'siniestroFechaHora',
     cell: ({ getValue }) => fmtDateTime(getValue() as string | null),
+    meta: { align: 'center' },
   },
-  { header: 'Diagnóstico', accessorKey: 'diagnostico' },
+  { header: 'Diagnóstico', accessorKey: 'diagnostico', meta: { align: 'center' }, },
+  
   {
     header: 'Categoría',
     accessorKey: 'siniestroCategoria',
@@ -62,12 +64,14 @@ const cols: ColumnDef<SiniestroItem>[] = [
     header: 'Próx. Control Médico',
     accessorKey: 'proximoControlMedicoFechaHora',
     cell: ({ getValue }) => fmtDateTime(getValue() as string | null),
+    meta: { align: 'center' },
   },
   { header: 'Prestador inicial', accessorKey: 'prestador' },
   {
     header: 'Alta Médica',
     accessorKey: 'altaMedicaFecha',
     cell: ({ getValue }) => fmtDate(getValue() as string | null),
+    meta: { align: 'center' },
   },
 ];
 
@@ -89,10 +93,6 @@ export default function SiniestrosPage() {
   const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
   const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
 
-  const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
-    cuitDesdeQuery ? { CUIT: Number(cuitDesdeQuery) } : {}
-  );
-
   // Si viene CUIT por query param, forzar selección por CUIT y bloquear el selector
   useEffect(() => {
     if (isLoadingEmpresas) return;
@@ -104,16 +104,6 @@ export default function SiniestrosPage() {
       seleccionAutomaticaRef.current = true;
     }
   }, [cuitDesdeQuery, empresas, isLoadingEmpresas]);
-
-  // Si está bloqueado por CUIT y no hay match en el store, igual mostrar la Razón Social en el combo
-  useEffect(() => {
-    if (!cuitDesdeQuery) return;
-    if (empresaSeleccionada) return;
-
-    const razonSocial = (polizaRawData as any)?.empleador_Denominacion;
-    if (!razonSocial) return;
-    setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as any);
-  }, [cuitDesdeQuery, empresaSeleccionada, polizaRawData]);
 
   // Seleccionar automáticamente si solo hay una empresa (salvo que venga CUIT por query)
   useEffect(() => {
@@ -149,48 +139,20 @@ export default function SiniestrosPage() {
     return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
   };
 
-  const params: Parameters = cuitFinal ? { CUIT: cuitFinal } : {};
-
-  // El hook solo hará fetch si hay CUIT en los parámetros
-  const { data, error, isLoading } = gestionEmpleadorAPI.useGetVEmpleadorSiniestros(params);
-
   const instanciasParams: Parameters = cuitFinal ? { CUIT: cuitFinal } : {};
-  
   if (selectedDenuncia != null && cuitFinal) {
     (instanciasParams as any).Denuncia = selectedDenuncia;
   }
 
-  // El hook solo hará fetch si hay CUIT y Denuncia en los parámetros
   const {
     data: instanciasData,
     isLoading: isLoadingInst,
     error: errorInst,
   } = gestionEmpleadorAPI.useGetVEmpleadorSiniestrosInstancias(instanciasParams);
 
-  // Log con token enmascarado y URL (debug)
-  const url = useMemo(
-    () => gestionEmpleadorAPI.getVEmpleadorSiniestrosURL(params),
-    [params]
-  );
-  useEffect(() => {
-    const raw = token.getToken?.();
-    console.log("raw",raw)
-    const masked =
-      typeof raw === 'string'
-        ? `Bearer ${raw.slice(0, 6)}…${raw.slice(-6)}`
-        : '(objeto/token compuesto)';
-    console.log('[GET] VEmpleadorSiniestros →', { url, params, tokenPreview: masked });
-  }, [url, params]);
-
-  // Filas principales
-  const rows: SiniestroItem[] = useMemo(
-    () => (Array.isArray(data) ? data : []),
-    [data]
-  );
-
-  // Carga instancias de esa denuncia
+  // Carga instancias de esa denuncia (como antes: denunciaNro o siniestroNro para abrir el panel)
   const handleRowClick = (row: SiniestroItem) => {
-    const den = Number(row.denunciaNro ?? 0);
+    const den = Number(row.denunciaNro ?? 0) || Number(row.siniestroNro ?? 0);
     if (den) setSelectedDenuncia(den);
   };
 
@@ -223,21 +185,16 @@ export default function SiniestrosPage() {
         />
       </Box>
 
-      {error && (
-        <p style={{ color: 'crimson' }}>
-          {String((error as any)?.message ?? error)}
-        </p>
-      )}
+      <EmpleadorSiniestrosContextProvider cuit={cuitFinal}>
+        <TablaSiniestrosPadre
+          cuitDesdeQuery={cuitDesdeQuery}
+          empresaSeleccionada={empresaSeleccionada}
+          setEmpresaSeleccionada={setEmpresaSeleccionada}
+          onRowClick={handleRowClick}
+        />
+      </EmpleadorSiniestrosContextProvider>
 
-      <DataTable<SiniestroItem>
-        data={rows}
-        columns={cols}
-        isLoading={isLoading}
-        size="mid"
-        onRowClick={handleRowClick}
-      />
-
-      {/* Panel inferior*/}
+      {/* Tabla hija (instancias): lógica original, sin cambios */}
       {selectedDenuncia != null && (
         <>
           {errorInst && (
@@ -245,7 +202,6 @@ export default function SiniestrosPage() {
               {String((errorInst as any)?.message ?? errorInst)}
             </p>
           )}
-
           <CondicionesTabla
             rows={instanciasRows}
             loading={isLoadingInst}
@@ -254,5 +210,46 @@ export default function SiniestrosPage() {
         </>
       )}
     </div>
+  );
+}
+
+type TablaSiniestrosPadreProps = {
+  cuitDesdeQuery: string;
+  empresaSeleccionada: Empresa | null;
+  setEmpresaSeleccionada: React.Dispatch<React.SetStateAction<Empresa | null>>;
+  onRowClick: (row: SiniestroItem) => void;
+};
+
+/** Solo la tabla padre de siniestros (fetch vía queryAPI/context). La tabla hija de instancias queda en la page. */
+function TablaSiniestrosPadre({
+  cuitDesdeQuery,
+  empresaSeleccionada,
+  setEmpresaSeleccionada,
+  onRowClick,
+}: TablaSiniestrosPadreProps) {
+  const { rows, isLoading, error, razonSocialFromQuery } = useEmpleadorSiniestrosContext();
+
+  useEffect(() => {
+    if (!cuitDesdeQuery) return;
+    if (empresaSeleccionada) return;
+    if (!razonSocialFromQuery) return;
+    setEmpresaSeleccionada({ razonSocial: razonSocialFromQuery } as Empresa);
+  }, [cuitDesdeQuery, empresaSeleccionada, razonSocialFromQuery, setEmpresaSeleccionada]);
+
+  return (
+    <>
+      {error && (
+        <p style={{ color: 'crimson' }}>
+          {String((error as any)?.message ?? error)}
+        </p>
+      )}
+      <DataTable<SiniestroItem>
+        data={rows}
+        columns={cols}
+        isLoading={isLoading}
+        size="mid"
+        onRowClick={onRowClick}
+      />
+    </>
   );
 }
