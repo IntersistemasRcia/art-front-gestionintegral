@@ -9,6 +9,7 @@ import {
   FormControlLabel,
   IconButton,
   Collapse,
+  CircularProgress,
 } from "@mui/material";
 import { ExpandMore, ExpandLess } from "@mui/icons-material";
 import CustomModal from '@/utils/ui/form/CustomModal';
@@ -22,7 +23,8 @@ interface TareasProps {
   open: boolean;
   onClose: () => void;
   usuario: UsuarioRow | null;
-  onSave: (permisos: PermisosModulo[]) => void;
+  // Puede retornar una promesa o ser sincrónica
+  onSave: (permisos: PermisosModulo[]) => void | Promise<void>;
 }
 
 interface PermisosModulo {
@@ -45,6 +47,9 @@ export default function Tareas({
   const [permisosModulos, setPermisosModulos] = useState<Record<number, boolean>>({});
   const [permisosTareas, setPermisosTareas] = useState<Record<string, boolean>>({});
   const [modulosExpandidos, setModulosExpandidos] = useState<Record<number, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   const getTareaKey = (moduloId: number, tareaId: number) => `${moduloId}-${tareaId}`;
 
@@ -78,6 +83,15 @@ export default function Tareas({
       setModulosExpandidos(modulosExpandidosIniciales);
     }
   }, [usuario]);
+
+  // Limpiar mensajes de estado cuando se abre el modal o cambia el usuario
+  useEffect(() => {
+    if (open) {
+      setSaveError(null);
+      setSaveSuccess(null);
+      setIsSaving(false);
+    }
+  }, [open, usuario?.id]);
 
   const handleModuloPermisoChange = (moduloId: number, habilitado: boolean) => {
     setPermisosModulos((prev) => ({
@@ -134,7 +148,7 @@ export default function Tareas({
     }));
   };
 
-  const handleGuardarConfiguracion = () => {
+  const handleGuardarConfiguracion = async () => {
     if (!usuario?.modulos) return;
 
     const modulosUnicos = getModulosUnicos();
@@ -153,8 +167,23 @@ export default function Tareas({
     }));
 
     console.log('Permisos módulos a enviar:', permisosModulosArray);
-    onSave(permisosModulosArray);
-    onClose();
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      const res = onSave(permisosModulosArray);
+      if (res && typeof (res as any).then === "function") {
+        await res;
+      }
+
+      setSaveSuccess("Guardado correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setSaveError(err?.message ?? "Error al guardar la configuración.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleVolver = () => {
@@ -202,11 +231,13 @@ export default function Tareas({
   return (
     <CustomModal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!isSaving) onClose();
+      }}
       title={`Configuración de Permisos - ${usuario.nombre}`}
       size="large"
     >
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, position: 'relative' }}>
         {/* Información del usuario */}
         <Typography
           variant="body2"
@@ -420,7 +451,7 @@ export default function Tareas({
         {/* Botones de acción */}
         <Box sx={{ display: "flex", gap: 2, justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", gap: 2 }}>
-            <CustomButton variant="outlined" onClick={handleVolver}>
+            <CustomButton variant="outlined" onClick={handleVolver} disabled={isSaving}>
               Volver
             </CustomButton>
 
@@ -428,6 +459,7 @@ export default function Tareas({
               variant="outlined"
               onClick={handleDarAccesoATodo}
               color="secondary"
+              disabled={isSaving}
             >
               Dar acceso a todo
             </CustomButton>
@@ -436,6 +468,7 @@ export default function Tareas({
               variant="outlined"
               onClick={handleQuitarTodosLosAccesos}
               color="error"
+              disabled={isSaving}
             >
               Quitar todos los accesos
             </CustomButton>
@@ -445,10 +478,42 @@ export default function Tareas({
             variant="contained"
             onClick={handleGuardarConfiguracion}
             color="primary"
+            disabled={isSaving}
           >
             Guardar Configuración
           </CustomButton>
         </Box>
+
+        {saveError && (
+          <Typography color="error" sx={{ mt: 2 }}>
+            {saveError}
+          </Typography>
+        )}
+
+        {saveSuccess && (
+          <Typography color="primary" sx={{ mt: 2 }}>
+            {saveSuccess}
+          </Typography>
+        )}
+
+        {isSaving && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 30,
+              flexDirection: 'column',
+              gap: 2,
+            }}
+          >
+            <CircularProgress />
+            <Typography variant="h6">Guardando...</Typography>
+          </Box>
+        )}
       </Box>
     </CustomModal>
   );
