@@ -702,7 +702,52 @@ const GenerarFormularioRGRL: React.FC<{
   const [secIdx, setSecIdx] = useState(0);
   const totalSecs = secciones.length;
   const [page, setPage] = useState(0);
-  useEffect(() => { setPage(Math.floor(secIdx / PAGE_SIZE)); }, [secIdx]);
+
+  // Mapas de páginas por rangos de 'interno' según tipo de formulario.
+  const pagesMap = useMemo(() => {
+    const a = [
+      [1, 19],
+      [21, 43],
+      [44, 63],
+      [64, 90],
+      [91, 112],
+      [113, 134],
+      [135, 149],
+      [150, 161],
+      'PA',
+      'PC'
+    ];
+    const b = [
+      [1, 26],
+      [27, 51],
+      [52, 80],
+      [81, 104],
+      [105, 135],
+      [136, 162],
+      [163, 188],
+      [189, 210],
+      'PA',
+      'PC'
+    ];
+    const c = [
+      [1, 19],
+      [20, 52],
+      [53, 70],
+      [71, 82],
+      [83, 98],
+      [99, 134],
+      [135, 148],
+      [149, 151],
+      'PA',
+      'PC'
+    ];
+
+    const kind = (tipoDeEsteFormulario?.descripcion ?? '').toString().toUpperCase();
+    if (kind.includes('FORMULARIO A') || kind.endsWith(' A')) return { pages: a, showPlanillas: true };
+    if (kind.includes('FORMULARIO B') || kind.endsWith(' B')) return { pages: b, showPlanillas: true };
+    if (kind.includes('FORMULARIO C') || kind.endsWith(' C')) return { pages: c, showPlanillas: true };
+    return { pages: null as null | any[], showPlanillas: false };
+  }, [tipoDeEsteFormulario]);
 
   const guardarPUT = async (completar: boolean) => {
     if (!form) return;
@@ -710,25 +755,24 @@ const GenerarFormularioRGRL: React.FC<{
     setError('');
     try {
       const fullCuest: any[] = [];
-      for (const sec of secciones) {
-        const qs = (sec.cuestionarios ?? []).slice().sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-        for (const q of qs) {
-          const key = q.codigo as number;
-          const r = respuestas[key] ?? {};
-            fullCuest.push({
-            interno: r.interno ?? 0,
-            internoCuestionario: key,
-            internoRespuestaFormulario: r.internoRespuestaFormulario ?? form.interno ?? 0,
-            respuesta: r.respuesta ?? '',
-            fechaRegularizacion: r.fechaRegularizacion ?? 0,
-            observaciones: r.observaciones ?? '',
-              fechaRegularizacionNormal: (r as any).fechaRegularizacionNormal ?? null,
-            estadoAccion: r.estadoAccion ?? 'A',
-            estadoFecha: r.estadoFecha ?? 0,
-            estadoSituacion: r.estadoSituacion ?? '',
-            bajaMotivo: r.bajaMotivo ?? 0,
-          });
-        }
+      // Recolectar todas las preguntas y ordenar por 'codigo' (interno)
+      const allQs = secciones.flatMap(s => (s.cuestionarios ?? [])).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
+      for (const q of allQs) {
+        const key = q.codigo as number;
+        const r = respuestas[key] ?? {};
+        fullCuest.push({
+          interno: r.interno ?? 0,
+          internoCuestionario: key,
+          internoRespuestaFormulario: r.internoRespuestaFormulario ?? form.interno ?? 0,
+          respuesta: r.respuesta ?? '',
+          fechaRegularizacion: r.fechaRegularizacion ?? 0,
+          observaciones: r.observaciones ?? '',
+          fechaRegularizacionNormal: (r as any).fechaRegularizacionNormal ?? null,
+          estadoAccion: r.estadoAccion ?? 'A',
+          estadoFecha: r.estadoFecha ?? 0,
+          estadoSituacion: r.estadoSituacion ?? '',
+          bajaMotivo: r.bajaMotivo ?? 0,
+        });
       }
 
       const gremiosFull = gremiosUI.map((g, i) => ({
@@ -804,15 +848,78 @@ const GenerarFormularioRGRL: React.FC<{
   }
 
   if (!isModal && idFromQuery && form) {
-    const secActual = secciones[secIdx];
-    const preguntas = (secActual?.cuestionarios ?? []).slice().sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-    const tieneNA = secActual?.tieneNoAplica === 1;
+    // Build preguntas según mapa de páginas si existe, sino por sección (comportamiento anterior)
+    const allPreguntas = secciones.flatMap(s => (s.cuestionarios ?? []).map(q => ({ ...q, _sec: s })));
+    let preguntas: any[] = [];
+    let tieneNA = false;
+    if (pagesMap.pages) {
+      const pages = pagesMap.pages;
+      const idx = Math.max(0, Math.min(page, pages.length - 1));
+      const sel = pages[idx] ?? [];
+      if (Array.isArray(sel) && sel.length === 2) {
+        const [from, to] = sel;
+        preguntas = allPreguntas.filter(p => {
+          const k = Number(p.codigo ?? 0);
+          return k >= from && k <= to;
+        }).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
+        tieneNA = preguntas.some(p => p._sec?.tieneNoAplica === 1);
+      } else if (Array.isArray(sel) && sel.length === 0) {
+        preguntas = [];
+        tieneNA = false;
+      } else if (sel === 'PA' || sel === 'PC') {
+        // Buscar secciones que correspondan a Planilla A o C por su descripción
+        const lookFor = sel === 'PA' ? 'PLANILLA A' : 'PLANILLA C';
+        const secs = secciones.filter(s => (s.descripcion ?? '').toString().toUpperCase().includes(lookFor));
+        preguntas = secs.flatMap(s => (s.cuestionarios ?? []).map(q => ({ ...q, _sec: s }))).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
+        tieneNA = preguntas.some(p => p._sec?.tieneNoAplica === 1);
+      }
+    } else {
+      const secActual = secciones[secIdx];
+      preguntas = (secActual?.cuestionarios ?? []).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
+      tieneNA = secActual?.tieneNoAplica === 1;
+    }
 
     const renderPaginador = () => {
+      if (pagesMap.pages) {
+        const pages = pagesMap.pages;
+        return (
+          <div className={styles.paginatorBar}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className={`${styles.pagerBtn} ${styles.pagerBtnNarrow}`}
+            >
+              &lt;
+            </button>
+
+            {pages.map((entry, i) => {
+              const label = entry === 'PA' ? 'Planilla A' : entry === 'PC' ? 'Planilla C' : (i + 1).toString();
+              return (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  className={`${styles.pagerBtn} ${page === i ? styles.pagerBtnActive : ''}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setPage(p => Math.min(pages.length - 1, p + 1))}
+              disabled={page === pages.length - 1}
+              className={`${styles.pagerBtn} ${styles.pagerBtnNarrow}`}
+            >
+              &gt;
+            </button>
+          </div>
+        );
+      }
+
+      // fallback: comportamiento anterior por secciones
       const totalPages = Math.max(1, Math.ceil(totalSecs / PAGE_SIZE));
       const pageStart = page * PAGE_SIZE;
       const pageEnd = Math.min(pageStart + PAGE_SIZE, totalSecs);
-
 
       return (
         <div className={styles.paginatorBar}>
@@ -857,7 +964,7 @@ const GenerarFormularioRGRL: React.FC<{
         <h2 className={styles.sectionHeaderTitle} />
         <div className={styles.sectionHeaderSubtitle}>
 
-          Sección {secIdx + 1} de {totalSecs} — {secActual?.descripcion}
+          Página {page + 1} {pagesMap.pages ? `de ${pagesMap.pages.length}` : ''}
         </div>
 
         <div className={`${styles.row} ${styles.sectionHeaderButtons}`}>
@@ -868,78 +975,91 @@ const GenerarFormularioRGRL: React.FC<{
 
         {renderPaginador()}
         <div className={styles.questionsBox}>
-          {preguntas.map((q) => {
-            const key = q.codigo as number;
-            const rr = respuestas[key] ?? {};
-            const value = rr.respuesta ?? '';
-            return (
-              <div key={key} className={styles.questionCard}>
-                <div className={styles.questionTitle}>
-                  {q.orden}. {q.pregunta}{' '}
-                  {q.comentario ? <span className={styles.questionComment}>— {q.comentario}</span> : null}
-                </div>
+          {(() => {
+            const grouped: Record<string, any[]> = {};
+            for (const p of preguntas) {
+              const title = (p._sec?.descripcion ?? '').toString().trim() || 'Sin título';
+              if (!grouped[title]) grouped[title] = [];
+              grouped[title].push(p);
+            }
 
-                <div className={styles.radioRow}>
-                  <label>
-                    <input
-                      type="radio"
-                      name={`r-${key}`}
-                      checked={value === 'SI'}
-                      onChange={() => onCambiarRespuesta(key, { respuesta: 'SI' })}
-                    /> SI
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name={`r-${key}`}
-                      checked={value === 'NO'}
-                      onChange={() => onCambiarRespuesta(key, { respuesta: 'NO' })}
-                    /> NO
-                  </label>
-                  {tieneNA ? (
-                    <label>
-                      <input
-                        type="radio"
-                        name={`r-${key}`}
-                        checked={value === 'NA'}
-                        onChange={() => onCambiarRespuesta(key, { respuesta: 'NA' })}
-                      /> No aplica
-                    </label>
-                  ) : null}
-                </div>
+            return Object.keys(grouped).map((title) => (
+              <div key={title}>
+                <div style={{ textAlign: 'center', fontWeight: 700, margin: '12px 0' }}>{title}</div>
+                {grouped[title].map((q) => {
+                  const key = q.codigo as number;
+                  const rr = respuestas[key] ?? {};
+                  const value = rr.respuesta ?? '';
+                  return (
+                    <div key={key} className={styles.questionCard}>
+                      <div className={styles.questionTitle}>
+                        {String(q.codigo ?? '')} - {q.pregunta}{' '}
+                        {q.comentario ? <span className={styles.questionComment}>— {q.comentario}</span> : null}
+                      </div>
 
-                <div className={styles.obsArea}>
-                  <textarea
-                    value={rr.observaciones ?? ''}
-                    onChange={(e) => onCambiarRespuesta(key, { observaciones: e.target.value })}
-                    placeholder="Observaciones…"
-                    className={styles.textarea}
+                      <div className={styles.radioRow}>
+                        <label>
+                          <input
+                            type="radio"
+                            name={`r-${key}`}
+                            checked={value === 'SI'}
+                            onChange={() => onCambiarRespuesta(key, { respuesta: 'SI' })}
+                          /> SI
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name={`r-${key}`}
+                            checked={value === 'NO'}
+                            onChange={() => onCambiarRespuesta(key, { respuesta: 'NO' })}
+                          /> NO
+                        </label>
+                        {tieneNA ? (
+                          <label>
+                            <input
+                              type="radio"
+                              name={`r-${key}`}
+                              checked={value === 'NA'}
+                              onChange={() => onCambiarRespuesta(key, { respuesta: 'NA' })}
+                            /> No aplica
+                          </label>
+                        ) : null}
+                      </div>
 
-                  />
-                </div>
+                      <div className={styles.obsArea}>
+                        <textarea
+                          value={rr.observaciones ?? ''}
+                          onChange={(e) => onCambiarRespuesta(key, { observaciones: e.target.value })}
+                          placeholder="Observaciones…"
+                          className={styles.textarea}
+                        />
+                      </div>
 
-                <div className={styles.dateRow}>
-                  <label className={styles.dateLabel}>Fecha regularización:</label>
-                  <input
-                    type="date"
-                    value={
-                      rr.fechaRegularizacionNormal ?? (rr.fechaRegularizacion ? `${String(rr.fechaRegularizacion).slice(0,4)}-${String(rr.fechaRegularizacion).slice(4,6)}-${String(rr.fechaRegularizacion).slice(6,8)}` : '')
-                    }
-                    onChange={(e) => {
-                      const iso = e.target.value || '';
-                      const digits = iso ? iso.replace(/-/g, '') : '';
-                      onCambiarRespuesta(key, {
-                        fechaRegularizacion: digits ? Number(digits) : 0,
-                        fechaRegularizacionNormal: iso ? iso : null,
-                      });
-                    }}
-                    placeholder="2025-10-30"
-                    className={styles.dateInputNum}
-                  />
-                </div>
+                      <div className={styles.dateRow}>
+                        <label className={styles.dateLabel}>Fecha regularización:</label>
+                        <input
+                          type="date"
+                          value={
+                            rr.fechaRegularizacionNormal ?? (rr.fechaRegularizacion ? `${String(rr.fechaRegularizacion).slice(0,4)}-${String(rr.fechaRegularizacion).slice(4,6)}-${String(rr.fechaRegularizacion).slice(6,8)}` : '')
+                          }
+                          onChange={(e) => {
+                            const iso = e.target.value || '';
+                            const digits = iso ? iso.replace(/-/g, '') : '';
+                            onCambiarRespuesta(key, {
+                              fechaRegularizacion: digits ? Number(digits) : 0,
+                              fechaRegularizacionNormal: iso ? iso : null,
+                            });
+                          }}
+                          placeholder="2025-10-30"
+                          className={styles.dateInputNum}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
 
         <div className={styles.row}>
