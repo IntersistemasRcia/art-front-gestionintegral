@@ -9,17 +9,20 @@ import type { Parameters } from '@/app/inicio/empleador/cobertura/types/persona'
 
 import DataTable from '@/utils/ui/table/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Box } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 
 import CondicionesTabla from './table';
 import type { SiniestroItem, InstanciaSiniestro } from './types/tipos';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
+import CustomButton from '@/utils/ui/button/CustomButton';
 import Formato from '@/utils/Formato';
 import styles from './siniestros.module.css';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { EmpleadorSiniestrosContextProvider, useEmpleadorSiniestrosContext } from './context';
+import useSWR from 'swr';
+import QueriesAPI, { type Pagination, type FiltroVm } from '@/data/queryAPI';
 
 
 const fmtDateTime = (v?: string | null) => {
@@ -81,6 +84,8 @@ const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '
 export default function SiniestrosPage() {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
   const [selectedDenuncia, setSelectedDenuncia] = useState<number | null>(null);
@@ -88,6 +93,19 @@ export default function SiniestrosPage() {
   const cuitQuery = searchParams.get('cuit') ?? searchParams.get('cuil') ?? '';
   const cuitDesdeQuery = normalizeDigits(cuitQuery);
   const bloquearBusquedaPorCuit = Boolean(cuitDesdeQuery);
+  const filtroIdParam = searchParams.get('filtroId');
+  const filtroNombreParam = searchParams.get('filtroNombre') ?? '';
+
+  const filtersParams = filtroIdParam ? { id: Number(filtroIdParam) } : null;
+  const { data: filtersData } = useSWR<Pagination<FiltroVm>>(
+    filtersParams ? QueriesAPI.swrGetFilters.key(filtersParams) : null,
+    QueriesAPI.swrGetFilters.fetcher
+  );
+  const proposition = useMemo(() => {
+    const data = filtersData?.data;
+    if (!Array.isArray(data) || data.length === 0) return null;
+    return data[0]?.proposition ?? null;
+  }, [filtersData?.data]);
 
   const cuitEmpresaSeleccionada = normalizeDigits((empresaSeleccionada as any)?.cuit);
   const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
@@ -139,6 +157,14 @@ export default function SiniestrosPage() {
     return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
   };
 
+  const handleLimpiarFiltro = () => {
+    const params = new URLSearchParams();
+    if (cuitQuery) params.set('cuit', cuitQuery);
+    router.replace(params.toString() ? `${pathname}?${params}` : pathname);
+  };
+
+  const tieneFiltroAplicado = Boolean(filtroIdParam && filtroNombreParam);
+
   const instanciasParams: Parameters = cuitFinal ? { CUIT: cuitFinal } : {};
   if (selectedDenuncia != null && cuitFinal) {
     (instanciasParams as any).Denuncia = selectedDenuncia;
@@ -172,20 +198,32 @@ export default function SiniestrosPage() {
 
   return (
     <div style={{ padding: 16 }}>
-      <Box className={styles.empresaSelectorContainer}>
-        <CustomSelectSearch<Empresa>
-          label="Seleccionar Empresa"
-          options={empresas}
-          value={empresaSeleccionada}
-          onChange={handleEmpresaChange}
-          getOptionLabel={getEmpresaLabel}
-          isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
-          loading={isLoadingEmpresas}
-          disabled={isLoadingEmpresas || empresas.length === 0 || bloquearBusquedaPorCuit}
-        />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', marginBottom: 2 }}>
+        <Box className={styles.empresaSelectorContainer} sx={{ flexShrink: 0 }}>
+          <CustomSelectSearch<Empresa>
+            label="Seleccionar Empresa"
+            options={empresas}
+            value={empresaSeleccionada}
+            onChange={handleEmpresaChange}
+            getOptionLabel={getEmpresaLabel}
+            isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
+            loading={isLoadingEmpresas}
+            disabled={isLoadingEmpresas || empresas.length === 0 || bloquearBusquedaPorCuit}
+          />
+        </Box>
+        {tieneFiltroAplicado && (
+          <>
+            <Typography variant="h5" sx={{ fontWeight: 500 }}>
+              Filtro aplicado: <strong>{decodeURIComponent(filtroNombreParam)}</strong>
+            </Typography>
+            <CustomButton variant="outlined" size="small" onClick={handleLimpiarFiltro}>
+              Limpiar Filtro
+            </CustomButton>
+          </>
+        )}
       </Box>
 
-      <EmpleadorSiniestrosContextProvider cuit={cuitFinal}>
+      <EmpleadorSiniestrosContextProvider cuit={cuitFinal} proposition={proposition}>
         <TablaSiniestrosPadre
           cuitDesdeQuery={cuitDesdeQuery}
           empresaSeleccionada={empresaSeleccionada}

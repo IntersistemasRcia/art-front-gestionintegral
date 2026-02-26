@@ -55,11 +55,15 @@ function mapRowToSiniestroItem(row: Row): SiniestroItem {
   };
 }
 
-function buildQuery(cuit: number): Query {
+function buildQuery(cuit: number, proposition?: string | null): Query {
+  const baseWhere = `eq(empCUIT,${cuit})`;
+  const where = proposition?.trim()
+    ? `and(${baseWhere},${proposition.trim()})`
+    : baseWhere;
   return {
     select: SELECT_COLUMNS.map((name) => ({ value: name, name })),
     from: [{ table: TABLE_NAME }],
-    where: `eq(empCUIT,${cuit})`,
+    where,
     order: { by: ["siniestroNro"] },
   };
 }
@@ -78,10 +82,14 @@ const EmpleadorSiniestrosContext = createContext<EmpleadorSiniestrosContextType 
 type Props = {
   children: ReactNode;
   cuit: number | undefined;
+  proposition?: string | null;
 };
 
-export function EmpleadorSiniestrosContextProvider({ children, cuit }: Props) {
-  const query = useMemo(() => (cuit != null && cuit > 0 ? buildQuery(cuit) : null), [cuit]);
+export function EmpleadorSiniestrosContextProvider({ children, cuit, proposition }: Props) {
+  const query = useMemo(
+    () => (cuit != null && cuit > 0 ? buildQuery(cuit, proposition) : null),
+    [cuit, proposition]
+  );
 
   const executeKey = query != null ? [QueriesAPI.executeURL, token.getToken(), JSON.stringify(query)] as const : null;
   const executeFetcher = (key: typeof executeKey) => {

@@ -38,16 +38,25 @@ const InicioPage = () => {
             Error al cargar los indicadores
           </Box>
         ) : indicadores && indicadores.length > 0 ? (
-          indicadores.map((indicador: IndicadorDTO, index: number) => (
-            <Card
-              key={indicador.id}
-              title={indicador.descripcion}
-              quantity={indicador.valor}
-              description={indicador.nombre}
-              link={indicador.link}
-              borderColorClass={borderColors[index % borderColors.length]}
-            />
-          ))
+          indicadores.map((indicador: IndicadorDTO, index: number) => {
+            const baseLink = indicador.link ?? "";
+            const params = new URLSearchParams();
+            if (indicador.filtroId != null) {
+              params.set("filtroId", String(indicador.filtroId));
+              params.set("filtroNombre", indicador.descripcion ?? "");
+            }
+            const link = params.toString() ? `${baseLink}${baseLink.includes("?") ? "&" : "?"}${params}` : baseLink;
+            return (
+              <Card
+                key={indicador.id}
+                title={indicador.descripcion}
+                quantity={indicador.valor}
+                description={indicador.nombre}
+                link={link}
+                borderColorClass={borderColors[index % borderColors.length]}
+              />
+            );
+          })
         ) : (
           <Box sx={{ gridColumn: '1 / -1', padding: '20px', textAlign: 'center', color: 'var(--gris)' }}>
             No hay indicadores disponibles
