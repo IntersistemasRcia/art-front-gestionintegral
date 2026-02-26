@@ -115,10 +115,9 @@ export function EmpleadorSiniestrosContextProvider({ children, cuit, proposition
   );
 
   const value = useMemo<EmpleadorSiniestrosContextType>(() => {
-    const rows: SiniestroItem[] = Array.isArray(executeData?.data)
-      ? executeData.data.map(mapRowToSiniestroItem)
-      : [];
-    const firstRow = Array.isArray(executeData?.data) && executeData.data.length > 0 ? executeData.data[0] : null;
+    const data = executeData?.data;
+    const rows: SiniestroItem[] = Array.isArray(data) ? data.map(mapRowToSiniestroItem) : [];
+    const firstRow = Array.isArray(data) && data.length > 0 ? data[0] : null;
     const razonSocialFromQuery = firstRow
       ? String(firstRow?.RazonSocial ?? firstRow?.razonSocial ?? "").trim() || null
       : null;
