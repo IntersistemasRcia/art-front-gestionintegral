@@ -3,7 +3,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useState, useEffect, useMemo, Dispatch, SetStateAction } from 'react';
 import { usePathname } from 'next/navigation';
-import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data, BsCreditCard } from 'react-icons/bs';
+import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data, BsCreditCard, BsGear } from 'react-icons/bs';
 import { MdGroups } from "react-icons/md";
 import { FaFileInvoiceDollar } from "react-icons/fa6";
 import { IconType } from 'react-icons';
@@ -87,6 +87,14 @@ const menuItems: MenuItem[] = [
     icon: BsPersonFillGear,
     link: "/inicio/usuarios",
     permissionTask: "Usuarios",
+  },
+  {
+    name: "Configuraciones",
+    icon: BsGear,
+    permissionTask: "Configuraciones",
+    children: [
+      { name: "Indicadores", icon: BsBarChartLineFill, link: "/inicio/configuraciones/indicadores", permissionTask: "Configuraciones_Indicadores" },
+    ],
   },
 ];
 

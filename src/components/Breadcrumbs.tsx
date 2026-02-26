@@ -16,7 +16,7 @@ const Breadcrumbs = () => {
         {pathnames.map((value, index) => {
           const to = `/${pathnames.slice(0, index + 1).join('/')}`;
           const isLast = index === pathnames.length - 1;
-          const name = value.charAt(0).toUpperCase() + value.slice(1);
+          const name = value.toLowerCase();
 
           return (
             <li key={to}>
