@@ -17,6 +17,11 @@ export interface Empresa {
   localidad: string;
   provincia: string;
 }
+
+export interface RefSector {
+  id: number;
+  descripcion: string;
+}
 //#endregion Types
 
 //#region token
@@ -51,6 +56,17 @@ export class AuthAPIClass extends ExternalAPI {
       this.getEmpresas(params)
     );
   //#endregion getEmpresas
+
+    //Region Sectores
+  readonly refSectoresURL = () => this.getURL({ path: "/api/Sectores" }).toString();
+  getRefSectores = async () => tokenizable.get<RefSector[]>(
+    this.refSectoresURL()
+  ).then(({ data }) => data);
+  useGetRefSectores = () => useSWR(
+    [this.refSectoresURL(), token.getToken()], () => this.getRefSectores()
+  );
+  //#endregion
+  
 }
 
 const AuthAPI = Object.seal(new AuthAPIClass());

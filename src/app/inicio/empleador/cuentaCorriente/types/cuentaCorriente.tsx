@@ -17,6 +17,7 @@ export type CuentaCorrienteRegistro = {
     totalCuotaAPagar: number;
     totalPagadoCuota: number;
     saldoMensual: number;
+    saldoAcumulado: number;
 }
 
 export type DDJJRegistro = {

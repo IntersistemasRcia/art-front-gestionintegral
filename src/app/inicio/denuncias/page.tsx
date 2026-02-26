@@ -52,6 +52,12 @@ const buildFechaHoraSiniestroIso = (fechaOcurrencia?: string, hora?: string): st
     : dayjs().toISOString();
 };
 
+const buildFechaHoraTomaConocimientoIso = (fechaInformacionArt?: string): string => {
+  return fechaInformacionArt
+    ? dayjs(fechaInformacionArt).toISOString()
+    : dayjs().toISOString();
+};
+
 const buildAfiNacimientoYear = (fechaNac?: string): number => {
   return fechaNac ? dayjs(fechaNac).year() : 0;
 };
@@ -160,6 +166,7 @@ const parseApiTimeToHM = (v: any): string => {
 
 const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, empleadorCuit?: number) => {
   const fechaHoraSiniestro = buildFechaHoraSiniestroIso(formData.fechaOcurrencia, formData.hora);
+  const fechaHoraTomaConocimientoSiniestro = buildFechaHoraTomaConocimientoIso(formData.fechaInformacionArt);
   const afiFechaNacimiento = buildAfiNacimientoYear(formData.fechaNac);
   const emp = empresa || {};
   const empCuitNum = typeof empleadorCuit === 'number' ? empleadorCuit : onlyDigits(formData.empCuit);
@@ -237,6 +244,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     origenIngreso: 'web',
     descripcion: formData.descripcion,
     fechaHoraSiniestro,
+    fechaHoraTomaConocimientoSiniestro,
 
     enViaPublica: mapSiNoToApi(formData.enViaPublica || ''),
 
@@ -350,6 +358,9 @@ const transformFormDataToPutRequest = async (
 
     avisoEmpleadorSinContratoVigente: false,
     avisoTrabajadorFueraNomina: 0,
+
+    // Fecha en que se tomó conocimiento (API espera 'siniestroTomaConocimientoFechaHora' en PUT)
+    siniestroTomaConocimientoFechaHora: (base as any).fechaHoraTomaConocimientoSiniestro || '',
 
     denunciaInstanciaImagenes,
   } as DenunciaPutRequest;
@@ -569,6 +580,12 @@ function DenunciasPage() {
         const horaFromIso = fechaIso && dayjs(fechaIso).isValid()
           ? dayjs(fechaIso).format('HH:mm')
           : '';
+        // Fecha en la que se informó a la ART (puede venir en siniestroTomaConocimientoFechaHora)
+        const rawInfoIso = sin?.siniestroTomaConocimientoFechaHora ?? api.siniestroTomaConocimientoFechaHora ?? null;
+        const fechaInfoIso = rawInfoIso != null ? String(rawInfoIso) : null;
+        const fechaInformacionFromIso = fechaInfoIso && dayjs(fechaInfoIso).isValid()
+          ? dayjs(fechaInfoIso).format('YYYY-MM-DD')
+          : '';
         const fechaCalc = fechaFromIso || parseApiDateToYMD(sin?.siniestroFecha);
         const horaCalc = horaFromIso || parseApiTimeToHM(sin?.siniestroHora);
         const mapped: DenunciaFormData = {
@@ -622,6 +639,7 @@ function DenunciasPage() {
           descripcion: descripcionVal,
           fechaOcurrencia: fechaCalc || initialDenunciaFormData.fechaOcurrencia,
           hora: horaCalc || initialDenunciaFormData.hora,
+          fechaInformacionArt: fechaInformacionFromIso || initialDenunciaFormData.fechaInformacionArt,
           enViaPublica: enViaPublicaSel,
           // Datos del Establecimiento (para poder editarlos)
           establecimientoCuit: api.empEstCuit != null ? String(api.empEstCuit) : initialDenunciaFormData.establecimientoCuit,
