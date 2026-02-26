@@ -478,6 +478,7 @@ export type DenunciaPostRequest = {
   denunciaCanalIngresoInterno: number;
   descripcion: string;
   fechaHoraSiniestro: string;
+  fechaHoraTomaConocimientoSiniestro: string;
   enViaPublica: string;
 
   tipoAccidente: string;
@@ -582,6 +583,8 @@ export type DenunciaPutRequest = {
   enViaPublica: string;
   tipoAccidente: string;
   estadoDenunciaSiniestro: string;
+  fechaHoraTomaConocimientoSiniestro?: string;
+  siniestroTomaConocimientoFechaHora?: string;
   conIniTelefono: string;
   conIniApellidoNombres: string;
   conIniRelacionConFamiliar: string;

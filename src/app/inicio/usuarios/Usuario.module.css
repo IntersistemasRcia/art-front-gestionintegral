@@ -29,6 +29,13 @@
   height: fit-content;
 }
 
+.infoColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
 .infoPanelTitle {
   font-size: 16px !important;
   font-weight: 600 !important;

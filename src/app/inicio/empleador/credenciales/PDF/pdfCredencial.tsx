@@ -56,6 +56,7 @@ export async function buildCredencialPdf(input: CredencialPdfInput): Promise<jsP
   const afiliado = input.afiliado ?? {};
   const poliza0 = (input.poliza && input.poliza.length > 0 ? input.poliza[0] : undefined) ?? {};
   const assets = input.assets ?? {};
+  let hadError = false;
 
   const pageW = pdf.internal.pageSize.getWidth();
 
@@ -168,6 +169,7 @@ export async function buildCredencialPdf(input: CredencialPdfInput): Promise<jsP
       const qrSize = 18;
       pdf.addImage(qrDataUrl, "PNG", backX + halfW - qrSize - 4, bodyY + 2, qrSize, qrSize);
     } catch {
+      hadError = true;
       // sin QR si no carga
     }
   }
@@ -182,10 +184,42 @@ export async function buildCredencialPdf(input: CredencialPdfInput): Promise<jsP
 
   const srtUrl = assets.srtImageUrl ?? "/icons/SRT.png";
   try {
-    const srtDataUrl = await urlToDataUrl(srtUrl);
-    pdf.addImage(srtDataUrl, "PNG", backX + halfW - 26, footerY - 6, 22, 10);
-  } catch {
+    // Agregar solo el QR encima del logo, dejando el logo SRT en su posición/size original
+    try {
+      // coordenadas y tamaños para logo SRT y QR (declaradas aquí para alcance)
+      const srtW = 20; // ancho un poco mayor (aumentado 2mm)
+      const srtH = 8;  // altura rectangular
+      const srtX = backX + halfW - srtW - 4; // posicionar a la derecha con pequeño margen
+      const srtY = footerY - 2; // mover logo SRT 4mm hacia abajo (solo el logo)
+      const qrSize = 20; 
+      const qrX = srtX + (srtW - qrSize) / 2; // centrar QR sobre el logo
+      const qrY = srtY - qrSize - 10; 
+
+      // intentar agregar QR encima (si existe)
+      try {
+        const qrAboveUrl = "/images/qr.png";
+        const qrAboveDataUrl = await urlToDataUrl(qrAboveUrl);
+        pdf.addImage(qrAboveDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+      } catch {
+        // si no carga el QR, continuar
+      }
+
+      // agregar logo SRT en su tamaño/posición ajustada
+      const srtDataUrl = await urlToDataUrl(srtUrl);
+      pdf.addImage(srtDataUrl, "PNG", srtX, srtY, srtW, srtH);
+      } catch (e) {
+        hadError = true;
+        console.error('Error añadiendo logo SRT o QR:', e);
+        // sin logo SRT si no carga
+      }
+  } catch (e) {
+    hadError = true;
+    console.error('Error procesando logo SRT:', e);
     // sin logo SRT si no carga
+  }
+
+  if (hadError) {
+    throw new Error('No se pudo descargar la credencial, por favor vuelva a intentar');
   }
 
   return pdf;

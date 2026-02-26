@@ -363,11 +363,64 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const [detallePage, setDetallePage] = useState<number>(1);
   const pageSize = 20;
 
-  const totalPages = Math.max(1, Math.ceil(detalleFiltrado.length / pageSize));
-  const detallePageData = useMemo(
-    () => detalleFiltrado.slice((detallePage - 1) * pageSize, detallePage * pageSize),
-    [detalleFiltrado, detallePage]
-  );
+  // Página por rangos de 'interno' (mapas por tipo de formulario)
+  const [tipoFormularioSelected, setTipoFormularioSelected] = useState<number | null>(null);
+
+  const pagesByType = useMemo(() => {
+    const a = [
+      [1, 20],
+      [21, 43],
+      [44, 63],
+      [64, 90],
+      [91, 112],
+      [113, 134],
+      [135, 149],
+      [150, 161]
+    ];
+    const b = [
+      [1, 26],
+      [27, 51],
+      [52, 80],
+      [81, 104],
+      [105, 135],
+      [136, 162],
+      [163, 188],
+      [189, 210]
+    ];
+    const c = [
+      [1, 19],
+      [20, 52],
+      [53, 70],
+      [71, 82],
+      [83, 98],
+      [99, 134],
+      [135, 148],
+      [149, 151]
+    ];
+    return { a, b, c } as const;
+  }, []);
+
+  const currentPages = useMemo(() => {
+    if (tipoFormularioSelected === 1) return pagesByType.a;
+    if (tipoFormularioSelected === 2) return pagesByType.b;
+    if (tipoFormularioSelected === 3) return pagesByType.c;
+    return null as null | number[][];
+  }, [tipoFormularioSelected, pagesByType]);
+
+  const totalPages = currentPages ? Math.max(1, currentPages.length) : Math.max(1, Math.ceil(detalleFiltrado.length / pageSize));
+
+  const detallePageData = useMemo(() => {
+    if (currentPages) {
+      const idx = Math.max(0, Math.min(detallePage - 1, currentPages.length - 1));
+      const sel = currentPages[idx] ?? [];
+      if (Array.isArray(sel) && sel.length === 2) {
+        const [from, to] = sel;
+        return detalleFiltrado.filter(d => (d.Nro ?? 0) >= from && (d.Nro ?? 0) <= to).sort((x, y) => (x.Nro ?? 0) - (y.Nro ?? 0));
+      }
+      return [] as typeof detalleFiltrado;
+    }
+    return detalleFiltrado.slice((detallePage - 1) * pageSize, detallePage * pageSize);
+  }, [detalleFiltrado, detallePage, currentPages]);
 
   // Asegura que la página actual no exceda el total de páginas al cambiar el detalle.
   useEffect(() => {
@@ -596,6 +649,8 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     setPlanillaA(data.planillaA);
     setPlanillaC(data.planillaC);
     setPlanillaB(data.planillaB);
+    // Guardar el tipo de formulario (internoFormulario) para mapear páginas
+    setTipoFormularioSelected(data.internoFormulario ?? null);
 
   };
 
@@ -913,15 +968,34 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
                         </tr>
                       </thead>
                       <tbody>
-                        {detallePageData.map((r) => (
-                          <tr key={r.Nro}>
-                            <td>{r.Nro}</td>
-                            <td>{r.Pregunta || '—'}</td>
-                            <td>{r.Respuesta}</td>
-                            <td>{r.FechaRegularizacion}</td>
-                            <td>{r.NormaVigente || '—'}</td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          // Agrupar por Categoria y renderizar título centrado y en negrita
+                          const groups: Record<string, FormularioRGRLDetalle[]> = {};
+                          const orderMap: Record<string, number> = {};
+                          for (const it of detallePageData) {
+                            const t = (it.Categoria ?? 'Sin categoría').toString();
+                            if (!groups[t]) groups[t] = [];
+                            groups[t].push(it);
+                            orderMap[t] = it.CategoriaOrden ?? orderMap[t] ?? 0;
+                          }
+                          const titles = Object.keys(groups).sort((a, b) => (orderMap[a] ?? 0) - (orderMap[b] ?? 0));
+                          return titles.map(title => (
+                            <React.Fragment key={title}>
+                              <tr>
+                                <td colSpan={5} style={{ textAlign: 'center', fontWeight: 700, padding: '8px 0' }}>{title}</td>
+                              </tr>
+                              {groups[title].map(r => (
+                                <tr key={r.Nro}>
+                                  <td>{r.Nro}</td>
+                                  <td>{r.Pregunta || '—'}</td>
+                                  <td>{r.Respuesta}</td>
+                                  <td>{r.FechaRegularizacion}</td>
+                                  <td>{r.NormaVigente || '—'}</td>
+                                </tr>
+                              ))}
+                            </React.Fragment>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>

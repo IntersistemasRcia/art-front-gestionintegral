@@ -83,7 +83,7 @@ export const ruleProcessor: RuleProcessor = (rule, options, meta) => {
     if (Array.isArray(v)) return v.map(e => formatValue(e)).join(",");
     v = getInputValue();
     switch (typeof v) {
-      case "string": return `'${v.replace("\\", "\\\\").replace("'", "\\'")}'`;
+      case "string": return `'${sanitizeStringValue(v)}'`;
       case "number": return `${v}`;
       case "boolean": return !v ? "0" : "1";
       default: return "";
@@ -98,6 +98,14 @@ export const ruleProcessor: RuleProcessor = (rule, options, meta) => {
         default: return v;
       }
     }
+  }
+
+  function sanitizeStringValue(input: string) {
+    return String(input)
+      .replace(/[\t\r\n]+/g, " ")
+      .trim()
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'");
   }
   function like(opc?: { pre?: string, value?: any, pos?: string }) {
     if (source === "field") return formatValue();

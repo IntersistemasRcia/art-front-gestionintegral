@@ -26,12 +26,17 @@ import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 import CargoInterface from "./interfaces/CargoInterface";
 import Formato from "@/utils/Formato";
+import ArtAPI from '@/data/artAPI';
+import useSWR from 'swr';
+import AuthAPI from '@/data/authAPI';
+import dayjs from 'dayjs';
 
 // Definición del modo de operación (replicada desde UsuariosPage)
 export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
 
 export interface UsuarioFormFields {
   nombre: string;
+  apellido?: string;
   email: string;
   cuit: string; // Keep as string for form input, will convert to number on submit
   phoneNumber: string;
@@ -63,6 +68,7 @@ export interface UsuarioFormFields {
   serviciosAdicionales?: number;
   aplicaIva?: number;
   srtComercializadorOrganizadorInterno?: number;
+  sectorId?: number;
 }
 
 export interface Props {
@@ -82,6 +88,7 @@ export interface Props {
 
 const initialFormState: UsuarioFormFields = {
   nombre: "",
+  apellido: "",
   email: "",
   cuit: "",
   phoneNumber: "",
@@ -94,11 +101,13 @@ const initialFormState: UsuarioFormFields = {
   // tipo: "",
   userName: "",
   empresaId: 0,
+  sectorId: undefined,
 };
 
 // Interfaces completas para errores y campos tocados
 export interface ValidationErrors {
   nombre?: string;
+  apellido?: string;
   email?: string;
   cuit?: string;
   phoneNumber?: string;
@@ -123,10 +132,12 @@ export interface ValidationErrors {
   id?: string;
   maxUsuarios?: string;
   cantidadUsuarios?: string;
+  sectorId?: string;
 }
 
 export interface TouchedFields {
   nombre?: boolean;
+  apellido?: boolean;
   email?: boolean;
   cuit?: boolean;
   phoneNumber?: boolean;
@@ -157,6 +168,7 @@ export interface TouchedFields {
   aplicaIva?: boolean;
   maxUsuarios?: boolean;
   cantidadUsuarios?: boolean;
+  sectorId?: boolean;
 }
 
 export default function UsuarioForm({
@@ -181,6 +193,7 @@ export default function UsuarioForm({
   const [modalMsgOpen, setModalMsgOpen] = useState<boolean>(false);
   const [modalMsgText, setModalMsgText] = useState<string>("");
   const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
+  const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
@@ -205,7 +218,7 @@ export default function UsuarioForm({
     // Restablecer el formulario y los estados de error/tocado al abrir o cambiar los datos
     if (initialData) {
       const processedData = { ...initialData };
-      
+
       // Aplicar formato al CUIT
       console.log("Initial:", processedData);
       if (processedData.userName) {
@@ -234,16 +247,17 @@ export default function UsuarioForm({
         const currentCountFromList = usuarios.filter((u) => u.empresaId === processedData.empresaId).length;
         processedData.cantidadUsuarios = empresa?.cantidadUsuarios ?? currentCountFromList;
       }
-      
+
       setForm(processedData);
     } else {
       setForm(initialFormState);
     }
-    
+
     setErrors({});
     setTouched({});
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
     setShowPassword(false); // Resetear la visibilidad de contraseña
+    setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
   }, [initialData, open, isEditing, isCreating, cargos, refEmpleadores]);
 
   const modalTitle = useMemo(() => {
@@ -359,7 +373,7 @@ export default function UsuarioForm({
           // En edición, solo validar si alguno de los campos de password tiene contenido
           const hasPassword = form.password && form.password.trim() !== "";
           const hasConfirmPassword = value.trim() !== "";
-          
+
           if (hasPassword || hasConfirmPassword) {
             // Si cualquiera tiene contenido, validar ambos
             return validateConfirmPassword(value, form.password || "");
@@ -443,6 +457,12 @@ export default function UsuarioForm({
           ...prev,
           [name]: formattedCuit,
         }));
+        // Si completó 11 dígitos, disparar consulta ARCA
+        if (cleanValue.length === 11) {
+          setArcaCUIL(Number(cleanValue));
+        } else {
+          setArcaCUIL(undefined);
+        }
       }
     } else {
       setForm((prev: UsuarioFormFields) => ({
@@ -450,7 +470,7 @@ export default function UsuarioForm({
         [name]: value,
       }));
     }
-        
+
     if (touched[fieldName]) {
       const error = validateField(fieldName, name === "cuit" ? formatCuit(value.replace(/[^0-9]/g, '')) : value);
       setErrors((prev) => ({
@@ -498,10 +518,28 @@ export default function UsuarioForm({
     }
   };
 
+  const handleSectorChange = (e: SelectChangeEvent<number | "">) => {
+    const { value } = e.target;
+    const sectorId = value === "" ? undefined : Number(value);
+
+    setForm((prev: UsuarioFormFields) => ({
+      ...prev,
+      sectorId: sectorId,
+    }));
+
+    if (touched.sectorId) {
+      const error = validateField("sectorId", String(sectorId || ""));
+      setErrors((prev) => ({
+        ...prev,
+        sectorId: error,
+      }));
+    }
+  };
+
   const handleIsAdminUserChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     setIsAdminUser(checked);
-    
+
     if (checked) {
       // Si se marca como administrador, limpiar la empresa y establecer rol
       setForm((prev: UsuarioFormFields) => ({
@@ -511,7 +549,7 @@ export default function UsuarioForm({
         maxUsuarios: 0,
         cantidadUsuarios: 0,
       }));
-      
+
       // Limpiar errores de empresa y rol si existen
       setErrors((prev) => ({
         ...prev,
@@ -526,7 +564,7 @@ export default function UsuarioForm({
         ...prev,
         rol: "",
       }));
-      
+
       if (touched.empresaId) {
         const empresaError = validateField("empresaId", String(form.empresaId || ""));
         setErrors((prev) => ({
@@ -557,6 +595,25 @@ export default function UsuarioForm({
     }));
   };
 
+  // Llamada ARCA: usar useSWR con key null hasta completar 11 dígitos
+  const { data: arcaData, isValidating: isLoadingArca, error: arcaError } = useSWR(
+    arcaCUIL ? ArtAPI.getARCAURL({ CUIL: arcaCUIL }) : null,
+    () => ArtAPI.getARCA({ CUIL: arcaCUIL }),
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+
+  const { data: sectores, isValidating: isLoadingSectores, error: sectoresError } = AuthAPI.useGetRefSectores();
+
+  useEffect(() => {
+    if (!arcaData) return;
+    setForm(prev => ({
+      ...prev,
+      nombre: arcaData.nombre ?? prev.nombre,
+      apellido: arcaData.apellido ?? prev.apellido,
+      fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
+    }));
+  }, [arcaData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -577,7 +634,7 @@ export default function UsuarioForm({
     if (isCreating && isAdminUser) {
       finalEmpresaId = 0; // Si es administrador, empresaId debe ser 0
     }
-    
+
     const formDataWithDefaults = {
       ...form,
       cuit: form.cuit.replace(/[^\d]/g, ""), // Parse CUIT as integer, removing all non-digits
@@ -585,7 +642,7 @@ export default function UsuarioForm({
       tipo: "", // Default type
       rol: form.rol || (roles.length > 0 ? roles[0].nombre : ""), // Default to first role
       empresaId: finalEmpresaId,
-    };    
+    };
 
     // Mark all fields as touched
     const allTouched: TouchedFields = Object.keys(form).reduce((acc, key) => {
@@ -613,7 +670,7 @@ export default function UsuarioForm({
   return (
     <CustomModal
       open={open}
-      onClose={isSubmitting ? () => {} : onClose}
+      onClose={isSubmitting ? () => { } : onClose}
       title={modalTitle}
       size={isCreating ? "large" : "mid"}
     >
@@ -646,6 +703,19 @@ export default function UsuarioForm({
                   required={!isDisabled}
                   disabled={isDisabled}
                   placeholder="Ingrese nombre"
+                />
+                <TextField
+                  label="Apellido"
+                  name="apellido"
+                  value={form.apellido || ''}
+                  onChange={handleTextFieldChange}
+                  onBlur={() => handleBlur("apellido")}
+                  error={touched.apellido && !!errors.apellido}
+                  helperText={touched.apellido && errors.apellido}
+                  fullWidth
+                  required={!isDisabled}
+                  disabled={isDisabled}
+                  placeholder="Ingrese apellido"
                 />
               </div>
 
@@ -725,7 +795,7 @@ export default function UsuarioForm({
                     onBlur={() => handleBlur("cargoId")}
                     displayEmpty
                   >
-                    
+
                     {cargos.map((cargo) => (
                       <MenuItem key={cargo.id} value={cargo.id}>
                         {cargo.descripcion}
@@ -773,6 +843,44 @@ export default function UsuarioForm({
                     </Typography>
                   )}
                 </FormControl>
+                <FormControl
+                  fullWidth
+                  required={!isDisabled}
+                  error={touched.sectorId && !!errors.sectorId}
+                  disabled={isDisabled}
+                >
+                  <InputLabel>Sector</InputLabel>
+                  <Select
+                    name="sectorId"
+                    value={form.sectorId ?? ""}
+                    label="Sector"
+                    onChange={handleSectorChange}
+                    onBlur={() => handleBlur("sectorId")}
+                  >
+                    {isLoadingSectores ? (
+                      <MenuItem value="">
+                        <em>Cargando...</em>
+                      </MenuItem>
+                    ) : sectores && sectores.length > 0 ? (
+                      sectores.map((s) => (
+                        <MenuItem key={s.id} value={s.id}>
+                          {s.descripcion}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem value="">No hay sectores</MenuItem>
+                    )}
+                  </Select>
+                  {touched.sectorId && errors.sectorId && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ ml: 2, mt: 0.5 }}
+                    >
+                      {errors.sectorId}
+                    </Typography>
+                  )}
+                </FormControl>
               </div>
 
               {isCreating && (
@@ -791,7 +899,7 @@ export default function UsuarioForm({
                         maxUsuarios: newValue?.cantidadUsuariosMaxima ?? prev.maxUsuarios ?? 0,
                         cantidadUsuarios: newValue?.cantidadUsuarios ?? usuarios.filter(u => u.empresaId === empresaId).length,
                       }));
-                      
+
                       if (touched.empresaId) {
                         const error = validateField("empresaId", String(empresaId));
                         setErrors((prev) => ({
@@ -839,7 +947,7 @@ export default function UsuarioForm({
                   name="cantidadUsuarios"
                   type="number"
                   value={form.cantidadUsuarios ?? 0}
-                  onChange={() => {}}
+                  onChange={() => { }}
                   fullWidth
                   disabled
                 />
@@ -863,86 +971,86 @@ export default function UsuarioForm({
 
             {/* Credenciales de Acceso (Ocultas en View y Deleted)*/}
             {(isCreating || isEditing) && (
-                <div className={styles.formSection}>
-                  <Typography variant="h6" className={styles.sectionTitle}>
-                    Credenciales de Acceso
-                  </Typography>
+              <div className={styles.formSection}>
+                <Typography variant="h6" className={styles.sectionTitle}>
+                  Credenciales de Acceso
+                </Typography>
 
-                  <div className={styles.formRow}>
-                    <TextField
-                      label={
-                        isCreating
-                          ? "Contraseña temporal"
-                          : "Nueva contraseña (opcional)"
-                      }
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      value={form.password}
-                      onChange={handleTextFieldChange}
-                      onBlur={() => handleBlur("password")}
-                      error={touched.password && !!errors.password}
-                      helperText={touched.password && errors.password}
-                      fullWidth
-                      required={isCreating && !isDisabled}
-                      disabled={isDisabled}
-                      placeholder={
-                        isCreating ? "••••••••" : "Dejar vacío para no cambiar"
-                      }
-                    />
-                    <TextField
-                      label={
-                        isCreating
-                          ? "Confirmar contraseña"
-                          : "Confirmar nueva contraseña"
-                      }
-                      name="confirmPassword"
-                      type={showPassword ? "text" : "password"}
-                      value={form.confirmPassword}
-                      onChange={handleTextFieldChange}
-                      onBlur={() => handleBlur("confirmPassword")}
-                      error={
-                        touched.confirmPassword && !!errors.confirmPassword
-                      }
-                      helperText={
-                        touched.confirmPassword && errors.confirmPassword
-                      }
-                      fullWidth
-                      required={isCreating && !isDisabled}
-                      disabled={isDisabled}
-                      placeholder={
-                        isCreating ? "••••••••" : "Dejar vacío para no cambiar"
-                      }
-                    />
+                <div className={styles.formRow}>
+                  <TextField
+                    label={
+                      isCreating
+                        ? "Contraseña temporal"
+                        : "Nueva contraseña (opcional)"
+                    }
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={handleTextFieldChange}
+                    onBlur={() => handleBlur("password")}
+                    error={touched.password && !!errors.password}
+                    helperText={touched.password && errors.password}
+                    fullWidth
+                    required={isCreating && !isDisabled}
+                    disabled={isDisabled}
+                    placeholder={
+                      isCreating ? "••••••••" : "Dejar vacío para no cambiar"
+                    }
+                  />
+                  <TextField
+                    label={
+                      isCreating
+                        ? "Confirmar contraseña"
+                        : "Confirmar nueva contraseña"
+                    }
+                    name="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={form.confirmPassword}
+                    onChange={handleTextFieldChange}
+                    onBlur={() => handleBlur("confirmPassword")}
+                    error={
+                      touched.confirmPassword && !!errors.confirmPassword
+                    }
+                    helperText={
+                      touched.confirmPassword && errors.confirmPassword
+                    }
+                    fullWidth
+                    required={isCreating && !isDisabled}
+                    disabled={isDisabled}
+                    placeholder={
+                      isCreating ? "••••••••" : "Dejar vacío para no cambiar"
+                    }
+                  />
 
-                    <div className={styles.showPasswordRow}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={showPassword}
-                            onChange={handleShowPasswordChange}
-                            disabled={isDisabled}
-                            color="primary"
-                          />
-                        }
-                        label="Mostrar contraseña"
-                      />
-                    </div>
+                  <div className={styles.showPasswordRow}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={showPassword}
+                          onChange={handleShowPasswordChange}
+                          disabled={isDisabled}
+                          color="primary"
+                        />
+                      }
+                      label="Mostrar contraseña"
+                    />
                   </div>
-
-                  <Typography variant="body2" className={styles.passwordHelp}>
-                    {isCreating
-                      ? "La contraseña debe tener al menos 8 caracteres, incluir mayúsculas, minúsculas y números."
-                      : "Deje ambos campos vacíos para mantener la contraseña actual. Si desea cambiarla, complete ambos campos con la nueva contraseña."}
-                  </Typography>
                 </div>
-              )}
+
+                <Typography variant="body2" className={styles.passwordHelp}>
+                  {isCreating
+                    ? "La contraseña debe tener al menos 8 caracteres, incluir mayúsculas, minúsculas y números."
+                    : "Deje ambos campos vacíos para mantener la contraseña actual. Si desea cambiarla, complete ambos campos con la nueva contraseña."}
+                </Typography>
+              </div>
+            )}
             <div className={styles.formActions}>
               {/* Botón de acción principal (Oculto en 'view') */}
               {!isViewing && (
-                <CustomButton 
-                  type="submit" 
+                <CustomButton
+                  type="submit"
                   disabled={isSubmitting}
-                  style={{ 
+                  style={{
                     opacity: isSubmitting ? 0.7 : 1,
                     cursor: isSubmitting ? 'not-allowed' : 'pointer'
                   }}
@@ -950,17 +1058,17 @@ export default function UsuarioForm({
                   {isSubmitting ? (
                     <>
                       <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                      {isEditing ? "Guardando..." 
-                       : isDeleting ? "Procesando..." 
-                       : isActivating ? "Activando..." 
-                       : "Registrando..."}
+                      {isEditing ? "Guardando..."
+                        : isDeleting ? "Procesando..."
+                          : isActivating ? "Activando..."
+                            : "Registrando..."}
                     </>
                   ) : (
                     <>
                       {isEditing ? "Guardar Cambios"
-                       : isDeleting ? "Dar de baja Usuario"
-                       : isActivating ? "Activar Usuario"
-                       : "Registrar Usuario"}
+                        : isDeleting ? "Dar de baja Usuario"
+                          : isActivating ? "Activar Usuario"
+                            : "Registrar Usuario"}
                     </>
                   )}
                 </CustomButton>
@@ -970,7 +1078,7 @@ export default function UsuarioForm({
                 onClick={onClose}
                 color="secondary"
                 disabled={isSubmitting}
-                style={{ 
+                style={{
                   opacity: isSubmitting ? 0.7 : 1,
                   cursor: isSubmitting ? 'not-allowed' : 'pointer'
                 }}
@@ -980,18 +1088,49 @@ export default function UsuarioForm({
             </div>
           </div>
           {isCreating && (
-            <div className={styles.infoPanel}>
-              <Typography variant="h6" className={styles.infoPanelTitle}>
-                Información Importante
-              </Typography>
-              <ul className={styles.infoList}>
-                <li>El usuario recibirá un email para activar su cuenta</li>
-                <li>La contraseña temporal deberá ser cambiada</li>
-                <li>Posteriormente se podrán configurar los permisos</li>
-                <li>Los campos marcados con * son obligatorios</li>
-              </ul>
+            <div className={styles.infoColumn}>
+              <div className={styles.infoPanel}>
+                <Typography variant="h6" className={styles.infoPanelTitle}>
+                  Información Importante
+                </Typography>
+                <ul className={styles.infoList}>
+                  <li>El usuario recibirá un email para activar su cuenta</li>
+                  <li>La contraseña temporal deberá ser cambiada</li>
+                  <li>Posteriormente se podrán configurar los permisos</li>
+                  <li>Los campos marcados con * son obligatorios</li>
+                </ul>
+              </div>
+
+              <div className={styles.infoPanel}>
+                <Typography variant="h6" className={styles.infoPanelTitle}>
+                  Información de ARCA
+                </Typography>
+                <div style={{ marginTop: 8 }}>
+                  {isLoadingArca ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CircularProgress size={18} />
+                      <Typography variant="body2">Consultando ARCA...</Typography>
+                    </div>
+                  ) : arcaError ? (
+                    <Typography variant="body2" color="error">No se pudo consultar ARCA</Typography>
+                  ) : arcaData ? (
+                    <ul className={styles.infoList}>
+                      <li><strong>Nombre:</strong> {arcaData.nombre || ''}</li>
+                      <li><strong>Apellido:</strong> {arcaData.apellido || ''}</li>
+                      <li><strong>Fecha de Nac.:</strong> {arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : ''}</li>
+                    </ul>
+                  ) : (
+                    <ul className={styles.infoList}>
+                      <li><strong>Nombre:</strong> </li>
+                      <li><strong>Apellido:</strong> </li>
+                      <li><strong>Fecha de Nac.:</strong> </li>
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
           )}
+
         </div>
       </Box>
       <CustomModalMessage

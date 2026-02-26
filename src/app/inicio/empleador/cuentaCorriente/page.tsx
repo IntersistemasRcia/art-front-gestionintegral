@@ -138,6 +138,33 @@ function CuentaCorrientePage() {
     const sortedData = useMemo(() => {
         return CtaCteRawData?.data || [];
     }, [CtaCteRawData]);
+
+    // Calcular saldo mensual y saldo acumulado manualmente:
+
+    const computedData = useMemo(() => {
+        const rows = Array.isArray(sortedData) ? [...sortedData] : [];
+
+        // Ordenamos por periodo ascendente (antiguo -> reciente) para acumular correctamente
+        rows.sort((a: any, b: any) => String(a.periodo).localeCompare(String(b.periodo)));
+
+        let prevSaldoAcumulado = 0;
+
+        return rows.map((r: any) => {
+            const totalPagado = isNaN(parseToNumber(r.totalPagadoCuota)) ? 0 : parseToNumber(r.totalPagadoCuota);
+            const totalCuota = isNaN(parseToNumber(r.totalCuota)) ? 0 : parseToNumber(r.totalCuota);
+
+            const saldoMensual = totalPagado - totalCuota;
+            const saldoAcumulado = saldoMensual + prevSaldoAcumulado;
+
+            prevSaldoAcumulado = saldoAcumulado;
+
+            return {
+                ...r,
+                saldoMensual,
+                saldoAcumulado,
+            };
+        });
+    }, [sortedData]);
     
     // 1. CONTROL DE LA PESTAÑA: Usamos useState para el valor numérico
     // Iniciamos con 0 si queremos 'Estado de Cuenta', o 1 si queremos 'Últimas DDJJ'
@@ -185,15 +212,15 @@ function CuentaCorrientePage() {
         { header: 'FFEP S/Res', accessorKey: 'ffep', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: 'Total Cuota a Pagar', accessorKey: 'totalCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: 'Total Pagado Cuota', accessorKey: 'totalPagadoCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: 'Saldo Mensual', accessorKey: 'saldo', 
+        { header: 'Saldo Mensual', accessorKey: 'saldoMensual', 
             cell: info => {
-                const saldo = info.getValue() as number;
-                const mensual = -Number(saldo);
+                // Usamos el campo calculado `saldoMensual`
+                const mensual = Number(info.row.original?.saldoMensual ?? info.getValue() ?? 0);
                 const style = mensual < 0 ? { color: 'red', fontWeight: 'bold' } : {};
                 return <span style={style}>{formatCurrency(mensual)}</span>;
             }
             , meta: { align: 'center'} },
-        { header: 'Saldo Acumulado', accessorKey: 'saldoAcumulado', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: 'Saldo Acumulado', accessorKey: 'saldoAcumulado', cell: info => formatCurrency(info.row.original?.saldoAcumulado ?? info.getValue()), meta: { align: 'center'} },
     ], []);
 
     const columnsDDJJ: ColumnDef<DDJJRegistro>[] = useMemo(() => [
@@ -213,13 +240,13 @@ function CuentaCorrientePage() {
             content: (
                 <>
                     <DataTable
-                        data={sortedData || []} 
+                        data={computedData || []} 
                         columns={columns} 
                         size="mid"
                         isLoading={false}
                     />
                     <ExportButtons 
-                        data={sortedData || []}
+                        data={computedData || []}
                         type="estadoCuenta"
                         sumarleUnMesAlPeriodo={sumarleUnMesAlPeriodo}
                     />
@@ -232,13 +259,13 @@ function CuentaCorrientePage() {
             content: (
                 <>
                     <DataTable
-                        data={sortedData || []} 
+                        data={computedData || []} 
                         columns={columnsDDJJ} 
                         size="mid"
                         isLoading={false}
                     />
                     <ExportButtons 
-                        data={sortedData || []}
+                        data={computedData || []}
                         type="ultimasDDJJ"
                     />
                 </>

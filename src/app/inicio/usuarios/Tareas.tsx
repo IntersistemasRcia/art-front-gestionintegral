@@ -9,6 +9,7 @@ import {
   FormControlLabel,
   IconButton,
   Collapse,
+  CircularProgress,
 } from "@mui/material";
 import { ExpandMore, ExpandLess } from "@mui/icons-material";
 import CustomModal from '@/utils/ui/form/CustomModal';
@@ -22,7 +23,8 @@ interface TareasProps {
   open: boolean;
   onClose: () => void;
   usuario: UsuarioRow | null;
-  onSave: (permisos: PermisosModulo[]) => void;
+  // Puede retornar una promesa o ser sincrónica
+  onSave: (permisos: PermisosModulo[]) => void | Promise<void>;
 }
 
 interface PermisosModulo {
@@ -45,6 +47,9 @@ export default function Tareas({
   const [permisosModulos, setPermisosModulos] = useState<Record<number, boolean>>({});
   const [permisosTareas, setPermisosTareas] = useState<Record<string, boolean>>({});
   const [modulosExpandidos, setModulosExpandidos] = useState<Record<number, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   const getTareaKey = (moduloId: number, tareaId: number) => `${moduloId}-${tareaId}`;
 
@@ -78,6 +83,15 @@ export default function Tareas({
       setModulosExpandidos(modulosExpandidosIniciales);
     }
   }, [usuario]);
+
+  // Limpiar mensajes de estado cuando se abre el modal o cambia el usuario
+  useEffect(() => {
+    if (open) {
+      setSaveError(null);
+      setSaveSuccess(null);
+      setIsSaving(false);
+    }
+  }, [open, usuario?.id]);
 
   const handleModuloPermisoChange = (moduloId: number, habilitado: boolean) => {
     setPermisosModulos((prev) => ({
@@ -134,7 +148,7 @@ export default function Tareas({
     }));
   };
 
-  const handleGuardarConfiguracion = () => {
+  const handleGuardarConfiguracion = async () => {
     if (!usuario?.modulos) return;
 
     const modulosUnicos = getModulosUnicos();
@@ -153,8 +167,23 @@ export default function Tareas({
     }));
 
     console.log('Permisos módulos a enviar:', permisosModulosArray);
-    onSave(permisosModulosArray);
-    onClose();
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      const res = onSave(permisosModulosArray);
+      if (res && typeof (res as any).then === "function") {
+        await res;
+      }
+
+      setSaveSuccess("Guardado correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setSaveError(err?.message ?? "Error al guardar la configuración.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleVolver = () => {
@@ -202,73 +231,47 @@ export default function Tareas({
   return (
     <CustomModal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!isSaving) onClose();
+      }}
       title={`Configuración de Permisos - ${usuario.nombre}`}
       size="large"
     >
-      <Box sx={{ p: 2 }}>
+      <Box className={tareasStyles.container}>
         {/* Información del usuario */}
         <Typography
           variant="body2"
           color="textSecondary"
-          sx={{ mb: 2, fontSize: "1.8rem" }}
+          className={tareasStyles.titleText}
         >
           Administración de Usuarios &gt; {usuario.nombre} &gt; Configuración de
           Permisos
         </Typography>
 
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ fontSize: "1.5rem" }}>
+        <Box className={tareasStyles.userInfo}>
+          <Typography variant="body2" className={tareasStyles.userInfoText}>
             <strong>Usuario:</strong> {usuario.email}
           </Typography>
-          <Typography variant="body2" sx={{ fontSize: "1.5rem" }}>
+          <Typography variant="body2" className={tareasStyles.userInfoText}>
             <strong>Cargo:</strong> {usuario.cargoDescripcion}
           </Typography>
         </Box>
 
-        <Typography variant="body2" sx={{ mb: 3, fontSize: "1.5rem" }}>
+        <Typography variant="body2" className={tareasStyles.subtitle}>
           Seleccione a qué módulos tendrá acceso este usuario:
         </Typography>
 
         {/* Tabla de permisos */}
-        <Box
-          sx={{
-            border: "1px solid #ddd",
-            borderRadius: 1,
-            overflow: "hidden",
-            mb: 3,
-          }}
-        >
+        <Box className={tareasStyles.tableBox}>
           {/* Header */}
-          <Box
-            sx={{
-              display: "flex",
-              backgroundColor: "#f5f5f5",
-              borderBottom: "1px solid #ddd",
-              p: 1,
-            }}
-          >
-            <Typography
-              variant="body2"
-              sx={{ flex: 2, fontWeight: "bold", fontSize: "1.3rem" }}
-            >
+          <Box className={tareasStyles.tableHeader}>
+            <Typography variant="body2" className={tareasStyles.headerColLarge}>
               Opción del Menú
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                flex: 1,
-                fontWeight: "bold",
-                textAlign: "center",
-                fontSize: "1.3rem",
-              }}
-            >
+            <Typography variant="body2" className={tareasStyles.headerColCenter}>
               Acceso (S/N)
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{ flex: 2, fontWeight: "bold", fontSize: "1.3rem" }}
-            >
+            <Typography variant="body2" className={tareasStyles.headerColInfo}>
               Información sobre permisos
             </Typography>
           </Box>
@@ -278,21 +281,12 @@ export default function Tareas({
             ?.map((modulo, moduloIndex) => (
             <Box key={`modulo-${modulo.id}`}>
               {/* Header del módulo con control de permisos y expandir/contraer */}
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  backgroundColor: "#e8f4f8",
-                  p: 1,
-                  borderBottom: "1px solid #ddd",
-                  fontWeight: "bold",
-                }}
-              >
-                <Box sx={{ flex: 2, display: "flex", alignItems: "center" }}>
+              <Box className={tareasStyles.moduleHeader}>
+                <Box className={tareasStyles.moduleLeft}>
                   <IconButton
                     size="small"
                     onClick={() => handleToggleModulo(modulo.id)}
-                    sx={{ mr: 1 }}
+                    className={tareasStyles.iconButtonMargin}
                   >
                     {modulosExpandidos[modulo.id] ? (
                       <ExpandLess />
@@ -300,31 +294,16 @@ export default function Tareas({
                       <ExpandMore />
                     )}
                   </IconButton>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: "bold", fontSize: "1.2rem" }}
-                  >
+                  <Typography variant="body2" className={tareasStyles.moduleName}>
                     {modulo.nombre}
                   </Typography>
                 </Box>
 
-                <Box sx={{ flex: 1, textAlign: "center" }}>
+                <Box className={tareasStyles.moduleCenter}>
                   <Box
-                    sx={{
-                      display: "inline-block",
-                      width: 30,
-                      height: 20,
-                      borderRadius: "3px",
-                      backgroundColor: permisosModulos[modulo.id]
-                        ? "#4CAF50"
-                        : "#f44336",
-                      color: "white",
-                      textAlign: "center",
-                      lineHeight: "20px",
-                      fontSize: "15px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                    }}
+                    className={`${tareasStyles.moduleBadge} ${
+                      permisosModulos[modulo.id] ? tareasStyles.enabled : tareasStyles.disabled
+                    }`}
                     onClick={() =>
                       handleModuloPermisoChange(
                         modulo.id,
@@ -336,10 +315,7 @@ export default function Tareas({
                   </Box>
                 </Box>
 
-                <Typography
-                  variant="body2"
-                  sx={{ flex: 2, fontSize: "1.2rem", color: "#666" }}
-                >
+                <Typography variant="body2" className={tareasStyles.moduleInfo}>
                   {permisosModulos[modulo.id]
                     ? "• Acceso habilitado al módulo"
                     : "• Acceso denegado al módulo"}
@@ -352,30 +328,13 @@ export default function Tareas({
                 timeout="auto"
                 unmountOnExit
               >
-                {modulo.tareas?.map((tarea, tareaIndex) => (
-                  <Box
-                    key={`${modulo.id}-tarea-${tarea.tareaId}`}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      borderBottom:
-                        tareaIndex === modulo.tareas.length - 1
-                          ? "none"
-                          : "1px solid #ddd",
-                      p: 1,
-                      pl: 4, // Indentación para mostrar que son sub-elementos
-                      minHeight: 40,
-                      backgroundColor: "#f9f9f9",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{ flex: 2, pl: 2, fontSize: "1.1rem" }}
-                    >
+                {modulo.tareas?.map((tarea) => (
+                  <Box key={`${modulo.id}-tarea-${tarea.tareaId}`} className={tareasStyles.tareaBox}>
+                    <Typography variant="body2" className={tareasStyles.tareaText}>
                       {tarea.tareaDescripcion}
                     </Typography>
 
-                    <Box sx={{ flex: 1, textAlign: "center" }}>
+                    <Box className={tareasStyles.tareaCenter}>
                       <Box
                         className={
                           `${tareasStyles.toggleBadge} ${
@@ -396,16 +355,11 @@ export default function Tareas({
                           )
                         }
                       >
-                        {permisosTareas[getTareaKey(modulo.id, tarea.tareaId)]
-                          ? "S"
-                          : "N"}
+                        {permisosTareas[getTareaKey(modulo.id, tarea.tareaId)] ? "S" : "N"}
                       </Box>
                     </Box>
 
-                    <Typography
-                      variant="body2"
-                      sx={{ flex: 2, fontSize: "1.1rem", color: "#666" }}
-                    >
+                    <Typography variant="body2" className={tareasStyles.tareaInfo}>
                       {permisosTareas[getTareaKey(modulo.id, tarea.tareaId)]
                         ? "• Tarea habilitada"
                         : "• Tarea deshabilitada"}
@@ -418,9 +372,9 @@ export default function Tareas({
         </Box>
 
         {/* Botones de acción */}
-        <Box sx={{ display: "flex", gap: 2, justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <CustomButton variant="outlined" onClick={handleVolver}>
+        <Box className={tareasStyles.actionsRow}>
+          <Box className={tareasStyles.actionsLeft}>
+            <CustomButton variant="outlined" onClick={handleVolver} disabled={isSaving}>
               Volver
             </CustomButton>
 
@@ -428,6 +382,7 @@ export default function Tareas({
               variant="outlined"
               onClick={handleDarAccesoATodo}
               color="secondary"
+              disabled={isSaving}
             >
               Dar acceso a todo
             </CustomButton>
@@ -436,6 +391,7 @@ export default function Tareas({
               variant="outlined"
               onClick={handleQuitarTodosLosAccesos}
               color="error"
+              disabled={isSaving}
             >
               Quitar todos los accesos
             </CustomButton>
@@ -445,10 +401,30 @@ export default function Tareas({
             variant="contained"
             onClick={handleGuardarConfiguracion}
             color="primary"
+            disabled={isSaving}
           >
             Guardar Configuración
           </CustomButton>
         </Box>
+
+        {saveError && (
+          <Typography className={tareasStyles.messageError}>
+            {saveError}
+          </Typography>
+        )}
+
+        {saveSuccess && (
+          <Typography className={tareasStyles.messageSuccess}>
+            {saveSuccess}
+          </Typography>
+        )}
+
+        {isSaving && (
+          <Box className={tareasStyles.overlay}>
+            <CircularProgress />
+            <Typography variant="h6">Guardando...</Typography>
+          </Box>
+        )}
       </Box>
     </CustomModal>
   );

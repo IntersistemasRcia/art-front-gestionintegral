@@ -618,7 +618,7 @@ function CuentaCorrienteComercializador() {
             /> 
 
             <Typography variant="body1" className={styles.notice}>
-                (*)Monto de la comision sujeto a retenciones, la liquidacion final le sera enviada a su correo
+                (*)Monto de la comisión sujeto a retenciones, la liquidación final le será enviada a su correo.
             </Typography>
 
         </div>
