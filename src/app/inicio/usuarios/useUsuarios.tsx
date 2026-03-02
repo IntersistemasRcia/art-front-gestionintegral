@@ -2,7 +2,9 @@ import { AxiosError } from "axios";
 import UsuarioAPI from "@/data/usuarioAPI";
 import { useAuth } from '@/data/AuthContext';
 import ArtAPI from "@/data/artAPI";
+import AuthAPI from "@/data/authAPI";
 import IUsuarioDarDeBaja from "./interfaces/IUsuarioDarDeBajaReactivar";
+import UsuarioRow from "./interfaces/UsuarioRow";
 
 const { useGetAll, useGetRoles, registrar, tareasUpdate, update, darDeBaja, reactivar, useGetCargos, reestablecer, reenviarCorreo } = UsuarioAPI;
 const { useGetRefEmpleadores } = ArtAPI;
@@ -21,6 +23,24 @@ export default function useUsuarios() {
   // console.log("user**",user)
 
   const { data: refEmpleadores } = useGetRefEmpleadores();
+  const { data: sectores } = AuthAPI.useGetRefSectores();
+
+  const usuarios: UsuarioRow[] = (usuariosData?.data || []).map((usuario) => {
+    const usuarioConSector = usuario as UsuarioRow & { SectorId?: number | string };
+    const resolvedSectorId =
+      usuarioConSector.sectorId ??
+      (usuarioConSector.SectorId !== undefined && usuarioConSector.SectorId !== null
+        ? Number(usuarioConSector.SectorId)
+        : undefined);
+
+    const sectorDescripcion = sectores?.find((s) => s.id === resolvedSectorId)?.descripcion;
+
+    return {
+      ...usuarioConSector,
+      sectorId: resolvedSectorId,
+      sectorDescripcion,
+    };
+  });
 
   const registrarUsuario = async (formData: any) => {
     try {
@@ -132,7 +152,7 @@ export default function useUsuarios() {
   };
 
   return {
-    usuarios: usuariosData?.data || [],
+    usuarios,
     roles: roles || [],
     cargos: cargos || [],
     refEmpleadores: refEmpleadores || [],

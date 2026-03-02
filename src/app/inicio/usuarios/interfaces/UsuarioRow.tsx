@@ -6,6 +6,7 @@ export default interface UsuarioRow {
   nombre: string;
   tipo: string;
   sectorId?: number;
+  sectorDescripcion?: string;
   userName: string;
   email: string;
   estado: string;
