@@ -69,51 +69,9 @@ interface DataContextType {
 }
 
 // ===== Helpers / formatters =====
-const fechaHoraFormatter = (v: any) => Formato.FechaHora(v);
 const fechaFormatter = (v: any) => Formato.Fecha(v);
 const numeroFormatter = (v: any) => Formato.Numero(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
-
-//Funcion para obtener los valores de [Estado,  Dias.Trans, Sector]
-//Estado: Estado "Pendiente", "Cerrado".
-//Estado Pendiente: El mismio se obtiene si el campo "cierre" de mi tabla "reclamoConsulta" es igual a null, en este caso utilizamos
-//la vista "vw_EstadoAtencionAlPublico" para obtener el estado "Pendiente".
-//si el mismo esta pendiente, se concatena [Pendiente + el campo de (Apertura) de la vista "vw_AtencionAlPublico"]
-//con formato dd/mm/aaaa hh:mm:ss
-//ejemplo: "Pendiente 12/03/2024 14:30:00"
-
-//Estado Cerrado: El mismo se obtiene si el campo "cierre" de mi tabla "reclamoConsulta" es distinto de null, en este caso utilizamos
-//la vista "vw_EstadoAtencionAlPublico" para obtener el estado "Cerrado".
-//si el mismo esta cerrado, se concatena [Cerrado + el campo de (Cierre) de la vista "vw_AtencionAlPublico"]
-//con formato dd/mm/aaaa hh:mm:ss
-//ejemplo: "Cerrado 20/03/2024 10:15:00"
-//-------------------------------------
-//Dias.Trans: se obtiene si tiene fecha de "cierre", [Fecha de cierre - Fecha de apertura] en dias
-//sino, si no tiene fecha de cierre, se toma la fecha actual - fecha de apertura.
-
-const diasTranscurridosFormatter = (row: Row) => {
-  const cierre = tolerantGet(row, "Cierre");
-  const apertura = tolerantGet(row, "Apertura");
-  const fechaApertura = apertura ? dayjs(apertura) : null;
-  if (fechaApertura) {
-    const fechaCierre = cierre ? dayjs(cierre) : dayjs(); 
-    const diffDias = fechaCierre.diff(fechaApertura, "day");
-    return `${diffDias} dias`;
-  }
-  return null; 
-}
-
-
-const estadoFormatter = (row: Row) => {
-  const cierre = tolerantGet(row, "Cierre");
-  const apertura = tolerantGet(row, "Apertura");
-  if (cierre) {
-    return `Cerrado ${Formato.FechaHora(cierre)}`;
-  } else {
-    return `Pendiente ${Formato.FechaHora(apertura)}`;
-  }
-};
-
 
 // accessor tolerante (case-insensitive y sin _ ni espacios)
 const normalizeKey = (s: string) => (typeof s === "string" ? s.toLowerCase().replace(/[_\s]/g, "") : s);
@@ -151,10 +109,8 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       { name: "TemaDescripcion", label: "Tema", type: "text" },
       { name: "CategoriaDescripcion", label: "Categoría", type: "text" },
       { name: "TipoTramiteDescripcion", label: "Trámite", type: "text" },
-      /////////////////////////////////////////////////////////////////////
-      //Nuevos campos [Estado, Dias.Trans, Sector] 
-      { name: "Estado", label: "Estado", type: "text", formatter: estadoFormatter },
-      { name: "DiasTrans", label: "T. Trans.", type: "number", formatter: diasTranscurridosFormatter },
+      { name: "Estado", label: "Estado", type: "text" },
+      { name: "DiasTrans", label: "T. Trans.", type: "number", formatter: numeroFormatter },
       { name: "SectorDescripcion", label: "Sector", type: "text" },
 
 
@@ -167,13 +123,9 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
     ],
   });
 
-
-
-  // Columnas + campos para QB (excluyo Interno y campos calculados del QB)
+  // Columnas + campos para QB
   const { columns, fields, headers } = useMemo(() => {
     const all = tables.vw_AtencionAlPublico;
-    // Permitimos filtrar por `Interno` (Número) y por los campos calculados `Estado` y `DiasTrans`.
-    const camposCalculados = ["Estado", "DiasTrans"];
     const fieldsForQB = all; // incluir todos los campos para que el QueryBuilder permita filtrarlos
 
     const columns: ColumnDef<Row>[] = [];
@@ -184,18 +136,13 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
         accessorKey: name,
         header: label ?? name,
         cell: (info) => {
-          // Para campos calculados (Estado, DiasTrans), paso toda la fila al formatter
-          if (name === "Estado" || name === "DiasTrans") {
-            return formatter ? formatter(info.row.original) : "";
-          }
           const raw = tolerantGet(info.row.original, name);
           const val = display(raw);
           return formatter ? formatter(val) : (val ?? "");
         },
       });
       headers.columns[name] = { key: name, header: label ?? name };
-      // No registrar formatters para campos calculados (ya se calculan antes de exportar)
-      if (formatter && name !== "Estado" && name !== "DiasTrans") {
+      if (formatter) {
         headers.options.formatters!.row![name] = formatter;
       }
     });
@@ -298,13 +245,10 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
   const onAplicaFiltro = useCallback(() => {
     return (async function procesar() {
       const table = "vw_AtencionAlPublico" as const;
-      const camposCalculados = ["Estado", "DiasTrans"];
-      const camposASeleccionar = tables[table].filter(c => !camposCalculados.includes(c.name));
 
       const q: Query = {
         // alias = nombre exacto (como en tu componente de referencia)
-        // Solo selecciono campos que existen en la DB (excluyo calculados)
-        select: camposASeleccionar.map((c) => ({ value: c.name, name: c.name })),
+        select: tables[table].map((c) => ({ value: c.name, name: c.name })),
         from: [{ table }],
         order: { by: [tables[table][0].name] }, // orden por primera columna: Interno
       };
@@ -392,13 +336,6 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
     const fileName = `${options.sheet.name.replaceAll(" ", "_")}-${now.format("YYYYMMDDHHmmssSSS")}.xlsx`;
     options.sheet.name += ` (${now.format("DD-MM-YYYY")})`;
 
-    // Agregar campos calculados a cada fila para la exportación
-    const rowsConCamposCalculados = rows.map(row => ({
-      ...row,
-      Estado: estadoFormatter(row),
-      DiasTrans: diasTranscurridosFormatter(row),
-    }));
-
     setDialog(
       <Dialog
         open
@@ -411,7 +348,7 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       </Dialog>
     );
 
-    await saveTable(headers.columns, rowsConCamposCalculados, fileName, options).then(
+    await saveTable(headers.columns, rows, fileName, options).then(
       onCloseDialog,
       (e) => errorDialog({
         title: "Error al generar excel",
