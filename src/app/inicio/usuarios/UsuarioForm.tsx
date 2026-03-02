@@ -609,7 +609,6 @@ export default function UsuarioForm({
     setForm(prev => ({
       ...prev,
       nombre: arcaData.nombre ?? prev.nombre,
-      apellido: arcaData.apellido ?? prev.apellido,
       fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
     }));
   }, [arcaData]);
@@ -692,7 +691,7 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
-                  label="Nombre"
+                  label="Nombre/Apellido"
                   name="nombre"
                   value={form.nombre}
                   onChange={handleTextFieldChange}
@@ -703,19 +702,6 @@ export default function UsuarioForm({
                   required={!isDisabled}
                   disabled={isDisabled}
                   placeholder="Ingrese nombre"
-                />
-                <TextField
-                  label="Apellido"
-                  name="apellido"
-                  value={form.apellido || ''}
-                  onChange={handleTextFieldChange}
-                  onBlur={() => handleBlur("apellido")}
-                  error={touched.apellido && !!errors.apellido}
-                  helperText={touched.apellido && errors.apellido}
-                  fullWidth
-                  required={!isDisabled}
-                  disabled={isDisabled}
-                  placeholder="Ingrese apellido"
                 />
               </div>
 
@@ -1116,13 +1102,11 @@ export default function UsuarioForm({
                   ) : arcaData ? (
                     <ul className={styles.infoList}>
                       <li><strong>Nombre:</strong> {arcaData.nombre || ''}</li>
-                      <li><strong>Apellido:</strong> {arcaData.apellido || ''}</li>
                       <li><strong>Fecha de Nac.:</strong> {arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : ''}</li>
                     </ul>
                   ) : (
                     <ul className={styles.infoList}>
                       <li><strong>Nombre:</strong> </li>
-                      <li><strong>Apellido:</strong> </li>
                       <li><strong>Fecha de Nac.:</strong> </li>
                     </ul>
                   )}
