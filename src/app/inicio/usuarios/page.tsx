@@ -60,6 +60,7 @@ export default function UsuariosPage() {
     // Usamos el `|| 1` como valor por defecto, aunque es mejor que el backend lo maneje si no existe
     empresaId: user?.empresaId || 0, 
     cargoId: undefined,
+    sectorId: undefined,
   };
 
   const {
@@ -130,6 +131,12 @@ export default function UsuariosPage() {
 
   const handleOpenModal = (method: RequestMethod, row?: UsuarioRow) => {
     // CORRECCIÓN 2: Mapeamos la fila (UsuarioRow) a datos del formulario (UsuarioFormFields)
+    const sectorIdFromRow = row?.sectorId ?? (row as UsuarioRow & { SectorId?: number | string } | undefined)?.SectorId;
+    const resolvedSectorId =
+      sectorIdFromRow !== undefined && sectorIdFromRow !== null && sectorIdFromRow !== ""
+        ? Number(sectorIdFromRow)
+        : undefined;
+
     const dataToForm: UsuarioFormFields = row
       ? {
           cuit: row.cuit || "",
@@ -146,6 +153,7 @@ export default function UsuariosPage() {
           // cargo: (row.cargo && row.cargo.trim() !== "" && row.cargo !== "null" && row.cargo !== "undefined") ? row.cargo : "",
           // Mantenemos la empresaId de la fila o del usuario actual
           empresaId: row.empresaId || user?.empresaId || 0, 
+          sectorId: resolvedSectorId,
           // Es crucial incluir el ID de usuario para edición/eliminación
           id: String(row.id), // <-- Aseguramos que el ID se convierte a string para el formulario
         }

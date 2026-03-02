@@ -5,6 +5,7 @@ export default interface UsuarioRow {
   cuit: string;
   nombre: string;
   tipo: string;
+  sectorId?: number;
   userName: string;
   email: string;
   estado: string;

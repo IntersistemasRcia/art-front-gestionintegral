@@ -518,7 +518,7 @@ export default function UsuarioForm({
     }
   };
 
-  const handleSectorChange = (e: SelectChangeEvent<number | "">) => {
+  const handleSectorChange = (e: SelectChangeEvent<string>) => {
     const { value } = e.target;
     const sectorId = value === "" ? undefined : Number(value);
 
@@ -837,25 +837,25 @@ export default function UsuarioForm({
                 >
                   <InputLabel>Sector</InputLabel>
                   <Select
-                    name="sectorId"
-                    value={form.sectorId ?? ""}
-                    label="Sector"
-                    onChange={handleSectorChange}
-                    onBlur={() => handleBlur("sectorId")}
-                  >
-                    {isLoadingSectores ? (
-                      <MenuItem value="">
-                        <em>Cargando...</em>
-                      </MenuItem>
-                    ) : sectores && sectores.length > 0 ? (
-                      sectores.map((s) => (
-                        <MenuItem key={s.id} value={s.id}>
-                          {s.descripcion}
+                      name="sectorId"
+                      value={form.sectorId ? String(form.sectorId) : ""}
+                      label="Sector"
+                      onChange={handleSectorChange}
+                      onBlur={() => handleBlur("sectorId")}
+                    >
+                      {isLoadingSectores ? (
+                        <MenuItem value="">
+                          <em>Cargando...</em>
                         </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem value="">No hay sectores</MenuItem>
-                    )}
+                      ) : sectores && sectores.length > 0 ? (
+                        sectores.map((s) => (
+                          <MenuItem key={s.id} value={String(s.id)}>
+                            {s.descripcion}
+                          </MenuItem>
+                        ))
+                      ) : (
+                        <MenuItem value="">No hay sectores</MenuItem>
+                      )}
                   </Select>
                   {touched.sectorId && errors.sectorId && (
                     <Typography
