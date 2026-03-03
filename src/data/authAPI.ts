@@ -1,4 +1,4 @@
-import { AxiosError } from "axios";
+import axios, { AxiosError } from "axios";
 import useSWR from "swr";
 import { ExternalAPI } from "./api";
 import TokenConfigurator from "@/types/TokenConfigurator";
@@ -17,6 +17,19 @@ export interface Empresa {
   localidad: string;
   provincia: string;
 }
+
+export type EnviarCorreoAttachment = {
+  fileName: string;
+  contentType: string;
+  base64Data: string;
+};
+
+export type EnviarCorreoRequest = {
+  to: string[];
+  cabecera: string;
+  seccion: string;
+  attachments: EnviarCorreoAttachment[];
+};
 
 export interface RefSector {
   id: number;
@@ -65,6 +78,24 @@ export class AuthAPIClass extends ExternalAPI {
   useGetRefSectores = () => useSWR(
     [this.refSectoresURL(), token.getToken()], () => this.getRefSectores()
   );
+  //#endregion
+
+
+  //#region EnviarCorreo Cotización
+  readonly postEnviarCorreoURL = () =>
+    this.getURL({ path: '/api/Email' }).toString();
+
+  enviarCorreo = async (data: EnviarCorreoRequest) =>
+    axios
+      .post(this.postEnviarCorreoURL(), data, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+      .then(async (response) => {
+        if (response.status === 200 || response.status === 201) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
   //#endregion
   
 }

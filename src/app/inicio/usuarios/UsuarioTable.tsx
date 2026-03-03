@@ -117,6 +117,11 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
       { accessorKey: "email", header: "Email"},
       { accessorKey: "rol", header: "Rol"},
       { accessorKey: "cargoDescripcion", header: "Cargo/Función"},
+      {
+        accessorKey: "sectorDescripcion",
+        header: "Sector",
+        cell: ({ row }) => row.original.sectorDescripcion || "-",
+      },
       { accessorKey: "estado", header: "Estado"},
       { accessorKey: "phoneNumber", header: "Teléfono"},
       { id: "actions",

@@ -17,6 +17,7 @@ import {
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
+import { useAuth } from '@/data/AuthContext';
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import RefEmpleador from "./interfaces/RefEmpleador";
@@ -194,6 +195,14 @@ export default function UsuarioForm({
   const [modalMsgText, setModalMsgText] = useState<string>("");
   const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
   const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
+
+  const { user } = useAuth();
+  const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
+  type RoleWithChild = RolesInterface & { esRolHijo?: boolean };
+  const availableRoles = useMemo(() => {
+    if (!isAdminEmpleador) return roles;
+    return (roles as RoleWithChild[]).filter(r => !!r.esRolHijo);
+  }, [roles, isAdminEmpleador]);
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
@@ -518,7 +527,7 @@ export default function UsuarioForm({
     }
   };
 
-  const handleSectorChange = (e: SelectChangeEvent<number | "">) => {
+  const handleSectorChange = (e: SelectChangeEvent<string>) => {
     const { value } = e.target;
     const sectorId = value === "" ? undefined : Number(value);
 
@@ -609,7 +618,6 @@ export default function UsuarioForm({
     setForm(prev => ({
       ...prev,
       nombre: arcaData.nombre ?? prev.nombre,
-      apellido: arcaData.apellido ?? prev.apellido,
       fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
     }));
   }, [arcaData]);
@@ -692,7 +700,7 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
-                  label="Nombre"
+                  label="Nombre/Apellido"
                   name="nombre"
                   value={form.nombre}
                   onChange={handleTextFieldChange}
@@ -703,19 +711,6 @@ export default function UsuarioForm({
                   required={!isDisabled}
                   disabled={isDisabled}
                   placeholder="Ingrese nombre"
-                />
-                <TextField
-                  label="Apellido"
-                  name="apellido"
-                  value={form.apellido || ''}
-                  onChange={handleTextFieldChange}
-                  onBlur={() => handleBlur("apellido")}
-                  error={touched.apellido && !!errors.apellido}
-                  helperText={touched.apellido && errors.apellido}
-                  fullWidth
-                  required={!isDisabled}
-                  disabled={isDisabled}
-                  placeholder="Ingrese apellido"
                 />
               </div>
 
@@ -827,7 +822,7 @@ export default function UsuarioForm({
                     onChange={handleSelectChange}
                     onBlur={() => handleBlur("rol")}
                   >
-                    {roles.map((rol) => (
+                    {availableRoles.map((rol) => (
                       <MenuItem key={rol.id} value={rol.nombre}>
                         {rol.nombre}
                       </MenuItem>
@@ -851,25 +846,25 @@ export default function UsuarioForm({
                 >
                   <InputLabel>Sector</InputLabel>
                   <Select
-                    name="sectorId"
-                    value={form.sectorId ?? ""}
-                    label="Sector"
-                    onChange={handleSectorChange}
-                    onBlur={() => handleBlur("sectorId")}
-                  >
-                    {isLoadingSectores ? (
-                      <MenuItem value="">
-                        <em>Cargando...</em>
-                      </MenuItem>
-                    ) : sectores && sectores.length > 0 ? (
-                      sectores.map((s) => (
-                        <MenuItem key={s.id} value={s.id}>
-                          {s.descripcion}
+                      name="sectorId"
+                      value={form.sectorId ? String(form.sectorId) : ""}
+                      label="Sector"
+                      onChange={handleSectorChange}
+                      onBlur={() => handleBlur("sectorId")}
+                    >
+                      {isLoadingSectores ? (
+                        <MenuItem value="">
+                          <em>Cargando...</em>
                         </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem value="">No hay sectores</MenuItem>
-                    )}
+                      ) : sectores && sectores.length > 0 ? (
+                        sectores.map((s) => (
+                          <MenuItem key={s.id} value={String(s.id)}>
+                            {s.descripcion}
+                          </MenuItem>
+                        ))
+                      ) : (
+                        <MenuItem value="">No hay sectores</MenuItem>
+                      )}
                   </Select>
                   {touched.sectorId && errors.sectorId && (
                     <Typography
@@ -1116,13 +1111,11 @@ export default function UsuarioForm({
                   ) : arcaData ? (
                     <ul className={styles.infoList}>
                       <li><strong>Nombre:</strong> {arcaData.nombre || ''}</li>
-                      <li><strong>Apellido:</strong> {arcaData.apellido || ''}</li>
                       <li><strong>Fecha de Nac.:</strong> {arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : ''}</li>
                     </ul>
                   ) : (
                     <ul className={styles.infoList}>
                       <li><strong>Nombre:</strong> </li>
-                      <li><strong>Apellido:</strong> </li>
                       <li><strong>Fecha de Nac.:</strong> </li>
                     </ul>
                   )}
