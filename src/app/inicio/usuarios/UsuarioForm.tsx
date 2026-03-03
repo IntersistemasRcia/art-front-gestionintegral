@@ -198,7 +198,11 @@ export default function UsuarioForm({
 
   const { user } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
-  const availableRoles = useMemo(() => isAdminEmpleador ? roles.filter(r => (r as any).esRolHijo) : roles, [roles, isAdminEmpleador]);
+  type RoleWithChild = RolesInterface & { esRolHijo?: boolean };
+  const availableRoles = useMemo(() => {
+    if (!isAdminEmpleador) return roles;
+    return (roles as RoleWithChild[]).filter(r => !!r.esRolHijo);
+  }, [roles, isAdminEmpleador]);
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
