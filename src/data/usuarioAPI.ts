@@ -451,22 +451,6 @@ export class UsuarioAPIClass extends ExternalAPI {
     );
   //#endregion
 
-  //#region EnviarCorreo Cotización
-  readonly postEnviarCorreoURL = () =>
-    this.getURL({ path: '/Api/Usuario/EnviarCorreo' }).toString();
-
-  enviarCorreo = async (data: EnviarCorreoRequest) =>
-    axios
-      .post(this.postEnviarCorreoURL(), data, {
-        headers: { 'Content-Type': 'application/json' },
-      })
-      .then(async (response) => {
-        if (response.status === 200 || response.status === 201) return response.data;
-        return Promise.reject(
-          new AxiosError(`Error en la petición: ${response.data}`)
-        );
-      });
-  //#endregion
 
   //#region Confirmar Email
   readonly confirmarEmailURL = () =>

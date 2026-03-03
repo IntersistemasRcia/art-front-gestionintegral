@@ -5,7 +5,7 @@ import { TextField, Box, Grid, Typography } from '@mui/material';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { CIIUIndicesDTO, ARTSellosIIBBDTO, EmpleadoresPadronDTO, CotizacionesDTO } from '@/data/cotizadorAPI';
-import UsuarioAPI from '@/data/usuarioAPI';
+import AuthAPI from '@/data/authAPI';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
@@ -198,9 +198,10 @@ export const CotizadorEmailModal = ({
       setMessageModal({ open: false, message: '', type: 'success' as MessageType });
 
     try {
-      await UsuarioAPI.enviarCorreo({
+      await AuthAPI.enviarCorreo({
         to: [email],
-        cuerpo: '<br/><br/><strong>Le enviamos adjunta la cotización solicitada</strong>',
+        cabecera: 'Estimada/o ' + (formData.nombre || ''),
+        seccion: 'CotizadorEmailConfiguration',
         attachments: [
           {
             fileName: 'ART MUTUAL RURAL Cotización.pdf',
