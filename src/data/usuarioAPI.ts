@@ -110,6 +110,7 @@ export interface RolesInterface {
   id: string;
   nombre: string;
   nombreNormalizado: string;
+  esRolHijo: boolean;
 }
 //#endregion /api/Roles types
 //#region /api/Tablas types

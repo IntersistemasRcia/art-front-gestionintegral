@@ -17,6 +17,7 @@ import {
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
+import { useAuth } from '@/data/AuthContext';
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import RefEmpleador from "./interfaces/RefEmpleador";
@@ -194,6 +195,10 @@ export default function UsuarioForm({
   const [modalMsgText, setModalMsgText] = useState<string>("");
   const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
   const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
+
+  const { user } = useAuth();
+  const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
+  const availableRoles = useMemo(() => isAdminEmpleador ? roles.filter(r => (r as any).esRolHijo) : roles, [roles, isAdminEmpleador]);
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
@@ -813,7 +818,7 @@ export default function UsuarioForm({
                     onChange={handleSelectChange}
                     onBlur={() => handleBlur("rol")}
                   >
-                    {roles.map((rol) => (
+                    {availableRoles.map((rol) => (
                       <MenuItem key={rol.id} value={rol.nombre}>
                         {rol.nombre}
                       </MenuItem>
