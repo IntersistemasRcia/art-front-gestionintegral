@@ -78,7 +78,7 @@ export default function DatosUsuarioSection({
 
       <div className={styles.formRow}>
         <TextField
-          label="Nombre"
+          label="Nombre/Apellido"
           name="nombre"
           value={form.nombre}
           onChange={onTextFieldChange}
