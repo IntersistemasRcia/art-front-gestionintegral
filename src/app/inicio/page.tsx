@@ -16,7 +16,6 @@ const borderColors = ['border-blue', 'border-pink', 'border-purple', 'border-yel
 
 const InicioPage = () => {
   const { data: session, status } = useSession();
-  // El hook maneja automáticamente la autenticación y hace el fetching
   const isAuthenticated = status === 'authenticated';
   const { data: indicadores, isLoading, error } = useGetIndicadores(isAuthenticated);
 
