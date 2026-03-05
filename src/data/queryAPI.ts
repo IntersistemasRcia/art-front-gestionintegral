@@ -165,7 +165,8 @@ export type IndicadorDTO = {
   opcionAsociada?: string;
   filtroId?: number;
 };
-export type GetIndicadoresSWRKey = [url: string, token: string];
+export type GetIndicadoresParams = { cuit?: number };
+export type GetIndicadoresSWRKey = [url: string, token: string, cuit: number | undefined];
 //#endregion dashboard
 
 //#region indicadores gestion
@@ -345,34 +346,36 @@ export class QueriesAPIClass extends ExternalAPI {
   //#region dashboard
 
   //#region getIndicadores
-  readonly getIndicadoresURL = this.getURL({ path: "/api/Dashboard/Indicadores" }).toString();
-  getIndicadores = async () => tokenizable.get<IndicadorDTO[]>(
-    this.getIndicadoresURL
+  readonly getIndicadoresURL = (params?: GetIndicadoresParams) =>
+    this.getURL({ path: "/api/Dashboard/Indicadores", search: params?.cuit != null ? { cuit: String(params.cuit) } : undefined }).toString();
+  getIndicadores = async (params?: GetIndicadoresParams) => tokenizable.get<IndicadorDTO[]>(
+    this.getIndicadoresURL(params)
   ).then(({ data }) => data, (error) => reject<IndicadorDTO[]>(error));
   swrGetIndicadores = Object.freeze({
-    key: (): GetIndicadoresSWRKey => [this.getIndicadoresURL, token.getToken()],
-    fetcher: (key: GetIndicadoresSWRKey) => this.getIndicadores(),
+    key: (cuit?: number): GetIndicadoresSWRKey => [this.getIndicadoresURL({ cuit }), token.getToken(), cuit],
+    fetcher: (key: GetIndicadoresSWRKey) => this.getIndicadores({ cuit: key[2] }),
   });
   useGetIndicadores = (enabled: boolean = true) => {
-    // Usar useSession para obtener el token directamente y que se actualice reactivamente
     const { data: session, status } = useSession();
-    const accessToken = (session as any)?.accessToken;
+    const accessToken = (session as { accessToken?: string })?.accessToken;
     const isAuthenticated = status === 'authenticated';
+    const user = session?.user as Record<string, unknown> | undefined;
+    const empresaCUITRaw = user?.empresaCUIT ?? user?.EmpresaCUIT ?? user?.empresaCuit;
+    const empresaCUIT = Number(empresaCUITRaw);
+    const cuit = empresaCUIT > 0 ? empresaCUIT : undefined;
     
-    // Crear la key con el token de la sesión para que cambie cuando se autentica
     const swrKey = enabled && isAuthenticated && accessToken 
-      ? [this.getIndicadoresURL, accessToken] as GetIndicadoresSWRKey
+      ? [this.getIndicadoresURL({ cuit }), accessToken, cuit] as GetIndicadoresSWRKey
       : null;
     
-    // Solo hacer la petición si está habilitado y hay token (usuario autenticado)
     return useSWR<IndicadorDTO[], APIError>(
       swrKey,
       this.swrGetIndicadores.fetcher,
       {
         revalidateOnFocus: true,
         revalidateOnReconnect: true,
-        revalidateOnMount: true, // Forzar revalidación al montar el componente
-        refreshInterval: 0, // No hacer polling automático
+        revalidateOnMount: true,
+        refreshInterval: 0,
       }
     );
   };
