@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'; 
 import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import ArtAPI from '@/data/artAPI';
 import Persona from './types/persona';
 import DataTable from '@/utils/ui/table/DataTable';
 import { ColumnDef } from '@tanstack/react-table';
@@ -19,7 +20,7 @@ import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
 
-const { useGetPersonal, useGetPoliza } = gestionEmpleadorAPI;
+const { useGetPoliza } = gestionEmpleadorAPI;
 
 export default function CoberturaPage() {
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
@@ -39,8 +40,8 @@ export default function CoberturaPage() {
         ? { CUIT: cuitEmpresaActual }
         : {};
 
-    const { data: personalRawData, isLoading: isPersonalLoading } = useGetPersonal(paramsCUIT); 
     const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza(paramsCUIT);
+    const [isPersonalLoading, setIsPersonalLoading] = useState<boolean>(false);
     
     // Estados para las dos tablas: Pendiente (Origen) y Cubierto (Destino)
     const [personalPendiente, setPersonalPendiente] = useState<Persona[]>([]);
@@ -158,14 +159,38 @@ export default function CoberturaPage() {
     
     // Inicializa personalPendiente con los datos crudos cuando se cargan
     useEffect(() => {
-        if (personalRawData && personalRawData.length > 0) {
-            setPersonalPendiente(personalRawData);
-        } else if (personalRawData && personalRawData.length === 0) {
-            // Si la respuesta es un array vacío, limpiar las tablas
-            setPersonalPendiente([]);
-            setPersonalCubierto([]);
-        }
-    }, [personalRawData]);
+        const cuilToQuery = Number.isFinite(cuitEmpresaActual) && cuitEmpresaActual > 0 ? cuitEmpresaActual : undefined;
+        if (!cuilToQuery) return;
+
+        let mounted = true;
+        (async () => {
+            try {
+                setIsPersonalLoading(true);
+                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, PageSize: 99999 });
+                const arr = Array.isArray(raw) ? raw : (raw?.DATA ?? raw?.data ?? []);
+                const personas: Persona[] = (arr as unknown[])
+                    .map((x) => {
+                        const obj = x as Record<string, unknown>;
+                        return {
+                            interno: obj.interno as number | undefined,
+                            cuil: Number(obj.cuil),
+                            nombreEmpleador: String(obj.nombre ?? obj.nombreEmpleador ?? "").trim(),
+                        } as Persona;
+                    })
+                    .filter(p => Number.isFinite(p.cuil));
+                if (mounted) {
+                    setPersonalPendiente(personas);
+                }
+            } catch (error) {
+                console.error('Error cargando EmpleadorTrabajadores', error);
+                if (mounted) setPersonalPendiente([]);
+            } finally {
+                if (mounted) setIsPersonalLoading(false);
+            }
+        })();
+
+        return () => { mounted = false; };
+    }, [cuitEmpresaActual]);
 
     // Generar objeto de selección inicial para todas las filas
     const initialRowSelectionPendiente = useMemo(() => {
