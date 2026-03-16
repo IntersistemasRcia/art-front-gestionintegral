@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -10,6 +11,7 @@ import styles from './ClientLayoutWrapper.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/data/AuthContext'; // Importa el hook de contexto
 import { useEmpresasLoader } from '@/data/useEmpresasLoader';
+import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 
 const formatTitleFromPath = (pathname: string): string => {
   if (pathname === '/inicio') {
@@ -51,6 +53,7 @@ const formatTitleFromPath = (pathname: string): string => {
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { status, session } = useAuth(); // Obtén el estado y la sesión del contexto
+  const [isExpiredSessionModalOpen, setIsExpiredSessionModalOpen] = useState(false);
   
   // Cargar empresas automáticamente cuando el usuario esté autenticado
   useEmpresasLoader();
@@ -59,11 +62,48 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   const pathname = usePathname();
   const pageTitle = formatTitleFromPath(pathname);
 
+  const sessionExpires =
+    typeof session === 'object' &&
+    session !== null &&
+    'expires' in session &&
+    typeof session.expires === 'string'
+      ? session.expires
+      : null;
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/');
     }
   }, [status, router]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !sessionExpires) {
+      setIsExpiredSessionModalOpen(false);
+      return;
+    }
+
+    const expiresAt = new Date(sessionExpires).getTime();
+    if (Number.isNaN(expiresAt)) {
+      return;
+    }
+
+    const timeoutMs = expiresAt - Date.now();
+    if (timeoutMs <= 0) {
+      setIsExpiredSessionModalOpen(true);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsExpiredSessionModalOpen(true);
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [status, sessionExpires]);
+
+  const handleExpiredSessionModalClose = async () => {
+    setIsExpiredSessionModalOpen(false);
+    await signOut({ callbackUrl: '/login' });
+  };
 
   if (status === "loading") {
     return (
@@ -79,6 +119,13 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     
   return (
     <>
+      <CustomModalMessage
+        open={isExpiredSessionModalOpen}
+        onClose={handleExpiredSessionModalClose}
+        message="La sesion expiró, puede identificarse nuevamente"
+        type="warning"
+        title="Sesión expirada"
+      />
       <Navbar />
       <div className={styles.mainLayout}>
         <div className={styles.breadcrumbsContainer}>
