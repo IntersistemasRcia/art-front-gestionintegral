@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import useSWR from "swr";
 import { Box, Typography } from "@mui/material";
 import IndicadorTable from "./IndicadorTable";
 import IndicadorForm, { IndicadorFormFields } from "./IndicadorForm";
@@ -8,9 +9,12 @@ import styles from "./Indicador.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import QueriesAPI, { IndicadorGestionDTO } from "@/data/queryAPI";
+import AuthAPI from "@/data/authAPI";
 import { useAuth } from "@/data/AuthContext";
 
 const { useGetIndicadoresGestion, useCreateIndicador, useUpdateIndicador, useDeleteIndicador } = QueriesAPI;
+
+const FILTERS_SWR_KEY = "indicadores-filters";
 
 type RequestMethod = "create" | "edit" | "view" | "delete";
 
@@ -18,27 +22,21 @@ interface RequestState {
   method: RequestMethod | null;
   indicadorData: IndicadorFormFields | null;
 }
-
+ 
 export default function IndicadoresPage() {
   const { hasTask } = useAuth();
-  
-  // Validar permisos
-  if (!hasTask("Configuraciones")) {
-    return (
-      <Box sx={{ padding: 4, textAlign: "center" }}>
-        <Typography variant="h6" color="error">
-          No tienes permisos para acceder a esta sección
-        </Typography>
-      </Box>
-    );
-  }
 
   const { data: indicadores, isLoading, error, mutate } = useGetIndicadoresGestion();
+  const { data: filtersResponse } = useSWR(
+    FILTERS_SWR_KEY,
+    () => QueriesAPI.getFilters(),
+    { revalidateOnMount: true, revalidateOnFocus: false }
+  );
+  const filtros = filtersResponse?.data ?? [];
+  const { data: roles = [] } = AuthAPI.useGetRefRoles();
+  const { data: sectores = [] } = AuthAPI.useGetRefSectores();
+  const { data: cargos = [] } = AuthAPI.useGetRefCargosEmpresa();
 
-  // Debug: Log para verificar los datos
-  console.log("Indicadores data:", indicadores);
-  console.log("Is loading:", isLoading);
-  console.log("Error:", error);
   const { trigger: createIndicador, isMutating: isCreating } = useCreateIndicador();
   const { trigger: updateIndicador, isMutating: isUpdating } = useUpdateIndicador();
   const { trigger: deleteIndicador, isMutating: isDeleting } = useDeleteIndicador();
@@ -49,7 +47,6 @@ export default function IndicadoresPage() {
     method: null,
     indicadorData: null,
   });
-
   const [modalMessage, setModalMessage] = useState<{
     open: boolean;
     message: string;
@@ -59,6 +56,16 @@ export default function IndicadoresPage() {
     message: '',
     type: 'info'
   });
+
+  if (!hasTask("Configuraciones")) {
+    return (
+      <Box sx={{ padding: 4, textAlign: "center" }}>
+        <Typography variant="h6" color="error">
+          No tienes permisos para acceder a esta sección
+        </Typography>
+      </Box>
+    );
+  }
 
   const showModal = requestState.method !== null;
 
@@ -274,6 +281,10 @@ export default function IndicadoresPage() {
         errorMsg={formError}
         method={requestState.method || "create"}
         isSubmitting={isSubmitting || isCreating || isUpdating || isDeleting}
+        roles={roles}
+        sectores={sectores}
+        cargos={cargos}
+        filtros={filtros}
       />
 
       <CustomModalMessage

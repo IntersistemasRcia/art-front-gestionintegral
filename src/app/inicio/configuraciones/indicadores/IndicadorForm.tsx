@@ -13,6 +13,8 @@ import {
 import { SelectChangeEvent } from "@mui/material/Select";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
+import type { RefRol, RefSector, RefCargoEmpresa } from "@/data/authAPI";
+import type { FiltroVm } from "@/data/queryAPI";
 
 export type RequestMethod = "create" | "edit" | "view" | "delete";
 
@@ -37,6 +39,10 @@ export interface Props {
   errorMsg?: string | null;
   method: RequestMethod;
   isSubmitting?: boolean;
+  roles?: RefRol[];
+  sectores?: RefSector[];
+  cargos?: RefCargoEmpresa[];
+  filtros?: FiltroVm[];
 }
 
 const initialFormState: IndicadorFormFields = {
@@ -59,6 +65,10 @@ export default function IndicadorForm({
   errorMsg,
   method,
   isSubmitting = false,
+  roles = [],
+  sectores = [],
+  cargos = [],
+  filtros = [],
 }: Props) {
   const [formData, setFormData] = useState<IndicadorFormFields>(initialFormState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -76,7 +86,7 @@ export default function IndicadorForm({
   const isReadOnly = isViewMode;
 
   const handleChange = (field: keyof IndicadorFormFields) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string | number>
   ) => {
     const value = e.target.value;
     setFormData((prev) => ({
@@ -160,17 +170,36 @@ export default function IndicadorForm({
           </Box>
 
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-            <TextField
+            <FormControl
               sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }}
-              label="Filtro ID"
-              type="number"
-              value={formData.filtroId}
-              onChange={handleChange("filtroId")}
               disabled={isReadOnly}
               required
               error={touched.filtroId && formData.filtroId === 0}
-              helperText={touched.filtroId && formData.filtroId === 0 ? "El Filtro ID es requerido" : ""}
-            />
+            >
+              <InputLabel shrink>Filtro</InputLabel>
+              <Select
+                value={formData.filtroId === 0 ? "" : String(formData.filtroId)}
+                onChange={handleChange("filtroId")}
+                label="Filtro"
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Sin selección</em>
+                </MenuItem>
+                {filtros
+                  .filter((f) => f.id != null)
+                  .map((filtro) => (
+                    <MenuItem key={filtro.id} value={String(filtro.id)}>
+                      {filtro.nombre ?? `Filtro ${filtro.id}`}
+                    </MenuItem>
+                  ))}
+              </Select>
+              {touched.filtroId && formData.filtroId === 0 && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                  El filtro es requerido
+                </Typography>
+              )}
+            </FormControl>
 
             <TextField
               sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }}
@@ -185,36 +214,74 @@ export default function IndicadorForm({
           </Box>
 
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-            <TextField
+            <FormControl
               sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }}
-              label="Rol ID"
-              value={formData.rolId}
-              onChange={handleChange("rolId")}
               disabled={isReadOnly}
               required
               error={touched.rolId && !formData.rolId}
-              helperText={touched.rolId && !formData.rolId ? "El Rol ID es requerido" : ""}
-            />
+            >
+              <InputLabel shrink>Rol</InputLabel>
+              <Select
+                value={formData.rolId}
+                onChange={handleChange("rolId")}
+                label="Rol"
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Sin selección</em>
+                </MenuItem>
+                {roles.map((rol) => (
+                  <MenuItem key={rol.id} value={rol.id}>
+                    {rol.nombre}
+                  </MenuItem>
+                ))}
+              </Select>
+              {touched.rolId && !formData.rolId && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                  El rol es requerido
+                </Typography>
+              )}
+            </FormControl>
 
-            <TextField
-              sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }}
-              label="Cargo ID"
-              type="number"
-              value={formData.cargoId ?? ""}
-              onChange={handleChange("cargoId")}
-              disabled={isReadOnly}
-            />
+            <FormControl sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }} disabled={isReadOnly}>
+              <InputLabel shrink>Cargo</InputLabel>
+              <Select
+                value={formData.cargoId != null ? String(formData.cargoId) : ""}
+                onChange={handleChange("cargoId")}
+                label="Cargo"
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Sin selección</em>
+                </MenuItem>
+                {cargos.map((cargo) => (
+                  <MenuItem key={cargo.id} value={String(cargo.id)}>
+                    {cargo.descripcion}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
 
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-            <TextField
-              sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }}
-              label="Sector ID"
-              type="number"
-              value={formData.sectorId ?? ""}
-              onChange={handleChange("sectorId")}
-              disabled={isReadOnly}
-            />
+            <FormControl sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }} disabled={isReadOnly}>
+              <InputLabel shrink>Sector</InputLabel>
+              <Select
+                value={formData.sectorId != null ? String(formData.sectorId) : ""}
+                onChange={handleChange("sectorId")}
+                label="Sector"
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Sin selección</em>
+                </MenuItem>
+                {sectores.map((sector) => (
+                  <MenuItem key={sector.id} value={String(sector.id)}>
+                    {sector.descripcion}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             <FormControl sx={{ flex: "1 1 calc(50% - 8px)", minWidth: "200px" }} disabled={isReadOnly}>
               <InputLabel>Estado</InputLabel>

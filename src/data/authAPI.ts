@@ -35,6 +35,20 @@ export interface RefSector {
   id: number;
   descripcion: string;
 }
+
+export interface RefRol {
+  id: string;
+  nombre: string;
+  nombreNormalizado: string;
+  esRolHijo: boolean;
+  tareas?: unknown[];
+}
+
+export interface RefCargoEmpresa {
+  id: number;
+  descripcion: string;
+  empresaId: number;
+}
 //#endregion Types
 
 //#region token
@@ -70,7 +84,7 @@ export class AuthAPIClass extends ExternalAPI {
     );
   //#endregion getEmpresas
 
-    //Region Sectores
+  //#region Sectores
   readonly refSectoresURL = () => this.getURL({ path: "/api/Sectores" }).toString();
   getRefSectores = async () => tokenizable.get<RefSector[]>(
     this.refSectoresURL()
@@ -78,8 +92,27 @@ export class AuthAPIClass extends ExternalAPI {
   useGetRefSectores = () => useSWR(
     [this.refSectoresURL(), token.getToken()], () => this.getRefSectores()
   );
-  //#endregion
+  //#endregion Sectores
 
+  //#region Roles
+  readonly refRolesURL = () => this.getURL({ path: "/api/Roles" }).toString();
+  getRefRoles = async () => tokenizable.get<RefRol[]>(
+    this.refRolesURL()
+  ).then(({ data }) => data);
+  useGetRefRoles = () => useSWR(
+    [this.refRolesURL(), token.getToken()], () => this.getRefRoles()
+  );
+  //#endregion Roles
+
+  //#region Cargos Empresa
+  readonly refCargosEmpresaURL = () => this.getURL({ path: "/api/Cargos/Empresa" }).toString();
+  getRefCargosEmpresa = async () => tokenizable.get<RefCargoEmpresa[]>(
+    this.refCargosEmpresaURL()
+  ).then(({ data }) => data);
+  useGetRefCargosEmpresa = () => useSWR(
+    [this.refCargosEmpresaURL(), token.getToken()], () => this.getRefCargosEmpresa()
+  );
+  //#endregion Cargos Empresa
 
   //#region EnviarCorreo Cotización
   readonly postEnviarCorreoURL = () =>
