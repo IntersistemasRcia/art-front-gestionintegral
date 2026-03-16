@@ -14,10 +14,19 @@ export const authOptions: NextAuthOptions = {
         loginPassword: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        return await login({
-          usuario: credentials?.loginUser,
-          password: credentials?.loginPassword
-        }).then();
+        try {
+          const user = await login({
+            usuario: credentials?.loginUser,
+            password: credentials?.loginPassword,
+          });
+
+          if (!user) return null;
+          return user as any;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Error de autenticación";
+          throw new Error(message);
+        }
       },
     }),
   ],

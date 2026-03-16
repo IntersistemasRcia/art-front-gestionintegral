@@ -24,6 +24,11 @@ export interface LoginCommand {
   usuario?: string;
   password?: string;
 }
+export interface LoginErrorResponse {
+  StatusCode?: number;
+  Mensaje?: string;
+  message?: string;
+}
 export interface TokenDTO {
   tokenId?: string;
   validTo: string;
@@ -179,16 +184,26 @@ export class UsuarioAPIClass extends ExternalAPI {
       ({ data }) => data,
       (error) => {
         if (axios.isAxiosError(error)) {
+          const responseData = error.response?.data as LoginErrorResponse | string | undefined;
+          const apiMessage =
+            typeof responseData === "string"
+              ? responseData
+              : responseData?.Mensaje || responseData?.message;
+
           console.error(
             "Authentication failed:",
             error.response?.data || error.message
           );
+
+          // Propaga el mensaje de la API (ej: "Confirmación Pendiente...")
+          throw new Error(apiMessage || "Credenciales inválidas");
         } else if (error instanceof Error) {
           console.error("An unexpected error occurred:", error.message);
+          throw error;
         } else {
           console.error("An unexpected error occurred:", error);
+          throw new Error("Error inesperado al iniciar sesión");
         }
-        return null;
       }
     );
   useLogin = (login: LoginCommand) =>
