@@ -122,7 +122,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
       <CustomModalMessage
         open={isExpiredSessionModalOpen}
         onClose={handleExpiredSessionModalClose}
-        message="La sesion expiró, puede identificarse nuevamente"
+        message="La sesion expiró. Por favor vuelva a Iniciar Sesión."
         type="warning"
         title="Sesión expirada"
       />
