@@ -56,6 +56,8 @@ export default function UsuariosPage() {
     phoneNumber: "",
     nombre: "",
     userName: "",
+    titulo: "",
+    matricula: "",
     maxUsuarios: 0,
     // Usamos el `|| 1` como valor por defecto, aunque es mejor que el backend lo maneje si no existe
     empresaId: user?.empresaId || 0, 
@@ -149,6 +151,8 @@ export default function UsuariosPage() {
           nombre: row.nombre || "",
           cargoId: row.cargoId || 1,
           userName: row.userName || "",
+          titulo: row.titulo || "",
+          matricula: row.matricula || "",
           // Limpiar cargo si está vacío, es null, undefined, o contiene valores no deseados
           // cargo: (row.cargo && row.cargo.trim() !== "" && row.cargo !== "null" && row.cargo !== "undefined") ? row.cargo : "",
           // Mantenemos la empresaId de la fila o del usuario actual
