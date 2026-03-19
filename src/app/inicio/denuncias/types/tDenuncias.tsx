@@ -1,4 +1,3 @@
-import { s } from "react-querybuilder/dist/index-Dxdojb6L";
 import type { SelectChangeEvent } from "@mui/material/Select";
 
 // Interface for detailed incident/accident report
@@ -86,7 +85,7 @@ export type DenunciaCreate = {
   origenIngreso: string;
   avisoTrabajadorFueraNomina: boolean | null;
   avisoEmpleadorSinContratoVigente: boolean | null;
-  estado: number;
+  estado: number | string;
   denunciaCanalIngresoInterno: number;
 }
 
@@ -346,7 +345,7 @@ export type DenunciaGetAll = {
 };
 
 export type DenunciaQueryParams = {
-  Estado?: number;
+  Estado?: number | string;
   PageIndex?: number;
   PageSize?: number;
   EmpCuit?: number;
@@ -474,11 +473,11 @@ export type DenunciaPostRequest = {
   origenIngreso: string;
   avisoTrabajadorFueraNomina: number;
   avisoEmpleadorSinContratoVigente: boolean;
-  estado: number;
+  estado: string;
   denunciaCanalIngresoInterno: number;
   descripcion: string;
-  fechaHoraSiniestro: string;
-  fechaHoraTomaConocimientoSiniestro: string;
+  fechaHoraSiniestro: string | null;
+  fechaHoraTomaConocimientoSiniestro: string | null;
   enViaPublica: string;
 
   tipoAccidente: string;
@@ -579,12 +578,11 @@ export type DenunciaPutRequest = {
   avisoEmpleadorSinContratoVigente: boolean;
   denunciaCanalIngresoInterno: number;
   descripcion: string;
-  fechaHoraSiniestro: string;
+  fechaHoraSiniestro: string | null;
   enViaPublica: string;
   tipoAccidente: string;
   estadoDenunciaSiniestro: string;
-  fechaHoraTomaConocimientoSiniestro?: string;
-  siniestroTomaConocimientoFechaHora?: string;
+  siniestroTomaConocimientoFechaHora?: string | null;
   conIniTelefono: string;
   conIniApellidoNombres: string;
   conIniRelacionConFamiliar: string;
