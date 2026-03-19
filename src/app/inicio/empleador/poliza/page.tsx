@@ -7,6 +7,9 @@ import { useAuth } from "@/data/AuthContext";
 import { TextField, Box } from "@mui/material";
 import Formato from "@/utils/Formato";
 import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import ArtAPI from '@/data/artAPI';
+import AuthAPI from '@/data/authAPI';
+import type { ComercializadorById, VComercializadorRow } from '@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios';
 import CustomButton from "@/utils/ui/button/CustomButton";
 import { BsDownload } from "react-icons/bs";
 import { saveAs } from "file-saver";
@@ -141,6 +144,22 @@ const Poliza = () => {
     return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
   };
 
+  const srtIdRawGlobal = polizaRawData?.srtComercializadorInterno ?? 0;
+  const srtIdGlobal = Number(String(srtIdRawGlobal ?? 0).replace(/\D/g, ""));
+  const { data: comercializadorByIdData } = ArtAPI.useGetComercializadorById(
+    Number.isFinite(srtIdGlobal) && srtIdGlobal > 0 ? ({ id: srtIdGlobal } as unknown as ComercializadorById) : undefined
+  );
+
+  // Cargar parámetros de entidad (entidadId = 0) para Datos de la Aseguradora
+  const { data: parametrosEntidadData } = AuthAPI.useGetParametrosEntidadURL({ entidadId: 0 });
+  const parametrosMap: Record<string, string> = (parametrosEntidadData ?? []).reduce(
+    (acc: Record<string, string>, p: any) => {
+      if (p?.parametroNombre) acc[p.parametroNombre] = String(p?.valor ?? "");
+      return acc;
+    },
+    {}
+  );
+
   return (
     <div>
       {/* Combo de selección de empresa en la parte superior izquierda */}
@@ -191,7 +210,7 @@ const Poliza = () => {
         <TextField
           label="CUIT:"
           name="CUIT"
-          value="30-71.621.143-2"
+          value={parametrosMap['ART_CUIT'] ?? ""}
           fullWidth
           variant="standard"
         />
@@ -199,7 +218,7 @@ const Poliza = () => {
         <TextField
           label="Domicilio:"
           name="Domicilio"
-          value="Reconquista 630 Piso:6 - C.A.B.A. - CAPITAL FEDERAL - CP:1003"
+          value={parametrosMap['ART_Domicilio'] ?? ""}
           fullWidth
           variant="standard"
         />
@@ -207,7 +226,7 @@ const Poliza = () => {
         <TextField
           label="Teléfono:"
           name="Telefono"
-          value="(011)(37546700)"
+          value={parametrosMap['ART_Telefono'] ?? ""}
           fullWidth
           variant="standard"
         />
@@ -215,42 +234,42 @@ const Poliza = () => {
         <TextField
           label="Email:"
           name="Email"
-          value="info@artmutualrural.org.ar"
+          value={parametrosMap['ART_Email'] ?? ""}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Reclamos y Consultas:"
           name="reclamos"
-          value="0800-333-2786"
+          value={parametrosMap['ART_Reclamos y Consulta'] ?? ""}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Denominación:"
           name="Denominacion"
-          value="ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO"
+          value={parametrosMap['ART_Denominacion'] ?? ""}
           fullWidth
           variant="standard"
         />
         <TextField
           label="FAX:"
           name="FAX"
-          value="(011)(37546700)"
+          value={parametrosMap['ART_Fax'] ?? ""}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Página web:"
           name="web"
-          value="www.artmutualrural.org.ar"
+          value={parametrosMap['ART_Pagina web'] ?? ""}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Denuncias y Accidentes:"
           name="denuncias"
-          value="0800-333-6888"
+          value={parametrosMap['ART_Denuncia y Accidente'] ?? ""}
           fullWidth
           variant="standard"
         />
@@ -258,29 +277,65 @@ const Poliza = () => {
 
       {/* Sección de Canal Comercial */}
       <h3 className={styles.sectionTitle}>Canal Comercial</h3>
-      <div className={styles.dataGrid}>
-        <TextField
-          label="CUIT/CUIL:"
-          name="cuitcuil"
-          value="-----------"
-          fullWidth
-          variant="standard"
-        />
-        <TextField
-          label="Matricula:"
-          name="Matricula"
-          value="-----------"
-          fullWidth
-          variant="standard"
-        />
-        <TextField
-          label="Apellido y Nombre/Denominación:"
-          name="apellidoynombre"
-          value="-----------"
-          fullWidth
-          variant="standard"
-        />
-      </div>
+      {
+        (() => {
+          const comercializador = (comercializadorByIdData as VComercializadorRow) ?? null;
+
+          if (Number.isFinite(srtIdGlobal) && srtIdGlobal > 0) {
+            return (
+              <div className={styles.dataGrid}>
+                <TextField
+                  label="CUIT/CUIL:"
+                  name="cuitcuil"
+                  value={String(comercializador?.cuil ?? "-----------")}
+                  fullWidth
+                  variant="standard"
+                />
+                <TextField
+                  label="Matricula:"
+                  name="Matricula"
+                  value={String(comercializador?.matricula ?? "-----------")}
+                  fullWidth
+                  variant="standard"
+                />
+                <TextField
+                  label="Apellido y Nombre/Denominación:"
+                  name="apellidoynombre"
+                  value={String(comercializador?.referenteRazonSocial ?? "-----------")}
+                  fullWidth
+                  variant="standard"
+                />
+              </div>
+            );
+          }
+
+          return (
+            <div className={styles.dataGrid}>
+              <TextField
+                label="CUIT/CUIL:"
+                name="cuitcuil"
+                value="-----------"
+                fullWidth
+                variant="standard"
+              />
+              <TextField
+                label="Matricula:"
+                name="Matricula"
+                value="-----------"
+                fullWidth
+                variant="standard"
+              />
+              <TextField
+                label="Apellido y Nombre/Denominación:"
+                name="apellidoynombre"
+                value="-----------"
+                fullWidth
+                variant="standard"
+              />
+            </div>
+          );
+        })()
+      }
 
       {/* Sección de Datos del Empleador */}
       <h3 className={styles.sectionTitle}>Datos del Empleador</h3>
@@ -371,14 +426,22 @@ const Poliza = () => {
         <TextField
           label="CIIU:"
           name="CIIU"
-          value={polizaRawData?.ciiu || "---"}
+          value={polizaRawData?.ciiu
+            ? `${polizaRawData.ciiu} - ${polizaRawData.ciiuDescripcion ?? ""}`
+            : "---"}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Alicuota:"
           name="Alicuota"
-          value={`ILT: ${polizaRawData?.alicuota_PagoILT} - Valor Fijo: $${polizaRawData?.alicuota_SumaFija}`}
+          value={
+            polizaRawData
+              ? (Number(polizaRawData.alicuota_PagoILT) === 1
+                  ? `ILT: 1-El Empleador paga ILT por cuenta y orden de la ART - Valor Fijo: $${polizaRawData.alicuota_SumaFija}`
+                  : '-----')
+              : '---'
+          }
           fullWidth
           variant="standard"
         />
@@ -403,9 +466,9 @@ const Poliza = () => {
         />
 
         <TextField
-          label="Codigo Operación:"
+          label="Operación:"
           name="Operacion"
-          value={polizaRawData?.codigoOperacion || "---"}
+          value={polizaRawData ? `${polizaRawData.codigoOperacion} - ${polizaRawData.operacionDescripcion}` : "---"}
           fullWidth
           variant="standard"
         />
