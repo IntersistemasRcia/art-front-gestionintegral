@@ -20,6 +20,8 @@ export interface Empresa {
   domicilio: string;
   localidad: string;
   provincia: string;
+  polizaNro?: number;
+  poliza?: number;
 }
 
 export type EnviarCorreoAttachment = {
