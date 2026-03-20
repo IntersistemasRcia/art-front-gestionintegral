@@ -13,6 +13,7 @@ import { useAuth } from "@/data/AuthContext";
 import { Delete, GroupAdd, GroupRemove, Mail, Password } from "@mui/icons-material";
 import { BsEnvelopeArrowUpFill } from "react-icons/bs";
 import Formato from "@/utils/Formato";
+import styles from "./UsuarioTable.module.css";
 
 interface Props {
   data: UsuarioRow[];
@@ -116,7 +117,16 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
       { accessorKey: "nombre", header: "Nombre"},
       { accessorKey: "email", header: "Email"},
       { accessorKey: "rol", header: "Rol"},
-      { accessorKey: "cargoDescripcion", header: "Cargo/Función"},
+      {
+        accessorKey: "cargoDescripcion",
+        header: () => (
+          <Box sx={{ lineHeight: 1.1 }}>
+            Cargo/
+            <br />
+            Función
+          </Box>
+        ),
+      },
       {
         accessorKey: "sectorDescripcion",
         header: "Sector",
@@ -131,7 +141,7 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
           const isRowUserAdminEmpleador = row.original.rol?.toLowerCase() === "administradorempleador";
           
           return (
-            <Box sx={{ display: "flex"}}>
+            <Box className={styles.actionsGrid}>
                   <>
                     <Tooltip
                       title="Editar usuario"
@@ -151,7 +161,7 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                         color="warning"
                         size="small"
                       >
-                        <EditIcon fontSize="large" />
+                        <EditIcon fontSize="medium" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip
@@ -172,7 +182,7 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                         color="primary"
                         size="small"
                       >
-                        <VisibilityIcon fontSize="large" />
+                        <VisibilityIcon fontSize="medium" />
                       </IconButton>
                     </Tooltip>                    
                     <Tooltip
@@ -193,7 +203,7 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                         color="success"
                         size="small"
                       >
-                        <SecurityIcon fontSize="large" />
+                        <SecurityIcon fontSize="medium" />
                       </IconButton>
                     </Tooltip>
 
@@ -215,7 +225,7 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                         color="warning"
                         size="small"
                       >
-                        <Password fontSize="large" />
+                        <Password fontSize="medium" />
                       </IconButton>
                     </Tooltip>
                   </>
@@ -240,7 +250,7 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                       color="primary"
                       size="small"
                     >
-                      <Mail fontSize="large" />
+                      <Mail fontSize="medium" />
                     </IconButton>
                   </Tooltip>
                 </>
@@ -266,12 +276,12 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                     color="error"
                     size="small"
                   >
-                    <GroupRemove fontSize="large" />
+                    <GroupRemove fontSize="medium" />
                   </IconButton>
                 </Tooltip>
               </>
               )}
-              {row.original.estado.toLowerCase() === "pendiente activación" && (
+              {row.original.estado.toLowerCase() === "pendiente activación" ? (
                 <>
                     <Tooltip
                       title="Reenviar Correo"
@@ -291,10 +301,12 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
                         color="warning"
                         size="small"
                       >
-                        <BsEnvelopeArrowUpFill fontSize="large" />
+                        <BsEnvelopeArrowUpFill className={styles.pendingMailIcon} />
                       </IconButton>
                     </Tooltip>
                   </>
+              ) : (
+                <Box className={styles.emptyActionSlot} />
                 )}
             </Box>
           );
@@ -305,5 +317,5 @@ export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivat
     [onEdit, onDelete, onView, onPermisos, onActivate, hasTask, disabledButtons.reestablecer, disabledButtons.reenviarCorreo, handleReestablecerClick, handleReenviarCorreoClick]
   );
 
-  return <DataTable data={data} columns={columns}  isLoading={isLoading} />;
+  return <DataTable data={data} columns={columns} isLoading={isLoading} size="small" />;
 }
