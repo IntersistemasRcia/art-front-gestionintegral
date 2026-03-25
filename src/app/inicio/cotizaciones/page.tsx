@@ -7,7 +7,7 @@ import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import { CotizadorForm } from './CotizadorForm';
 
-const  basePath = process.env.NEXT_PUBLIC_API_EMPLEADOR_URL || 'http://fallback-prod.url'; 
+const  basePath = process.env.NEXT_PUBLIC_FRONT_COTIZADOR_URL || 'http://fallback-prod.url'; 
 
 const EXTERNAL_QUOTE_URL = `${basePath}/Cotizador`;
 
