@@ -1,0 +1,25 @@
+.actionsGrid {
+	display: grid;
+	grid-template-columns: repeat(6, auto);
+	width: fit-content;
+	margin-left: auto;
+	align-items: center;
+	gap: 2px;
+}
+
+.actionsGrid :global(.MuiIconButton-root) {
+	padding: 4px;
+}
+
+.actionsGrid :global(.MuiSvgIcon-root) {
+	font-size: 1.9rem;
+}
+
+.pendingMailIcon {
+	font-size: 1.9rem;
+}
+
+.emptyActionSlot {
+	width: 32px;
+	height: 32px;
+}

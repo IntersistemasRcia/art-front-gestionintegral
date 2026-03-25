@@ -9,10 +9,14 @@ import UsuarioRow from "./interfaces/UsuarioRow";
 const { useGetAll, useGetRoles, registrar, tareasUpdate, update, darDeBaja, reactivar, useGetCargos, reestablecer, reenviarCorreo } = UsuarioAPI;
 const { useGetRefEmpleadores } = ArtAPI;
 
-export default function useUsuarios() {
+export default function useUsuarios(empresaId?: number) {
   
   const { user, status } = useAuth();   
-  const { data: usuariosData, error: usuariosError, isLoading: usuariosLoading, mutate: mutateUsuarios } = useGetAll(user?.empresaId == 0 ? {}:{ empresaId: user?.empresaId});
+  const params = empresaId !== undefined
+    ? { empresaId }
+    : (user?.empresaId == 0 ? {} : { empresaId: user?.empresaId });
+
+  const { data: usuariosData, error: usuariosError, isLoading: usuariosLoading, mutate: mutateUsuarios } = useGetAll(params);
   const { data: roles, error: rolesError, isLoading: rolesLoading } = useGetRoles();  
   const {
     data: cargos,

@@ -9,6 +9,10 @@ export interface EmpresasParams {
   CUIT?: number | string;
 }
 
+export interface ParametersParamEntidad {
+  entidadId?: number;
+}
+
 export interface Empresa {
   empresaId: number;
   cuit: number;
@@ -16,6 +20,8 @@ export interface Empresa {
   domicilio: string;
   localidad: string;
   provincia: string;
+  polizaNro?: number;
+  poliza?: number;
 }
 
 export type EnviarCorreoAttachment = {
@@ -130,6 +136,26 @@ export class AuthAPIClass extends ExternalAPI {
         );
       });
   //#endregion
+
+
+    //GET ParametrosEntidad
+  readonly getParametrosEntidadURL = (params: ParametersParamEntidad = {}) => {
+    return this.getURL({ path: "/api/ParametrosEntidades", search: toURLSearch(params) }).toString();
+  };
+  getParametrosEntidad = async (params: ParametersParamEntidad = {}) => tokenizable.get(
+    this.getParametrosEntidadURL(params),
+  ).then(({ data }) => data);
+  useGetParametrosEntidadURL = (params: ParametersParamEntidad = {}) => useSWR(
+    [this.getParametrosEntidadURL(params), token.getToken()], () => this.getParametrosEntidad(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+  //endregion
+
+
+
   
 }
 

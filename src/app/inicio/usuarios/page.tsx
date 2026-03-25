@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Box, Typography } from "@mui/material";
 import UsuarioForm, { UsuarioFormFields } from "./UsuarioForm";
 import UsuarioTable from "./UsuarioTable";
 import EmpresaTable from "./EmpresaTable";
 import Tareas from "./Tareas";
 import useUsuarios from "./useUsuarios";
+import { useEmpresasStore } from "@/data/empresasStore";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { Empresa } from "@/data/authAPI";
+import { useSearchParams } from "next/navigation";
+import Formato from "@/utils/Formato";
+import { useEmpresasLoader } from "@/data/useEmpresasLoader";
 import styles from "./Usuario.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
@@ -56,11 +62,64 @@ export default function UsuariosPage() {
     phoneNumber: "",
     nombre: "",
     userName: "",
+    titulo: "",
+    matricula: "",
     maxUsuarios: 0,
     // Usamos el `|| 1` como valor por defecto, aunque es mejor que el backend lo maneje si no existe
     empresaId: user?.empresaId || 0, 
     cargoId: undefined,
     sectorId: undefined,
+  };
+
+  // Cargar empresas y preparar selector
+  useEmpresasLoader();
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
+  const [bloquearBusquedaPorCuit, setBloquearBusquedaPorCuit] = useState(false);
+  const searchParams = useSearchParams();
+  const cuitQuery = searchParams?.get("cuit") ?? searchParams?.get("cuil");
+  const cuitForzado = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
+
+  useEffect(() => {
+    if (Number.isFinite(cuitForzado) && cuitForzado > 0) return;
+    if (!isLoadingEmpresas) {
+      if (empresas.length === 1) {
+        setEmpresaSeleccionada(empresas[0]);
+        seleccionAutomaticaRef.current = true;
+      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
+        setEmpresaSeleccionada(null);
+        seleccionAutomaticaRef.current = false;
+      }
+    }
+  }, [empresas.length, isLoadingEmpresas, cuitForzado]);
+
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+    const hasCuitForzado = Number.isFinite(cuitForzado) && cuitForzado > 0;
+    setBloquearBusquedaPorCuit(hasCuitForzado);
+    if (!hasCuitForzado) return;
+    const match = empresas.find((e) => {
+      const digits = Number(String((e as any)?.cuit ?? "").replace(/\D/g, ""));
+      return Number.isFinite(digits) && digits === cuitForzado;
+    });
+    if (match) {
+      setEmpresaSeleccionada(match);
+      seleccionAutomaticaRef.current = true;
+    }
+  }, [cuitForzado, empresas, isLoadingEmpresas]);
+
+  const handleEmpresaChange = (_event: React.SyntheticEvent, newValue: Empresa | null) => {
+    if (bloquearBusquedaPorCuit) return;
+    setEmpresaSeleccionada(newValue);
+    seleccionAutomaticaRef.current = false;
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
+    const cuitFormateado = Formato.CUIP((empresa as any)?.cuit);
+    return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
   };
 
   const {
@@ -77,7 +136,7 @@ export default function UsuariosPage() {
     usuarioReactivar,
     usuarioReestablecer,
     usuarioReenviarCorreo
-  } = useUsuarios();
+  } = useUsuarios(empresaSeleccionada?.empresaId);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [requestState, setRequestState] = useState<RequestState>({
@@ -149,6 +208,8 @@ export default function UsuariosPage() {
           nombre: row.nombre || "",
           cargoId: row.cargoId || 1,
           userName: row.userName || "",
+          titulo: row.titulo || "",
+          matricula: row.matricula || "",
           // Limpiar cargo si está vacío, es null, undefined, o contiene valores no deseados
           // cargo: (row.cargo && row.cargo.trim() !== "" && row.cargo !== "null" && row.cargo !== "undefined") ? row.cargo : "",
           // Mantenemos la empresaId de la fila o del usuario actual
@@ -364,6 +425,25 @@ const handleSubmit = async (data: UsuarioFormFields) => {
           >
             Crear usuario
           </CustomButton>
+
+          {/* Selector empresa*/}
+          <Box className={styles.empresaSelectorWrapper}>
+            <Box className={styles.empresaSelectorBox}>
+              <CustomSelectSearch<Empresa>
+                options={empresas}
+                getOptionLabel={getEmpresaLabel}
+                value={empresaSeleccionada}
+                onChange={handleEmpresaChange}
+                label="Seleccionar Empresa"
+                placeholder="Buscar empresa..."
+                loading={isLoadingEmpresas}
+                loadingText="Cargando empresas..."
+                noOptionsText={isLoadingEmpresas ? "Cargando..." : empresas.length === 0 ? "No hay empresas disponibles" : "No se encontraron empresas"}
+                disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
+                isOptionEqualToValue={(option, value) => option?.empresaId === value?.empresaId}
+              />
+            </Box>
+          </Box>
 
           <UsuarioTable
             data={usuarios}

@@ -13,6 +13,9 @@ import { Box, Checkbox, FormControlLabel, TextField, Typography } from '@mui/mat
 import Image from 'next/image';
 import Formato from '@/utils/Formato';
 import Cobertura_PDF from './Cobertura_PDF';
+import HistorialTable from './HistorialTable';
+import { useAuth } from '@/data/AuthContext';
+import CustomTabs from '@/utils/ui/tab/CustomTab';
 import ExcelJS from 'exceljs';
 import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 import { useEmpresasStore } from "@/data/empresasStore";
@@ -153,8 +156,19 @@ export default function CoberturaPage() {
             inputReference.current?.focus();
             return;
         }
-        // continuar con la descarga / abrir PDF
-        setAbrirPDF(true);
+
+        void (async () => {
+            const empresa = await ArtAPI.getEmpresaByCUIT({ CUIT: empresaSeleccionada!.cuit });
+            void ArtAPI.postCobertura({
+                cuit: empresaSeleccionada!.cuit,
+                poliza: empresa.polizaNro,
+                razonSocial: empresaSeleccionada!.razonSocial,
+                destinatario: presentadoA,
+                tipoCertificado: clausula ? 'Con cláusula de no repetición' : 'Sin cláusula de no repetición'
+            });
+
+            setAbrirPDF(true);
+        })();
     };
     
     // Inicializa personalPendiente con los datos crudos cuando se cargan
@@ -407,12 +421,34 @@ export default function CoberturaPage() {
     // Mostrar destinatario específico en la cláusula si fue ingresado, sino uso el genérico
     const destinatarioEnClausula = presentadoA?.trim() ? presentadoA : 'A quien corresponda';
 
+  
+    const { hasTask } = useAuth();
+    const canViewHistorial = hasTask('empleador_Cobertura_Historial');
+
+    const [tabIndex, setTabIndex] = useState<number>(0);
+    const handleTabChange = (_e: any, newVal: number) => setTabIndex(newVal);
+
+
+
     return ( 
         <div className={styles.inicioContainer}>
             <div className={styles.header}>
                 <h1 className={styles.mainTitle}>Gestión de Cobertura de Personal</h1>
             </div>
 
+            <CustomTabs
+                tabs={canViewHistorial ? [
+                    { label: 'Certificado', value: 0, content: <></> },
+                    { label: 'Historial', value: 1, content: <></> },
+                ] : [
+                    { label: 'Certificado', value: 0, content: <></> },
+                ]}
+                currentTab={tabIndex}
+                onTabChange={handleTabChange}
+            />
+
+            {tabIndex === 0 && (
+                <>
             <Box className={styles.empresaSelectorContainer}>
                 <CustomSelectSearch<Empresa>
                     options={empresas}
@@ -542,7 +578,15 @@ export default function CoberturaPage() {
             </div>
             <div className={styles.detalles}>
             </div>
+                </>
+            )}
+
+            {tabIndex === 1 && (
+                <HistorialTable data={[]} isLoading={false} />
+            )}
             
+            {tabIndex === 0 && (
+                <>
             {/* -------------------- SECCIÓN DE CERTIFICADO DE COBERTURA -------------------- */}
             
             <div className={styles.downloadButtonContainer}>
@@ -670,6 +714,8 @@ export default function CoberturaPage() {
                 />
                 ) : null}
           </div>
+                </>
+            )}
                 {/* Modal de mensajes estandarizado (formato RGRL) */}
                 <CustomModalMessage
                         open={msgOpen}

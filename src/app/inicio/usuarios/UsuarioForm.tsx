@@ -38,6 +38,7 @@ export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" |
 export interface UsuarioFormFields {
   nombre: string;
   apellido?: string;
+  titulo?: string;
   email: string;
   cuit: string; // Keep as string for form input, will convert to number on submit
   phoneNumber: string;
@@ -90,6 +91,7 @@ export interface Props {
 const initialFormState: UsuarioFormFields = {
   nombre: "",
   apellido: "",
+  titulo: "",
   email: "",
   cuit: "",
   phoneNumber: "",
@@ -109,6 +111,7 @@ const initialFormState: UsuarioFormFields = {
 export interface ValidationErrors {
   nombre?: string;
   apellido?: string;
+  titulo?: string;
   email?: string;
   cuit?: string;
   phoneNumber?: string;
@@ -139,6 +142,7 @@ export interface ValidationErrors {
 export interface TouchedFields {
   nombre?: boolean;
   apellido?: boolean;
+  titulo?: boolean;
   email?: boolean;
   cuit?: boolean;
   phoneNumber?: boolean;
@@ -211,6 +215,7 @@ export default function UsuarioForm({
   const isDeleting = method === "delete";
   const isActivating = method === "activate";
   const isDisabled = isViewing || isDeleting || isActivating;
+  const requiresTituloMatricula = form.rol === "MedicinaLaboral" || form.rol === "SeguridadEHigiene";
 
   // Función helper para formatear CUIT
   const formatCuit = (cuit: string): string => {
@@ -224,6 +229,8 @@ export default function UsuarioForm({
   };
 
   useEffect(() => {
+    if (!open) return;
+
     // Restablecer el formulario y los estados de error/tocado al abrir o cambiar los datos
     if (initialData) {
       const processedData = { ...initialData };
@@ -267,7 +274,7 @@ export default function UsuarioForm({
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
     setShowPassword(false); // Resetear la visibilidad de contraseña
     setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
-  }, [initialData, open, isEditing, isCreating, cargos, refEmpleadores]);
+  }, [initialData, open, isEditing, isCreating]);
 
   const modalTitle = useMemo(() => {
     switch (method) {
@@ -395,6 +402,16 @@ export default function UsuarioForm({
       //   return validatePhoneNumber(value);
       case "nombre":
         return validateRequired(value, "Nombre");
+      case "titulo":
+        if (!requiresTituloMatricula) {
+          return undefined;
+        }
+        return validateRequired(value, "Título Habilitante");
+      case "matricula":
+        if (!requiresTituloMatricula) {
+          return undefined;
+        }
+        return validateRequired(value, "Matrícula");
       // case "userName":
       //   return validateRequired(value, "Usuario");
       // case "tipo":
@@ -406,6 +423,7 @@ export default function UsuarioForm({
         }
         return validateRequired(value, "Rol");
       case "cargoId":
+        if (isAdminEmpleador) return undefined;
         return validateRequired(String(value), "Cargo");
       case "empresaId":
         // No validar empresa si está marcado como administrador en modo creación
@@ -413,6 +431,9 @@ export default function UsuarioForm({
           return undefined;
         }
         return validateRequired(String(value), "Empresa");
+      case "sectorId":
+        if (isAdminEmpleador) return undefined;
+        return validateRequired(String(value), "Sector");
       default:
         return undefined;
     }
@@ -473,6 +494,12 @@ export default function UsuarioForm({
           setArcaCUIL(undefined);
         }
       }
+    } else if (name === "matricula") {
+      const numericValue = value.replace(/\D/g, '');
+      setForm((prev: UsuarioFormFields) => ({
+        ...prev,
+        [name]: numericValue,
+      }));
     } else {
       setForm((prev: UsuarioFormFields) => ({
         ...prev,
@@ -651,6 +678,7 @@ export default function UsuarioForm({
       tipo: "", // Default type
       rol: form.rol || (roles.length > 0 ? roles[0].nombre : ""), // Default to first role
       empresaId: finalEmpresaId,
+      cargoId: isCreating && isAdminEmpleador ? 1 : form.cargoId,
     };
 
     // Mark all fields as touched
@@ -778,9 +806,10 @@ export default function UsuarioForm({
               <div className={styles.formRow}>
                 <FormControl
                   fullWidth
-                  required={!isDisabled}
+                  required={!isDisabled && !isAdminEmpleador}
                   error={touched.cargoId && !!errors.cargoId}
                   disabled={isDisabled}
+                  sx={{ display: isAdminEmpleador ? 'none' : undefined }}
                 >
                   <InputLabel>Cargo/Función</InputLabel>
                   <Select
@@ -791,7 +820,6 @@ export default function UsuarioForm({
                     onBlur={() => handleBlur("cargoId")}
                     displayEmpty
                   >
-
                     {cargos.map((cargo) => (
                       <MenuItem key={cargo.id} value={cargo.id}>
                         {cargo.descripcion}
@@ -841,9 +869,10 @@ export default function UsuarioForm({
                 </FormControl>
                 <FormControl
                   fullWidth
-                  required={!isDisabled}
+                  required={!isDisabled && !isAdminEmpleador}
                   error={touched.sectorId && !!errors.sectorId}
                   disabled={isDisabled}
+                  sx={{ display: isAdminEmpleador ? 'none' : undefined }}
                 >
                   <InputLabel>Sector</InputLabel>
                   <Select
@@ -877,6 +906,34 @@ export default function UsuarioForm({
                     </Typography>
                   )}
                 </FormControl>
+              </div>
+
+              <div className={styles.formRow} style={{ display: requiresTituloMatricula ? undefined : 'none' }}>
+                <TextField
+                  label="Título Habilitante"
+                  name="titulo"
+                  value={form.titulo || ""}
+                  onChange={handleTextFieldChange}
+                  onBlur={() => handleBlur("titulo")}
+                  error={touched.titulo && !!errors.titulo}
+                  helperText={touched.titulo && errors.titulo}
+                  fullWidth
+                  required={!isDisabled && requiresTituloMatricula}
+                  disabled={isDisabled}
+                />
+                <TextField
+                  label="Matrícula"
+                  name="matricula"
+                  value={form.matricula || ""}
+                  onChange={handleTextFieldChange}
+                  onBlur={() => handleBlur("matricula")}
+                  error={touched.matricula && !!errors.matricula}
+                  helperText={touched.matricula && errors.matricula}
+                  fullWidth
+                  required={!isDisabled && requiresTituloMatricula}
+                  disabled={isDisabled}
+                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                />
               </div>
 
               {isCreating && (

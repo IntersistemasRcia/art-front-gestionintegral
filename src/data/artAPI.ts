@@ -11,6 +11,7 @@ import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNomb
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador} from "@/app/inicio/comercializador/polizas/types/poliza";
 import {ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
 import {ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
+import {CoberturaPost, CoberturaPostResponse, ParametersCobertura} from "@/app/inicio/empleador/cobertura/types/cobertura";
 import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
@@ -1085,6 +1086,41 @@ export class ArtAPIClass extends ExternalAPI {
       }
     );
   //#endregion
+
+
+
+    //POST certificado de cobertura
+  readonly postCoberturaURL = this.getURL({ path: "/api/CertificadosCoberturaLog" }).toString();
+  postCobertura = async (data: CoberturaPost) =>
+    tokenizable.post<CoberturaPostResponse>(this.postCoberturaURL, data).then(({ data }) => data);
+  swrPostCobertura: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: CoberturaPost }) => Promise<CoberturaPostResponse>;
+  } = Object.freeze({
+    key: [this.postCoberturaURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postCobertura(arg),
+  });
+  usePostCobertura = () =>
+    useSWRMutation<CoberturaPostResponse, Error, [url: string, token: string], CoberturaPost>(
+      this.swrPostCobertura.key,
+      this.swrPostCobertura.fetcher
+    );
+  //#endregion
+
+    //GET cobertura
+    readonly getCoberturaURL = (params: ParametersCobertura = {}) => {
+    return this.getURL({ path: "/api/CertificadosCoberturaLog", search: toURLSearch(params) }).toString();
+  };
+  getCobertura = async (params: ParametersCobertura = {}) => tokenizable.get(
+    this.getCoberturaURL(params),
+  ).then(({ data }) => data);
+  useGetCoberturaURL = (params: ParametersCobertura = {}) => useSWR(
+    [this.getCoberturaURL(params), token.getToken()], () => this.getCobertura(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
 
 
 

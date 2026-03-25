@@ -204,3 +204,14 @@
   gap: 8px;
   margin-top: 8px;
 }
+
+.empresaSelectorWrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.empresaSelectorBox {
+  min-width: 420px;
+}
