@@ -66,6 +66,14 @@ export default function Signin() {
       if (res?.error) {
         // Intentar detectar si la API nos devolvió un link de restablecimiento
         const errorStr = String(res.error || "");
+
+        const pendingEmail = errorStr.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
+        if (pendingEmail && /requiere validaci[oó]n/i.test(errorStr)) {
+          await usuarioAPI.reenviarCorreo(pendingEmail);
+          setError(`Su cuenta requiere validación. Le enviamos un correo electrónico a ${pendingEmail} para que pueda verificarla y activar su acceso.`);
+          return;
+        }
+
         const resetRegex = /(https?:\/\/[^\s\"]*resetPassword\?[^\"\s]*)|(?:resetPassword\?[^\"\s]*)/i;
         const match = errorStr.match(resetRegex);
         if (match) {
@@ -103,9 +111,9 @@ export default function Signin() {
         setError("Error desconocido en el proceso de autenticación");
         console.warn("[Login] signIn retornó resultado inesperado:", res);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Login] excepción en handleSubmit:", err);
-      setError(err?.message ?? "Error inesperado al iniciar sesión");
+      setError(err instanceof Error ? err.message : "Error inesperado al iniciar sesión");
     } finally {
       setIsLoading(false);
     }
@@ -132,9 +140,9 @@ export default function Signin() {
         setOpenForgotPassword(false);
         setRecoveryMessage("");
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ForgotPassword] Error:", err);
-      setRecoveryError(err?.message || "Error al enviar el correo de recuperación");
+      setRecoveryError(err instanceof Error ? err.message : "Error al enviar el correo de recuperación");
     } finally {
       setIsSendingEmail(false);
     }
