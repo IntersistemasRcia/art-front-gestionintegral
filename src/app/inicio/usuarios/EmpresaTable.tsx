@@ -6,61 +6,101 @@ import { Alert, Box, IconButton, TextField, Tooltip, Typography } from "@mui/mat
 import EditIcon from "@mui/icons-material/Edit";
 import DataTable from "@/utils/ui/table/DataTable";
 import ArtAPI from "@/data/artAPI";
+import AuthAPI from "@/data/authAPI";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import Formato from "@/utils/Formato";
-
-type EmpresaRow = {
-	interno?: number;
-	cuit?: string;
-	nombreEmpresa?: string;
-	parametro?: string;
-	accion?: string;
-};
-
-interface Props {
-	data?: EmpresaRow[];
-	isLoading?: boolean;
-}
+import type { EmpresaRow, ParametroEntidad, EmpresaById, Props } from "./types/empresa";
 
 export default function EmpresaTable({ data, isLoading }: Props) {
 	const { useGetRefEmpleadores, usePutEmpresaParametro } = ArtAPI;
+	const { useGetParametrosEntidadURL } = AuthAPI;
 	const {
 		data: refEmpleadores,
 		isLoading: isLoadingRef,
 		mutate: mutateRefEmpleadores,
 	} = useGetRefEmpleadores();
+	const {
+		data: parametrosEntidadData,
+		isLoading: isLoadingParametros,
+		mutate: mutateParametrosEntidad,
+	} = useGetParametrosEntidadURL({ parametroId: 1 });
 	const { trigger: putEmpresaParametro, isMutating: isSaving } = usePutEmpresaParametro();
+	const parametrosEntidad = (parametrosEntidadData ?? []) as ParametroEntidad[];
 
 	const [openModal, setOpenModal] = useState(false);
-	const [selectedCuit, setSelectedCuit] = useState<number | null>(null);
+	const [selectedEmpresaId, setSelectedEmpresaId] = useState<number | null>(null);
+	const [empresasById, setEmpresasById] = useState<Record<number, EmpresaById>>({});
+	const [isLoadingEmpresasById, setIsLoadingEmpresasById] = useState(true);
 	const [cantidadUsuariosMaxima, setCantidadUsuariosMaxima] = useState<number>(0);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [modalMsgOpen, setModalMsgOpen] = useState(false);
 	const [modalMsgText, setModalMsgText] = useState<string>("");
 	const [modalMsgType, setModalMsgType] = useState<MessageType>("info");
 
-	const allowedCuits = useMemo(() => new Set([30707933336, 30616512052]), []);
+	useEffect(() => {
+		let active = true;
+		const loadEmpresasById = async () => {
+			setIsLoadingEmpresasById(true);
+			const empresas = await Promise.all(
+				parametrosEntidad.map(async (parametro) => {
+					try {
+						return (await ArtAPI.getEmpresaById({ id: parametro.entidadId })) as EmpresaById;
+					} catch {
+						return null;
+					}
+				})
+			);
+			if (!active) return;
+			setEmpresasById(
+				empresas.filter((empresa): empresa is EmpresaById => empresa !== null).reduce<Record<number, EmpresaById>>((acc, empresa) => {
+					acc[empresa.interno] = empresa;
+					return acc;
+				}, {})
+			);
+			setIsLoadingEmpresasById(false);
+		};
+
+		if (parametrosEntidad.length > 0) {
+			loadEmpresasById();
+		} else {
+			setEmpresasById({});
+			setIsLoadingEmpresasById(false);
+		}
+
+		return () => {
+			active = false;
+		};
+	}, [parametrosEntidad]);
+
 	const tableData = useMemo<EmpresaRow[]>(() => {
 		if (data && data.length > 0) {
 			return data;
 		}
-		return (refEmpleadores || [])
-			.filter((empleador) => allowedCuits.has(empleador.cuit))
-			.map((empleador) => ({
-				interno: empleador.interno,
-				cuit: empleador.cuit != null ? String(empleador.cuit) : "",
-				nombreEmpresa: empleador.razonSocial || "",
-				parametro: "CantidadUsuariosEmpresa",
-				accion: "",
-			}));
-	}, [data, refEmpleadores, allowedCuits]);
+		if (isLoadingEmpresasById) return [];
+		return parametrosEntidad.flatMap((parametro) => {
+			const empresa = empresasById[parametro.entidadId];
+			if (!empresa) return [];
+			return [{
+				interno: parametro.entidadId,
+				cuit: String(empresa.cuit),
+				nombreEmpresa: empresa.razonSocial,
+				parametro: parametro.parametroNombre,
+				action: "",
+			}];
+		});
+	}, [data, parametrosEntidad, empresasById, isLoadingEmpresasById]);
 
 	const selectedEmpresa = useMemo(() => {
-		if (!refEmpleadores || selectedCuit == null) return null;
-		return refEmpleadores.find((e) => e.cuit === selectedCuit) ?? null;
-	}, [refEmpleadores, selectedCuit]);
+		if (!refEmpleadores || selectedEmpresaId == null) return null;
+		return refEmpleadores.find((e) => e.interno === selectedEmpresaId) ?? null;
+	}, [refEmpleadores, selectedEmpresaId]);
+
+	const selectedParametro = useMemo(() => {
+		if (selectedEmpresaId == null) return null;
+		return parametrosEntidad.find((p) => p.entidadId === selectedEmpresaId) ?? null;
+	}, [parametrosEntidad, selectedEmpresaId]);
 
 	useEffect(() => {
 		if (!openModal) return;
@@ -71,23 +111,22 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 
 	useEffect(() => {
 		if (!openModal) return;
-		setCantidadUsuariosMaxima(selectedEmpresa?.cantidadUsuariosMaxima ?? 0);
-	}, [openModal, selectedEmpresa]);
+		setCantidadUsuariosMaxima(Number(selectedParametro?.valor ?? 0));
+	}, [openModal, selectedParametro]);
 
 	const handleOpenEdit = (row: EmpresaRow) => {
-		const cuitNumber = row.cuit ? Number(row.cuit) : NaN;
-		setSelectedCuit(Number.isFinite(cuitNumber) ? cuitNumber : null);
+		setSelectedEmpresaId(row.interno ?? null);
 		setOpenModal(true);
 	};
 
 	const handleCloseModal = () => {
 		setOpenModal(false);
-		setSelectedCuit(null);
+		setSelectedEmpresaId(null);
 		setSaveError(null);
 	};
 
 	const handleSave = async () => {
-		if (!selectedEmpresa) return;
+		if (!selectedEmpresa || !selectedParametro) return;
 		const actuales = selectedEmpresa.cantidadUsuarios ?? 0;
 		if (cantidadUsuariosMaxima < actuales) {
 			setModalMsgType("warning");
@@ -102,14 +141,16 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 			await putEmpresaParametro({
 				id: selectedEmpresa.interno,
 				data: {
-					nombre: "CantidadUsuariosEmpresa",
+					nombre: selectedParametro.parametroNombre,
 					valor: String(cantidadUsuariosMaxima),
 				},
 			});
 			await mutateRefEmpleadores();
+			await mutateParametrosEntidad();
 			handleCloseModal();
-		} catch (e: any) {
-			setSaveError(e?.message ?? "No se pudo guardar el parámetro.");
+		} catch (e: unknown) {
+			const errorMessage = e instanceof Error ? e.message : "No se pudo guardar el parámetro.";
+			setSaveError(errorMessage);
 		}
 	};
 
@@ -151,7 +192,7 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 			<DataTable
 				data={tableData}
 				columns={columns}
-				isLoading={isLoading ?? isLoadingRef}
+				isLoading={(isLoading ?? false) || isLoadingRef || isLoadingParametros || isLoadingEmpresasById}
 			/>
 
 			<CustomModal

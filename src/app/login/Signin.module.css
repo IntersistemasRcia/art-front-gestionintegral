@@ -156,4 +156,6 @@
 /* Error alert */
 .error {
   margin-bottom: 10px !important;
+  font-size: 1.2rem;
 }
+

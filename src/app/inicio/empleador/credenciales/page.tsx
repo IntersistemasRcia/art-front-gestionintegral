@@ -13,6 +13,7 @@ import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import Formato from '@/utils/Formato';
 import { downloadCredencialPdf } from "./PDF/pdfCredencial";
 import type { AfiliadoCredencial, PolizaCredencial } from "./types/pdf";
+import type { PolizaComercializador } from "./types/credencial";
 import CustomButton from '@/utils/ui/button/CustomButton';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
@@ -155,11 +156,13 @@ function CredencialesPage() {
             title="Descargar credencial"
             onClick={async () => {
               const empresa = await ArtAPI.getEmpresaByCUIT({ CUIT: empresaCUIT });
+              const polizas = await ArtAPI.getPolizaComercializador({ CUIT: empresaCUIT }) as PolizaComercializador[];
+              const numeroContrato = Array.isArray(polizas) ? (polizas[0]?.numero ?? '') : '';
               const pol = [
                 {
                   empleador_Denominacion: empresa.razonSocial,
                   cuit: Formato.CUIP(empresaCUIT),
-                  numero: empresa.contratoNro,
+                  numero: numeroContrato,
                 },
               ];
               try {
