@@ -8,11 +8,12 @@ import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, Establ
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
-import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador} from "@/app/inicio/comercializador/polizas/types/poliza";
-import {ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
-import {ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
-import {CoberturaPost, CoberturaPostResponse, ParametersCobertura} from "@/app/inicio/empleador/cobertura/types/cobertura";
+import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador } from "@/app/inicio/comercializador/polizas/types/poliza";
+import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
+import { ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
+import { CoberturaPost, CoberturaPostResponse, ParametersCobertura } from "@/app/inicio/empleador/cobertura/types/cobertura";
 import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
+import { EmpresaParamsID } from "@/app/inicio/usuarios/types/empresa";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 
@@ -632,6 +633,31 @@ export class ArtAPIClass extends ExternalAPI {
   );
   //#endregion
 
+  //#Region Empresa por Id
+  readonly getEmpresaByIdURL = (params: EmpresaParamsID) => {
+    return this.getURL({
+      path: `/api/Empresas/${params.id}`,
+    }).toString();
+  };
+
+  getEmpresaById = async (params: EmpresaParamsID) =>
+    tokenizable
+      .get(this.getEmpresaByIdURL(params))
+      .then(({ data }) => data);
+
+  useGetEmpresaById = (params?: EmpresaParamsID) =>
+    useSWR(
+      params?.id && token.getToken()
+        ? [this.getEmpresaByIdURL(params), token.getToken()]
+        : null,
+      () => this.getEmpresaById(params as EmpresaParamsID),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion Empresa por Id
+
 
   //#region Empresa PUT
   readonly putEmpresaParametroBaseURL = this.getURL({ path: "/api/Empresas" }).toString();
@@ -1068,7 +1094,7 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region ARCA GET
-    readonly getARCAURL = (params: ARCAparams = {}) => {
+  readonly getARCAURL = (params: ARCAparams = {}) => {
     return this.getURL({
       path: "/api/Arca/ConsultaPadron",
       search: toURLSearch(params),
@@ -1089,7 +1115,7 @@ export class ArtAPIClass extends ExternalAPI {
 
 
 
-    //POST certificado de cobertura
+  //POST certificado de cobertura
   readonly postCoberturaURL = this.getURL({ path: "/api/CertificadosCoberturaLog" }).toString();
   postCobertura = async (data: CoberturaPost) =>
     tokenizable.post<CoberturaPostResponse>(this.postCoberturaURL, data).then(({ data }) => data);
@@ -1107,8 +1133,8 @@ export class ArtAPIClass extends ExternalAPI {
     );
   //#endregion
 
-    //GET cobertura
-    readonly getCoberturaURL = (params: ParametersCobertura = {}) => {
+  //GET cobertura
+  readonly getCoberturaURL = (params: ParametersCobertura = {}) => {
     return this.getURL({ path: "/api/CertificadosCoberturaLog", search: toURLSearch(params) }).toString();
   };
   getCobertura = async (params: ParametersCobertura = {}) => tokenizable.get(

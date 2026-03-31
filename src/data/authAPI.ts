@@ -11,6 +11,7 @@ export interface EmpresasParams {
 
 export interface ParametersParamEntidad {
   entidadId?: number;
+  parametroId?: number;
 }
 
 export interface Empresa {
