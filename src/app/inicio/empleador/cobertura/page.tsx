@@ -9,7 +9,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import styles from "./cobertura.module.css";
 import CustomButton from '@/utils/ui/button/CustomButton';
 import { BsBoxArrowInLeft, BsBoxArrowInRight, BsDownload, BsFileEarmarkExcel } from "react-icons/bs";
-import { Box, Checkbox, FormControlLabel, TextField, Typography } from '@mui/material';
+import { Box, Checkbox, FormControlLabel, TextField, Typography, CircularProgress } from '@mui/material';
 import Image from 'next/image';
 import Formato from '@/utils/Formato';
 import Cobertura_PDF from './Cobertura_PDF';
@@ -55,6 +55,7 @@ export default function CoberturaPage() {
     const [presentadoA, setPresentadoA] = useState<string>('');
     const [abrirPDF, setAbrirPDF] = useState<boolean>(false);
     const [clausula, setClausula] = useState<boolean>(false);
+    const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
     // Estado para mensajes (formato unificado como en RGRL)
     const [msgOpen, setMsgOpen] = useState<boolean>(false);
@@ -151,23 +152,30 @@ export default function CoberturaPage() {
     const [newNombre, setNewNombre] = useState<string>('');
 
     const handleDownload = () => {
+        if (isDownloading) return;
+
         // Si no hay destinatario, poner foco en el campo "Para ser presentado a"
         if (!presentadoA?.trim()) {
             inputReference.current?.focus();
             return;
         }
 
+        setIsDownloading(true);
         void (async () => {
-            const empresa = await ArtAPI.getEmpresaByCUIT({ CUIT: empresaSeleccionada!.cuit });
-            void ArtAPI.postCobertura({
-                cuit: empresaSeleccionada!.cuit,
-                poliza: empresa.polizaNro,
-                razonSocial: empresaSeleccionada!.razonSocial,
-                destinatario: presentadoA,
-                tipoCertificado: clausula ? 'Con cláusula de no repetición' : 'Sin cláusula de no repetición'
-            });
+            try {
+                const empresa = await ArtAPI.getEmpresaByCUIT({ CUIT: empresaSeleccionada!.cuit });
+                void ArtAPI.postCobertura({
+                    cuit: empresaSeleccionada!.cuit,
+                    poliza: empresa.polizaNro,
+                    razonSocial: empresaSeleccionada!.razonSocial,
+                    destinatario: presentadoA,
+                    tipoCertificado: clausula ? 'Con cláusula de no repetición' : 'Sin cláusula de no repetición'
+                });
 
-            setAbrirPDF(true);
+                setAbrirPDF(true);
+            } finally {
+                setIsDownloading(false);
+            }
         })();
     };
     
@@ -594,8 +602,9 @@ export default function CoberturaPage() {
                     onClick={handleDownload}
                     variant="contained"
                     color="primary"
-                    icon={<BsDownload />}
+                    icon={isDownloading ? <CircularProgress size={18} color="inherit" /> : <BsDownload />}
                     size="large"
+                    disabled={isDownloading}
                 >
                     DESCARGAR CERTIFICADO DE COBERTURA
                 </CustomButton>
