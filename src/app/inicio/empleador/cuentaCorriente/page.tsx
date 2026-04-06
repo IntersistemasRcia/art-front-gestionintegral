@@ -197,22 +197,22 @@ function CuentaCorrientePage() {
     }
 
     const columns: ColumnDef<CuentaCorrienteRegistro>[] = useMemo(() => [
-        { id: 'periodoCobertura', header: 'Período Cobertura', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(sumarleUnMesAlPeriodo(info.getValue() as any) as any,"MM-YYYY"), meta: { align: 'center'} }, //DEBO RESTAR UN MES AL VALOR
-        { id: 'periodoDDJJ', header: 'Período DDJJ', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue() as any,"MM-YYYY"), meta: { align: 'center'} },
-        { header: 'Fecha de Presentación', accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue() as any), meta: { align: 'center'} },
+        { id: 'periodoCobertura', header: () => <>Período<br />Cobertura</>, accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(sumarleUnMesAlPeriodo(info.getValue() as any) as any,"MM-YYYY"), meta: { align: 'center'} }, //DEBO RESTAR UN MES AL VALOR
+        { id: 'periodoDDJJ', header: () => <>Período<br />DDJJ</>, accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue() as any,"MM-YYYY"), meta: { align: 'center'} },
+        { header: () => <>Fecha<br />Pres.</>, accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue() as any), meta: { align: 'center'} },
         { header: 'Tipo', accessorKey: 'origenDDJJ', meta: { align: 'center'} },
         { header: 'Masa Salarial', accessorKey: 'masaSalarial', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: 'Cant. Trabajadores', accessorKey: 'cantidadTrabajadores', meta: { align: 'center'} },
+        { header: () => <>Cant.<br />Trab.</>, accessorKey: 'cantidadTrabajadores', meta: { align: 'center'} },
         { header: 'Alic. Fija', accessorKey: 'alicuotaFijaVigenteTrabajador', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
         { header: 'Alic. Var.', accessorKey: 'alicuotaVariableVigenteSobreMasaSalarial', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
-        { header: 'Alic. Fija + FFEP Declarado', accessorKey: 'alicuotaFijaDeclaradaTrabajador', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
-        { header: 'Alic. Var. Declarada', accessorKey: 'alicuotaVariableDeclaradaMasaSalarial', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
-        { header: 'Premio A Pagar', accessorKey: 'primaAPagar', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: 'Total Devengado FFEP', accessorKey: 'totalDevengadoFFEP', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Alic. Fija +<br />FFEP Dec.</>, accessorKey: 'alicuotaFijaDeclaradaTrabajador', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Alic. Var.<br />Declarada</>, accessorKey: 'alicuotaVariableDeclaradaMasaSalarial', cell: info => formatDecimal(info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Premio A<br />Pagar</>, accessorKey: 'primaAPagar', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Total Dev.<br />FFEP</>, accessorKey: 'totalDevengadoFFEP', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: 'FFEP S/Res', accessorKey: 'ffep', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: 'Total Cuota a Pagar', accessorKey: 'totalCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: 'Total Pagado Cuota', accessorKey: 'totalPagadoCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: 'Saldo Mensual', accessorKey: 'saldoMensual', 
+        { header: () => <>Total Cuota<br />a Pagar</>, accessorKey: 'totalCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Total Pagado<br />Cuota</>, accessorKey: 'totalPagadoCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Saldo<br />Mensual</>, accessorKey: 'saldoMensual', 
             cell: info => {
                 // Usamos el campo calculado `saldoMensual`
                 const mensual = Number(info.row.original?.saldoMensual ?? info.getValue() ?? 0);
@@ -220,7 +220,7 @@ function CuentaCorrientePage() {
                 return <span style={style}>{formatCurrency(mensual)}</span>;
             }
             , meta: { align: 'center'} },
-        { header: 'Saldo Acumulado', accessorKey: 'saldoAcumulado', cell: info => formatCurrency(info.row.original?.saldoAcumulado ?? info.getValue()), meta: { align: 'center'} },
+        { header: () => <>Saldo<br />Acumulado</>, accessorKey: 'saldoAcumulado', cell: info => formatCurrency(info.row.original?.saldoAcumulado ?? info.getValue()), meta: { align: 'center'} },
     ], []);
 
     const columnsDDJJ: ColumnDef<DDJJRegistro>[] = useMemo(() => [
@@ -242,6 +242,7 @@ function CuentaCorrientePage() {
                     <DataTable
                         data={computedData || []} 
                         columns={columns} 
+                        pageSizeOptions={[12]}
                         size="mid"
                         isLoading={false}
                     />
@@ -261,6 +262,7 @@ function CuentaCorrientePage() {
                     <DataTable
                         data={computedData || []} 
                         columns={columnsDDJJ} 
+                        pageSizeOptions={[12]}
                         size="mid"
                         isLoading={false}
                     />

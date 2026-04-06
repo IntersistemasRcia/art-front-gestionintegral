@@ -12,6 +12,12 @@ interface ExportButtonsProps {
 }
 
 const ExportButtons: React.FC<ExportButtonsProps> = ({ data, type, sumarleUnMesAlPeriodo }) => {
+    const toRoundedNumber = (value: unknown): number | null => {
+        if (value == null) return null;
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        if (Number.isNaN(numericValue)) return null;
+        return Number(numericValue.toFixed(2));
+    };
 
     // Funciones de exportación para Estado de Cuenta
     const handleExportCtaCteCSV = async () => {
@@ -25,8 +31,8 @@ const ExportButtons: React.FC<ExportButtonsProps> = ({ data, type, sumarleUnMesA
             ...row,
             periodoCobertura: Formato.Fecha(sumarleUnMesAlPeriodo?.(row.periodo), "MM-YYYY"),
             periodoDDJJ: Formato.Fecha(row.periodo, "MM-YYYY"),
-            saldo: row.saldo != null ? parseFloat(row.saldo.toFixed(2)) : row.saldo,
-            saldoAcumulado: row.saldoAcumulado != null ? parseFloat(row.saldoAcumulado.toFixed(2)) : row.saldoAcumulado,
+            saldoMensual: toRoundedNumber(row.saldoMensual),
+            saldoAcumulado: toRoundedNumber(row.saldoAcumulado),
         }));
         
         const exportColumns = {
@@ -45,7 +51,7 @@ const ExportButtons: React.FC<ExportButtonsProps> = ({ data, type, sumarleUnMesA
             ffep: { header: 'FFEP S/Res', key: 'ffep' },
             totalCuota: { header: 'Total Cuota a Pagar', key: 'totalCuota' },
             totalPagadoCuota: { header: 'Total Pagado Cuota', key: 'totalPagadoCuota' },
-            saldo: { header: 'Saldo Mensual', key: 'saldo' },
+            saldoMensual: { header: 'Saldo Mensual', key: 'saldoMensual' },
             saldoAcumulado: { header: 'Saldo Acumulado', key: 'saldoAcumulado' },
         };
         
@@ -63,8 +69,8 @@ const ExportButtons: React.FC<ExportButtonsProps> = ({ data, type, sumarleUnMesA
             ...row,
             periodoCobertura: Formato.Fecha(sumarleUnMesAlPeriodo?.(row.periodo), "MM-YYYY"),
             periodoDDJJ: Formato.Fecha(row.periodo, "MM-YYYY"),
-            saldo: row.saldo != null ? parseFloat(row.saldo.toFixed(2)) : row.saldo,
-            saldoAcumulado: row.saldoAcumulado != null ? parseFloat(row.saldoAcumulado.toFixed(2)) : row.saldoAcumulado,
+            saldoMensual: toRoundedNumber(row.saldoMensual),
+            saldoAcumulado: toRoundedNumber(row.saldoAcumulado),
         }));
         
         const exportColumns = {
@@ -83,7 +89,7 @@ const ExportButtons: React.FC<ExportButtonsProps> = ({ data, type, sumarleUnMesA
             ffep: { header: 'FFEP S/Res', key: 'ffep' },
             totalCuota: { header: 'Total Cuota a Pagar', key: 'totalCuota' },
             totalPagadoCuota: { header: 'Total Pagado Cuota', key: 'totalPagadoCuota' },
-            saldo: { header: 'Saldo Mensual', key: 'saldo' },
+            saldoMensual: { header: 'Saldo Mensual', key: 'saldoMensual' },
             saldoAcumulado: { header: 'Saldo Acumulado', key: 'saldoAcumulado' },
         };
         
