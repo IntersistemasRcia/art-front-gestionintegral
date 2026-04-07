@@ -62,12 +62,22 @@ export default function useUsuarios(empresaId?: number) {
   };
 
   const usuarioUpdate = async (usuarioId: string, formData: any) => {
+    // Obtener email previo para comparar después del update
+    const existing = usuarios.find((u) => String(u.id) === String(usuarioId));
+    const previousEmail = existing?.email;
+
     try {
       // Usa el fetcher importado para la petición POST, especificando los tipos genéricos
       // await fetcher("UsuarioAPI", "registrar", { data: formData });
       await update(usuarioId, formData);
       // Con SWR, usa mutate para revalidar automáticamente los datos.
       await mutateUsuarios();
+
+      // Si cambió el email, reenviar correo de activación con el nuevo email
+      if (formData?.email && formData.email !== previousEmail) {
+        await reenviarCorreo(String(formData.email));
+      }
+
       return { success: true };
     } catch (err) {
       const error =
