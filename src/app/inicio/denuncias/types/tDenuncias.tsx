@@ -142,6 +142,7 @@ export interface DenunciaFormData {
   domicilioNro: string;
   domicilioPiso: string;
   domicilioDpto: string;
+    trasladoTipo: string;
   domicilioEntreCalle1: string;
   domicilioEntreCalle2: string;
   telefono: string;
@@ -171,12 +172,31 @@ export interface DenunciaFormData {
   // Verificación de Contacto Inicial
   verificaContactoInicial: string;
 
+  // Estado del Trabajador
+  estTrabEstaConsciente: string;
+  estTrabColor: string;
+  estTrabHabla: string;
+  estTrabGravedad: string;
+  estTrabRespira: string;
+  estTrabObservaciones: string;
+  estTrabTieneHemorragia: string;
+  estTrabContextoDenuncia: string;
+  estTrabPrestadorTraslado: string;
+
+  estTrabPrestadorTrasladoRazonSocial?: string;
+
   // Paso 4: Confirmación
   // Archivos adjuntos
   archivosAdjuntos: File[];
 
   // Aceptación de términos
   aceptoTerminos: boolean;
+
+  // ROAM
+  roam: string;
+  roamNumero: string;
+  roamInterno: string;
+  roamAnio: string;
 
   // Datos del Empleador (solapa adicional)
   empCuit: string;
@@ -321,6 +341,21 @@ export const initialDenunciaFormData: DenunciaFormData = {
   establecimientoTelefono: '',
   establecimientoEmail: '',
   verificaContactoInicial: '',
+  estTrabEstaConsciente: 'Ignora',
+  estTrabColor: 'Ind.',
+  estTrabHabla: 'Ignora',
+  estTrabGravedad: 'Ignora',
+  estTrabRespira: 'Ignora',
+  estTrabObservaciones: '',
+  estTrabTieneHemorragia: 'Ignora',
+  estTrabContextoDenuncia: 'Ignora',
+  estTrabPrestadorTraslado: '',
+  trasladoTipo: '',
+  // ROAM defaults
+  roam: '',
+  roamNumero: '',
+  roamInterno: '',
+  roamAnio: '',
 
   // Paso 4
   archivosAdjuntos: [],
@@ -343,9 +378,9 @@ export type DenunciaGetAll = {
   conIniDomicilioEntreCalle?: string;
   conIniDomicilioYCalle?: string;
 };
-
 export type DenunciaQueryParams = {
   Estado?: number | string;
+  Tipo?: number
   PageIndex?: number;
   PageSize?: number;
   EmpCuit?: number;
@@ -450,6 +485,7 @@ export type DenunciaPostRequest = {
   empEstTelefonos: string;
   empEsteMail: string;
   prestadorCuit: number;
+  estTrabPrestadorTraslado?: number | null;
   afiCuil: number;
   afiDocTipo: string;
   afiDocNumero: number;
@@ -502,6 +538,7 @@ export type DenunciaPostRequest = {
     archivoNombre: string;
     imagen: string;
   }>;
+  trasladoTipo: string;
 };
 
 // Tipo para actualizar una denuncia existente (PUT /api/Denuncias/{id})

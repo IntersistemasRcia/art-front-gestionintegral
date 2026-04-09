@@ -12,6 +12,7 @@ import { SelectChangeEvent } from "@mui/material/Select";
 import styles from "../denuncias.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import ArtAPI from "@/data/artAPI";
+import { useAuth } from "@/data/AuthContext";
 import Formato from "@/utils/Formato";
 import {
   DenunciaFormData,
@@ -32,6 +33,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
   onSelectChange,
   onBlur,
 }) => {
+  const { hasTask } = useAuth();
+  const canEditRelacionAccidentado = hasTask("Denuncia_Formulario_RealizaDenuncias");
 
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
 
@@ -337,20 +340,22 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             fullWidth
             required={false}
             error={touched.relacionAccidentado && !!errors.relacionAccidentado}
-            disabled={true}
-            className={styles.disabledOpacity}
+            disabled={isDisabled || !canEditRelacionAccidentado}
+            className={isDisabled || !canEditRelacionAccidentado ? styles.disabledOpacity : undefined}
           >
             <InputLabel>Relación c/accidentado</InputLabel>
             <Select
               name="relacionAccidentado"
-              value={"EMPLEADOR"}
+              value={canEditRelacionAccidentado ? form.relacionAccidentado : "EMPLEADOR"}
               label="Relación c/accidentado"
+              onChange={onSelectChange}
               onBlur={() => onBlur("relacionAccidentado")}
-              inputProps={{ readOnly: true }}
             >
-              <MenuItem key={"EMPLEADOR"} value={"EMPLEADOR"}>
-                Empleador
-              </MenuItem>
+              {RELACION_ACCIDENTADO.map((relacion) => (
+                <MenuItem key={relacion.value} value={relacion.value}>
+                  {relacion.label}
+                </MenuItem>
+              ))}
             </Select>
             {touched.relacionAccidentado && errors.relacionAccidentado && (
               <Typography
