@@ -12,7 +12,6 @@ import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalM
 import DenunciaForm from './denunciaForm';
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
-
 const estadoOptions = [
   { value: '', label: 'Todos los estados' },
   { value: 'Borrador', label: 'Borrador' },
@@ -70,6 +69,29 @@ const mapSiNoToApi = (v: string | undefined): string => {
   return '';
 };
 
+const mapRoamToApi = (v: string | undefined): string => {
+  if (!v) return '';
+  const s = v.trim().toLowerCase();
+  if (s === 'si' || s === 's') return 'Si';
+  if (s === 'no' || s === 'n') return 'No';
+  if (s === 'posible' || s === 'posi' || s === 'p' || s === 'puede ser' || s === 'puede') return 'Posi';
+  // Enviar literal si es otra etiqueta
+  return String(v).trim();
+};
+
+const normalizeApiRoamToSelect = (apiValue: any): string => {
+  if (apiValue == null || apiValue === '') return '';
+  const s = String(apiValue).trim().toLowerCase();
+  if (s === 'si' || s === 's') return 'Si';
+  if (s === 'no' || s === 'n') return 'No';
+  if (s === 'posi' || s === 'posible' || s === 'p') return 'Posible';
+  // Si la API devuelve la etiqueta literal ya en español, intentar usarla tal cual
+  const cap = String(apiValue).trim();
+  return cap;
+};
+
+// estTrabColor: enviamos/recibimos el literal seleccionado directamente
+
 const mapEstadoCivilToApi = (v: string | undefined): string => {
   if (!v) return '';
   const s = v.trim().toLowerCase();
@@ -94,6 +116,16 @@ const normalizeApiSiNoBinary = (apiValue: any): 'Si' | 'No' | '' => {
   const s = String(apiValue).trim().toLowerCase();
   if (s === 's' || s === 'si' || s === 'true' || s === '1') return 'Si';
   if (s === 'n' || s === 'no' || s === 'false' || s === '0') return 'No';
+  return '';
+};
+
+const normalizeApiSiNoIgnora = (apiValue: any): 'Si' | 'No' | 'Ignora' | '' => {
+  if (apiValue == null || apiValue === '') return '';
+  if (typeof apiValue === 'boolean') return apiValue ? 'Si' : 'No';
+  const s = String(apiValue).trim().toLowerCase();
+  if (s === 's' || s === 'si' || s === 'true' || s === '1') return 'Si';
+  if (s === 'n' || s === 'no' || s === 'false' || s === '0') return 'No';
+  if (s === 'i' || s === 'ignora') return 'Ignora';
   return '';
 };
 
@@ -166,6 +198,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
   const afiFechaNacimiento = buildAfiNacimientoYear(formData.fechaNac);
   const emp = empresa || {};
   const empCuitNum = typeof empleadorCuit === 'number' ? empleadorCuit : onlyDigits(formData.empCuit);
+  const prestadorTrasladoDigits = onlyDigits((formData as any).estTrabPrestadorTraslado || '');
 
   return {
     siniestroTipo: formData.tipoDenuncia,
@@ -183,21 +216,21 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     empCodPostal: Number(onlyDigits(formData.empCodPostal)),
     empTelefonos: String(formData.empTelefonos ?? ''),
     empeMail: String(formData.empEmail ?? ''),
-    empOcCuit: empCuitNum,
-    empOcRazonSocial: String(formData.empRazonSocial ?? ''),
-    empOcEstablecimiento: String(formData.empRazonSocial ?? ''),
-    empOcCiiu: 0,
-    empOcDomicilioCalle: String(formData.empDomicilioCalle ?? ''),
-    empOcDomicilioNro: String(formData.empDomicilioNro ?? ''),
-    empOcDomicilioPiso: String(formData.empDomicilioPiso ?? ''),
-    empOcDomicilioDpto: String(formData.empDomicilioDpto ?? ''),
-    empOcDomicilioEntreCalle1: String(formData.empDomicilioEntreCalle1 ?? ''),
-    empOcDomicilioEntreCalle2: String(formData.empDomicilioEntreCalle2 ?? ''),
-    empOcCodLocalidad: String(formData.empCodLocalidad ?? ''),
-    empOcCodPostal: Number(onlyDigits(formData.empCodPostal)),
+    empOcCuit: Number(onlyDigits((formData as any).establecimientoCuit ?? '')),
+    empOcRazonSocial: String((formData as any).establecimientoNombre ?? ''),
+    empOcEstablecimiento: String((formData as any).establecimientoNombre ?? ''),
+    empOcCiiu: Number(onlyDigits((formData as any).establecimientoCiiu ?? '')),
+    empOcDomicilioCalle: String((formData as any).establecimientoCalle ?? ''),
+    empOcDomicilioNro: String((formData as any).establecimientoNumero ?? ''),
+    empOcDomicilioPiso: String((formData as any).establecimientoPiso ?? ''),
+    empOcDomicilioDpto: String((formData as any).establecimientoDpto ?? ''),
+    empOcDomicilioEntreCalle1: String((formData as any).establecimientoEntreCalle1 ?? ''),
+    empOcDomicilioEntreCalle2: String((formData as any).establecimientoEntreCalle2 ?? ''),
+    empOcCodLocalidad: String((formData as any).establecimientoCodLocalidad ?? ''),
+    empOcCodPostal: Number(onlyDigits((formData as any).establecimientoCodPostal ?? '')),
     empOcSubContrato: "",
-    empOcTelefonos: String(formData.empTelefonos ?? ''),
-    empOceMail: String(formData.empEmail ?? ''),
+    empOcTelefonos: String((formData as any).establecimientoTelefonos ?? (formData as any).establecimientoTelefono ?? ''),
+    empOceMail: String((formData as any).establecimientoEmail ?? ''),
    // Datos del Establecimiento (empEst*)
     empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
     // Usamos la razón social de la empresa como razón social del establecimiento
@@ -213,7 +246,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     empEstDomicilioEntreCalle2: "",
     empEstCodLocalidad: String(formData.establecimientoCodLocalidad ?? ''),
     empEstCodPostal: Number(onlyDigits(formData.establecimientoCodPostal)),
-    empEstTelefonos: String(formData.establecimientoTelefono ?? ''),
+    empEstTelefonos: String(formData.establecimientoTelefono ?? (formData as any).establecimientoTelefonos ?? ''),
     empEsteMail: String(formData.establecimientoEmail ?? ''),
     prestadorCuit: onlyDigits(formData.prestadorInicialCuit),
     afiCuil: cuilToNumber(formData.cuil),
@@ -259,6 +292,21 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     conIniDomicilioDepartamento: String(formData.dpto ?? ''),
     conIniDomicilioEntreCalle: String(formData.entreCalle ?? ''),
     conIniDomicilioYCalle: String(formData.entreCalleY ?? ''),
+    estTrabEstaConsciente: mapSiNoToApi(formData.estTrabEstaConsciente || ''),
+    estTrabColor: String(formData.estTrabColor || ''),
+    estTrabHabla: mapSiNoToApi(formData.estTrabHabla || ''),
+    estTrabGravedad: String(formData.estTrabGravedad || ''),
+    estTrabRespira: mapSiNoToApi(formData.estTrabRespira || ''),
+    estTrabObservaciones: String(formData.estTrabObservaciones ?? ''),
+    estTrabTieneHemorragia: mapSiNoToApi(formData.estTrabTieneHemorragia || ''),
+    estTrabContextoDenuncia: mapSiNoToApi(formData.estTrabContextoDenuncia || ''),
+    trasladoTipo: String(formData.trasladoTipo ?? ''),
+    estTrabPrestadorTraslado: prestadorTrasladoDigits ? Number(prestadorTrasladoDigits) : null,
+    // ROAM
+    roam: mapRoamToApi((formData as any).roam || ''),
+    roamInterno: Number((formData as any).roamInterno ?? 0),
+    roamNumero: Number((formData as any).roamNumero ?? 0),
+    roamAnio: Number((formData as any).roamAnio ?? 0),
 
   };
 };
@@ -283,7 +331,8 @@ const transformFormDataToPostRequest = async (
   formData: DenunciaFormData,
   empresa?: any,
   empleadorCuit?: number,
-  isFinal: boolean = false
+  isFinal: boolean = false,
+  includeNroPreDenuncia: boolean = false
 ): Promise<DenunciaPostRequest> => {
   const base = buildBaseDenunciaPayload(formData, empresa, empleadorCuit);
 
@@ -298,6 +347,7 @@ const transformFormDataToPostRequest = async (
 
   return {
     ...base,
+    ...(includeNroPreDenuncia ? { nroPreDenuncia: 0 } : {}),
     siniestroNro: 0,
     denunciaCanalIngresoInterno: 0,
     estado: isFinal ? 'Pendiente' : 'Borrador',
@@ -482,8 +532,10 @@ const Spinner: React.FC = () => (
 );
 
 function DenunciasPage() {
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   const isAdmin = (user?.rol || '').toLowerCase() === 'administrador';
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
+  const canEditCuit = isAdmin || (hasTask && typeof hasTask === 'function' && hasTask('Denuncia_VerDenuncia'));
 
   const [estado, setEstado] = useState<string | undefined>(undefined);
   const [pageIndex, setPageIndex] = useState(1);
@@ -498,11 +550,13 @@ function DenunciasPage() {
   // Si el usuario NO es administrador, fijar el filtro por su empresa CUIT y bloquear cambios
   useEffect(() => {
     const userCuit = user?.empresaCUIT;
-    if (!isAdmin && userCuit && String(userCuit).length === 11) {
+    // Si el usuario NO es administrador y NO tiene la tarea Denuncia_VerDenuncia,
+    // fijar el filtro por su empresa CUIT y bloquear cambios.
+    if (!isAdmin && !(hasTask && typeof hasTask === 'function' && hasTask('Denuncia_VerDenuncia')) && userCuit && String(userCuit).length === 11) {
       setEmpCuit(userCuit);
       setCuitBusqueda(String(userCuit));
     }
-  }, [isAdmin, user?.empresaCUIT]);
+  }, [isAdmin, user?.empresaCUIT, hasTask]);
 
   // Auto-trigger search when CUIT input reaches 11 digits
   useEffect(() => {
@@ -558,13 +612,26 @@ function DenunciasPage() {
       PageIndex: pageIndex,
       PageSize: pageSize,
       orderBy: '-Interno',
-    };
+    } as DenunciaQueryParams;
     // Aplicar EmpCuit solo cuando es un CUIT válido (11 dígitos)
     if (typeof empCuit === 'number' && String(empCuit).length === 11) {
       params.EmpCuit = empCuit;
     }
+    // Si el usuario tiene la tarea Denuncia_VerDenuncia, aplicar filtro Tipo=2
+    try {
+      if (hasTask && typeof hasTask === 'function') {
+        if (hasTask('Denuncia_VerPreDenuncia')) {
+          (params as any).Tipo = 1;
+        } else if (hasTask('Denuncia_VerDenuncia')) {
+          (params as any).Tipo = 2;
+        }
+      }
+    } catch (e) {
+      // noop: en caso de error con hasTask, no aplicamos el filtro
+    }
+
     return params;
-  }, [estado, pageIndex, pageSize, empCuit]);
+  }, [estado, pageIndex, pageSize, empCuit, hasTask]);
 
   // API call using SWR
   const { data, error, isLoading, mutate: mutateDenuncias } = ArtAPI.useGetDenuncias(queryParams);
@@ -724,6 +791,7 @@ function DenunciasPage() {
           codPostal: String(api.conIniCodPostal ?? api.empCodPostal ?? '') || initialDenunciaFormData.codPostal,
           telefonos: api.conIniTelefono ?? api.empTelefonos ?? initialDenunciaFormData.telefonos,
           prestadorInicialCuit: String(api.prestadorCuit ?? ''),
+          roam: normalizeApiRoamToSelect(api.roam ?? api?.roam ?? ''),
           cuil: api.afiCuil ? String(api.afiCuil) : initialDenunciaFormData.cuil,
           docTipo: api.afiDocTipo ?? initialDenunciaFormData.docTipo,
           docNumero: api.afiDocNumero ? String(api.afiDocNumero) : initialDenunciaFormData.docNumero,
@@ -768,6 +836,14 @@ function DenunciasPage() {
           trabajadoresRelacionados: Array.isArray(api.trabajadoresRelacionados) ? api.trabajadoresRelacionados : initialDenunciaFormData.trabajadoresRelacionados,
           prestadorInicialRazonSocial: api.prestadorInicialRazonSocial ?? initialDenunciaFormData.prestadorInicialRazonSocial,
           verificaContactoInicial: api.verificaContactoInicial ?? initialDenunciaFormData.verificaContactoInicial,
+          estTrabEstaConsciente: normalizeApiSiNoIgnora(api.estTrabEstaConsciente) || initialDenunciaFormData.estTrabEstaConsciente,
+          estTrabColor: api.estTrabColor != null ? String(api.estTrabColor) : initialDenunciaFormData.estTrabColor,
+          estTrabHabla: normalizeApiSiNoIgnora(api.estTrabHabla) || initialDenunciaFormData.estTrabHabla,
+          estTrabGravedad: api.estTrabGravedad != null ? String(api.estTrabGravedad) : initialDenunciaFormData.estTrabGravedad,
+          estTrabRespira: normalizeApiSiNoIgnora(api.estTrabRespira) || initialDenunciaFormData.estTrabRespira,
+          estTrabObservaciones: String(api.estTrabObservaciones ?? initialDenunciaFormData.estTrabObservaciones),
+          estTrabTieneHemorragia: normalizeApiSiNoIgnora(api.estTrabTieneHemorragia) || initialDenunciaFormData.estTrabTieneHemorragia,
+          estTrabContextoDenuncia: normalizeApiSiNoIgnora(api.estTrabContextoDenuncia) || initialDenunciaFormData.estTrabContextoDenuncia,
           archivosAdjuntos: initialDenunciaFormData.archivosAdjuntos,
           aceptoTerminos: false,
         };
@@ -832,11 +908,13 @@ function DenunciasPage() {
       }
 
       if (method === "create") {
-        const postData = await transformFormDataToPostRequest(data, empresaByCuit, empCuit, isFinal);
+        const postData = await transformFormDataToPostRequest(data, empresaByCuit, empCuit, isFinal, canRealizaDenuncias);
         const created = await postDenuncia(postData);
         showModalMessage(
           isFinal
-            ? `Su pre-denuncia ha sido registrada correctamente en nuestro sistema.\n Será validada por nuestro equipo en las próximas 24 horas hábiles.`
+            ? (canRealizaDenuncias
+                ? "Su denuncia ya a sido Registrada y se encuentra en Estado Pendiente"
+                : `Su pre-denuncia ha sido registrada correctamente en nuestro sistema.\n Será validada por nuestro equipo en las próximas 24 horas hábiles.`)
             : "Borrador guardado exitosamente",
           "success"
         );
@@ -869,7 +947,9 @@ function DenunciasPage() {
 
         showModalMessage(
           isFinal
-            ? `Su pre-denuncia ha sido registrada correctamente en nuestro sistema.\n Será validada por nuestro equipo en las próximas 24 horas hábiles.`
+            ? (canRealizaDenuncias
+                ? "Su denuncia ya a sido Registrada y se encuentra en Estado Pendiente"
+                : `Su pre-denuncia ha sido registrada correctamente en nuestro sistema.\n Será validada por nuestro equipo en las próximas 24 horas hábiles.`)
             : "Borrador actualizado exitosamente",
           "success"
         );
@@ -889,7 +969,20 @@ function DenunciasPage() {
   };
   
   // Table columns definition
-  const tableColumns = [
+  const baseTableColumns = [
+    {
+      accessorKey: 'denunciaNro',
+      header: 'Nro. Denuncia',
+      size: 120,
+      cell: (info: any) => {
+        const original = info?.row?.original || {};
+        const estado = (original?.estado ?? '').toString();
+        if (estado === 'Borrador') return 0;
+        const pre = original?.nroPreDenuncia ?? 0;
+        if (pre && Number(pre) !== 0) return 0;
+        return info.getValue ? info.getValue() ?? 0 : (original?.denunciaNro ?? 0);
+      }
+    },
     {
       accessorKey: 'nroPreDenuncia',
       header: 'Nro. Pre-Denuncia',
@@ -948,6 +1041,22 @@ function DenunciasPage() {
     },
   ];
 
+  const tableColumns = useMemo(() => {
+    try {
+      if (hasTask && typeof hasTask === 'function') {
+        if (hasTask('Denuncia_VerPreDenuncia')) {
+          return baseTableColumns.filter(c => (c as any).accessorKey !== 'denunciaNro');
+        }
+        if (hasTask('Denuncia_VerDenuncia')) {
+          return baseTableColumns.filter(c => (c as any).accessorKey !== 'nroPreDenuncia');
+        }
+      }
+    } catch (e) {
+      // noop
+    }
+    return baseTableColumns;
+  }, [hasTask]);
+
   if (loading) return <Spinner />;
   if (error && !is404Error) {
     return (
@@ -992,7 +1101,7 @@ function DenunciasPage() {
             placeholder="Ingresá CUIT (11 dígitos)"
             value={cuitBusqueda}
             onChange={(e) => setCuitBusqueda((e.target.value || '').replace(/[^\d]/g, ''))}
-            disabled={!isAdmin}
+            disabled={!canEditCuit}
             className={styles.cuitInput}
           />
         </div>
@@ -1000,7 +1109,7 @@ function DenunciasPage() {
 
       <div className={styles.actionsBar}>
         <CustomButton onClick={() => handleOpenModal("create")}>
-          Registrar Denuncia
+          {canRealizaDenuncias ? "Registrar Denuncia" : "Registrar Pre-Denuncia"}
         </CustomButton>
       </div>
 
@@ -1051,7 +1160,7 @@ function DenunciasPage() {
           modalMessage.type === 'error'
             ? 'Faltan cargar datos obligatorios'
             : modalMessage.type === 'success'
-              ? 'Pre-Denuncia Registrada con Éxito'
+              ? (canRealizaDenuncias ? 'Denuncia Realizada con Éxito' : 'Pre-Denuncia Registrada con Éxito')
               : undefined
         }
       />

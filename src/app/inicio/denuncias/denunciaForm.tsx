@@ -14,6 +14,7 @@ import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import { DenunciaFormData, initialDenunciaFormData, TIPO_DOCUMENTO, ESTADO_CIVIL, COLORES, TIPOS_TRASLADO, Props, RequestMethod, ValidationErrors, TouchedFields } from "./types/tDenuncias";
 import DatosIniciales from "./datosIniciales/datosIniciales";
+import NuevaDenuncia from "./nuevaDenuncia/nuevaDenuncia";
 import DatosTrabajador from "./datosTrabajador/datosTrabajador";
 import DatosSiniestro from "./datosSiniestro/datosSiniestro";
 import ConfirmacionDenuncia from "./confirmacion/confirmacion";
@@ -42,8 +43,14 @@ export default function DenunciaForm({
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const lastFetchedEmpCuitRef = useRef<string>("");
   const lastAutoValuesRef = useRef<Record<string, string>>({});
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
+  // Índices y etiquetas dinámicas según permiso
+  const confirmIndex = canRealizaDenuncias ? 5 : 4;
+  const confirmLabelNumber = canRealizaDenuncias ? 6 : 5;
+  const contentLastIndex = confirmIndex - 1; 
+  const maxTabIndex = confirmIndex;
   const [empCuitReadOnly, setEmpCuitReadOnly] = useState(false);
   const [empModalOpen, setEmpModalOpen] = useState(false);
   const [empModalType, setEmpModalType] = useState<MessageType>('warning');
@@ -115,6 +122,10 @@ export default function DenunciaForm({
   }, [initialData, open]);
 
   useEffect(() => {
+    if (isCreating && canRealizaDenuncias) {
+      setEmpCuitReadOnly(false);
+      return;
+    }
     const empresaCUIT = Number((user as any)?.empresaCUIT ?? 0);
     if (empresaCUIT && empresaCUIT > 0) {
       const digits = String(empresaCUIT);
@@ -125,10 +136,42 @@ export default function DenunciaForm({
     } else {
       setEmpCuitReadOnly(false);
     }
-  }, [user]);
+  }, [user, isCreating, canRealizaDenuncias]);
+
+  useEffect(() => {
+    if (!open || !isCreating || !canRealizaDenuncias) return;
+    setForm((prev) => ({
+      ...prev,
+      empCuit: '',
+      empPoliza: '',
+      empRazonSocial: '',
+      empDomicilioCalle: '',
+      empDomicilioNro: '',
+      empDomicilioPiso: '',
+      empDomicilioDpto: '',
+      empDomicilioEntreCalle1: '',
+      empDomicilioEntreCalle2: '',
+      empCodLocalidad: '',
+      empCodPostal: '',
+      empTelefonos: '',
+      empEmail: '',
+      establecimientoCuit: '',
+      establecimientoNombre: '',
+      establecimientoCiiu: '',
+      establecimientoCalle: '',
+      establecimientoNumero: '',
+      establecimientoPiso: '',
+      establecimientoDpto: '',
+      establecimientoCodLocalidad: '',
+      establecimientoCodPostal: '',
+      establecimientoTelefono: '',
+      establecimientoEmail: '',
+    }));
+  }, [open, isCreating, canRealizaDenuncias]);
 
   useEffect(() => {
     if (!open) return;
+    if (isCreating && canRealizaDenuncias) return;
     if (isAdmin) return; // no precargar para administradores
     const empFromForm = String(form.empCuit || "").replace(/\D/g, '');
     if (empFromForm.length === 11) {
@@ -139,7 +182,7 @@ export default function DenunciaForm({
     if (empresaCUIT && String(empresaCUIT).length === 11) {
       setForm(prev => ({ ...prev, establecimientoCuit: Formato.CUIP(String(empresaCUIT)) }));
     }
-  }, [open, user?.empresaCUIT, isAdmin]);
+  }, [open, user?.empresaCUIT, isAdmin, isCreating, canRealizaDenuncias, form.empCuit]);
 
   // Al abrir el formulario, si empCuit ya tiene 11 dígitos, pre-cargar datos del empleador
   useEffect(() => {
@@ -172,7 +215,7 @@ export default function DenunciaForm({
   const modalTitle = useMemo(() => {
     switch (method) {
       case "create":
-        return "Registro de Pre-Denuncia";
+        return canRealizaDenuncias ? "Registro Denuncia" : "Registro de Pre-Denuncia";
       case "edit":
         return "Editar Pre-Denuncia";
       case "view":
@@ -182,7 +225,7 @@ export default function DenunciaForm({
       default:
         return "Formulario de Pre-Denuncia";
     }
-  }, [method]);
+  }, [method, canRealizaDenuncias]);
 
   // Autocompletar datos del empleador a partir del CUIT ingresado
   useEffect(() => {
@@ -397,7 +440,7 @@ export default function DenunciaForm({
       fieldsToValidate = [
         "empCuit",
       ];
-    } else if (currentTab === 4) {
+    } else if (currentTab === confirmIndex) {
       const aceptoTerminosError = formData.aceptoTerminos ? undefined : "Debe aceptar los términos y condiciones";
       if (aceptoTerminosError) {
         newErrors.aceptoTerminos = aceptoTerminosError;
@@ -611,10 +654,10 @@ export default function DenunciaForm({
 
     // Validar todas las solapas y acumular errores para mostrarlos en todas
     const combinedErrors: ValidationErrors = {};
-    [0, 1, 2, 3, 4].forEach((tabIndex) => {
+    for (let tabIndex = 0; tabIndex <= contentLastIndex; tabIndex++) {
       const tabErrors = validateAllFields(formToSubmit, tabIndex);
       Object.assign(combinedErrors, tabErrors);
-    });
+    }
 
     const allTabsValid = Object.keys(combinedErrors).length === 0;
     setErrors(combinedErrors);
@@ -722,10 +765,8 @@ export default function DenunciaForm({
 
         <div className={styles.formLayout}>
           <div className={styles.formContent}>
-            <CustomTab
-              currentTab={activeTab}
-              onTabChange={handleTabChange}
-              tabs={[
+            {(() => {
+              const tabItems: any[] = [
                 {
                   label: "1. Datos Iniciales",
                   value: 0,
@@ -761,25 +802,8 @@ export default function DenunciaForm({
                   ),
                 },
                 {
-                  label: "3. Datos del Siniestro",
+                  label: "3. Datos del Empleador",
                   value: 2,
-                  disabled: false,
-                  content: (
-                    <DatosSiniestro
-                      form={form}
-                      errors={errors}
-                      touched={touched}
-                      isDisabled={isDisabled}
-                      isEditing={isEditing}
-                      onTextFieldChange={handleTextFieldChange}
-                      onSelectChange={handleSelectChange}
-                      onBlur={handleBlur}
-                    />
-                  ),
-                },
-                {
-                  label: "4. Datos del Empleador",
-                  value: 3,
                   disabled: false,
                   content: (
                     <DatosEmpleador
@@ -796,25 +820,75 @@ export default function DenunciaForm({
                   ),
                 },
                 {
-                  label: "5. Confirmación",
-                  value: 4,
+                  label: "4. Datos del Siniestro",
+                  value: 3,
                   disabled: false,
                   content: (
-                    <ConfirmacionDenuncia
+                    <DatosSiniestro
                       form={form}
+                      errors={errors}
+                      touched={touched}
                       isDisabled={isDisabled}
-                      uploadedFiles={uploadedFiles}
-                      errors={{ aceptoTerminos: errors.aceptoTerminos }}
-                      touched={{ aceptoTerminos: touched.aceptoTerminos }}
-                      onFileUpload={handleFileUpload}
-                      onFileRemove={handleFileRemove}
-                      onCheckboxChange={handleCheckboxChange}
+                      isEditing={isEditing}
+                      onTextFieldChange={handleTextFieldChange}
+                      onSelectChange={handleSelectChange}
                       onBlur={handleBlur}
                     />
                   ),
                 },
-              ]}
-            />
+              ];
+
+              // Añadir la pestaña "Denuncia" sólo si el usuario tiene permiso
+              if (canRealizaDenuncias) {
+                const denunciaLabelNumber = contentLastIndex + 1;
+                const dynamicLabel =
+                  form.tipoDenuncia === 'AccidenteTrabajo'
+                    ? `${denunciaLabelNumber}. Denuncia-Accidente de trabajo`
+                    : form.tipoDenuncia === 'Enfermedad'
+                    ? `${denunciaLabelNumber}. Denuncia-Enfermedad Profesional`
+                    : `${denunciaLabelNumber}. Denuncia`;
+                tabItems.push({
+                  label: dynamicLabel,
+                  value: contentLastIndex,
+                  disabled: false,
+                  content: (
+                    <NuevaDenuncia
+                      form={form}
+                      errors={errors}
+                      touched={touched}
+                      isDisabled={isDisabled}
+                      onTextFieldChange={handleTextFieldChange}
+                      onSelectChange={handleSelectChange}
+                      onBlur={handleBlur}
+                    />
+                  ),
+                });
+              }
+
+              // Pestaña Confirmación con numeración dinámica
+              tabItems.push({
+                label: `${confirmLabelNumber}. Confirmación`,
+                value: confirmIndex,
+                disabled: false,
+                content: (
+                  <ConfirmacionDenuncia
+                    form={form}
+                    isDisabled={isDisabled}
+                    uploadedFiles={uploadedFiles}
+                    errors={{ aceptoTerminos: errors.aceptoTerminos }}
+                    touched={{ aceptoTerminos: touched.aceptoTerminos }}
+                    onFileUpload={handleFileUpload}
+                    onFileRemove={handleFileRemove}
+                    onCheckboxChange={handleCheckboxChange}
+                    onBlur={handleBlur}
+                  />
+                ),
+              });
+
+              return (
+                <CustomTab currentTab={activeTab} onTabChange={handleTabChange} tabs={tabItems} />
+              );
+            })()}
             
 
             {/* Botones de navegación */}
@@ -830,7 +904,7 @@ export default function DenunciaForm({
                 </CustomButton>
               )}
 
-              {activeTab < 4 && !isViewing && (
+              {activeTab < maxTabIndex && !isViewing && (
                 <CustomButton
                   onClick={handleNext}
                   color="primary"
@@ -841,7 +915,7 @@ export default function DenunciaForm({
                 </CustomButton>
               )}
 
-              {activeTab === 4 && !isViewing && (
+              {activeTab === maxTabIndex && !isViewing && (
                 <CustomButton
                   type="submit"
                   color="primary"

@@ -16,10 +16,11 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   onSelectChange,
   onBlur,
 }) => {
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
 
   const empresaId = Number((user as any)?.empresaId ?? 0);
-  const lockAllFields = isDisabled || empresaId > 0;
+  const lockAllFields = isDisabled || (empresaId > 0 && !canRealizaDenuncias);
   const lockNonCuitFields = empresaId === 0; // admin: solo CUIT editable
   const nonCuitLocked = lockAllFields || lockNonCuitFields;
   const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
@@ -79,6 +80,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   // Prefill automático desde empresaCUIT del usuario si está disponible
   const userCuitPrefilledRef = useRef(false);
   useEffect(() => {
+    if (canRealizaDenuncias) return;
     if (userCuitPrefilledRef.current) return;
     const userCuit = Number((user as any)?.empresaCUIT ?? 0);
     if (!userCuit || String(userCuit).length !== 11) return;
@@ -98,7 +100,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
     } catch {
       // ignore
     }
-  }, [user, form.empCuit, onTextFieldChange]);
+  }, [user, form.empCuit, onTextFieldChange, canRealizaDenuncias]);
   return (
     <div className={styles.formSection}>
       <Typography variant="h5" component="h2" className={styles.sectionTitle}>

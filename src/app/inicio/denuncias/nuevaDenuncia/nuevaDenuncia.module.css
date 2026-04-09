@@ -1,0 +1,36 @@
+.gridThreeCols {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: 12px;
+}
+
+.gridThreeRepeatWithMarginTop {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	margin-top: 8px;
+}
+
+.gridThreeRepeat {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.gridSearchLocalidad {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr 1fr;
+	gap: 12px;
+	margin-top: 8px;
+}
+
+.gridFourRepeat {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.gridRoam {
+	display: grid;
+	grid-template-columns: 200px 120px 120px 1fr;
+	gap: 12px;
+}

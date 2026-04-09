@@ -67,7 +67,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     establecimientoCuitInitialFormattedRef.current = true;
   }, [form.establecimientoCuit]);
 
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
   const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
 
   // Establecimientos por CUIT
@@ -142,6 +143,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
 
   // Si el usuario no es administrador, fijar CUIT de establecimiento al CUIT de la empresa del usuario (no editable)
   useEffect(() => {
+    if (canRealizaDenuncias) return;
     if (isUserAdmin) return;
     if (!user) return;
     const empresaCuitRaw = String(user.empresaCUIT ?? "");
@@ -156,7 +158,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     } catch (err) {
       // ignore
     }
-  }, [user?.empresaCUIT, isUserAdmin]);
+  }, [user?.empresaCUIT, isUserAdmin, canRealizaDenuncias]);
 
   return (
     <>
@@ -176,8 +178,8 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               error={touched.establecimientoCuit && !!errors.establecimientoCuit}
               helperText={touched.establecimientoCuit ? errors.establecimientoCuit : undefined}
               fullWidth
-              required={!isDisabled && isUserAdmin}
-              disabled={isDisabled || !isUserAdmin}
+              required={!isDisabled && (isUserAdmin || canRealizaDenuncias)}
+              disabled={isDisabled || (!isUserAdmin && !canRealizaDenuncias)}
               placeholder="CUIT del establecimiento"
             />
 
