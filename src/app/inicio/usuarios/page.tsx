@@ -506,7 +506,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         message={modalMessage.message}         
         type={modalMessage.type}         
         onClose={handleClose}        
-        title="Atención requerida"  
+        title="Operación exitosa"  
       />
     </Box>
   );
