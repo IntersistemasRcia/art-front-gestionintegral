@@ -808,7 +808,7 @@ const GenerarFormularioRGRL: React.FC<{
           setError('');
           setModalMsg(
             textoPregunta
-              ? `Falta responder la pregunta ${nro}: ${textoPregunta}`
+              ? `Debe completar todo el formulario para confirmar.`
               : `Falta responder la pregunta ${nro}.`
           );
           setModalMsgType('error');
@@ -1132,7 +1132,7 @@ const GenerarFormularioRGRL: React.FC<{
 
     return (
 
-      <div className={styles.container}>
+      <div className={`${styles.container} ${puedeVerCabeceraEdicion ? styles.headerVisible : ''}`}>
         {/* Vista de edición del formulario — preguntas, paginador y listas (gremios/contratistas/responsables). */}
         <h2 className={styles.sectionHeaderTitle} />
         {puedeVerCabeceraEdicion && (
@@ -1608,7 +1608,7 @@ const GenerarFormularioRGRL: React.FC<{
   }
 
   return (
-    <div className={styles.container}>
+  <div className={`${styles.container} ${puedeVerCabeceraEdicion ? styles.headerVisible : ''}`}>
       {/* Carga de datos inicial y botones para crear/replicar el formulario. */}
       <CabeceraFormulario
         cuit={cuit}
