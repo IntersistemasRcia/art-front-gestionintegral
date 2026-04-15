@@ -55,7 +55,7 @@ export type ImpresionProps = {
   cabecera: CabeceraData;
   detalle: DetalleRow[];
   planillaA: import('../../types/rgrl').PlanillaAItem[];
-  planillaB: import('../../types/rgrl').PlanillaBItem[];
+  planillaB?: import('../../types/rgrl').PlanillaBItem[];
   planillaC: import('../../types/rgrl').PlanillaCItem[];
   gremios: import('../../types/rgrl').GremioItem[];
   contratistas: import('../../types/rgrl').ContratistaItem[];

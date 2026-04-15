@@ -38,6 +38,14 @@
   font-weight: 600;
   text-transform: uppercase;
 }
+
+/* Centrar columnas: RESPUESTA (3) y FECHA DE REGULARIZACIÓN (4) */
+.detalleTable thead th:nth-child(3),
+.detalleTable thead th:nth-child(4),
+.detalleTable tbody td:nth-child(3),
+.detalleTable tbody td:nth-child(4) {
+  text-align: center;
+}
 .categoriaHeader {
   font-weight: 700;
   text-align: center;

@@ -16,6 +16,7 @@ export type FormularioRGRL = {
   FechaHoraConfirmado: string;
   // Fecha cruda tal como viene de la API (ISO) para parseos/decisiones lógicas
   CreacionFechaHoraRaw?: string | null;
+  FechaSRTRaw?: string | null;
 };
 
 export type FormularioRGRLDetalle = {
@@ -50,7 +51,7 @@ export type PrintData = {
   cabecera: CabeceraData;
   detalle: FormularioRGRLDetalle[];
   planillaA: PlanillaAItem[];
-  planillaB: PlanillaBItem[];
+  planillaB?: PlanillaBItem[];
   planillaC: PlanillaCItem[];
   gremios: GremioItem[];
   contratistas: ContratistaItem[];

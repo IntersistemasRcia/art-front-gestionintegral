@@ -111,6 +111,7 @@ const mapApiToUi = (r: ApiFormularioRGRL): FormularioRGRL => ({
   FechaHoraCreacion: Fecha(r.creacionFechaHora),
   FechaHoraConfirmado: Fecha(r.completadoFechaHora),
   CreacionFechaHoraRaw: r.creacionFechaHora ?? null,
+  FechaSRTRaw: r.fechaSRT ?? null,
 });
 
 const CargarConsultaFormulariosRGRL = async (cuit: number): Promise<FormularioRGRL[]> => {
@@ -208,6 +209,16 @@ const normRepresentacion = (v?: string | number | null): string => {
   }
 };
 
+const formatFechaAAAAMMDD = (v?: number | string | null): string => {
+  if (v == null) return '';
+  const s = String(v).replace(/\D/g, '');
+  if (s.length !== 8) return '';
+  const yyyy = s.slice(0, 4);
+  const mm = s.slice(4, 6);
+  const dd = s.slice(6, 8);
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
   // GET /FormulariosRGRL/{id}: arma el payload completo para impresión y vista de detalle.
   const res = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRGRL/${id}`, { cache: 'no-store' });
@@ -237,7 +248,7 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
       CategoriaOrden: meta?.seccionOrden ?? 0,
       Pregunta: meta?.pregunta ?? '',
       Respuesta: mapRespuesta(r.respuesta),
-      FechaRegularizacion: r.fechaRegularizacionNormal ?? '',
+      FechaRegularizacion: (r.fechaRegularizacionNormal ?? '').toString().trim() || formatFechaAAAAMMDD(r.fechaRegularizacion),
       NormaVigente: meta?.norma ?? '',
     });
   }
@@ -342,7 +353,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const [openGenerar, setOpenGenerar] = useState<boolean>(false);
   const [replicaDe, setReplicaDe] = useState<number | undefined>(undefined);
 
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT } = user as any;
 
@@ -556,16 +567,20 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     fechaSRT: data.fechaSRT ?? '',
   };
 
-  setPrintData({
+    setPrintData({
     cabecera,
-    detalle: (data.detalle ?? []).filter(r =>
-      (r.Pregunta?.trim()) ||
-      (r.Respuesta?.trim()) ||
-      (r.FechaRegularizacion?.trim()) ||
-      (r.NormaVigente?.trim())
-    ),
+    detalle: (data.detalle ?? [])
+      .filter(r =>
+        (r.Pregunta?.trim()) ||
+        (r.Respuesta?.trim()) ||
+        (r.FechaRegularizacion?.trim()) ||
+        (r.NormaVigente?.trim())
+      )
+      .filter(r => {
+        const cat = String(r.Categoria ?? '').toUpperCase();
+        return !cat.includes('PLANILLA B');
+      }),
     planillaA: data.planillaA,
-    planillaB: data.planillaB,
     planillaC: data.planillaC,
     gremios: data.gremios,
     contratistas: data.contratistas,
@@ -596,15 +611,24 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
           const olderOrEqual1Year = creado.isValid() && anos >= 1;
 
           const estado = String(row.original.Estado ?? '').trim();
-          const showEditar = estado !== 'Confirmado' && !olderOrEqual1Year;
+          const showEditar = (estado !== 'Confirmado' || hasTask('Empleador_FormularioRGRL_EditarDenunciaConfirmada')) && !olderOrEqual1Year;
           const showReplicar = !olderOrEqual1Year;
+
+      
+          const fechaSRTraw = String((row.original as any).FechaSRTRaw ?? '').trim();
+          const canPrint = estado === 'Confirmado' && !!fechaSRTraw;
 
           return (
             <div className={styles.iconActions}>
               {showEditar && (
                 <BsPencilFill title="Editar" onClick={onEdit} className={styles.iconButton} />
               )}
-              <BsFileEarmarkPdfFill title="Imprimir" onClick={onClick} className={styles.iconButton} />
+              <BsFileEarmarkPdfFill
+                title={canPrint ? 'Imprimir' : 'Imprimir (requerido Estado=Confirmado y Fecha SRT)'}
+                onClick={canPrint ? onClick : (e: any) => { e.stopPropagation?.(); }}
+                className={styles.iconButton}
+                style={{ opacity: canPrint ? 1 : 0.45, cursor: canPrint ? 'pointer' : 'default', pointerEvents: canPrint ? 'auto' : 'none' }}
+              />
               {showReplicar && (
                 <BsFront title="Replicar" onClick={onCopy} className={styles.iconButton} />
               )}
@@ -761,7 +785,6 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
               <div className={styles.pills}>
                 {[
                   { key: 'planillaA', label: 'Planilla A' },
-                  { key: 'planillaB', label: 'Planilla B' },
                   { key: 'planillaC', label: 'Planilla C' },
                   { key: 'gremios', label: 'Gremios' },
                   { key: 'contratistas', label: 'Contratistas' },

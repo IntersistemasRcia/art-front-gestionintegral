@@ -18,6 +18,8 @@ import IconButton from '@mui/material/IconButton';
 import DataTableImport from '@/utils/ui/table/DataTable';
 
 import ArtAPI from '@/data/artAPI';
+import CabeceraFormulario from './CabeceraFormulario';
+import { useAuth } from '@/data/AuthContext';
 
 
 import type {
@@ -108,6 +110,7 @@ const GenerarFormularioRGRL: React.FC<{
 }> = ({ initialCuit, replicaDe, onDone }) => {
 
   const router = useRouter();
+  const { hasTask } = useAuth();
   const search = useSearchParams();
   // En modal (onDone) se ignoran query params.
   const isModal = Boolean(onDone);
@@ -157,6 +160,7 @@ const GenerarFormularioRGRL: React.FC<{
   const [modalMsgOpen, setModalMsgOpen] = useState(false);
   const [modalMsg, setModalMsg] = useState('');
   const [modalMsgType, setModalMsgType] = useState<MessageType>('warning');
+  const [fechaSRTEdit, setFechaSRTEdit] = useState<string>('');
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -307,7 +311,7 @@ const GenerarFormularioRGRL: React.FC<{
         completadoFechaHora: toIsoOrNull(new Date()),
         notificacionFecha: toIsoOrNull(new Date()),
         internoPresentacion: 0,
-        fechaSRT: toIsoOrNull(new Date()),
+        fechaSRT: null,
       };
 
       const res = await fetch(`${API_BASE}/FormulariosRGRL`, {
@@ -578,9 +582,9 @@ const GenerarFormularioRGRL: React.FC<{
     }
   ], [responsablesUI]);
 
-  const [openGremios, setOpenGremios] = useState(false);
-  const [openContratistas, setOpenContratistas] = useState(false);
-  const [openResponsables, setOpenResponsables] = useState(false);
+  type InlinePanel = 'preguntas' | 'gremios' | 'contratistas' | 'responsables';
+  const [panel, setPanel] = useState<InlinePanel>('preguntas');
+  const puedeVerCabeceraEdicion = hasTask('Empleador_FormularioRGRL_EditarDenunciaConfirmada');
 
   // Carga el formulario ya creado/edición (paso 2)
   const cargarPaso2 = useCallback(async () => {
@@ -591,6 +595,16 @@ const GenerarFormularioRGRL: React.FC<{
       const [tfs, frm] = await Promise.all([fetchTipos(), fetchFormularioById(idFromQuery)]);
       setTipos(tfs);
       setForm(frm);
+      setFechaSRTEdit(frm.fechaSRT && dayjs(frm.fechaSRT).isValid() ? dayjs(frm.fechaSRT).format('YYYY-MM-DD') : '');
+      const c = Number((frm as any).cuit ?? 0) || undefined;
+      setCuit(c);
+      setEstablecimientoSel(frm.internoEstablecimiento);
+      setTipoSel(frm.internoFormulario);
+      if (c) {
+        const [rs, ests] = await Promise.all([fetchRazonSocial(c), fetchEstablecimientos(c)]);
+        setRazonSocial(rs);
+        setEstablecimientos(ests);
+      }
 
       try {
         const respGrem = (frm.respuestasGremio ?? []) as any[];
@@ -650,8 +664,8 @@ const GenerarFormularioRGRL: React.FC<{
             cuit: Number(r?.cuit ?? 0) || undefined,
             responsable: r?.responsable ?? '',
             cargo: r?.cargo ?? '',
-            representacion: Number(r?.representacion ?? 0) || undefined,
-            esContratado: Number(r?.esContratado ?? 0) || undefined,
+            representacion: r?.representacion === 0 || r?.representacion === '0' ? 0 : (Number(r?.representacion ?? 0) || undefined),
+            esContratado: r?.esContratado === 0 || r?.esContratado === '0' ? 0 : (Number(r?.esContratado ?? 0) || undefined),
             tituloHabilitante: r?.tituloHabilitante ?? '',
             matricula: r?.matricula ?? '',
             entidadOtorganteTitulo: r?.entidadOtorganteTitulo ?? '',
@@ -706,7 +720,7 @@ const GenerarFormularioRGRL: React.FC<{
   // Mapas de páginas por rangos de 'interno' según tipo de formulario.
   const pagesMap = useMemo(() => {
     const a = [
-      [1, 19],
+      [1, 20],
       [21, 43],
       [44, 63],
       [64, 90],
@@ -749,8 +763,79 @@ const GenerarFormularioRGRL: React.FC<{
     return { pages: null as null | any[], showPlanillas: false };
   }, [tipoDeEsteFormulario]);
 
-  const guardarPUT = async (completar: boolean) => {
+  const guardarPUT = async (completar: boolean, options?: { redirigir?: boolean; fechaSRTOverride?: string | null }) => {
     if (!form) return;
+    if (completar) {
+      for (let i = 0; i < responsablesUI.length; i++) {
+        const r = responsablesUI[i] ?? {};
+        const tieneDatos =
+          String(r.cuit ?? '').trim() !== '' ||
+          String(r.responsable ?? '').trim() !== '' ||
+          String(r.cargo ?? '').trim() !== '' ||
+          typeof r.esContratado === 'number' ||
+          String(r.tituloHabilitante ?? '').trim() !== '' ||
+          String(r.matricula ?? '').trim() !== '' ||
+          String(r.entidadOtorganteTitulo ?? '').trim() !== '';
+        if (tieneDatos && typeof r.representacion !== 'number') {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Representación.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+      }
+
+      const preguntasObligatorias = secciones
+        .filter((s) => {
+          const desc = (s.descripcion ?? '').toString().toUpperCase();
+          return !desc.includes('PLANILLA A') && !desc.includes('PLANILLA C') && !desc.includes('PLANILLA B');
+        })
+        .flatMap((s) => s.cuestionarios ?? [])
+        .map((q) => Number(q.codigo ?? 0))
+        .filter((codigo) => codigo > 0)
+        .filter((codigo, idx, arr) => arr.indexOf(codigo) === idx)
+        .sort((a, b) => a - b);
+
+      const hoy = Number(dayjs().format('YYYYMMDD'));
+      for (const nro of preguntasObligatorias) {
+        const r = respuestas[nro] ?? {};
+        const respuesta = String(r.respuesta ?? '').toUpperCase();
+        if (respuesta !== 'SI' && respuesta !== 'NO' && respuesta !== 'NA') {
+          const preguntaFaltante = secciones
+            .flatMap((s) => s.cuestionarios ?? [])
+            .find((q) => Number(q.codigo ?? 0) === nro);
+          const textoPregunta = String(preguntaFaltante?.pregunta ?? '').trim();
+          setError('');
+          setModalMsg(
+            textoPregunta
+              ? `Falta responder la pregunta ${nro}: ${textoPregunta}`
+              : `Falta responder la pregunta ${nro}.`
+          );
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (respuesta === 'NO') {
+          const fecha = Number(
+            (r.fechaRegularizacionNormal ? String(r.fechaRegularizacionNormal).replace(/-/g, '') : r.fechaRegularizacion) ?? 0
+          );
+          if (!fecha) {
+            setError('');
+            setModalMsg(`La pregunta ${nro} con respuesta NO requiere fecha de regularización.`);
+            setModalMsgType('error');
+            setModalMsgOpen(true);
+            return;
+          }
+          if (fecha <= hoy) {
+            setError('');
+            setModalMsg(`La pregunta ${nro} con respuesta NO requiere una fecha posterior a hoy.`);
+            setModalMsgType('error');
+            setModalMsgOpen(true);
+            return;
+          }
+        }
+      }
+    }
     setLoading(true);
     setError('');
     try {
@@ -823,7 +908,7 @@ const GenerarFormularioRGRL: React.FC<{
         respuestasContratista: contratistasFull,
         respuestasResponsable: responsablesFull,
         internoPresentacion: form.internoPresentacion ?? 0,
-        fechaSRT: form.fechaSRT ?? toIsoOrNull(new Date()),
+        fechaSRT: options?.fechaSRTOverride ?? null,
       };
 
       const res = await fetch(`${API_BASE}/FormulariosRGRL/${form.interno}`, {
@@ -835,7 +920,16 @@ const GenerarFormularioRGRL: React.FC<{
       await res.json().catch(() => null);
       if (!res.ok) throw new Error(`PUT /FormulariosRGRL/${form.interno} -> ${res.status}`);
 
-      router.replace('/inicio/empleador/formularioRGRL');
+      if (options?.redirigir === false && typeof options?.fechaSRTOverride !== 'undefined') {
+        setError('');
+        setModalMsg('Fecha SRT actualizada correctamente.');
+        setModalMsgType('success');
+        setModalMsgOpen(true);
+      }
+
+      if (options?.redirigir !== false) {
+        router.replace('/inicio/empleador/formularioRGRL');
+      }
     } catch (e: any) {
       setError(e?.message ?? (completar ? 'Error al finalizar.' : 'Error al guardar incompleto.'));
     } finally {
@@ -879,14 +973,32 @@ const GenerarFormularioRGRL: React.FC<{
       tieneNA = secActual?.tieneNoAplica === 1;
     }
 
+    const currentPageEntry = pagesMap.pages
+      ? pagesMap.pages[Math.max(0, Math.min(page, pagesMap.pages.length - 1))]
+      : null;
+    const isPlanillaAPage = currentPageEntry === 'PA';
+    const isPlanillaCPage = currentPageEntry === 'PC';
+    const isPlanillaEspecialPage = isPlanillaAPage || isPlanillaCPage;
+
     const renderPaginador = () => {
       if (pagesMap.pages) {
         const pages = pagesMap.pages;
+        const last = pages.length - 1;
         return (
           <div className={styles.paginatorBar}>
             <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
+              onClick={() => {
+                if (panel === 'responsables') {
+                  setPanel('contratistas');
+                } else if (panel === 'contratistas') {
+                  setPanel('gremios');
+                } else if (panel === 'gremios') {
+                  setPanel('preguntas');
+                } else {
+                  setPage(p => Math.max(0, p - 1));
+                }
+              }}
+              disabled={panel === 'preguntas' && page === 0}
               className={`${styles.pagerBtn} ${styles.pagerBtnNarrow}`}
             >
               &lt;
@@ -897,17 +1009,42 @@ const GenerarFormularioRGRL: React.FC<{
               return (
                 <button
                   key={i}
-                  onClick={() => setPage(i)}
-                  className={`${styles.pagerBtn} ${page === i ? styles.pagerBtnActive : ''}`}
+                  onClick={() => {
+                    setPanel('preguntas');
+                    setPage(i);
+                  }}
+                  className={`${styles.pagerBtn} ${panel === 'preguntas' && page === i ? styles.pagerBtnActive : ''}`}
                 >
                   {label}
                 </button>
               );
             })}
 
+            <button onClick={() => setPanel('gremios')} className={`${styles.pagerBtn} ${panel === 'gremios' ? styles.pagerBtnActive : ''}`}>
+              Gremios
+            </button>
+            <button onClick={() => setPanel('contratistas')} className={`${styles.pagerBtn} ${panel === 'contratistas' ? styles.pagerBtnActive : ''}`}>
+              Contratistas
+            </button>
+            <button onClick={() => setPanel('responsables')} className={`${styles.pagerBtn} ${panel === 'responsables' ? styles.pagerBtnActive : ''}`}>
+              Responsables
+            </button>
+
             <button
-              onClick={() => setPage(p => Math.min(pages.length - 1, p + 1))}
-              disabled={page === pages.length - 1}
+              onClick={() => {
+                if (panel === 'preguntas') {
+                  if (page >= last) {
+                    setPanel('gremios');
+                  } else {
+                    setPage(p => Math.min(last, p + 1));
+                  }
+                } else if (panel === 'gremios') {
+                  setPanel('contratistas');
+                } else if (panel === 'contratistas') {
+                  setPanel('responsables');
+                }
+              }}
+              disabled={panel === 'responsables'}
               className={`${styles.pagerBtn} ${styles.pagerBtnNarrow}`}
             >
               &gt;
@@ -918,14 +1055,25 @@ const GenerarFormularioRGRL: React.FC<{
 
       // fallback: comportamiento anterior por secciones
       const totalPages = Math.max(1, Math.ceil(totalSecs / PAGE_SIZE));
+      const last = totalPages - 1;
       const pageStart = page * PAGE_SIZE;
       const pageEnd = Math.min(pageStart + PAGE_SIZE, totalSecs);
 
       return (
         <div className={styles.paginatorBar}>
           <button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
+            onClick={() => {
+              if (panel === 'responsables') {
+                setPanel('contratistas');
+              } else if (panel === 'contratistas') {
+                setPanel('gremios');
+              } else if (panel === 'gremios') {
+                setPanel('preguntas');
+              } else {
+                setPage(p => Math.max(0, p - 1));
+              }
+            }}
+            disabled={panel === 'preguntas' && page === 0}
             className={`${styles.pagerBtn} ${styles.pagerBtnNarrow}`}
           >
             &lt;
@@ -937,8 +1085,11 @@ const GenerarFormularioRGRL: React.FC<{
             return (
               <button
                 key={secciones[i].interno ?? i}
-                onClick={() => setSecIdx(i)}
-                className={`${styles.pagerBtn} ${active ? styles.pagerBtnActive : ''}`}
+                onClick={() => {
+                  setPanel('preguntas');
+                  setSecIdx(i);
+                }}
+                className={`${styles.pagerBtn} ${panel === 'preguntas' && active ? styles.pagerBtnActive : ''}`}
                 title={secciones[i].descripcion}
               >
                 {i + 1}
@@ -946,9 +1097,31 @@ const GenerarFormularioRGRL: React.FC<{
             );
           })}
 
+          <button onClick={() => setPanel('gremios')} className={`${styles.pagerBtn} ${panel === 'gremios' ? styles.pagerBtnActive : ''}`}>
+            Gremios
+          </button>
+          <button onClick={() => setPanel('contratistas')} className={`${styles.pagerBtn} ${panel === 'contratistas' ? styles.pagerBtnActive : ''}`}>
+            Contratistas
+          </button>
+          <button onClick={() => setPanel('responsables')} className={`${styles.pagerBtn} ${panel === 'responsables' ? styles.pagerBtnActive : ''}`}>
+            Responsables
+          </button>
+
           <button
-            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-            disabled={page === totalPages - 1}
+            onClick={() => {
+              if (panel === 'preguntas') {
+                if (page >= last) {
+                  setPanel('gremios');
+                } else {
+                  setPage(p => Math.min(last, p + 1));
+                }
+              } else if (panel === 'gremios') {
+                setPanel('contratistas');
+              } else if (panel === 'contratistas') {
+                setPanel('responsables');
+              }
+            }}
+            disabled={panel === 'responsables'}
             className={`${styles.pagerBtn} ${styles.pagerBtnNarrow}`}
           >
             &gt;
@@ -962,110 +1135,440 @@ const GenerarFormularioRGRL: React.FC<{
       <div className={styles.container}>
         {/* Vista de edición del formulario — preguntas, paginador y listas (gremios/contratistas/responsables). */}
         <h2 className={styles.sectionHeaderTitle} />
+        {puedeVerCabeceraEdicion && (
+          <>
+            <CabeceraFormulario
+              cuit={cuit}
+              onCuitChange={setCuit}
+              razonSocial={razonSocial}
+              establecimientos={establecimientos}
+              estActual={estActual}
+              esReplica={true}
+              onEstablecimientoChange={setEstablecimientoSel}
+              estSuperficie={estSuperficie}
+              onSuperficieChange={setEstSuperficie}
+              estCantTrab={estCantTrab}
+              onCantTrabChange={setEstCantTrab}
+              tipos={tipos}
+              tipoSel={tipoSel}
+              onTipoChange={setTipoSel}
+              onVolver={() => {}}
+              onCrear={() => {}}
+              disableCrear={true}
+              soloLectura={true}
+              mostrarAcciones={false}
+            />
+            <div className={styles.fechaSrtRow}>
+              <TextField
+                label="Fecha SRT"
+                type="date"
+                value={fechaSRTEdit}
+                onChange={(e) => setFechaSRTEdit(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                className={styles.fechaSrtInput}
+              />
+              <CustomButton
+                onClick={() => {
+                  const fechaSRT = toIsoOrNull(fechaSRTEdit || null);
+                  setForm((prev) => (prev ? { ...prev, fechaSRT } : prev));
+                  guardarPUT(false, { redirigir: false, fechaSRTOverride: fechaSRT });
+                }}
+              >
+                Actualiza Fecha Srt
+              </CustomButton>
+            </div>
+          </>
+        )}
         <div className={styles.sectionHeaderSubtitle}>
 
           Página {page + 1} {pagesMap.pages ? `de ${pagesMap.pages.length}` : ''}
         </div>
 
-        <div className={`${styles.row} ${styles.sectionHeaderButtons}`}>
-          <CustomButton onClick={() => setOpenGremios(true)}>Gremios</CustomButton>
-          <CustomButton onClick={() => setOpenContratistas(true)}>Contratistas</CustomButton>
-          <CustomButton onClick={() => setOpenResponsables(true)}>Responsables</CustomButton>
-        </div>
-
         {renderPaginador()}
-        <div className={styles.questionsBox}>
-          {(() => {
-            const grouped: Record<string, any[]> = {};
-            for (const p of preguntas) {
-              const title = (p._sec?.descripcion ?? '').toString().trim() || 'Sin título';
-              if (!grouped[title]) grouped[title] = [];
-              grouped[title].push(p);
-            }
 
-            return Object.keys(grouped).map((title) => (
-              <div key={title}>
-                <div style={{ textAlign: 'center', fontWeight: 700, margin: '12px 0' }}>{title}</div>
-                {grouped[title].map((q) => {
-                  const key = q.codigo as number;
-                  const rr = respuestas[key] ?? {};
-                  const value = rr.respuesta ?? '';
-                  return (
-                    <div key={key} className={styles.questionCard}>
-                      <div className={styles.questionTitle}>
-                        {String(q.codigo ?? '')} - {q.pregunta}{' '}
-                        {q.comentario ? <span className={styles.questionComment}>— {q.comentario}</span> : null}
-                      </div>
+        {panel === 'gremios' ? (
+          <div className={styles.questionsBox}>
+            <div className="formGrid">
+              {[0, 1, 2].map((idx) => (
+                <div key={idx} className={styles.modalGrid120}>
+                  <TextField
+                    label="Nro. Legajo"
+                    type="number"
+                    value={gremiosUI[idx]?.legajo ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : undefined;
+                      setGremiosUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), legajo: val };
+                        return next;
+                      });
+                    }}
+                  />
+                  <TextField
+                    label="Nombre"
+                    value={gremiosUI[idx]?.nombre ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGremiosUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), nombre: val };
+                        return next;
+                      });
+                    }}
+                    fullWidth
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        
+        {panel === 'contratistas' && (
+          <div className={styles.contratistasLegendFixed}>
+            <p>En caso de tener contratistas, indicar nro de CUIT y Nombre - Razón Social</p>
+          </div>
+        )}
 
-                      <div className={styles.radioRow}>
-                        <label>
-                          <input
-                            type="radio"
-                            name={`r-${key}`}
-                            checked={value === 'SI'}
-                            onChange={() => onCambiarRespuesta(key, { respuesta: 'SI' })}
-                          /> SI
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name={`r-${key}`}
-                            checked={value === 'NO'}
-                            onChange={() => onCambiarRespuesta(key, { respuesta: 'NO' })}
-                          /> NO
-                        </label>
-                        {tieneNA ? (
-                          <label>
-                            <input
-                              type="radio"
-                              name={`r-${key}`}
-                              checked={value === 'NA'}
-                              onChange={() => onCambiarRespuesta(key, { respuesta: 'NA' })}
-                            /> No aplica
-                          </label>
-                        ) : null}
-                      </div>
+        {panel === 'gremios' && (
+          <div className={styles.gremiosLegendFixed}>
+            <p>En caso de contar con delegados gremiales indicar número de legajo conforme a la inscripción en el Ministerio de Trabajo, Empleo y Seguridad Social</p>
+            <p><a href="http://www.trabajo.gov.ar" target="_blank" rel="noreferrer">http://www.trabajo.gov.ar</a></p>
+          </div>
+        )}
 
-                      <div className={styles.obsArea}>
-                        <textarea
-                          value={rr.observaciones ?? ''}
-                          onChange={(e) => onCambiarRespuesta(key, { observaciones: e.target.value })}
-                          placeholder="Observaciones…"
-                          className={styles.textarea}
-                        />
-                      </div>
+        {panel === 'contratistas' ? (
+          <div className={styles.questionsBox}>
+            <div className="formGrid">
+              {[0, 1, 2].map((idx) => (
+                <div key={idx} className={styles.modalGrid160}>
+                  <TextField
+                    label="CUIT"
+                    value={
+                      String(contratistasUI[idx]?.cuit ?? '').replace(/[^\d]/g, '').length === 11
+                        ? CUIP(contratistasUI[idx]?.cuit)
+                        : String(contratistasUI[idx]?.cuit ?? '')
+                    }
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/[^\d]/g, '');
+                      const val = digits ? Number(digits) : undefined;
+                      setContratistasUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), cuit: val };
+                        return next;
+                      });
+                    }}
+                    inputMode="numeric"
+                  />
+                  <TextField
+                    label="Contratista"
+                    value={contratistasUI[idx]?.contratista ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setContratistasUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), contratista: val };
+                        return next;
+                      });
+                    }}
+                    fullWidth
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
-                      <div className={styles.dateRow}>
-                        <label className={styles.dateLabel}>Fecha regularización:</label>
-                        <input
-                          type="date"
-                          value={
-                            rr.fechaRegularizacionNormal ?? (rr.fechaRegularizacion ? `${String(rr.fechaRegularizacion).slice(0,4)}-${String(rr.fechaRegularizacion).slice(4,6)}-${String(rr.fechaRegularizacion).slice(6,8)}` : '')
-                          }
-                          onChange={(e) => {
-                            const iso = e.target.value || '';
-                            const digits = iso ? iso.replace(/-/g, '') : '';
-                            onCambiarRespuesta(key, {
-                              fechaRegularizacion: digits ? Number(digits) : 0,
-                              fechaRegularizacionNormal: iso ? iso : null,
-                            });
-                          }}
-                          placeholder="2025-10-30"
-                          className={styles.dateInputNum}
-                        />
-                      </div>
+        {panel === 'responsables' ? (
+          <div className={`${styles.questionsBox} ${styles.responsablesWideBox}`}>
+            <div className={styles.responsablesRows}>
+              {[0, 1, 2, 3, 4].map((idx) => (
+                <div key={idx} className={styles.responsableRowGrid}>
+                  <TextField
+                    label="CUIT/CUIL/CUIP"
+                    value={(() => {
+                      const digits = String(responsablesUI[idx]?.cuit ?? '').replace(/[^\d]/g, '');
+                      return digits.length === 11 ? CUIP(digits) : (digits ? digits : '');
+                    })()}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/[^\d]/g, '');
+                      const val = digits ? Number(digits) : undefined;
+                      setResponsablesUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), cuit: val };
+                        return next;
+                      });
+                    }}
+                    inputMode="numeric"
+                  />
+                  <TextField
+                    label="Nombre y apellido"
+                    value={responsablesUI[idx]?.responsable ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setResponsablesUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), responsable: val };
+                        return next;
+                      });
+                    }}
+                    fullWidth
+                  />
+                  <FormControl fullWidth>
+                    <InputLabel>Cargo</InputLabel>
+                    <Select
+                      label="Cargo"
+                      value={responsablesUI[idx]?.cargo ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setResponsablesUI((prev) => {
+                          const next = [...prev];
+                          next[idx] = { ...(next[idx] ?? {}), cargo: val };
+                          return next;
+                        });
+                      }}
+                    >
+                      <MenuItem value=""><em>Seleccioná...</em></MenuItem>
+                      <MenuItem value={'H'}>Profesional de Higiene y Seguridad en el Trabajo</MenuItem>
+                      <MenuItem value={'M'}>Profesional de Medicina Laboral</MenuItem>
+                      <MenuItem value={'R'}>Responsable de Datos del Formulario</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel>Representación</InputLabel>
+                    <Select
+                      label="Representación"
+                      value={typeof responsablesUI[idx]?.representacion === 'number' ? responsablesUI[idx]?.representacion : ''}
+                      onChange={(e) => {
+                        const v = e.target.value as string | number;
+                        setResponsablesUI((prev) => {
+                          const next = [...prev];
+                          next[idx] = { ...(next[idx] ?? {}), representacion: v === '' ? undefined : Number(v) };
+                          return next;
+                        });
+                      }}
+                    >
+                      <MenuItem value=""><em>Seleccioná...</em></MenuItem>
+                      <MenuItem value={1}>Representante Legal</MenuItem>
+                      <MenuItem value={2}>Presidente</MenuItem>
+                      <MenuItem value={3}>VicePresidente</MenuItem>
+                      <MenuItem value={4}>Director General</MenuItem>
+                      <MenuItem value={5}>Gerente General</MenuItem>
+                      <MenuItem value={6}>Administrador General</MenuItem>
+                      <MenuItem value={0}>Otros</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel>Propio/Contratado</InputLabel>
+                    <Select
+                      label="Propio/Contratado"
+                      value={typeof responsablesUI[idx]?.esContratado === 'number' ? responsablesUI[idx]?.esContratado : ''}
+                      onChange={(e) => {
+                        const v = e.target.value as string | number;
+                        setResponsablesUI((prev) => {
+                          const next = [...prev];
+                          next[idx] = { ...(next[idx] ?? {}), esContratado: v === '' ? undefined : Number(v) };
+                          return next;
+                        });
+                      }}
+                    >
+                      <MenuItem value=""><em>Seleccioná...</em></MenuItem>
+                      <MenuItem value={0}>Contratado</MenuItem>
+                      <MenuItem value={1}>Propio</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Título habilitante"
+                    value={responsablesUI[idx]?.tituloHabilitante ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setResponsablesUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), tituloHabilitante: val };
+                        return next;
+                      });
+                    }}
+                  />
+                  <TextField
+                    label="N° matrícula"
+                    value={responsablesUI[idx]?.matricula ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setResponsablesUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), matricula: val };
+                        return next;
+                      });
+                    }}
+                  />
+                  <TextField
+                    label="Entidad que otorgó el título habilitante"
+                    value={responsablesUI[idx]?.entidadOtorganteTitulo ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setResponsablesUI((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...(next[idx] ?? {}), entidadOtorganteTitulo: val };
+                        return next;
+                      });
+                    }}
+                    fullWidth
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {panel === 'preguntas' ? (
+          <div className={styles.questionsBox}>
+            {(() => {
+              const grouped: Record<string, any[]> = {};
+              for (const p of preguntas) {
+                const title = (p._sec?.descripcion ?? '').toString().trim() || 'Sin título';
+                if (!grouped[title]) grouped[title] = [];
+                grouped[title].push(p);
+              }
+
+              return Object.keys(grouped).map((title) => (
+                <div key={title}>
+                  {(() => {
+                    const preguntasSeccion = grouped[title];
+                    const marcarSeccion = (respuesta: 'SI' | 'NO' | 'NA') => {
+                      setRespuestas((prev) => {
+                        const next = { ...prev };
+                        for (const item of preguntasSeccion) {
+                          const key = item.codigo as number;
+                          const base = next[key] ?? { internoCuestionario: key, respuesta: '' };
+                          next[key] = { ...base, respuesta };
+                        }
+                        return next;
+                      });
+                    };
+                    return (
+                      <>
+                  <div style={{ textAlign: 'center', fontWeight: 700, margin: '12px 0' }}>{title}</div>
+                  <div
+                    className={styles.questionHeaderRow}
+                    style={
+                      isPlanillaEspecialPage
+                        ? { gridTemplateColumns: isPlanillaAPage ? '70px 1fr 260px' : '70px 1fr 260px 260px' }
+                        : undefined
+                    }
+                  >
+                    <div className={styles.qNum}>{isPlanillaEspecialPage ? 'Código' : 'Nro.'}</div>
+                    <div className={styles.qText}>Condiciones a cumplir</div>
+                    <div
+                      className={styles.qAnswerHead}
+                      style={isPlanillaEspecialPage ? { gridTemplateColumns: '1fr' } : undefined}
+                    >
+                      {isPlanillaEspecialPage ? (
+                        <div>Sí (Indicar si corresponde)</div>
+                      ) : (
+                        <>
+                          <CustomButton onClick={() => marcarSeccion('SI')} style={{ padding: '2px 8px', minHeight: 24, fontSize: 12, lineHeight: '16px' }}>SI</CustomButton>
+                          <CustomButton onClick={() => marcarSeccion('NO')} style={{ padding: '2px 8px', minHeight: 24, fontSize: 12, lineHeight: '16px' }}>NO</CustomButton>
+                          <CustomButton onClick={() => marcarSeccion('NA')} style={{ padding: '2px 8px', minHeight: 24, fontSize: 12, lineHeight: '16px' }}>No Aplica</CustomButton>
+                        </>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            ));
-          })()}
-        </div>
+                    {!isPlanillaEspecialPage && <div className={styles.qDateHead}>Fecha de Regularización</div>}
+                    {!isPlanillaAPage && <div className={styles.qNormaHead}>Norma Vigente</div>}
+                  </div>
+                      </>
+                    );
+                  })()}
+                  {grouped[title].map((q) => {
+                    const key = q.codigo as number;
+                    const rr = respuestas[key] ?? {};
+                    const value = rr.respuesta ?? '';
+                    const hoyIso = dayjs().format('YYYY-MM-DD');
+                    const fechaIso = rr.fechaRegularizacionNormal ?? (rr.fechaRegularizacion ? `${String(rr.fechaRegularizacion).slice(0,4)}-${String(rr.fechaRegularizacion).slice(4,6)}-${String(rr.fechaRegularizacion).slice(6,8)}` : '');
+                    const fechaVisible = fechaIso && fechaIso > hoyIso ? fechaIso : '';
+                    return (
+                      <div
+                        key={key}
+                        className={styles.questionRow}
+                        style={
+                          isPlanillaEspecialPage
+                            ? { gridTemplateColumns: isPlanillaAPage ? '70px 1fr 260px' : '70px 1fr 260px 260px' }
+                            : undefined
+                        }
+                      >
+                        <div className={styles.qNum}>{String(q.codigo ?? '')}</div>
+                        <div className={styles.qText}>{q.pregunta}</div>
+                        <div className={styles.qAnswer} style={isPlanillaEspecialPage ? { gridTemplateColumns: '1fr' } : undefined}>
+                          {isPlanillaEspecialPage ? (
+                            <label className={styles.qRadioCell}>
+                              <input
+                                type="checkbox"
+                                checked={value === 'SI'}
+                                onChange={(e) => onCambiarRespuesta(key, { respuesta: e.target.checked ? 'SI' : '' })}
+                              />
+                            </label>
+                          ) : (
+                            <>
+                              <label className={styles.qRadioCell}>
+                                <input
+                                  type="radio"
+                                  name={`r-${key}`}
+                                  checked={value === 'SI'}
+                                  onChange={() => onCambiarRespuesta(key, { respuesta: 'SI' })}
+                                />
+                              </label>
+                              <label className={styles.qRadioCell}>
+                                <input
+                                  type="radio"
+                                  name={`r-${key}`}
+                                  checked={value === 'NO'}
+                                  onChange={() => onCambiarRespuesta(key, { respuesta: 'NO' })}
+                                />
+                              </label>
+                              <label className={styles.qRadioCell}>
+                                {tieneNA ? (
+                                  <input
+                                    type="radio"
+                                    name={`r-${key}`}
+                                    checked={value === 'NA'}
+                                    onChange={() => onCambiarRespuesta(key, { respuesta: 'NA' })}
+                                  />
+                                ) : null}
+                              </label>
+                            </>
+                          )}
+                        </div>
+                        {!isPlanillaEspecialPage && (
+                          <div className={styles.qDate}>
+                            <input
+                              type="date"
+                              value={fechaVisible}
+                              min={dayjs().add(1, 'day').format('YYYY-MM-DD')}
+                              onChange={(e) => {
+                                const iso = e.target.value || '';
+                                if (iso && iso <= hoyIso) return;
+                                const digits = iso ? iso.replace(/-/g, '') : '';
+                                onCambiarRespuesta(key, {
+                                  fechaRegularizacion: digits ? Number(digits) : 0,
+                                  fechaRegularizacionNormal: iso ? iso : null,
+                                });
+                              }}
+                              className={styles.qDateInput}
+                            />
+                          </div>
+                        )}
+                        {!isPlanillaAPage && <div className={styles.qNorma}>{q.comentario ?? ''}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
+          </div>
+        ) : null}
 
         <div className={styles.row}>
           <CustomButton onClick={() => router.back()} disabled={loading}>VOLVER</CustomButton>
           <CustomButton onClick={() => setConfirmOpen(true)} disabled={loading}>GUARDAR Y CONFIRMAR</CustomButton>
-          <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR</CustomButton>
+          <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR BORRADOR</CustomButton>
         </div>
 
         {loading && <div className={styles.savingMsg}>Guardando…</div>}
@@ -1093,233 +1596,13 @@ const GenerarFormularioRGRL: React.FC<{
             ¿Está seguro que desea CONFIRMAR el formulario?
           </div>
         </CustomModal>
-
-        <CustomModal open={openGremios} onClose={() => setOpenGremios(false)} title="Representación Gremial" size="mid">
-          <div className="formGrid">
-            <div className={styles.modalGrid120}>
-              <TextField
-                label="Nro. Legajo"
-                type="number"
-                value={nuevoGremio.legajo ?? ''}
-                onChange={(e) => setNuevoGremio(prev => ({ ...prev, legajo: e.target.value ? Number(e.target.value) : undefined }))}
-              />
-              <TextField
-                label="Nombre"
-                value={nuevoGremio.nombre ?? ''}
-                onChange={(e) => setNuevoGremio(prev => ({ ...prev, nombre: e.target.value }))}
-                fullWidth
-              />
-            </div>
-            <div className={styles.modalActionsRow}>
-              <CustomButton onClick={() => {
-                if (editGremioIndex != null && editGremioIndex >= 0) {
-                  setGremiosUI(prev => prev.map((p, idx) => idx === editGremioIndex ? (nuevoGremio as GremioUI) : p));
-                  setEditGremioIndex(null);
-                } else {
-                  setGremiosUI(prev => [...prev, nuevoGremio as GremioUI]);
-                }
-                setNuevoGremio({ legajo: undefined, nombre: '' });
-              }}>{editGremioIndex != null ? 'GUARDAR CAMBIOS' : 'AGREGAR'}</CustomButton>
-            </div>
-            <div className={styles.modalTableWrapper}>
-              <DataTableImport
-                data={gremiosUI}
-                columns={columnasGremios as any}
-                size="small"
-                pageSizeOptions={[5, 10, 15]}
-                enableSorting={true}
-                enableFiltering={false}
-                onRowClick={(rowData) => {
-                  const index = gremiosUI.findIndex(r => Number(r.legajo ?? 0) === Number((rowData as any).legajo ?? 0) && (r.nombre ?? '') === ((rowData as any).nombre ?? ''));
-                  if (index >= 0) {
-                    setNuevoGremio(gremiosUI[index]);
-                    setEditGremioIndex(index);
-                  }
-                }}
-              />
-            </div>
-
-            <div className={styles.tableFooter}>
-              <CustomButton onClick={() => setOpenGremios(false)}>GUARDAR</CustomButton>
-            </div>
-          </div>
-        </CustomModal>
-        <CustomModal open={openContratistas} onClose={() => setOpenContratistas(false)} title="Contratistas" size="mid">
-          <div className="formGrid">
-            <div className={styles.modalGrid160}>
-              <TextField
-                label="CUIT"
-                value={
-                  String(nuevoContratista.cuit ?? '').replace(/[^\d]/g, '').length === 11
-                    ? CUIP(nuevoContratista.cuit)
-                    : String(nuevoContratista.cuit ?? '')
-                }
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/[^\d]/g, '');
-                  setNuevoContratista(prev => ({ ...prev, cuit: digits ? Number(digits) : undefined }));
-                }}
-                inputMode="numeric"
-              />
-              <TextField
-                label="Contratista"
-                value={nuevoContratista.contratista ?? ''}
-                onChange={(e) => setNuevoContratista(prev => ({ ...prev, contratista: e.target.value }))}
-                fullWidth
-              />
-            </div>
-            <div className={styles.modalActionsRow}>
-              <CustomButton onClick={() => {
-                if (editContrIndex != null && editContrIndex >= 0) {
-                  setContratistasUI(prev => prev.map((p, idx) => idx === editContrIndex ? (nuevoContratista as ContratistaUI) : p));
-                  setEditContrIndex(null);
-                } else {
-                  setContratistasUI(prev => [...prev, nuevoContratista as ContratistaUI]);
-                }
-                setNuevoContratista({ cuit: undefined, contratista: '' });
-              }}>{editContrIndex != null ? 'GUARDAR CAMBIOS' : 'AGREGAR'}</CustomButton>
-            </div>
-            <div className={styles.modalTableWrapper}>
-              <DataTableImport
-                data={contratistasUI}
-                columns={columnasContratistas as any}
-                size="small"
-                pageSizeOptions={[5, 10, 15]}
-                enableSorting={true}
-                enableFiltering={false}
-                onRowClick={(rowData) => {
-                  const index = contratistasUI.findIndex(r => String(r.cuit ?? '') === String((rowData as any).cuit ?? '') && (r.contratista ?? '') === ((rowData as any).contratista ?? ''));
-                  if (index >= 0) {
-                    setNuevoContratista(contratistasUI[index]);
-                    setEditContrIndex(index);
-                  }
-                }}
-              />
-            </div>
-
-            <div className={styles.tableFooter}>
-              <CustomButton onClick={() => setOpenContratistas(false)}>GUARDAR</CustomButton>
-            </div>
-          </div>
-        </CustomModal>
-        <CustomModal open={openResponsables} onClose={() => setOpenResponsables(false)} title="Profesional / Responsable" size="large">
-          <div className="formGrid">
-            <div className={styles.modalGridRespTop}>
-              <TextField
-                label="CUIT"
-                value={(() => {
-                  const digits = String(nuevoResponsable.cuit ?? '').replace(/[^\d]/g, '');
-                  return digits.length === 11 ? CUIP(digits) : (digits ? digits : '');
-                })()}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/[^\d]/g, '');
-                  setNuevoResponsable(prev => ({ ...prev, cuit: digits ? Number(digits) : undefined }));
-                }}
-                inputMode="numeric"
-              />
-              <TextField
-                label="Nombre y apellido"
-                value={nuevoResponsable.responsable ?? ''}
-                onChange={(e) => setNuevoResponsable(prev => ({ ...prev, responsable: e.target.value }))}
-                fullWidth
-              />
-              <FormControl>
-                <InputLabel>Cargo</InputLabel>
-                <Select
-                  value={nuevoResponsable.cargo ?? ''}
-                  onChange={(e) => setNuevoResponsable(prev => ({ ...prev, cargo: e.target.value }))}
-                >
-                  <MenuItem value=""><em>Seleccioná...</em></MenuItem>
-                  <MenuItem value={'H'}>Profesional de Higiene y Seguridad en el Trabajo</MenuItem>
-                  <MenuItem value={'M'}>Profesional de Medicina Laboral</MenuItem>
-                  <MenuItem value={'R'}>Responsable de Datos del Formulario</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl>
-                <InputLabel>Representación</InputLabel>
-                <Select
-                  value={nuevoResponsable.representacion ?? ''}
-                  onChange={(e) => setNuevoResponsable(prev => ({ ...prev, representacion: Number(e.target.value || 0) }))}
-                >
-                  <MenuItem value=""><em>Seleccioná...</em></MenuItem>
-                  <MenuItem value={1}>Representante Legal</MenuItem>
-                  <MenuItem value={2}>Presidente</MenuItem>
-                  <MenuItem value={3}>VicePresidente</MenuItem>
-                  <MenuItem value={4}>Director General</MenuItem>
-                  <MenuItem value={5}>Gerente General</MenuItem>
-                  <MenuItem value={6}>Administrador General</MenuItem>
-                  <MenuItem value={0}>Otros</MenuItem>
-                </Select>
-              </FormControl>
-            </div>
-            <div className={styles.modalGridRespBottom}>
-              <FormControl>
-                <InputLabel>Propio/Contratado</InputLabel>
-                <Select
-                  value={typeof nuevoResponsable.esContratado === 'number' ? nuevoResponsable.esContratado : ''}
-                  onChange={(e) => {
-                    const v = e.target.value as string | number;
-                    setNuevoResponsable(prev => ({ ...prev, esContratado: v === '' ? undefined : Number(v) }));
-                  }}
-                >
-                  <MenuItem value=""><em>Seleccioná...</em></MenuItem>
-                  <MenuItem value={0}>Contratado</MenuItem>
-                  <MenuItem value={1}>Propio</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                label="Título"
-                value={nuevoResponsable.tituloHabilitante ?? ''}
-                onChange={(e) => setNuevoResponsable(prev => ({ ...prev, tituloHabilitante: e.target.value }))}
-              />
-              <TextField
-                label="Matrícula"
-                value={nuevoResponsable.matricula ?? ''}
-                onChange={(e) => setNuevoResponsable(prev => ({ ...prev, matricula: e.target.value }))}
-              />
-              <TextField
-                label="Entidad"
-                value={nuevoResponsable.entidadOtorganteTitulo ?? ''}
-                onChange={(e) => setNuevoResponsable(prev => ({ ...prev, entidadOtorganteTitulo: e.target.value }))}
-                fullWidth
-              />
-            </div>
-            <div className={styles.modalActionsRow}>
-              <CustomButton onClick={() => {
-                if (editRespIndex != null && editRespIndex >= 0) {
-                  setResponsablesUI(prev => prev.map((p, idx) => idx === editRespIndex ? (nuevoResponsable as ResponsableUI) : p));
-                  setEditRespIndex(null);
-                } else {
-                  setResponsablesUI(prev => [...prev, nuevoResponsable as ResponsableUI]);
-                }
-                setNuevoResponsable({ cuit: undefined, responsable: '', cargo: '', representacion: undefined, esContratado: undefined, tituloHabilitante: '', matricula: '', entidadOtorganteTitulo: '' });
-              }}>{editRespIndex != null ? 'GUARDAR CAMBIOS' : 'AGREGAR'}</CustomButton>
-            </div>
-
-            {/* Tabla de responsables (usando DataTableImport) */}
-            <div className={styles.modalTableWrapper}>
-              <DataTableImport
-                data={responsablesUI}
-                columns={columnasResponsables as any}
-                size="small"
-                pageSizeOptions={[5, 10, 15]}
-                enableSorting={true}
-                enableFiltering={false}
-                onRowClick={(rowData) => {
-                  // Si se hace click en la fila, seleccionamos para editar si coincide
-                  const index = responsablesUI.findIndex(r => String(r.cuit ?? '') === String((rowData as any).cuit ?? '') && (r.responsable ?? '') === ((rowData as any).responsable ?? ''));
-                  if (index >= 0) {
-                    setNuevoResponsable(responsablesUI[index]);
-                    setEditRespIndex(index);
-                  }
-                }}
-              />
-            </div>
-
-            <div className={styles.tableFooter}>
-              <CustomButton onClick={() => setOpenResponsables(false)}>GUARDAR</CustomButton>
-            </div>
-          </div>
-        </CustomModal>
+        <CustomModalMessage
+          open={modalMsgOpen}
+          onClose={handleCloseModalMsg}
+          message={modalMsg}
+          type={modalMsgType}
+          title="Datos faltantes"
+        />
       </div>
     );
   }
@@ -1327,106 +1610,27 @@ const GenerarFormularioRGRL: React.FC<{
   return (
     <div className={styles.container}>
       {/* Carga de datos inicial y botones para crear/replicar el formulario. */}
-      <Box className={styles.filterCuitBox}>
-        <TextField
-          label="CUIT"
-          value={
-            cuit
-              ? (String(cuit).replace(/\D/g, '').length === 11 ? CUIP(cuit) : String(cuit))
-              : ''
-          }
-          onChange={(e) => {
-            const digits = e.target.value.replace(/[^\d]/g, '');
-            setCuit(digits ? Number(digits) : undefined);
-          }}
-          placeholder="Ingresá CUIT"
-          inputMode="numeric"
-          fullWidth
-        />
-      </Box>
-      <Box className={styles.razonSocialBox}>
-        <TextField
-          label="Razón Social"
-          value={razonSocial}
-          placeholder="Sin datos"
-          fullWidth
-          InputProps={{ readOnly: true }}
-        />
-      </Box>
-      <Box className={styles.establecimientoBox}>
-          <FormControl fullWidth disabled={esReplica} title={esReplica ? 'Tipo fijado por replicación' : undefined}>
-            <Autocomplete
-              options={establecimientos}
-              getOptionLabel={(opt) => {
-                const suc = String(opt.nroSucursal ?? '').trim();
-                const calle = String(opt.domicilioCalle ?? '').trim();
-                const nro = String(opt.domicilioNro ?? '').trim();
-                const dir = [calle, nro].filter(Boolean).join(' ').trim();
-                return [suc, dir].filter(Boolean).join(' - ').trim();
-              }}
-              value={estActual ?? null}
-              onChange={(_e, newVal) => setEstablecimientoSel(newVal ? newVal.interno : undefined)}
-              isOptionEqualToValue={(option, value) => option.interno === value.interno}
-              renderInput={(params) => <TextField {...params} label="Establecimiento" />}
-              disabled={esReplica}
-            />
-          </FormControl>
-      </Box>
-      {estActual && (
-        <Box className={styles.estDatosGrid}>
-          <TextField
-            label="Superficie"
-            type="number"
-            value={estSuperficie}
-            onChange={(e) => setEstSuperficie(e.target.value)}
-            fullWidth
-            inputProps={{ inputMode: 'numeric' }}
-          />
-          <TextField
-            label="Cant. Trabajadores"
-            type="number"
-            value={estCantTrab}
-            onChange={(e) => setEstCantTrab(e.target.value)}
-            fullWidth
-            inputProps={{ inputMode: 'numeric' }}
-          />
-          <TextField
-            label="CIIU"
-            value={estActual.ciiu ?? ''}
-            fullWidth
-            InputProps={{ readOnly: true }}
-          />
-        </Box>
-      )}
-      <Box className={styles.establecimientoBox}>
-        <FormControl fullWidth disabled={esReplica} title={esReplica ? 'Tipo fijado por replicación' : undefined}>
-          <InputLabel>Formulario</InputLabel>
-          <Select
-            label="Formulario"
-            value={tipoSel ?? ''}
-            onChange={(e) => setTipoSel(Number(e.target.value) || undefined)}
-          >
-            <MenuItem value="" disabled>Seleccioná</MenuItem>
-            {tipos.map((t) => (
-              <MenuItem key={t.interno} value={t.interno}>{t.descripcion}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-      <Box className={styles.accionesFooter}>
-        <CustomButton
-          onClick={() => {
-            if (isModal) {
-              onDone?.(0);
-            } else {
-              router.back();
-            }
-          }}
-        >
-          VOLVER
-        </CustomButton>
-        <CustomButton onClick={crearFormulario} disabled={!cuit}>CREAR FORMULARIO</CustomButton>
-      </Box>
+      <CabeceraFormulario
+        cuit={cuit}
+        onCuitChange={setCuit}
+        razonSocial={razonSocial}
+        establecimientos={establecimientos}
+        estActual={estActual}
+        esReplica={esReplica}
+        onEstablecimientoChange={setEstablecimientoSel}
+        estSuperficie={estSuperficie}
+        onSuperficieChange={setEstSuperficie}
+        estCantTrab={estCantTrab}
+        onCantTrabChange={setEstCantTrab}
+        tipos={tipos}
+        tipoSel={tipoSel}
+        onTipoChange={setTipoSel}
+        onVolver={() => {
+          router.back();
+        }}
+        onCrear={crearFormulario}
+        disableCrear={!cuit}
+      />
       <CustomModalMessage
         open={modalMsgOpen}
         onClose={handleCloseModalMsg}
