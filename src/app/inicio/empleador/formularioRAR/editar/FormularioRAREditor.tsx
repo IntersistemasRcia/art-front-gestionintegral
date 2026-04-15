@@ -11,6 +11,7 @@ import 'dayjs/locale/es';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import Formato from '@/utils/Formato';
 import CustomButton from '../../../../../utils/ui/button/CustomButton';
 import DataTableImport from '../../../../../utils/ui/table/DataTable';
 import CustomModal from '../../../../../utils/ui/form/CustomModal';
@@ -43,6 +44,11 @@ interface EditarProps {
 }
 
 const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) => {
+  const formatoFechaTabla = (fecha: any) => {
+    if (!fecha || String(fecha).trim() === '') return '';
+    return Formato.Fecha(fecha, 'DD/MM/YYYY');
+  };
+
   const [cantExpuestos, setCantExpuestos] = React.useState<string>('');
   const [cantNoExpuestos, setCantNoExpuestos] = React.useState<string>('');
   const [descripcion, setDescripcion] = React.useState<string>('');
@@ -175,9 +181,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
   };
 
   const trabajadorCompleto =
-    [cuil, nombre, sector, ingreso, fechaInicio, exposicion, fechaFinExposicion, ultimoExamenMedico, codigoAgente].every(
+    [cuil, nombre, sector, ingreso, exposicion, codigoAgente].every(
       (x) => x && x.trim() !== ''
-    ) && cuil.replace(/\D/g, '').length >= 11;
+    ) && ((Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0) === 0 && Number(cantNoExpuestos) > 0) || ((fechaInicio && fechaInicio.trim() !== '') && (ultimoExamenMedico && ultimoExamenMedico.trim() !== ''))) && cuil.replace(/\D/g, '').length >= 11;
 
   const trabajadoresCargados = React.useMemo(() => {
     const s = new Set<string>();
@@ -191,6 +197,23 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
   const cargarFila = () => {
     if (!trabajadorCompleto) return;
 
+    const horasExposicion = Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0);
+    const esNoExpuestoSinFechas = horasExposicion === 0 && Number(cantNoExpuestos) > 0;
+
+    const fechaCargaFormulario = dayjs().format('YYYY-MM-DD');
+    if (ingreso && ingreso > fechaCargaFormulario) {
+      return alert('La fecha de ingreso debe ser menor o igual a la fecha de carga del formulario RAR');
+    }
+    if (!esNoExpuestoSinFechas && fechaInicio && ingreso && fechaInicio < ingreso) {
+      return alert('La fecha inicio exposición debe ser mayor o igual a la fecha de ingreso');
+    }
+    if (ultimoExamenMedico && ingreso && ultimoExamenMedico <= ingreso) {
+      return alert('La fecha del último examen médico debe ser posterior a la fecha de ingreso');
+    }
+    if (!esNoExpuestoSinFechas && fechaFinExposicion && fechaInicio && fechaFinExposicion < fechaInicio) {
+      return alert('La fecha fin exposición debe ser mayor o igual a la fecha inicio exposición');
+    }
+
     if (modoEdicion) {
       const cuilExiste = filas.some((f, idx) => f.CUIL === cuil.trim() && idx !== editandoIndex);
       if (cuilExiste) return alert('Este CUIL ya existe en otro trabajador');
@@ -202,9 +225,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
           Nombre: nombre.trim(),
           SectorTareas: sector.trim(),
           Ingreso: ingreso.trim(),
-          FechaFin: fechaInicio.trim(),
+          FechaFin: esNoExpuestoSinFechas ? '' : fechaInicio.trim(),
           Exposicion: exposicion.trim(),
-          FechaFinExposicion: fechaFinExposicion.trim(),
+          FechaFinExposicion: esNoExpuestoSinFechas ? '' : fechaFinExposicion.trim(),
           UltimoExamenMedico: ultimoExamenMedico.trim(),
           CodigoAgente: codigoAgente.trim(),
         };
@@ -225,9 +248,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
           Nombre: nombre.trim(),
           SectorTareas: sector.trim(),
           Ingreso: ingreso.trim(),
-          FechaFin: fechaInicio.trim(),
+          FechaFin: esNoExpuestoSinFechas ? '' : fechaInicio.trim(),
           Exposicion: exposicion.trim(),
-          FechaFinExposicion: fechaFinExposicion.trim(),
+          FechaFinExposicion: esNoExpuestoSinFechas ? '' : fechaFinExposicion.trim(),
           UltimoExamenMedico: ultimoExamenMedico.trim(),
           CodigoAgente: codigoAgente.trim(),
         },
@@ -458,11 +481,11 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
               { accessorKey: 'CUIL', header: 'CUIL' },
               { accessorKey: 'Nombre', header: 'Nombre' },
               { accessorKey: 'SectorTareas', header: 'Sector/Tareas' },
-              { accessorKey: 'Ingreso', header: 'F. Ingreso' },
-              { accessorKey: 'FechaFin', header: 'F. Fin' },
+              { accessorKey: 'Ingreso', header: 'F. Ingreso', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
+              { accessorKey: 'FechaFin', header: 'F. Fin', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
               { accessorKey: 'Exposicion', header: 'Exposición' },
-              { accessorKey: 'FechaFinExposicion', header: 'F. Fin Exposición' },
-              { accessorKey: 'UltimoExamenMedico', header: 'F. Último Examen' },
+              { accessorKey: 'FechaFinExposicion', header: 'F. Fin Exposición', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
+              { accessorKey: 'UltimoExamenMedico', header: 'F. Último Examen', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
               { accessorKey: 'CodigoAgente', header: 'Cód. Agente' },
               {
                 id: 'acciones',
@@ -542,17 +565,24 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
 
           <div className={styles.modalRow}>
             <TextField label="Sector/Tareas" value={sector} onChange={(e) => setSector(e.target.value)} fullWidth required className={styles.flex1} />
-            <TextField label="Ingreso" type="date" value={ingreso} onChange={(e) => setIngreso(e.target.value)} fullWidth required InputLabelProps={{ shrink: true }} className={styles.flex1} />
+            <TextField label="Ingreso" type="date" value={ingreso} onChange={(e) => setIngreso(e.target.value)} fullWidth required InputLabelProps={{ shrink: true }} inputProps={{ max: dayjs().format('YYYY-MM-DD') }} className={styles.flex1} />
           </div>
 
           <div className={styles.modalRow}>
-            <TextField label="Fecha Inicio" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} fullWidth required InputLabelProps={{ shrink: true }} className={styles.flex1} />
-            <TextField label="Exposición" value={exposicion} onChange={(e) => setExposicion(e.target.value)} fullWidth required className={styles.flex1} />
+            <TextField label="Fecha Inicio" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} fullWidth required={!(Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0) === 0 && Number(cantNoExpuestos) > 0)} disabled={Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0) === 0 && Number(cantNoExpuestos) > 0} InputLabelProps={{ shrink: true }} inputProps={{ min: ingreso || undefined }} className={styles.flex1} />
+            <TextField label="Exposición" value={exposicion} onChange={(e) => {
+              setExposicion(e.target.value);
+              const horas = Number(String(e.target.value || '').replace(/[^0-9]/g, '') || 0);
+              if (horas === 0 && Number(cantNoExpuestos) > 0) {
+                setFechaInicio('');
+                setFechaFinExposicion('');
+              }
+            }} fullWidth required className={styles.flex1} />
           </div>
 
           <div className={styles.modalRow}>
-            <TextField label="Fecha Fin Exposición" type="date" value={fechaFinExposicion} onChange={(e) => setFechaFinExposicion(e.target.value)} fullWidth required InputLabelProps={{ shrink: true }} className={styles.flex1} />
-            <TextField label="Último Examen Médico" type="date" value={ultimoExamenMedico} onChange={(e) => setUltimoExamenMedico(e.target.value)} fullWidth required InputLabelProps={{ shrink: true }} className={styles.flex1} />
+            <TextField label="Fecha Fin Exposición" type="date" value={fechaFinExposicion} onChange={(e) => setFechaFinExposicion(e.target.value)} fullWidth disabled={Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0) === 0 && Number(cantNoExpuestos) > 0} InputLabelProps={{ shrink: true }} inputProps={{ min: fechaInicio || undefined }} className={styles.flex1} />
+            <TextField label="Último Examen Médico" type="date" value={ultimoExamenMedico} onChange={(e) => setUltimoExamenMedico(e.target.value)} fullWidth required={!(Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0) === 0 && Number(cantNoExpuestos) > 0)} InputLabelProps={{ shrink: true }} inputProps={{ min: (Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0) === 0 && Number(cantNoExpuestos) > 0) ? undefined : ingreso ? dayjs(ingreso).add(1, 'day').format('YYYY-MM-DD') : undefined }} className={styles.flex1} />
           </div>
 
           <div className={styles.modalRow}>

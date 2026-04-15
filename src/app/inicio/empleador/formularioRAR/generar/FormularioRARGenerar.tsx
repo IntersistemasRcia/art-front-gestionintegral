@@ -109,6 +109,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     sector: string;
     ingreso: string;
     fechaInicio: string;
+    fechaFinExposicion: string;
     exposicion: string;
     ultimoExamenMedico: string;
     codigoAgente: string;
@@ -118,6 +119,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     sector: '',
     ingreso: '',
     fechaInicio: '',
+    fechaFinExposicion: '',
     exposicion: '',
     ultimoExamenMedico: '',
     codigoAgente: ''
@@ -173,12 +175,12 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
       size: 140,
     },
     {
-      accessorKey: 'Ingreso',
+      accessorKey: 'IngresoDisplay',
       header: 'F. Ingreso',
       size: 100,
     },
     {
-      accessorKey: 'FechaInicio',
+      accessorKey: 'FechaInicioDisplay',
       header: 'F. Inicio',
       size: 100,
     },
@@ -189,18 +191,12 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
       meta: { align: 'center' }
     },
     {
-      accessorKey: 'FechaFinExposicion',
+      accessorKey: 'FechaFinExposicionDisplay',
       header: 'F. Fin Exposición',
       size: 100,
-      cell: ({ getValue }: any) => {
-        const fecha = getValue();
-        return fecha && fecha.trim() !== ''
-          ? fecha
-          : null;
-      }
     },
     {
-      accessorKey: 'UltimoExamenMedico',
+      accessorKey: 'UltimoExamenMedicoDisplay',
       header: 'Últ. Examen',
       size: 100,
     },
@@ -270,6 +266,16 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     }
   ], [filas, modoEdicion, editandoIndex, handleEditarTrabajador, handleEliminarTrabajador]);
 
+  const filasTabla = React.useMemo(() => {
+    return filas.map((f) => ({
+      ...f,
+      IngresoDisplay: f.Ingreso ? Formato.Fecha(f.Ingreso, 'DD/MM/YYYY') : '',
+      FechaInicioDisplay: f.FechaInicio ? Formato.Fecha(f.FechaInicio, 'DD/MM/YYYY') : '',
+      FechaFinExposicionDisplay: f.FechaFinExposicion ? Formato.Fecha(f.FechaFinExposicion, 'DD/MM/YYYY') : '',
+      UltimoExamenMedicoDisplay: f.UltimoExamenMedico ? Formato.Fecha(f.UltimoExamenMedico, 'DD/MM/YYYY') : '',
+    }));
+  }, [filas]);
+
   // ===== Helpers =====
   const numerosValidos = (v: string) => {
     const valor = (v ?? '').trim();
@@ -287,9 +293,10 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     const nombreCompleto = nombre && nombre.trim() !== '';
     const sectorCompleto = sector && sector.trim() !== '';
     const ingresoCompleto = ingreso && ingreso.trim() !== '';
-    const fechaInicioCompleto = (fechaInicio && fechaInicio.trim() !== '') || (Number(exposicion) === 0 && Number(cantNoExpuestos) > 0);
+    const esNoExpuestoSinFechas = Number(exposicion) === 0 && Number(cantNoExpuestos) > 0;
+    const fechaInicioCompleto = esNoExpuestoSinFechas || (fechaInicio && fechaInicio.trim() !== '');
     const exposicionCompleto = exposicion && exposicion.trim() !== '';
-    const ultimoExamenMedicoCompleto = ultimoExamenMedico && ultimoExamenMedico.trim() !== '';
+    const ultimoExamenMedicoCompleto = esNoExpuestoSinFechas || (ultimoExamenMedico && ultimoExamenMedico.trim() !== '');
     const codigoAgenteCompleto = (codigoAgente && codigoAgente.trim() !== '') || (Number(exposicion) === 0 && Number(cantNoExpuestos) > 0);
 
     const resultado = cuilCompleto && nombreCompleto && sectorCompleto &&
@@ -616,7 +623,7 @@ React.useEffect(() => {
         console.log(' Limpiando selección automática del agente código 1 para permitir selección manual');
       }
     }
-  }, [exposicion, agentesCausantes, codigoAgente]);
+  }, [exposicion, agentesCausantes, codigoAgente, cantNoExpuestos]);
 
   // ===== Función para consultar datos por CUIL =====
   const consultarDatosPorCuil = React.useCallback(async (cuilCompleto: string) => {
@@ -666,6 +673,7 @@ React.useEffect(() => {
   // ===== Helper para determinar si el agente causante debe estar habilitado =====
   const agenteCausanteHabilitado = cantidadesCompletas && Number(exposicion) > 0;
   const exposicionEsCero = Number(exposicion) === 0;
+  const noExpuestoSinFechas = exposicionEsCero && Number(cantNoExpuestos) > 0;
 
   // ===== Función para validar campos y actualizar errores =====
   const validarCamposTrabajador = React.useCallback(() => {
@@ -675,6 +683,7 @@ React.useEffect(() => {
       sector: '',
       ingreso: '',
       fechaInicio: '',
+      fechaFinExposicion: '',
       exposicion: '',
       ultimoExamenMedico: '',
       codigoAgente: ''
@@ -702,11 +711,29 @@ React.useEffect(() => {
       nuevosErrores.ingreso = 'La fecha de ingreso es requerida';
     }
 
+    const esNoExpuestoSinFechas = Number(exposicion) === 0 && Number(cantNoExpuestos) > 0;
+
     // Validar Fecha Inicio Exposición
-    if (!(Number(exposicion) === 0 && Number(cantNoExpuestos) > 0)) {
-      if (!fechaInicio || fechaInicio.trim() === '') {
-        nuevosErrores.fechaInicio = 'La fecha de inicio de exposición es requerida';
-      }
+    if (!esNoExpuestoSinFechas && (!fechaInicio || fechaInicio.trim() === '')) {
+      nuevosErrores.fechaInicio = 'La fecha de inicio de exposición es requerida';
+    }
+
+    const fechaCargaFormulario = dayjs().format('YYYY-MM-DD');
+
+    if (ingreso && ingreso > fechaCargaFormulario) {
+      nuevosErrores.ingreso = 'La fecha de ingreso debe ser menor o igual a la fecha de carga del formulario RAR';
+    }
+
+    if (!esNoExpuestoSinFechas && fechaInicio && ingreso && fechaInicio < ingreso) {
+      nuevosErrores.fechaInicio = 'La fecha inicio exposición debe ser mayor o igual a la fecha de ingreso';
+    }
+
+    if (ultimoExamenMedico && ingreso && ultimoExamenMedico <= ingreso) {
+      nuevosErrores.ultimoExamenMedico = 'La fecha del último examen médico debe ser posterior a la fecha de ingreso';
+    }
+
+    if (!esNoExpuestoSinFechas && fechaFinExposicion && fechaInicio && fechaFinExposicion < fechaInicio) {
+      nuevosErrores.fechaFinExposicion = 'La fecha fin exposición debe ser mayor o igual a la fecha inicio exposición';
     }
 
     // Validar Nivel de Exposición
@@ -717,7 +744,7 @@ React.useEffect(() => {
     }
 
     // Validar Último Examen Médico
-    if (!ultimoExamenMedico || ultimoExamenMedico.trim() === '') {
+    if (!esNoExpuestoSinFechas && (!ultimoExamenMedico || ultimoExamenMedico.trim() === '')) {
       nuevosErrores.ultimoExamenMedico = 'La fecha del último examen médico es requerida';
     }
 
@@ -730,7 +757,7 @@ React.useEffect(() => {
 
     // Retornar si hay errores
     return Object.values(nuevosErrores).some(error => error !== '');
-  }, [cuil, nombre, sector, ingreso, fechaInicio, exposicion, ultimoExamenMedico, codigoAgente, cantNoExpuestos]);
+  }, [cuil, nombre, sector, ingreso, fechaInicio, fechaFinExposicion, exposicion, ultimoExamenMedico, codigoAgente]);
 
   // ===== Handlers =====
 
@@ -794,7 +821,7 @@ React.useEffect(() => {
       setUltimoExamenMedico('');
       setCodigoAgente('');
       setErroresCampos({
-        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
+        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', fechaFinExposicion: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
       });
       setModoEdicion(false);
       setEditandoIndex(-1);
@@ -929,7 +956,7 @@ React.useEffect(() => {
       setUltimoExamenMedico('');
       setCodigoAgente('');
       setErroresCampos({
-        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
+        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', fechaFinExposicion: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
       });
       setModoEdicion(false);
       setEditandoIndex(-1);
@@ -1072,6 +1099,13 @@ React.useEffect(() => {
 
     const total = Number(cantExpuestos) + Number(cantNoExpuestos);
 
+    const toIsoOrEmpty = (value: any) => {
+      const raw = String(value ?? '').trim();
+      if (!raw) return '';
+      const parsed = dayjs(raw);
+      return parsed.isValid() ? parsed.toISOString() : '';
+    };
+
     if (guardandoRef.current) return;
     guardandoRef.current = true;
 
@@ -1101,13 +1135,11 @@ React.useEffect(() => {
           cuil: Number(String(f.CUIL || '').replace(/\D/g, '') || 0),
           nombre: f.Nombre || '',
           sectorTarea: f.SectorTareas || '',
-          fechaIngreso: dayjs(f.Ingreso || fechaActual).toISOString(),
-          fechaUltimoExamenMedico: dayjs(f.UltimoExamenMedico || fechaActual).toISOString(),
+          fechaIngreso: toIsoOrEmpty(f.Ingreso),
+          fechaUltimoExamenMedico: toIsoOrEmpty(f.UltimoExamenMedico),
           codigoAgente: Number(f.CodigoAgente) || 1,
-          fechaInicioExposicion: dayjs(f.FechaInicio || fechaActual).toISOString(),
-          fechaFinExposicion: f.FechaFinExposicion && f.FechaFinExposicion.trim() !== ''
-            ? dayjs(f.FechaFinExposicion).toISOString()
-            : dayjs('2099-01-01').toISOString(),
+          fechaInicioExposicion: toIsoOrEmpty(f.FechaInicio),
+          fechaFinExposicion: toIsoOrEmpty(f.FechaFinExposicion),
           horasExposicion: horasParsed
         };
 
@@ -1177,6 +1209,13 @@ React.useEffect(() => {
 
   const handleGuardar = async () => {
 
+    const toIsoOrEmpty = (value: any) => {
+      const raw = String(value ?? '').trim();
+      if (!raw) return '';
+      const parsed = dayjs(raw);
+      return parsed.isValid() ? parsed.toISOString() : '';
+    };
+
     if (guardandoRef.current) return;
     guardandoRef.current = true;
 
@@ -1194,13 +1233,11 @@ React.useEffect(() => {
           cuil: Number(String(f.CUIL || '').replace(/\D/g, '') || 0),
           nombre: f.Nombre || '',
           sectorTarea: f.SectorTareas || '',
-          fechaIngreso: dayjs(f.Ingreso || fechaActual).toISOString(),
-          fechaUltimoExamenMedico: dayjs(f.UltimoExamenMedico || fechaActual).toISOString(),
+          fechaIngreso: toIsoOrEmpty(f.Ingreso),
+          fechaUltimoExamenMedico: toIsoOrEmpty(f.UltimoExamenMedico),
           codigoAgente: Number(f.CodigoAgente) || 1,
-          fechaInicioExposicion: dayjs(f.FechaInicio || fechaActual).toISOString(),
-          fechaFinExposicion: f.FechaFinExposicion && f.FechaFinExposicion.trim() !== ''
-            ? dayjs(f.FechaFinExposicion).toISOString()
-            : dayjs('2099-01-01').toISOString(), // Fecha por defecto: 01/01/2099 para indicar "no especificada"
+          fechaInicioExposicion: toIsoOrEmpty(f.FechaInicio),
+          fechaFinExposicion: toIsoOrEmpty(f.FechaFinExposicion),
         };
         trabajador.horasExposicion = horasParsed;
 
@@ -1323,6 +1360,7 @@ React.useEffect(() => {
             onFilasActualizadas={setFilas}
             onCantExpuestosActualizada={setCantExpuestos}
             onCantNoExpuestosActualizada={setCantNoExpuestos}
+            fechaCargaFormulario={dayjs().format('YYYY-MM-DD')}
             onMensajeError={(mensaje) => {
               setMensajeError(mensaje);
               setModalMessageType('error');
@@ -1422,7 +1460,7 @@ React.useEffect(() => {
                           setFechaFinExposicion('');
                           setUltimoExamenMedico('');
                           setCodigoAgente('');
-                          setErroresCampos({ cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: '' });
+                          setErroresCampos({ cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', fechaFinExposicion: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: '' });
                           setModoEdicion(false);
                           setEditandoIndex(-1);
                         } else {
@@ -1523,6 +1561,7 @@ React.useEffect(() => {
                 required
                 disabled={!cantidadesCompletas}
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ max: dayjs().format('YYYY-MM-DD') }}
                 className={styles.flex1}
                 error={!!erroresCampos.ingreso}
                 helperText={erroresCampos.ingreso}
@@ -1546,13 +1585,16 @@ React.useEffect(() => {
                   }
                 }}
                 fullWidth
-                required={!(Number(exposicion) === 0 && Number(cantNoExpuestos) > 0)}
-                disabled={!cantidadesCompletas}
+                required={!noExpuestoSinFechas}
+                disabled={!cantidadesCompletas || noExpuestoSinFechas}
                 InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: noExpuestoSinFechas ? undefined : ingreso || undefined
+                }}
                 className={styles.flex1}
                 style={{ marginRight: '15px' }}
                 error={!!erroresCampos.fechaInicio}
-
+                helperText={erroresCampos.fechaInicio}
               />
               <TextField
                 label="Horas de Exposición"
@@ -1593,13 +1635,24 @@ React.useEffect(() => {
                 name="fechaFinExposicion"
                 type="date"
                 value={fechaFinExposicion}
-                onChange={(e) => cantidadesCompletas && setFechaFinExposicion(e.target.value)}
+                onChange={(e) => {
+                  if (cantidadesCompletas) {
+                    setFechaFinExposicion(e.target.value);
+                    if (erroresCampos.fechaFinExposicion) {
+                      setErroresCampos(prev => ({ ...prev, fechaFinExposicion: '' }));
+                    }
+                  }
+                }}
                 fullWidth
-                disabled={!cantidadesCompletas}
+                disabled={!cantidadesCompletas || noExpuestoSinFechas}
                 InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: noExpuestoSinFechas ? undefined : fechaInicio || undefined
+                }}
                 className={styles.flex1}
                 style={{ marginRight: '15px' }}
-
+                error={!!erroresCampos.fechaFinExposicion}
+                helperText={erroresCampos.fechaFinExposicion}
               />
               <TextField
                 label="Último Examen Médico"
@@ -1616,9 +1669,12 @@ React.useEffect(() => {
                   }
                 }}
                 fullWidth
-                required
+                required={!noExpuestoSinFechas}
                 disabled={!cantidadesCompletas}
                 InputLabelProps={{ shrink: true }}
+                inputProps={{
+                  min: noExpuestoSinFechas ? undefined : ingreso ? dayjs(ingreso).add(1, 'day').format('YYYY-MM-DD') : undefined
+                }}
                 className={styles.flex1}
                 error={!!erroresCampos.ultimoExamenMedico}
                 helperText={erroresCampos.ultimoExamenMedico}
@@ -1759,7 +1815,7 @@ React.useEffect(() => {
               </h4>
 
               <DataTableImport
-                data={filas}
+                data={filasTabla}
                 columns={columnasTabla}
                 size="small"
                 pageSizeOptions={[5, 10, 15]}

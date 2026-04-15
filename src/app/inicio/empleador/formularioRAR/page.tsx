@@ -452,10 +452,10 @@ const FormulariosRAR: React.FC = () => {
 
   /* Columnas para tabla principal de formularios */
   const tableColumns = [
-    { accessorKey: 'interno', header: 'Interno'},
+    // { accessorKey: 'interno', header: 'Interno'},
     { accessorKey: 'cuit', header: 'CUIT', cell: (info: any) => Formato.CUIP(info.getValue()) },
     { accessorKey: 'empresaRazonSocial', header: 'Razón Social' },
-    { accessorKey: 'empresaDireccion', header: 'Dirección' },
+    { accessorKey: 'empresaDireccion', header: 'Nro. Establecimiento' },
     { accessorKey: 'estado', header: 'Estado' },
     { accessorKey: 'fechaCreacion', header: 'Fecha Creación', cell: (info: any) => fechaFormatter(info.getValue()), meta: { align: "center" } },
     { accessorKey: 'fechaPresentacion', header: 'Fecha Presentación', cell: (info: any) => fechaFormatter(info.getValue()), meta: { align: "center" } },
@@ -835,8 +835,7 @@ const FormulariosRAR: React.FC = () => {
               <Text style={pdfStyles.estabNumeroTitle}>
                 Nro. Establecimiento:{' '}
                 {String(
-                  datos.internoEstablecimiento ||
-                  datos.InternoEstablecimiento ||
+                  datos.establecimientoNumero ||
                   '—'
                 )}
               </Text>
@@ -891,11 +890,11 @@ const FormulariosRAR: React.FC = () => {
             </View>
 
             {/* Título antes de la tabla de trabajadores */}
-            {trabajadoresFormateados.length > 0 && (
-              <Text style={pdfStyles.trabajadoresTitle}>
-                Trabajadores Registrados ({trabajadoresFormateados.length})
-              </Text>
-            )}
+            {/* {trabajadoresFormateados.length > 0 && (
+              // <Text style={pdfStyles.trabajadoresTitle}>
+              //   Trabajadoress Registrados ({trabajadoresFormateados.length})
+              // </Text>
+            )} */}
           </>
         )}
       />
@@ -960,10 +959,10 @@ const FormulariosRAR: React.FC = () => {
 
                 </div>
                 <div className={styles.formularioGrid}>
-                  <p><strong>Razón Social:</strong> {registroSeleccionado.razonSocial || '—'}</p>
+                  <p><strong>Razón Social:</strong> {registroSeleccionado.empresaRazonSocial || registroSeleccionado.razonSocial || registroSeleccionado.RazonSocial || '—'}</p>
                   <p><strong>CUIT:</strong> {cuipFormatter(registroSeleccionado.cuit) || '—'}</p>
                   <p><strong>Estado:</strong> {registroSeleccionado.estado || '—'}</p>
-                  <p><strong>Dirección:</strong> {registroSeleccionado.direccion || '—'}</p>
+                  <p><strong>Dirección:</strong> {registroSeleccionado.empresaDireccion || registroSeleccionado.direccion || registroSeleccionado.Direccion || '—'}</p>
                 </div>
               </div>
 
