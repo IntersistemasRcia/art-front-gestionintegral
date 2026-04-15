@@ -236,7 +236,7 @@ export async function saveTable(
  * @param maxTrabajadores - Cantidad máxima de trabajadores a importar (basado en cantExpuestos + cantNoExpuestos)
  * @returns Promesa con el resultado de la importación
  */
-export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores?: number): Promise<ResultadoImportacion> {
+export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores?: number, fechaCargaFormulario?: string): Promise<ResultadoImportacion> {
   const workbook = new ExcelJS.Workbook();
   
   // Leer el archivo
@@ -256,6 +256,7 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
 
   let numFila = 0;
   let contadorExitosos = 0;
+  const fechaCarga = fechaCargaFormulario || new Date().toISOString().slice(0, 10);
 
   // Procesar filas (saltamos solo el encabezado: fila 1)
   worksheet.eachRow((row, rowNumber) => {
@@ -275,6 +276,7 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     const fechaInicio = convertirFechaExcel(row.getCell(5).value);
     
     let exposicion = String(row.getCell(6).value || '').trim();
+    const horasExposicion = Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0);
     
     // Convertir fecha fin exposición
     const fechaFinExposicion = convertirFechaExcel(row.getCell(7).value);
@@ -321,9 +323,9 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     }
 
     // Validar Fecha Inicio Exposición
-    if (!fechaInicio) {
+    if (!fechaInicio && horasExposicion > 0) {
       erroresFila.push('Fecha de Inicio Exposición es requerida');
-    } else {
+    } else if (fechaInicio) {
       const validacionInicio = validarFormatoFecha(fechaInicio);
       if (!validacionInicio.valida) {
         erroresFila.push('Fecha de Inicio Exposición debe estar en formato DD/MM/YYYY (ej: 15/1/2023 o 15/01/2023)');
@@ -338,23 +340,12 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     }
 
     // Validar Último Examen Médico
-    if (!ultimoExamenMedico) {
+    if (!ultimoExamenMedico && horasExposicion > 0) {
       erroresFila.push('Último Examen Médico es requerido');
-    } else {
+    } else if (ultimoExamenMedico) {
       const validacionExamen = validarFormatoFecha(ultimoExamenMedico);
       if (!validacionExamen.valida) {
         erroresFila.push('Último Examen Médico debe estar en formato DD/MM/YYYY (ej: 30/6/2024 o 30/06/2024)');
-      } else {
-        // Validar que el examen sea posterior a la fecha de ingreso (o en la misma fecha)
-        const validacionIngreso = validarFormatoFecha(ingreso);
-        if (validacionIngreso.valida && validacionExamen.fecha < validacionIngreso.fecha) {
-          console.log('DEBUG - Comparación de fechas:', {
-            ingreso: validacionIngreso.fecha,
-            examen: validacionExamen.fecha,
-            resultado: validacionExamen.fecha < validacionIngreso.fecha
-          });
-          erroresFila.push('Fecha del Último Examen Médico debe ser posterior o igual a la fecha de ingreso');
-        }
       }
     }
 
@@ -378,7 +369,23 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
       }
     }
 
-    // Si hay errores, añadir a errores
+    const validacionIngreso = validarFormatoFecha(ingreso);
+    const validacionInicio = validarFormatoFecha(fechaInicio);
+    const validacionExamen = validarFormatoFecha(ultimoExamenMedico);
+
+    if (validacionIngreso.valida && validacionIngreso.fecha > fechaCarga) {
+      erroresFila.push('La fecha de ingreso debe ser menor o igual a la fecha de carga del formulario RAR');
+    }
+    if (validacionInicio.valida && validacionIngreso.valida && validacionInicio.fecha < validacionIngreso.fecha) {
+      erroresFila.push('La fecha inicio exposición debe ser mayor o igual a la fecha de ingreso');
+    }
+    if (validacionExamen.valida && validacionIngreso.valida && validacionExamen.fecha <= validacionIngreso.fecha) {
+      erroresFila.push('La fecha del último examen médico debe ser posterior a la fecha de ingreso');
+    }
+    if (fechaFinExposicionValidada && validacionInicio.valida && fechaFinExposicionValidada < validacionInicio.fecha) {
+      erroresFila.push('La fecha fin exposición debe ser mayor o igual a la fecha inicio exposición');
+    }
+
     // Si hay errores, añadir a errores
     if (erroresFila.length > 0) {
       resultado.errores.push({
@@ -387,11 +394,6 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
         errores: erroresFila
       });
     } else {
-      // Validar fechas convertidas
-      const validacionIngreso = validarFormatoFecha(ingreso);
-      const validacionInicio = validarFormatoFecha(fechaInicio);
-      const validacionExamen = validarFormatoFecha(ultimoExamenMedico);
-
       // Añadir a exitosos solo si no hemos alcanzado el máximo
       if (!maxTrabajadores || contadorExitosos < maxTrabajadores) {
         resultado.exitosos.push({
@@ -467,14 +469,15 @@ export async function descargarPlantillaExcel() {
     '   • Ingrese datos desde la fila 2.',
     '',
     '2️⃣ Datos obligatorios',
-    '   • CUIL: formato XX-XXXXXXXX-X (ej: 20-12345678-9).',
+    '   • CUIL: formato válido con o sin guiones (ej: 20-12345678-9 / 20123456789)',
     '   • Nombre completo: ej. Juan Pérez.',
     '   • Sector/Tareas: ej. Producción, Administración.',
-    '   • Fecha ingreso: DD/MM/AAAA (ej: 15/01/2023).',
+    '   • Fecha ingreso: DD/MM/AAAA (ej: 15/01/2023). Debe ser igual o anterior a la fecha de carga del formulario.',
     '   • Fecha inicio exposición: igual o posterior a ingreso.',
     '   • Horas exposición: número de horas diarias (ej: 8).',
     '   • Último examen médico: fecha posterior o igual al ingreso.',
-    '   • Código agente: 5 dígitos (ej: 40005 = Ruido).',
+    '   • Código agente: ingresar dígitos (ej: 40005)',
+     '  • Trabajador sin exposición: Código 1 - Sin exposición. En este caso, la columna “Fecha inicio exposición” debe quedar vacía.',
     '',
     '3️⃣ Datos opcionales',
     '   • Fecha fin exposición: solo si ya terminó la exposición.',

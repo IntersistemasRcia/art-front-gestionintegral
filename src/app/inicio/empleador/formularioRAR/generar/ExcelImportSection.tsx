@@ -13,6 +13,7 @@ interface ExcelImportSectionProps {
   filas: any[];
   cantExpuestos: string;
   cantNoExpuestos: string;
+  fechaCargaFormulario: string;
   onFilasActualizadas: (nuevasFilas: any[]) => void;
   onCantExpuestosActualizada: (cant: string) => void;
   onCantNoExpuestosActualizada: (cant: string) => void;
@@ -25,6 +26,7 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
   filas,
   cantExpuestos,
   cantNoExpuestos,
+  fechaCargaFormulario,
   onFilasActualizadas,
   onCantExpuestosActualizada,
   onCantNoExpuestosActualizada,
@@ -45,7 +47,7 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
 
     setCargandoExcel(true);
     try {
-      const resultado = await importarTrabajadoresDesdeExcel(file, maxAImportar);
+      const resultado = await importarTrabajadoresDesdeExcel(file, maxAImportar, fechaCargaFormulario);
       
       // Calcular estadísticas del Excel
       const cuilsExpuestos = new Set<string>();
@@ -152,9 +154,9 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
           Cargá un archivo Excel con los datos de los trabajadores para importarlos automáticamente. 
           Podés descargar la plantilla para ver el formato requerido.
         </p>
-        <p className={establecimientoSeleccionadoValido ? styles.excelImportNote : styles.excelImportNoteDisabled}>
+        {/* <p className={establecimientoSeleccionadoValido ? styles.excelImportNote : styles.excelImportNoteDisabled}>
           Nota: la plantilla incluye una fila 3 de ejemplo. Cargá tus datos reales a partir de la fila 4.
-        </p>
+        </p> */}
 
         <div style={{
           display: 'flex',
