@@ -304,8 +304,6 @@ const GenerarFormularioRGRL: React.FC<{
         );
       }
 
-      // Nota: la validación de Responsables se realizará al guardar/confirmar el formulario,
-      // no al crear el registro inicial. No bloqueamos aquí la creación por falta de responsables.
 
 
       const payload = {
