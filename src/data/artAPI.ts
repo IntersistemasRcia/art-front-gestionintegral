@@ -6,7 +6,7 @@ import { token } from "./usuarioAPI";
 import RefEmpleador from "@/app/inicio/usuarios/interfaces/RefEmpleador";
 import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
-import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
+import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa, FormularioRGRLDeleteParams, FormularioRGRLDeleteResponse } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador } from "@/app/inicio/comercializador/polizas/types/poliza";
 import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
@@ -318,6 +318,29 @@ export class ArtAPIClass extends ExternalAPI {
   };
   //#endregion
 
+    //#region RGRL DELETE
+  readonly deleteFormularioRGRLBaseURL = this.getURL({ path: "/api/FormulariosRGRL" }).toString();
+
+  readonly deleteFormularioRGRLURL = (id: number | string) =>
+    this.getURL({ path: `/api/FormulariosRGRL/${id}` }).toString();
+
+  deleteFormularioRGRL = async (id: number | string) =>
+    tokenizable.delete<FormularioRGRLDeleteResponse>(this.deleteFormularioRGRLURL(id)).then(({ data }) => data);
+
+  swrDeleteFormularioRGRL: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: FormularioRGRLDeleteParams }) => Promise<FormularioRGRLDeleteResponse>;
+  } = Object.freeze({
+    key: [this.deleteFormularioRGRLBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.deleteFormularioRGRL(arg.id),
+  });
+
+  useDeleteFormularioRGRL = () =>
+    useSWRMutation<FormularioRGRLDeleteResponse, Error, [url: string, token: string], FormularioRGRLDeleteParams>(
+      this.swrDeleteFormularioRGRL.key,
+      this.swrDeleteFormularioRGRL.fetcher
+    );
+  //#endregion
 
 
   //#region Localidades

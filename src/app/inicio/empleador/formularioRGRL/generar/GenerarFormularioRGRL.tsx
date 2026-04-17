@@ -201,7 +201,8 @@ const GenerarFormularioRGRL: React.FC<{
       if (alertMessage) {
         setModalMsg(alertMessage);
         setModalMsgType('warning');
-        setModalMsgOpen(true);
+        // Nota: no abrir el modal automáticamente al cargar los datos.
+        // El modal debe abrirse solo cuando el usuario intenta guardar/confirmar.
       }
 
       setRazonSocial(rs);
@@ -303,12 +304,15 @@ const GenerarFormularioRGRL: React.FC<{
         );
       }
 
+      // Nota: la validación de Responsables se realizará al guardar/confirmar el formulario,
+      // no al crear el registro inicial. No bloqueamos aquí la creación por falta de responsables.
+
 
       const payload = {
         internoFormulario: tipoSel!,
         internoEstablecimiento: establecimientoSel!,
         creacionFechaHora: toIsoOrNull(new Date()),
-        completadoFechaHora: toIsoOrNull(new Date()),
+        completadoFechaHora: null,
         notificacionFecha: toIsoOrNull(new Date()),
         internoPresentacion: 0,
         fechaSRT: null,
@@ -785,6 +789,16 @@ const GenerarFormularioRGRL: React.FC<{
         }
       }
 
+      // Requerir al menos un Responsable de Datos del Formulario con datos completos
+      const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && typeof r.esContratado === 'number');
+      if (!tieneRespDatos) {
+        setError('');
+        setModalMsg('Debe indicar al menos un Responsable de Datos del Formulario con CUIT, nombre, representación y Propio/Contratado.');
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+
       const preguntasObligatorias = secciones
         .filter((s) => {
           const desc = (s.descripcion ?? '').toString().toUpperCase();
@@ -821,7 +835,7 @@ const GenerarFormularioRGRL: React.FC<{
           );
           if (!fecha) {
             setError('');
-            setModalMsg(`La pregunta ${nro} con respuesta NO requiere fecha de regularización.`);
+            setModalMsg(`La pregunta ${nro} con respuesta NO, requiere fecha de regularización.`);
             setModalMsgType('error');
             setModalMsgOpen(true);
             return;
@@ -901,14 +915,14 @@ const GenerarFormularioRGRL: React.FC<{
         internoFormulario: form.internoFormulario,
         internoEstablecimiento: form.internoEstablecimiento,
         creacionFechaHora: form.creacionFechaHora ?? toIsoOrNull(new Date()),
-        completadoFechaHora: completar ? toIsoOrNull(new Date()) : null,
+        completadoFechaHora: form.completadoFechaHora ?? (completar ? toIsoOrNull(new Date()) : null),
         notificacionFecha: form.notificacionFecha ?? toIsoOrNull(new Date()),
         respuestasCuestionario: fullCuest,
         respuestasGremio: gremiosFull,
         respuestasContratista: contratistasFull,
         respuestasResponsable: responsablesFull,
         internoPresentacion: form.internoPresentacion ?? 0,
-        fechaSRT: options?.fechaSRTOverride ?? null,
+        fechaSRT: typeof options?.fechaSRTOverride !== 'undefined' ? options!.fechaSRTOverride : (form.fechaSRT ?? null),
       };
 
       const res = await fetch(`${API_BASE}/FormulariosRGRL/${form.interno}`, {

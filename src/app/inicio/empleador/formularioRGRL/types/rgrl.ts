@@ -180,3 +180,9 @@ export type DetallePayload = {
   internoEstablecimiento?: number | null;
   fechaSRT?: string | null;
 };
+
+export type FormularioRGRLDeleteParams = {
+    id: number | string;
+};
+
+export type FormularioRGRLDeleteResponse = unknown;

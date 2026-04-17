@@ -115,9 +115,9 @@
 .iconActions {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: center;
-  width: 80%;
+  width: 100%;
 }
 
 .iconButton {
@@ -129,5 +129,20 @@
 
 .iconButton:hover {
   opacity: 0.85;
+}
+
+.iconDisabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: auto;
+}
+
+.iconDelete {
+  font-size: 24px;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
 }
 
