@@ -201,8 +201,6 @@ const GenerarFormularioRGRL: React.FC<{
       if (alertMessage) {
         setModalMsg(alertMessage);
         setModalMsgType('warning');
-        // Nota: no abrir el modal automáticamente al cargar los datos.
-        // El modal debe abrirse solo cuando el usuario intenta guardar/confirmar.
       }
 
       setRazonSocial(rs);
