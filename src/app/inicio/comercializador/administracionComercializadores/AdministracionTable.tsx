@@ -87,19 +87,21 @@ export default function AdministracionTable({
                 <IoMdEye className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
-              <IconButton
-                size="medium"
-                disabled={isOrganizadorComercializador || !hasTask("Comercializador_Administracion_AccionEditar")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isOrganizadorComercializador) return;
-                  onEditRow(row.original, "grupo");
-                }}
-              >
-                <MdEdit className={styles.actionIcon} />
-              </IconButton>
-            </Tooltip>
+            {String(row.original.cuil ?? '').replace(/\D/g, '') !== '0' && (
+              <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
+                <IconButton
+                  size="medium"
+                  disabled={isOrganizadorComercializador || !hasTask("Comercializador_Administracion_AccionEditar")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isOrganizadorComercializador) return;
+                    onEditRow(row.original, "grupo");
+                  }}
+                >
+                  <MdEdit className={styles.actionIcon} />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Dar de baja" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"
@@ -146,18 +148,20 @@ export default function AdministracionTable({
                 <IoMdEye className={styles.actionIcon} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
-              <IconButton
-                size="medium"
-                disabled={!hasTask("Comercializador_Administracion_AccionEditar")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditRow(row.original, "organizador");
-                }}
-              >
-                <MdEdit className={styles.actionIcon} />
-              </IconButton>
-            </Tooltip>
+            {String(row.original.cuil ?? '').replace(/\D/g, '') !== '0' && (
+              <Tooltip title="Editar" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
+                <IconButton
+                  size="medium"
+                  disabled={!hasTask("Comercializador_Administracion_AccionEditar")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditRow(row.original, "organizador");
+                  }}
+                >
+                  <MdEdit className={styles.actionIcon} />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Dar de baja" arrow slotProps={{ tooltip: { className: styles.actionTooltip } }}>
               <IconButton
                 size="medium"

@@ -218,7 +218,7 @@ export default function AdminUserPage() {
       telefono: String(x?.telefono ?? ''),
       srtComercializadorGOrganizadorInterno: Number(x?.srtComercializadorGOrganizadorInterno ?? 0),
       observaciones: String(x?.observaciones ?? x?.observacion ?? ''),
-      razonSocial: String(x?.razonSocial ?? ''),
+      razonSocial: String(x?.razonSocial ?? x?.observaciones ?? x?.observacion ?? ''),
       fechaNacimiento: String(x?.fechaNacimiento ?? ''),
       domicilioCalle: String(x?.domicilioCalle ?? ''),
       domicilioNro: String(x?.domicilioNro ?? ''),
@@ -433,7 +433,7 @@ export default function AdminUserPage() {
       domicilioCodLocalidad: kind === "organizador" ? String(rowAny?.codLocalidadSrt ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.codLocalidad ?? rowAny?.referenteCodLocalidadSrt ?? "") : undefined,
       domicilioCodPostal: kind === "organizador" ? String(rowAny?.codLocalidadPostal ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.codPostal ?? rowAny?.referenteCodLocalidadPostal ?? "") : undefined,
       srtComercializadorOrganizadorInterno: kind === "comercializador" ? Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0) : undefined,
-      srtComercializadorGOrganizadorInterno: kind === "comercializador" ? Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0) : undefined,
+      srtComercializadorGOrganizadorInterno: kind === "comercializador" || kind === "organizador" ? Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0) : undefined,
     } as UsuarioFormFields);
     setFormOpen(true);
   };
@@ -852,7 +852,7 @@ export default function AdminUserPage() {
               try {
                 await triggerPostOrganizador({
                   srtComercializadorGOrganizadorInterno: Number.isFinite(Number(gOrganizadorInternoForPost)) ? Number(gOrganizadorInternoForPost) : 0,
-                  observaciones: '',
+                  observaciones: String((data as any)?.nombre ?? ''),
                   cuil: Number.isFinite(cuilNumber) ? cuilNumber : 0,
                   email: String((data as any)?.email ?? ''),
                   telefono: String((data as any)?.phoneNumber ?? ''),

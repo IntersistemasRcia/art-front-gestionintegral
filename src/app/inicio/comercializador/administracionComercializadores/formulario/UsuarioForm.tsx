@@ -313,6 +313,8 @@ export default function UsuarioForm({
       }
 
       setForm(processedData);
+      setSelectedGrupoId(String((processedData as any).srtComercializadorGOrganizadorInterno ?? ""));
+      setSelectedOrganizadorId(String(processedData.srtComercializadorOrganizadorInterno ?? ""));
     } else {
       setForm(initialFormState);
       // Al abrir en modo crear, asegurarse de limpiar selects dependientes
