@@ -652,11 +652,6 @@ export default function UsuarioForm({
               creationRole={creationRole}
               errors={errors}
               touched={touched}
-              busqueda={busqueda}
-              onBusquedaChange={setBusqueda}
-              onBuscarLocalidades={handleBuscarLocalidades}
-              localidadesOptions={localidadesOptions}
-              isValidating={isValidating}
               isDisabled={isDisabled}
               isCreating={isCreating}
               isEditing={isEditing}

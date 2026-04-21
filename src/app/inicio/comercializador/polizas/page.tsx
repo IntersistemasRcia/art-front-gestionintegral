@@ -263,6 +263,21 @@ function PolizasPage() {
   const comercializadorMe = useMemo(() => (comercializadorMeData?.[0] ?? null) as any, [comercializadorMeData]);
   const organizadorMe = useMemo(() => (organizadorMeData?.[0] ?? null) as any, [organizadorMeData]);
 
+  const comercializadorAsociados = useMemo(() => {
+    const list = (comercializadorMe as any)?.comercializadorAsociados;
+    return Array.isArray(list) ? list : [];
+  }, [comercializadorMe]);
+
+  const grupoAsociado = useMemo(
+    () => comercializadorAsociados.find((x: any) => String(x?.tipo ?? '').trim().toUpperCase() === 'GRUPO') ?? null,
+    [comercializadorAsociados]
+  );
+
+  const organizadorAsociado = useMemo(
+    () => comercializadorAsociados.find((x: any) => String(x?.tipo ?? '').trim().toUpperCase() === 'ORGANIZADOR') ?? null,
+    [comercializadorAsociados]
+  );
+
  const grupoById = ArtAPI.useGetGOrganizadorById(
    isOrganizadorComercializador && organizadorMe
      ? { id: organizadorMe.srtComercializadorGOrganizadorInterno }
@@ -271,15 +286,15 @@ function PolizasPage() {
 
   const grupoFromComercializador = isComercializador
     ? ({
-      interno: Number((comercializadorMe as any)?.srtComercializadorGOrganizadorInterno ?? 0),
-      descripcion: String((comercializadorMe as any)?.comercializadorGOrganizadorDescripcion ?? ''),
+      interno: Number((grupoAsociado as any)?.interno ?? (grupoAsociado as any)?.asociadoId ?? 0),
+      descripcion: String((grupoAsociado as any)?.descripcion ?? ''),
     } as any)
     : null;
 
   const organizadorFromComercializador = isComercializador
     ? ({
-      interno: Number((comercializadorMe as any)?.srtComercializadorOrganizadorInterno ?? 0),
-      descripcion: String((comercializadorMe as any)?.comercializadorOrganizadorDescripcion ?? ''),
+      interno: Number((organizadorAsociado as any)?.interno ?? (organizadorAsociado as any)?.asociadoId ?? 0),
+      descripcion: String((organizadorAsociado as any)?.descripcion ?? ''),
     } as any)
     : null;
 
@@ -381,7 +396,7 @@ const organizadoresInternos = useMemo(() => {
   const organizadorSelect = (
     <CustomSelectSearch<any>
       options={isAdmin || isGrupoOrganizador ? (organizadoresData ?? []) : organizadorValue ? [organizadorValue] : []}
-      getOptionLabel={(x) => String((x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')}
+      getOptionLabel={(x) => String((x as any)?.razonSocial ?? (x as any)?.observaciones ?? (x as any)?.descripcion ?? '')}
       value={organizadorValue ?? null}
       onChange={(_e, v) => {
         setOrganizador(v);

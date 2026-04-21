@@ -331,6 +331,31 @@ export default function AdminUserPage() {
     const telefono = String(rowAny?.telefono ?? rowAny?.movil ?? "");
     const matricula = String(rowAny?.matricula ?? "");
 
+    const asociados = Array.isArray((rowAny as any)?.comercializadorAsociados)
+      ? (rowAny as any).comercializadorAsociados
+      : [];
+    const organizadorAsociado = asociados.find(
+      (x: any) => String(x?.tipo ?? '').trim().toUpperCase() === 'ORGANIZADOR'
+    );
+    const grupoAsociado = asociados.find(
+      (x: any) => String(x?.tipo ?? '').trim().toUpperCase() === 'GRUPO'
+    );
+
+    const organizadorInternoFromAsociados = Number(
+      (organizadorAsociado as any)?.interno ?? (organizadorAsociado as any)?.asociadoId ?? NaN
+    );
+    const grupoInternoFromAsociados = Number(
+      (grupoAsociado as any)?.interno ?? (grupoAsociado as any)?.asociadoId ?? NaN
+    );
+
+    const organizadorInterno = Number.isFinite(organizadorInternoFromAsociados)
+      ? organizadorInternoFromAsociados
+      : Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0);
+
+    const grupoInterno = Number.isFinite(grupoInternoFromAsociados)
+      ? grupoInternoFromAsociados
+      : Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0);
+
     if (kind === "comercializador" && Number.isFinite(interno) && interno > 0) {
       const today = new Date().toISOString().slice(0, 10);
       setEditComercializadorBase({
@@ -347,8 +372,8 @@ export default function AdminUserPage() {
         comision: Number(rowAny?.comision ?? 0),
         aplicaIva: Number(rowAny?.aplicaIva ?? 0),
         serviciosAdicionales: Number(rowAny?.serviciosAdicionales ?? 0),
-            srtComercializadorOrganizadorInterno: Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0),
-            srtComercializadorGOrganizadorInterno: Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0),
+            srtComercializadorOrganizadorInterno: organizadorInterno,
+            srtComercializadorGOrganizadorInterno: grupoInterno,
       });
     } else {
       setEditComercializadorBase(null);
@@ -432,8 +457,8 @@ export default function AdminUserPage() {
       domicilioEntreCalle2: kind === "organizador" ? String(rowAny?.domicilioEntreCalle2 ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.domicilioYCalle ?? rowAny?.referenteDomicilioEntreCalle2 ?? "") : undefined,
       domicilioCodLocalidad: kind === "organizador" ? String(rowAny?.codLocalidadSrt ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.codLocalidad ?? rowAny?.referenteCodLocalidadSrt ?? "") : undefined,
       domicilioCodPostal: kind === "organizador" ? String(rowAny?.codLocalidadPostal ?? "") : kind === "grupo" || kind === "comercializador" ? String(rowAny?.codPostal ?? rowAny?.referenteCodLocalidadPostal ?? "") : undefined,
-      srtComercializadorOrganizadorInterno: kind === "comercializador" ? Number(rowAny?.srtComercializadorOrganizadorInterno ?? rowAny?.comercializadorOrganizadorInterno ?? 0) : undefined,
-      srtComercializadorGOrganizadorInterno: kind === "comercializador" || kind === "organizador" ? Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0) : undefined,
+      srtComercializadorOrganizadorInterno: kind === "comercializador" ? organizadorInterno : undefined,
+      srtComercializadorGOrganizadorInterno: kind === "comercializador" ? grupoInterno : kind === "organizador" ? Number(rowAny?.srtComercializadorGOrganizadorInterno ?? 0) : undefined,
     } as UsuarioFormFields);
     setFormOpen(true);
   };
@@ -798,7 +823,7 @@ export default function AdminUserPage() {
               const cleanCuit = digits((data as any)?.cuit ?? '');
               const cuilNumber = Number(cleanCuit || 0);
               const today = new Date().toISOString().slice(0, 10);
-              const codPostalNumber = Number(digits((data as any)?.domicilioCodPostal ?? '') || 0);
+              const codPostalNumber = Number((data as any)?.codPostal ?? 0);
               const organizadorRow = isOrganizadorComercializador ? asArray(organizadorData)?.[0] : null;
               const organizadorInternoFromForm = Number((data as any)?.srtComercializadorOrganizadorInterno ?? 0);
               const organizadorInternoForPost = isOrganizadorComercializador
@@ -830,7 +855,7 @@ export default function AdminUserPage() {
                   domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
                   domicilioEntreCalle: String((data as any)?.domicilioEntreCalle1 ?? ''),
                   domicilioYCalle: String((data as any)?.domicilioEntreCalle2 ?? ''),
-                  codLocalidad: String((data as any)?.domicilioCodLocalidad ?? ''),
+                  codLocalidad: String((data as any)?.codLocalidad ?? ''),
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
                 } as any);
                 setPendingComercializador(null);
@@ -846,7 +871,7 @@ export default function AdminUserPage() {
             if (isOrganizador) {
               const cleanCuit = digits((data as any)?.cuit ?? '');
               const cuilNumber = Number(cleanCuit || 0);
-              const codPostalNumber = Number(digits((data as any)?.domicilioCodPostal ?? '') || 0);
+              const codPostalNumber = Number((data as any)?.codPostal ?? 0);
               const gOrganizadorInternoForPost = selectedGrupoInterno ?? gOrganizadorInterno ?? 0;
 
               try {
@@ -863,7 +888,7 @@ export default function AdminUserPage() {
                   domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
                   domicilioEntreCalle: String((data as any)?.domicilioEntreCalle1 ?? ''),
                   domicilioYCalle: String((data as any)?.domicilioEntreCalle2 ?? ''),
-                  codLocalidad: String((data as any)?.domicilioCodLocalidad ?? ''),
+                  codLocalidad: String((data as any)?.codLocalidad ?? ''),
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
                 } as any);
                 setPendingOrganizador(null);
@@ -879,7 +904,7 @@ export default function AdminUserPage() {
             if (isGrupoOrganizadorRol) {
               const cleanCuit = digits((data as any)?.cuit ?? '');
               const cuilNumber = Number(cleanCuit || 0);
-              const codPostalNumber = Number(digits((data as any)?.domicilioCodPostal ?? '') || 0);
+              const codPostalNumber = Number((data as any)?.codPostal ?? 0);
 
               const payload: ComercializadorGOrganizadoresPostRequest = {
                 descripcion: String((data as any)?.nombre ?? ''),
@@ -893,7 +918,7 @@ export default function AdminUserPage() {
                 domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
                 domicilioEntreCalle: String((data as any)?.domicilioEntreCalle1 ?? ''),
                 domicilioYCalle: String((data as any)?.domicilioEntreCalle2 ?? ''),
-                codLocalidad: String((data as any)?.domicilioCodLocalidad ?? ''),
+                codLocalidad: String((data as any)?.codLocalidad ?? ''),
                 codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
               };
 
