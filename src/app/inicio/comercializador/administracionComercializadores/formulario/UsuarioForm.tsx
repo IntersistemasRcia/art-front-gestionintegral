@@ -313,6 +313,8 @@ export default function UsuarioForm({
       }
 
       setForm(processedData);
+      setSelectedGrupoId(String((processedData as any).srtComercializadorGOrganizadorInterno ?? ""));
+      setSelectedOrganizadorId(String(processedData.srtComercializadorOrganizadorInterno ?? ""));
     } else {
       setForm(initialFormState);
       // Al abrir en modo crear, asegurarse de limpiar selects dependientes
@@ -650,11 +652,6 @@ export default function UsuarioForm({
               creationRole={creationRole}
               errors={errors}
               touched={touched}
-              busqueda={busqueda}
-              onBusquedaChange={setBusqueda}
-              onBuscarLocalidades={handleBuscarLocalidades}
-              localidadesOptions={localidadesOptions}
-              isValidating={isValidating}
               isDisabled={isDisabled}
               isCreating={isCreating}
               isEditing={isEditing}
