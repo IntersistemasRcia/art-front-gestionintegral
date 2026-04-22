@@ -39,7 +39,9 @@ import type {
   DetallePayload
 } from './types/rgrl';
 import { BsFileEarmarkPdfFill, BsPencilFill, BsFront } from "react-icons/bs";
+import { MdDelete } from 'react-icons/md';
 import ArtAPI from '@/data/artAPI';
+import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 
 let _tiposCache: ApiTiposFormularios | null = null;
 //#region tipos-catalogos
@@ -352,6 +354,12 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
   const [openGenerar, setOpenGenerar] = useState<boolean>(false);
   const [replicaDe, setReplicaDe] = useState<number | undefined>(undefined);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [deleteInterno, setDeleteInterno] = useState<number | null>(null);
+  const [modalMsgOpen, setModalMsgOpen] = useState<boolean>(false);
+  const [modalMsg, setModalMsg] = useState<string>('');
+  const [modalMsgType, setModalMsgType] = useState<MessageType>('info');
+  const [pendingRefresh, setPendingRefresh] = useState<boolean>(false);
 
   const { user, hasTask } = useAuth();
   // Accede a las propiedades de la sesión con seguridad
@@ -495,6 +503,17 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     },
     [empresaSeleccionada?.cuit]
   );
+
+    // Variante rápida que solo actualiza la tabla sin activar el loading global
+    const fetchFormulariosTable = useCallback(
+      async (cuitParam?: number) => {
+        const c = Number(cuitParam ?? empresaSeleccionada?.cuit);
+        if (!c || Number.isNaN(c)) return;
+        const response = await CargarConsultaFormulariosRGRL(c);
+        setFormulariosRGRL(response ?? []);
+      },
+      [empresaSeleccionada?.cuit]
+    );
   
   // Carga inicial y recarga cuando cambian la empresa seleccionada o "referenteDatos".
   useEffect(() => {
@@ -502,6 +521,14 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       fetchFormularios(empresaSeleccionada.cuit);
     }
   }, [fetchFormularios, referenteDatos, empresaSeleccionada?.cuit]);
+
+  const handleCloseModalMsg = async () => {
+    setModalMsgOpen(false);
+    if (pendingRefresh && empresaSeleccionada?.cuit) {
+      await fetchFormulariosTable(empresaSeleccionada.cuit);
+      setPendingRefresh(false);
+    }
+  };
 
   //#region table-and-handlers
   // Definición de columnas de la grilla principal y handlers asociados.
@@ -603,16 +630,10 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
             setOpenGenerar(true);
           };
 
-          // Ocultar iconos de replicar/editar si la fecha de creación es >= 1 año
           // Preferimos usar la fecha cruda (ISO) que guardamos en `CreacionFechaHoraRaw`; si no existe, usamos la cadena formateada.
-          const creadoRaw = (row.original as any).CreacionFechaHoraRaw ?? row.original.FechaHoraCreacion ?? '';
-          const creado = dayjs(creadoRaw);
-          const anos = creado.isValid() ? dayjs().diff(creado, 'year') : 0;
-          const olderOrEqual1Year = creado.isValid() && anos >= 1;
-
           const estado = String(row.original.Estado ?? '').trim();
-          const showEditar = (estado !== 'Confirmado' || hasTask('Empleador_FormularioRGRL_EditarDenunciaConfirmada')) && !olderOrEqual1Year;
-          const showReplicar = !olderOrEqual1Year;
+          const showEditar = (estado !== 'Confirmado' || hasTask('Empleador_FormularioRGRL_EditarDenunciaConfirmada'));
+          const showReplicar = true;
 
       
           const fechaSRTraw = String((row.original as any).FechaSRTRaw ?? '').trim();
@@ -624,14 +645,27 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
                 <BsPencilFill title="Editar" onClick={onEdit} className={styles.iconButton} />
               )}
               <BsFileEarmarkPdfFill
-                title={canPrint ? 'Imprimir' : 'Imprimir (requerido Estado=Confirmado y Fecha SRT)'}
+                title={canPrint ? 'Imprimir' : 'No es posible imprimir el formulario porque aún no fue presentado ante la SRT.'}
                 onClick={canPrint ? onClick : (e: any) => { e.stopPropagation?.(); }}
-                className={styles.iconButton}
-                style={{ opacity: canPrint ? 1 : 0.45, cursor: canPrint ? 'pointer' : 'default', pointerEvents: canPrint ? 'auto' : 'none' }}
+                className={`${styles.iconButton} ${canPrint ? '' : styles.iconDisabled}`}
               />
               {showReplicar && (
                 <BsFront title="Replicar" onClick={onCopy} className={styles.iconButton} />
               )}
+              {hasTask('Empleador_FormularioRGRL_EditarDenunciaConfirmada') && (() => {
+                const tieneConfirmado = String(row.original.FechaHoraConfirmado ?? '').trim() !== '';
+                const internoActual = Number(row.original.InternoFormularioRGRL || 0);
+                const onDel = !tieneConfirmado
+                  ? (e: any) => { e.stopPropagation?.(); setDeleteInterno(internoActual); setDeleteConfirmOpen(true); }
+                  : undefined;
+                return (
+                  <MdDelete
+                    title="Eliminar"
+                    onClick={onDel}
+                    className={`${styles.iconButton} ${tieneConfirmado ? styles.iconDisabled : ''} ${styles.iconDelete}`}
+                  />
+                );
+              })()}
             </div>
           );
         },
@@ -1069,6 +1103,50 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
           }}
         />
       </CustomModal>
+
+      <CustomModal
+        open={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteInterno(null); }}
+        title="Confirmar eliminación"
+        size="mid"
+        actions={
+          <div className={styles.confirmActions}>
+            <CustomButton onClick={() => {
+              const id = deleteInterno as number;
+              setDeleteConfirmOpen(false);
+              setDeleteInterno(null);
+              ArtAPI.deleteFormularioRGRL(id).then(() => {
+                setModalMsg('El formulario RGRL seleccionado fue borrado correctamente.');
+                setModalMsgType('success');
+                setPendingRefresh(true);
+                setModalMsgOpen(true);
+              }).catch(() => {
+                setModalMsg('Operación cancelada.');
+                setModalMsgType('error');
+                setModalMsgOpen(true);
+              });
+            }}>SI</CustomButton>
+            <CustomButton onClick={() => {
+              setDeleteConfirmOpen(false);
+              setDeleteInterno(null);
+              setModalMsg('El formulario RGRL seleccionado no fue borrado.');
+              setModalMsgType('error');
+              setModalMsgOpen(true);
+            }}>NO</CustomButton>
+          </div>
+        }
+      >
+        <div>
+          El formulario RGRL seleccionado será Borrado. ¿Está seguro que desea continuar?
+        </div>
+      </CustomModal>
+      <CustomModalMessage
+        open={modalMsgOpen}
+        onClose={handleCloseModalMsg}
+        message={modalMsg}
+        type={modalMsgType}
+        title={modalMsgType === 'success' ? 'Formulario borrado' : modalMsgType === 'error' ? 'Formulario no borrado' : undefined}
+      />
 
 
     </div>
