@@ -4,10 +4,11 @@ import { useSession } from "next-auth/react";
 import { ExternalAPI } from "./api";
 import { token } from "./usuarioAPI";
 import RefEmpleador from "@/app/inicio/usuarios/interfaces/RefEmpleador";
+import srtProvincia from "@/app/inicio/usuarios/interfaces/SrtProvincia";
 import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa, FormularioRGRLDeleteParams, FormularioRGRLDeleteResponse } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
-import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores } from "@/app/inicio/denuncias/types/tDenuncias";
+import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores, ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador } from "@/app/inicio/comercializador/polizas/types/poliza";
 import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
 import { ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
@@ -415,6 +416,64 @@ export class ArtAPIClass extends ExternalAPI {
       }
     );
 
+    //region LocalidadSRT
+  readonly getLocalidadesbySRTURL = (params: ParametersLocalidadSRT = {}) => {
+    return this.getURL({
+      path: "/api/SRTLocalidades",
+      search: toURLSearch(params),
+    }).toString();
+  };
+
+  getLocalidadesSRT = async (params: ParametersLocalidadSRT = {}) =>
+    tokenizable.get(this.getLocalidadesbySRTURL(params)).then(({ data }) => data);
+
+  useGetLocalidadesSRT = (params: ParametersLocalidadSRT = {}) =>
+    useSWR(
+      params && params.provinciaId
+        ? [this.getLocalidadesbySRTURL(params), token.getToken()]
+        : null,
+      () => this.getLocalidadesSRT(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+    //Region LoclaidadSrt Codigo {codigo}
+      readonly getLocalidadByCodigoURL = (params: ParametersLocalidadbyCodigo) => {
+    return this.getURL({
+      path: `/api/SRTLocalidades/codigo/${params.codigo}`,
+    }).toString();
+  };
+
+  getLocalidadById = async (params: ParametersLocalidadbyCodigo) =>
+    tokenizable
+      .get(this.getLocalidadByCodigoURL(params))
+      .then(({ data }) => data);
+
+  useGetLocalidadById = (params?: ParametersLocalidadbyCodigo) =>
+    useSWR(
+      params?.codigo && token.getToken()
+        ? [this.getLocalidadByCodigoURL(params), token.getToken()]
+        : null,
+      () => this.getLocalidadById(params as ParametersLocalidadbyCodigo),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+
+  //#endregion localidades
+
+  //Provincia
+  readonly srtProvinciaURL = () => this.getURL({ path: "/api/SRTProvincias" }).toString();
+  getsrtProvinciaURL = async () => tokenizable.get<srtProvincia[]>(
+    this.srtProvinciaURL()
+  ).then(({ data }) => data);
+  useGetSRTProvincias = () => useSWR(
+    [this.srtProvinciaURL(), token.getToken()], () => this.srtProvinciaURL()
+  );
   //#endregion
 
 

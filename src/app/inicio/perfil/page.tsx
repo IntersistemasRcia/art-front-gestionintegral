@@ -32,10 +32,6 @@ import Formato from "@/utils/Formato";
 
 function ProfilePage() {
   const { data: session, status } = useSession();
-  const { hasTask } = useAuth();
-  const [mostrarDetalles, setMostrarDetalles] = useState(false);
-
-  const detalleEnabled = hasTask("perfil_DetalleSesion");
 
   if (status === "loading") {
     return (
@@ -119,30 +115,7 @@ function ProfilePage() {
                   </Typography>
                 </Box>
 
-                {detalleEnabled && (empresaCUIT || empresaRazonSocial) && (
-                  <>
-                    <Divider className={styles.dividerMargin} sx={{ marginTop: 3 }} />
-                    
-                    <Typography variant="h6" gutterBottom className={styles.sectionTitle} sx={{ marginTop: 2 }}>
-                      <BusinessIcon className={styles.iconSectionTitle} />
-                      Empresa Relacionada
-                    </Typography>
-                    
-                    <Box className={styles.dataItem}>
-                      <BusinessIcon className={styles.icon} />
-                      <Typography variant="body1" component="span">
-                        <span className={styles.label}>Razón Social: {empresaRazonSocial ?? "N/A"}</span>  
-                      </Typography>
-                    </Box>
-                    
-                    <Box className={styles.dataItem}>
-                      <BadgeIcon className={styles.icon} />
-                      <Typography variant="body1" component="span">
-                        <span className={styles.label}>CUIT Empresa: {Formato.CUIP(empresaCUIT) ?? "N/A"}</span> 
-                      </Typography>
-                    </Box>
-                  </>
-                )}
+                
               </CardContent>
             </Card>
           </Grid>
@@ -150,64 +123,25 @@ function ProfilePage() {
           <Grid size={{ xs: 12, md: 6 }}>
             <Card raised className={styles.card}>
               <CardContent>
-                {detalleEnabled ? (
-                  <>
-                    <Typography variant="h6" gutterBottom className={styles.sectionTitle}>
-                      <InfoIcon className={styles.iconSectionTitle} />
-                      Detalles de la Sesión
-                    </Typography>
-                    <Divider className={styles.dividerMargin} />
+                <Typography variant="h6" gutterBottom className={styles.sectionTitle}>
+                  <BusinessIcon className={styles.iconSectionTitle} />
+                  Empresa Relacionada
+                </Typography>
+                <Divider className={styles.dividerMargin} />
 
-                    <Box className={styles.dataItem} style={{ justifyContent: 'center' }}>
-                      <CustomButton
-                        onClick={() => setMostrarDetalles(!mostrarDetalles)}
-                        size="mid"
-                      >
-                        {mostrarDetalles ? (
-                          <>
-                            <VisibilityOffIcon sx={{ marginRight: 1 }} />
-                            Ocultar detalles de sesión
-                          </>
-                        ) : (
-                          <>
-                            <VisibilityIcon sx={{ marginRight: 1 }} />
-                            Ver detalles de sesión
-                          </>
-                        )}
-                      </CustomButton>
-                    </Box>
+                <Box className={styles.dataItem}>
+                  <BusinessIcon className={styles.icon} />
+                  <Typography variant="body1" component="span">
+                    <span className={styles.label}>Razón Social: {empresaRazonSocial ?? "N/A"}</span>
+                  </Typography>
+                </Box>
 
-                    {mostrarDetalles && (
-                      <Box sx={{ marginTop: 2 }}>
-                        <pre className={styles.pre}>
-                          {JSON.stringify(session, null, 2)}
-                        </pre>
-                      </Box>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Typography variant="h6" gutterBottom className={styles.sectionTitle}>
-                      <BusinessIcon className={styles.iconSectionTitle} />
-                      Empresa Relacionada
-                    </Typography>
-                    <Divider className={styles.dividerMargin} />
-
-                    <Box className={styles.dataItem}>
-                      <BusinessIcon className={styles.icon} />
-                      <Typography variant="body1" component="span">
-                        <span className={styles.label}>Razón Social: {empresaRazonSocial ?? "N/A"}</span>
-                      </Typography>
-                    </Box>
-
-                    <Box className={styles.dataItem}>
-                      <BadgeIcon className={styles.icon} />
-                      <Typography variant="body1" component="span">
-                        <span className={styles.label}>CUIT Empresa: {Formato.CUIP(empresaCUIT) ?? "N/A"}</span>
-                      </Typography>
-                    </Box>
-                  </>
-                )}
+                <Box className={styles.dataItem}>
+                  <BadgeIcon className={styles.icon} />
+                  <Typography variant="body1" component="span">
+                    <span className={styles.label}>CUIT Empresa: {Formato.CUIP(empresaCUIT) ?? "N/A"}</span>
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>

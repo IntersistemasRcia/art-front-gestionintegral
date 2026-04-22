@@ -28,6 +28,7 @@ import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalM
 import CargoInterface from "./interfaces/CargoInterface";
 import Formato from "@/utils/Formato";
 import ArtAPI from '@/data/artAPI';
+import UsuarioAPI from '@/data/usuarioAPI';
 import useSWR from 'swr';
 import AuthAPI from '@/data/authAPI';
 import dayjs from 'dayjs';
@@ -699,6 +700,7 @@ export default function UsuarioForm({
 
       console.log("Submitting form data:", dataToSubmit);
       onSubmit(dataToSubmit);
+      if (isCreating) void UsuarioAPI.reenviarCorreo(dataToSubmit.email);
     }
   };
 

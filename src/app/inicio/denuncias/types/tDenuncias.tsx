@@ -660,6 +660,14 @@ export type ParametersLocalidadCodigo = {
   Codigo?: number;
 };
 
+export type ParametersLocalidadSRT = {
+  provinciaId?: number;
+}
+
+export type ParametersLocalidadbyCodigo = {
+  codigo?: string;
+};
+
 export type ParametersLocalidadNombre = {
   Nombre?: string;
 };
