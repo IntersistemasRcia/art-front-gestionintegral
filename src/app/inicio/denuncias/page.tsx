@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, SyntheticEvent } from 'react';
 import { Box, IconButton, Tooltip } from "@mui/material";
 import styles from './denuncias.module.css';
 import ArtAPI from '@/data/artAPI';
@@ -8,8 +8,10 @@ import { useAuth } from '@/data/AuthContext';
 import DataTable from '@/utils/ui/table/DataTable';
 import Formato from '@/utils/Formato';
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomTabs from '@/utils/ui/tab/CustomTab';
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import DenunciaForm from './denunciaForm';
+import EvolucionesTable from './evoluciones/evolucionesTable';
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 const estadoOptions = [
@@ -590,6 +592,8 @@ function DenunciasPage() {
   });
   const [selectedDenunciaId, setSelectedDenunciaId] = useState<number | null>(null);
   const [initialFiles, setInitialFiles] = useState<File[]>([]);
+  const [selectedDenunciaRow, setSelectedDenunciaRow] = useState<DenunciaGetAll | null>(null);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
 
   // Fetch denuncia by ID when editing
   const denunciaIdParams: DenunciaQueryParamsID | undefined = selectedDenunciaId ? { id: selectedDenunciaId } : undefined;
@@ -720,6 +724,10 @@ function DenunciasPage() {
   const handleCloseModal = () => {
     setRequestState({ method: null, denunciaData: null });
     setSelectedDenunciaId(null);
+  };
+
+  const handleTabChange = (_event: SyntheticEvent, newTabValue: number) => {
+    setActiveTabIndex(newTabValue);
   };
 
   // Map API DenunciaById response into DenunciaFormData when available
@@ -1071,69 +1079,90 @@ function DenunciasPage() {
   // Current initial data for the form
   const currentInitialData = requestState.denunciaData || initialDenunciaFormData;
 
+  const tabItems = [
+    {
+      label: 'Denuncias',
+      value: 0,
+      content: (
+        <>
+          {/* Filters */}
+          <div className={styles.filtersContainer}>
+            <div className={styles.filterGroup}>
+              <label htmlFor="estado" className={styles.filterLabel}>
+                FILTROS
+              </label>
+              <select
+                id="estado"
+                value={estado ?? ''}
+                onChange={handleEstadoChange}
+                className={styles.filterSelect}
+              >
+                {estadoOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.cuitGroup}>
+              <input
+                id="cuitBusqueda"
+                type="text"
+                placeholder="Ingresá CUIT (11 dígitos)"
+                value={cuitBusqueda}
+                onChange={(e) => setCuitBusqueda((e.target.value || '').replace(/[^\d]/g, ''))}
+                disabled={!canEditCuit}
+                className={styles.cuitInput}
+              />
+            </div>
+          </div>
+
+          <div className={styles.actionsBar}>
+            <CustomButton onClick={() => handleOpenModal("create")}>
+              {canRealizaDenuncias ? "Registrar Denuncia" : "Registrar Pre-Denuncia"}
+            </CustomButton>
+          </div>
+
+          {/* Data table */}
+          <div className={styles.compactTable}>
+            <DataTable
+              columns={tableColumns}
+              data={data?.data || []}
+              isLoading={isLoading}
+              manualPagination={true}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              pageCount={pageCount}
+              onPageChange={setPageIndex}
+              onPageSizeChange={handlePageSizeChange}
+              onRowClick={(r) => setSelectedDenunciaRow(r as DenunciaGetAll)}
+            />
+          </div>
+
+          {/* Empty state for no data */}
+          {!isLoading && ((data?.data && data.data.length === 0) || is404Error || (!data && !error)) && (
+            <div className={styles.emptyState}>
+              <p>No se encontraron denuncias con los filtros seleccionados.</p>
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      label: 'Evoluciones',
+      value: 1,
+      content: <EvolucionesTable denunciaNro={selectedDenunciaRow?.denunciaNro ?? null} />,
+    },
+  ];
+
   return (
     <Box className={styles.inicioContainer}>
-
-      {/* Filters */}
-      <div className={styles.filtersContainer}>
-        <div className={styles.filterGroup}>
-          <label htmlFor="estado" className={styles.filterLabel}>
-            FILTROS
-          </label>
-          <select
-            id="estado"
-            value={estado ?? ''}
-            onChange={handleEstadoChange}
-            className={styles.filterSelect}
-          >
-            {estadoOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.cuitGroup}>
-          <input
-            id="cuitBusqueda"
-            type="text"
-            placeholder="Ingresá CUIT (11 dígitos)"
-            value={cuitBusqueda}
-            onChange={(e) => setCuitBusqueda((e.target.value || '').replace(/[^\d]/g, ''))}
-            disabled={!canEditCuit}
-            className={styles.cuitInput}
-          />
-        </div>
-      </div>
-
-      <div className={styles.actionsBar}>
-        <CustomButton onClick={() => handleOpenModal("create")}>
-          {canRealizaDenuncias ? "Registrar Denuncia" : "Registrar Pre-Denuncia"}
-        </CustomButton>
-      </div>
-
-      {/* Data table */}
-      <div className={styles.compactTable}>
-        <DataTable
-          columns={tableColumns}
-          data={data?.data || []}
-          isLoading={isLoading}
-          manualPagination={true}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          pageCount={pageCount}
-          onPageChange={setPageIndex}
-          onPageSizeChange={handlePageSizeChange}
-        />
-      </div>
-
-      {/* Empty state for no data */}
-      {!isLoading && ((data?.data && data.data.length === 0) || is404Error || (!data && !error)) && (
-        <div className={styles.emptyState}>
-          <p>No se encontraron denuncias con los filtros seleccionados.</p>
-        </div>
-      )}
+      <CustomTabs
+        tabs={tabItems}
+        currentTab={activeTabIndex}
+        onTabChange={handleTabChange}
+      />
 
       {/* Denuncia Form Modal */}
       <DenunciaForm
