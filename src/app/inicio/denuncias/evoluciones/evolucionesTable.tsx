@@ -26,7 +26,13 @@ const columns: ColumnDef<EvolucionRow>[] = [
 	{ accessorKey: "estado", header: "Estado" },
 ];
 
-export default function CustomTab({ denunciaNro }: { denunciaNro?: number | string | null }) {
+type EvolucionesTableProps = {
+	denunciaNro?: number | string | null;
+	empleadoNombre?: string | null;
+	empleadoCuil?: number | string | null;
+};
+
+export default function CustomTab({ denunciaNro, empleadoNombre, empleadoCuil }: EvolucionesTableProps) {
 	const [modalTitle, setModalTitle] = useState<string>("");
 	const [openModal, setOpenModal] = useState(false);
 
@@ -47,7 +53,14 @@ export default function CustomTab({ denunciaNro }: { denunciaNro?: number | stri
 				<CustomButton onClick={handleOpenMedicas}>Cargar Evoluciones Medicas</CustomButton>
 			</div>
 			<DataTable data={data} columns={columns} size="mid" />
-			<FormularioEvoluciones open={openModal} onClose={() => setOpenModal(false)} title={modalTitle} denunciaNro={denunciaNro} />
+			<FormularioEvoluciones
+				open={openModal}
+				onClose={() => setOpenModal(false)}
+				title={modalTitle}
+				denunciaNro={denunciaNro}
+				empleadoNombre={empleadoNombre ?? null}
+				empleadoCuil={empleadoCuil ?? null}
+			/>
 		</>
 	);
 }

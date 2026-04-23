@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import PantallaGenerica from "./pantallasAdministrativas/pantallaGenerica";
+import SolicitudTraslado from "./pantallasAdministrativas/solicitudTraslado";
+import ConstanciaAltaMedica from "./pantallasMedicas/constanciaAltaMedica";
 import { Autocomplete, TextField } from "@mui/material";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import { FormularioEvolucionesProps } from "./types/evoluciones";
@@ -20,6 +22,7 @@ const ADMIN_OPTIONS: string[] = [
 ];
 
 const MEDICAS_OPTIONS: string[] = [
+	"Constancia Alta Medica",
 	"Constancia Atención Médica",
 	"Constancia Parte Médico Ingreso",
 	"Notificación de Auditoría Médica",
@@ -28,7 +31,7 @@ const MEDICAS_OPTIONS: string[] = [
 	"Solicitud Reintegro",
 ];
 
-export default function FormularioEvoluciones({ open, onClose, title, denunciaNro }: FormularioEvolucionesProps) {
+export default function FormularioEvoluciones({ open, onClose, title, denunciaNro, empleadoNombre, empleadoCuil }: FormularioEvolucionesProps) {
 	const [selected, setSelected] = useState<string | null>(null);
 
 	// Limpiar selección cada vez que el modal se abra
@@ -37,7 +40,9 @@ export default function FormularioEvoluciones({ open, onClose, title, denunciaNr
 	}, [open]);
 
 	const options = title === "Evoluciones Administrativa" ? ADMIN_OPTIONS : MEDICAS_OPTIONS;
-	const showPantallaGenerica = selected === "Comisión Médica" || selected === "Hospedaje";
+	const showPantallaGenerica = selected === "Comisión Médica" || selected === "Hospedaje" || selected === "Informe Social" || selected === "Notificación" || selected === "Notificación CECAP" || selected === "Orden Atención Médica" || selected === "Recalificación Profesional" || selected === "Solicitud Reintegro" || selected === "Turno";
+	const showSolicitudTraslado = selected === "Traslado";
+	const showConstanciaAltaMedica = selected === "Constancia Alta Medica";
 
 	const handleConfirm = () => {
 		console.log("Evolucion seleccionada:", selected);
@@ -49,7 +54,7 @@ export default function FormularioEvoluciones({ open, onClose, title, denunciaNr
 			open={open}
 			onClose={onClose}
 			title={title}
-			size="mid"
+			size={title === "Evoluciones Medicas" ? "large" : "mid"}
 			actions={(
 				<>
 					<CustomButton onClick={handleConfirm}>Confirmar</CustomButton>
@@ -69,6 +74,26 @@ export default function FormularioEvoluciones({ open, onClose, title, denunciaNr
 				{showPantallaGenerica && (
 					<div className={styles.marginTop}>
 						<PantallaGenerica denunciaNro={denunciaNro ?? null} />
+					</div>
+				)}
+
+				{showSolicitudTraslado && (
+					<div className={styles.marginTop}>
+						<SolicitudTraslado
+							denunciaNro={denunciaNro ?? null}
+							empleadoNombre={empleadoNombre ?? null}
+							empleadoCuil={empleadoCuil ?? null}
+						/>
+					</div>
+				)}
+
+				{showConstanciaAltaMedica && (
+					<div className={styles.marginTop}>
+						<ConstanciaAltaMedica
+							denunciaNro={denunciaNro ?? null}
+							empleadoNombre={empleadoNombre ?? null}
+							empleadoCuil={empleadoCuil ?? null}
+						/>
 					</div>
 				)}
 			</div>

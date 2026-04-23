@@ -3,6 +3,8 @@ export type FormularioEvolucionesProps = {
   onClose: () => void;
   title: string;
   denunciaNro?: number | string | null;
+  empleadoNombre?: string | null;
+  empleadoCuil?: number | string | null;
 };
 
 

@@ -368,6 +368,8 @@ export type DenunciaGetAll = {
   denunciaNro: number;
   siniestroNro: number;
   siniestroTipo: string;
+  empleadoCuil?: number | string;
+  empleadoNombre?: string;
   empCuit: number;
   empPoliza: number;
   empRazonSocial: string;

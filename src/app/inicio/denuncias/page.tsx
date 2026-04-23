@@ -1152,7 +1152,13 @@ function DenunciasPage() {
     {
       label: 'Evoluciones',
       value: 1,
-      content: <EvolucionesTable denunciaNro={selectedDenunciaRow?.denunciaNro ?? null} />,
+      content: (
+        <EvolucionesTable
+          denunciaNro={selectedDenunciaRow?.denunciaNro ?? null}
+          empleadoNombre={selectedDenunciaRow?.empleadoNombre ?? null}
+          empleadoCuil={selectedDenunciaRow?.empleadoCuil ?? null}
+        />
+      ),
     },
   ];
 
