@@ -4,7 +4,7 @@ import styles from "../../denuncias.module.css";
 import dayjs from "dayjs";
 import { PantallaAdministrativaProps } from "./types/pantallaAdministrativa";
 
-export default function Hospedaje({ denunciaNro }: PantallaAdministrativaProps) {
+export default function PantallaGenerica({ denunciaNro }: PantallaAdministrativaProps) {
 	const hoy = dayjs();
 	const fecha = hoy.format("DD/MM/YYYY");
 	const hora = hoy.format("HH:mm");
@@ -31,4 +31,3 @@ export default function Hospedaje({ denunciaNro }: PantallaAdministrativaProps) 
 		</>
 	);
 }
-

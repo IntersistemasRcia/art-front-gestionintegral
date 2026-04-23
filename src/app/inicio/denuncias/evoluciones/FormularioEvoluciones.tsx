@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import CustomModal from "@/utils/ui/form/CustomModal";
-import ComisionMedica from "./pantallasAdministrativas/comisionMedia";
-import Hospedaje from "./pantallasAdministrativas/hospedaje";
+import PantallaGenerica from "./pantallasAdministrativas/pantallaGenerica";
 import { Autocomplete, TextField } from "@mui/material";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import { FormularioEvolucionesProps } from "./types/evoluciones";
@@ -38,6 +37,7 @@ export default function FormularioEvoluciones({ open, onClose, title, denunciaNr
 	}, [open]);
 
 	const options = title === "Evoluciones Administrativa" ? ADMIN_OPTIONS : MEDICAS_OPTIONS;
+	const showPantallaGenerica = selected === "Comisión Médica" || selected === "Hospedaje";
 
 	const handleConfirm = () => {
 		console.log("Evolucion seleccionada:", selected);
@@ -65,17 +65,10 @@ export default function FormularioEvoluciones({ open, onClose, title, denunciaNr
 					renderInput={(params) => <TextField {...params} label="Tipo de Evolución" />}
 				/>
 
-				{/* Renderizado condicional para Comisión Médica */}
-				{selected === "Comisión Médica" && (
+				{/* Renderizado condicional para Comisión Médica y Hospedaje */}
+				{showPantallaGenerica && (
 					<div className={styles.marginTop}>
-						<ComisionMedica denunciaNro={denunciaNro ?? null} />
-					</div>
-				)}
-
-				{/* Renderizado condicional para Hospedaje */}
-				{selected === "Hospedaje" && (
-					<div className={styles.marginTop}>
-						<Hospedaje denunciaNro={denunciaNro ?? null} />
+						<PantallaGenerica denunciaNro={denunciaNro ?? null} />
 					</div>
 				)}
 			</div>
