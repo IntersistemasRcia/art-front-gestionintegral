@@ -10,7 +10,6 @@ import {
   InputLabel,
   FormControl,
   CircularProgress,
-  Autocomplete,
   Checkbox,
   FormControlLabel,
 } from "@mui/material";
@@ -32,6 +31,8 @@ import UsuarioAPI from '@/data/usuarioAPI';
 import useSWR from 'swr';
 import AuthAPI from '@/data/authAPI';
 import dayjs from 'dayjs';
+import CustomTabs from "@/utils/ui/tab/CustomTab";
+import { UsuarioEmpresasUsuarioTab } from "./UsuarioEmpresasUsuarioTab";
 
 // Definición del modo de operación (replicada desde UsuariosPage)
 export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
@@ -200,6 +201,7 @@ export default function UsuarioForm({
   const [modalMsgText, setModalMsgText] = useState<string>("");
   const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
   const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
+  const [fichaTab, setFichaTab] = useState(0);
 
   const { user } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
@@ -216,6 +218,8 @@ export default function UsuarioForm({
   const isDeleting = method === "delete";
   const isActivating = method === "activate";
   const isDisabled = isViewing || isDeleting || isActivating;
+  const hasEmpresasTab = true;
+  const empresasTabDisabled = isCreating && !Boolean(form.id);
   const requiresTituloMatricula = form.rol === "MedicinaLaboral" || form.rol === "SeguridadEHigiene";
 
   // Función helper para formatear CUIT
@@ -275,6 +279,7 @@ export default function UsuarioForm({
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
     setShowPassword(false); // Resetear la visibilidad de contraseña
     setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
+    setFichaTab(0);
   }, [initialData, open, isEditing, isCreating]);
 
   const modalTitle = useMemo(() => {
@@ -427,11 +432,8 @@ export default function UsuarioForm({
         if (isAdminEmpleador) return undefined;
         return validateRequired(String(value), "Cargo");
       case "empresaId":
-        // No validar empresa si está marcado como administrador en modo creación
-        if (isCreating && isAdminUser) {
-          return undefined;
-        }
-        return validateRequired(String(value), "Empresa");
+        // El campo "Empresa" no se gestiona en esta ficha.
+        return undefined;
       case "sectorId":
         if (isAdminEmpleador) return undefined;
         return validateRequired(String(value), "Sector");
@@ -711,7 +713,7 @@ export default function UsuarioForm({
       open={open}
       onClose={isSubmitting ? () => { } : onClose}
       title={modalTitle}
-      size={isCreating ? "large" : "mid"}
+      size={isCreating || Boolean(form.id) ? "large" : "mid"}
     >
       <Box
         component="form"
@@ -723,7 +725,16 @@ export default function UsuarioForm({
         )}
         <div className={styles.formLayout}>
           <div className={styles.formContent}>
-            {/* Datos del Usuario */}
+            <div className={hasEmpresasTab ? styles.tabsStableHeight : undefined}>
+              <CustomTabs
+                currentTab={fichaTab}
+                onTabChange={(_e, v) => setFichaTab(v)}
+                tabs={[
+                  {
+                    label: "Datos del Usuario",
+                    value: 0,
+                    content: (
+                      <>
             <div className={styles.formSection}>
               <Typography variant="h6" className={styles.sectionTitle}>
                 Datos del Usuario
@@ -938,76 +949,7 @@ export default function UsuarioForm({
                 />
               </div>
 
-              {isCreating && (
-                <div className={styles.formRow}>
-                  {/* Empresa (Autocomplete con búsqueda) */}
-                  <Autocomplete
-                    fullWidth
-                    options={refEmpleadores}
-                    getOptionLabel={(option) => option.razonSocial || ""}
-                    value={isAdminUser ? null : (refEmpleadores.find(emp => emp.interno === form.empresaId) || null)}
-                    onChange={(event, newValue) => {
-                      const empresaId = newValue ? newValue.interno : 0;
-                      setForm((prev: UsuarioFormFields) => ({
-                        ...prev,
-                        empresaId: empresaId,
-                        maxUsuarios: newValue?.cantidadUsuariosMaxima ?? prev.maxUsuarios ?? 0,
-                        cantidadUsuarios: newValue?.cantidadUsuarios ?? usuarios.filter(u => u.empresaId === empresaId).length,
-                      }));
-
-                      if (touched.empresaId) {
-                        const error = validateField("empresaId", String(empresaId));
-                        setErrors((prev) => ({
-                          ...prev,
-                          empresaId: error,
-                        }));
-                      }
-                    }}
-                    onBlur={() => handleBlur("empresaId")}
-                    disabled={isDisabled || (form.empresaId !== 0 && !isAdmin) || isAdminUser}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label={isAdminUser ? "Empresa" : "Empresa *"}
-                        error={touched.empresaId && !!errors.empresaId && !isAdminUser}
-                        helperText={touched.empresaId && errors.empresaId && !isAdminUser ? errors.empresaId : ""}
-                        placeholder={isAdminUser ? "No aplica para administradores" : "Buscar empresa..."}
-                      />
-                    )}
-                    filterOptions={(options, { inputValue }) => {
-                      return options.filter(option =>
-                        option.razonSocial.toLowerCase().includes(inputValue.toLowerCase())
-                      );
-                    }}
-                    noOptionsText="No se encontraron empresas"
-                  />
-                </div>
-              )}
             </div>
-
-            {isCreating && (
-              <div className={styles.formRow}>
-                <TextField
-                  label="Núm. Máx. de Usuarios"
-                  name="maxUsuarios"
-                  type="number"
-                  value={form.maxUsuarios ?? ""}
-                  fullWidth
-                  disabled={true}
-                  inputProps={{ min: 0, readOnly: true }}
-                />
-
-                <TextField
-                  label="Cantidad Actual de Usuarios"
-                  name="cantidadUsuarios"
-                  type="number"
-                  value={form.cantidadUsuarios ?? 0}
-                  onChange={() => { }}
-                  fullWidth
-                  disabled
-                />
-              </div>
-            )}
             {isAdmin && (
               <div className={styles.formRow}>
                 <FormControlLabel
@@ -1099,6 +1041,30 @@ export default function UsuarioForm({
                 </Typography>
               </div>
             )}
+                      </>
+                    ),
+                  },
+                  ...(hasEmpresasTab
+                    ? [
+                        {
+                          label: "Empresas del Usuario",
+                          value: 1,
+                          disabled: empresasTabDisabled,
+                          tooltip: "Primero registre el usuario",
+                          content: (
+                            <UsuarioEmpresasUsuarioTab
+                              open={open}
+                              usuarioId={String(form.id)}
+                              cuitForm={form.cuit}
+                              puedeEditar={isEditing}
+                            />
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
             <div className={styles.formActions}>
               {/* Botón de acción principal (Oculto en 'view') */}
               {!isViewing && (
