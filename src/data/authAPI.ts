@@ -56,6 +56,98 @@ export interface RefCargoEmpresa {
   descripcion: string;
   empresaId: number;
 }
+
+export type PostUsuariosEmpresasBody = {
+  usuarioId: string;
+  empresaId: number;
+  vigencia: string;
+};
+
+export type UsuariosEmpresasUsuarioLogueadoBody = {
+  empresasId: number[];
+  pageIndex: number;
+  pageSize: number;
+};
+
+export const USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX = 1;
+export const USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE = 10;
+
+export type UsuarioEmpresasListadoTokenVm = {
+  tokenId?: string;
+  validTo?: string;
+};
+
+export type UsuarioEmpresasListadoTareaVm = {
+  id: number;
+  tareaId: number;
+  tareaDescripcion?: string;
+  habilitada: boolean;
+};
+
+export type UsuarioEmpresasListadoModuloVm = {
+  id: number;
+  codigo: string;
+  nombre?: string;
+  habilitado: boolean;
+  tareas: UsuarioEmpresasListadoTareaVm[];
+};
+
+export type UsuarioEmpresasListadoExclusionVm = {
+  id: number;
+  tablaId: number;
+  tablaDescripcion?: string;
+  campoId: number;
+  campoDescripcion?: string;
+};
+
+export type UsuarioEmpresasListadoEmpresaVm = {
+  id: number;
+  usuarioId?: string;
+  empresaId: number;
+  empresaCUIT?: number;
+  empresaRazonSocial?: string;
+  fechaBaja?: string | null;
+};
+
+export type UsuarioEmpresasUsuarioLogueadoItem = {
+  id: string;
+  cuit: number;
+  nombre?: string;
+  tipo?: string;
+  sectorId?: number;
+  titulo?: string;
+  matricula?: string;
+  userName?: string;
+  normalizedUserName?: string;
+  email?: string;
+  normalizedEmail?: string;
+  emailConfirmed?: boolean;
+  phoneNumber?: string;
+  phoneNumberConfirmed?: boolean;
+  twoFactorEnabled?: boolean;
+  lockoutEnd?: string | null;
+  lockoutEnabled?: boolean;
+  accessFailedCount?: number;
+  token?: UsuarioEmpresasListadoTokenVm;
+  cargoId?: number;
+  cargoDescripcion?: string;
+  rol?: string;
+  createdBy?: string;
+  createdDate?: string;
+  estado?: string;
+  deletedDate?: string | null;
+  modulos?: UsuarioEmpresasListadoModuloVm[];
+  exclusiones?: UsuarioEmpresasListadoExclusionVm[];
+  empresas?: UsuarioEmpresasListadoEmpresaVm[];
+};
+
+export type UsuariosEmpresasUsuarioLogueadoResponse = {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
+  data: UsuarioEmpresasUsuarioLogueadoItem[];
+};
 //#endregion Types
 
 //#region token
@@ -90,6 +182,36 @@ export class AuthAPIClass extends ExternalAPI {
       this.getEmpresas(params)
     );
   //#endregion getEmpresas
+
+  //#region UsuariosEmpresas (asignación / baja)
+  readonly deleteUsuariosEmpresasBorrarURL = (id: number | string) =>
+    this.getURL({
+      path: `/api/UsuariosEmpresas/Borrar/${encodeURIComponent(String(id))}`,
+    }).toString();
+
+  deleteUsuariosEmpresasBorrar = async (id: number | string) =>
+    tokenizable
+      .delete(this.deleteUsuariosEmpresasBorrarURL(id))
+      .then(async (response) => {
+        if (response.status === 200 || response.status === 204) return;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.statusText}`)
+        );
+      });
+
+  readonly postUsuariosEmpresasURL = () =>
+    this.getURL({ path: "/api/UsuariosEmpresas" }).toString();
+
+  postUsuariosEmpresas = async (body: PostUsuariosEmpresasBody) =>
+    tokenizable
+      .post<unknown>(this.postUsuariosEmpresasURL(), body)
+      .then(async (response) => {
+        if (response.status === 200 || response.status === 201) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
+  //#endregion UsuariosEmpresas (asignación / baja)
 
   //#region Sectores
   readonly refSectoresURL = () => this.getURL({ path: "/api/Sectores" }).toString();
@@ -155,9 +277,37 @@ export class AuthAPIClass extends ExternalAPI {
   );
   //endregion
 
+  //#region UsuariosEmpresas / UsuarioLogueado
+  readonly postUsuariosEmpresasUsuarioLogueadoURL = () =>
+    this.getURL({ path: "/api/UsuariosEmpresas/UsuarioLogueado" }).toString();
 
+  postUsuariosEmpresasUsuarioLogueado = async (body: UsuariosEmpresasUsuarioLogueadoBody) =>
+    tokenizable
+      .post<UsuariosEmpresasUsuarioLogueadoResponse>(
+        this.postUsuariosEmpresasUsuarioLogueadoURL(),
+        body
+      )
+      .then(async (response) => {
+        if (response.status === 200 || response.status === 201) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
 
-  
+  useUsuariosEmpresasUsuarioLogueado = (body: UsuariosEmpresasUsuarioLogueadoBody | null) =>
+    useSWR(
+      body !== null
+        ? [
+            this.postUsuariosEmpresasUsuarioLogueadoURL(),
+            token.getToken(),
+            JSON.stringify([...body.empresasId].sort((a, b) => a - b)),
+            String(body.pageIndex),
+            String(body.pageSize),
+          ]
+        : null,
+      () => this.postUsuariosEmpresasUsuarioLogueado(body!)
+    );
+  //#endregion UsuariosEmpresas / UsuarioLogueado
 }
 
 const AuthAPI = Object.seal(new AuthAPIClass());

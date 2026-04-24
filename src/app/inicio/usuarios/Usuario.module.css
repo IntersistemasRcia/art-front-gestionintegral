@@ -20,6 +20,10 @@
   padding-right: 24px;
 }
 
+.tabsStableHeight {
+  min-height: 56rem;
+}
+
 .infoPanel {
   flex: 1;
   background-color: #f8f9fa;

@@ -71,6 +71,15 @@ export type Modulo = {
   tareas: Tarea[];
 };
 
+export type UsuarioEmpresaSesion = {
+  id: number;
+  usuarioId?: string;
+  empresaId: number;
+  empresaCUIT?: number;
+  empresaRazonSocial?: string;
+  fechaBaja?: string | null;
+};
+
 export interface UsuarioVm {
   id?: string;
   cuit: number;
@@ -94,6 +103,8 @@ export interface UsuarioVm {
   empresaId?: number;
   empresaCUIT: number;
   empresaRazonSocial: string;
+  /** Relación usuario–empresa en sesión (ids para filtros multi-empresa). */
+  empresas?: UsuarioEmpresaSesion[];
   modulos?: Modulo[]; //ToDo: verificar el tipo de arreglo
   exclusiones?: UsuarioExclusionVm[];
 }
@@ -110,6 +121,18 @@ export interface UsuarioGetAllResult {
   data: UsuarioRow[];
 }
 //#endregion /api/Usuario/GetAll types
+
+export type UsuarioUpdatePayload = {
+  phoneNumber: string;
+  nombre: string;
+  titulo: string;
+  matricula: string;
+  sectorId: number;
+  cargoId: number;
+  password?: string;
+  confirmPassword?: string;
+  email: string;
+};
 //#region /api/Roles types
 export interface RolesInterface {
   id: string;
@@ -225,9 +248,10 @@ export class UsuarioAPIClass extends ExternalAPI {
           new AxiosError(`Error en la petición: ${response.data}`)
         );
       });
-  useGetAll = (params: UsuarioGetAllParams = {}) =>
-    useSWR([this.getAllURL(params), token.getToken()], () =>
-      this.getAll(params)
+  useGetAll = (params?: UsuarioGetAllParams | null) =>
+    useSWR(
+      params === null ? null : [this.getAllURL(params ?? {}), token.getToken()],
+      () => this.getAll(params ?? {})
     );
   //#endregion getAll
 
@@ -263,14 +287,16 @@ export class UsuarioAPIClass extends ExternalAPI {
   //#region Update
   readonly updateURL = (usuarioId: string) =>
     this.getURL({ path: `/api/Usuario/${usuarioId}` }).toString();
-  update = async (usuarioId: string, data: any) =>
-    axios.put(this.updateURL(usuarioId), data).then(async (response) => {
-      if (response.status === 200) return response.data;
-      return Promise.reject(
-        new AxiosError(`Error en la petición: ${response.data}`)
-      );
-    });
-  useUsuarioUpdate = (usuarioId: string, data: any) =>
+  update = async (usuarioId: string, data: UsuarioUpdatePayload) =>
+    tokenizable
+      .put(this.updateURL(usuarioId), data)
+      .then(async (response) => {
+        if (response.status === 200) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
+  useUsuarioUpdate = (usuarioId: string, data: UsuarioUpdatePayload) =>
     useSWR([this.updateURL(usuarioId)], () => this.update(usuarioId, data));
   //#endregion Update
 
