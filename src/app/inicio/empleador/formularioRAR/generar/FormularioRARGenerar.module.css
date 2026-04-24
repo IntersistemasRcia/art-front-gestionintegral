@@ -197,6 +197,11 @@
   font-style: italic;
 }
 
+/* Buscador por CUIL en tabla de trabajadores */
+.buscadorCuil {
+  margin-bottom: 12px;
+}
+
 /* Contenedor de acciones en fila */
 .accionesContainer {
   display: flex;

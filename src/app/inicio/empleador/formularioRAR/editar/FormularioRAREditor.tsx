@@ -79,6 +79,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
   const [editandoIndex, setEditandoIndex] = React.useState<number>(-1);
   const [modoEdicion, setModoEdicion] = React.useState<boolean>(false);
 
+  // Filtro por CUIL en la tabla de trabajadores cargados
+  const [filtroCuil, setFiltroCuil] = React.useState<string>('');
+
   // CARGA INICIAL
   React.useEffect(() => {
     (async () => {
@@ -476,9 +479,18 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
       {filas.length > 0 && (
         <div className={styles.tableBlock}>
           <span className={`${styles.bold} ${styles.fs20}`}>Datos del Trabajador:</span>
+          <div className={styles.buscadorCuil}>
+            <TextField
+              label="Buscador por CUIL"
+              value={filtroCuil}
+              onChange={(e) => setFiltroCuil(e.target.value)}
+              size="small"
+              placeholder="Ingresá el CUIL a buscar..."
+            />
+          </div>
           <DataTableImport
             columns={[
-              { accessorKey: 'CUIL', header: 'CUIL' },
+              { accessorKey: 'CUIL', header: 'CUIL', cell: ({ getValue }: { getValue: () => string }) => Formato.CUIP(getValue()) },
               { accessorKey: 'Nombre', header: 'Nombre' },
               { accessorKey: 'SectorTareas', header: 'Sector/Tareas' },
               { accessorKey: 'Ingreso', header: 'F. Ingreso', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
@@ -521,7 +533,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
                 enableSorting: false,
               },
             ]}
-            data={filas}
+            data={filtroCuil ? filas.filter(f => (f.CUIL || '').replace(/\D/g, '').startsWith(filtroCuil.replace(/\D/g, ''))) : filas}
           />
         </div>
       )}
