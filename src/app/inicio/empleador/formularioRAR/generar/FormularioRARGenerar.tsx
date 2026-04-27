@@ -128,6 +128,9 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     // Estado para mostrar errores
   const [mensajeError, setMensajeError] = React.useState<string>('');
 
+  // Filtro por CUIL en la tabla de trabajadores cargados
+  const [filtroCuil, setFiltroCuil] = React.useState<string>('');
+
   const guardandoRef = React.useRef(false);
 
   // ===== Funciones para manejo de trabajadores =====
@@ -160,7 +163,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   // ===== Configuración de columnas para DataTable =====
   const columnasTabla = React.useMemo(() => [
     {
-      accessorKey: 'CUIL',
+      accessorKey: 'CUILDisplay',
       header: 'CUIL',
       size: 120,
     },
@@ -269,12 +272,17 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   const filasTabla = React.useMemo(() => {
     return filas.map((f) => ({
       ...f,
+      CUILDisplay: f.CUIL ? Formato.CUIP(f.CUIL) : '',
       IngresoDisplay: f.Ingreso ? Formato.Fecha(f.Ingreso, 'DD/MM/YYYY') : '',
       FechaInicioDisplay: f.FechaInicio ? Formato.Fecha(f.FechaInicio, 'DD/MM/YYYY') : '',
       FechaFinExposicionDisplay: f.FechaFinExposicion ? Formato.Fecha(f.FechaFinExposicion, 'DD/MM/YYYY') : '',
       UltimoExamenMedicoDisplay: f.UltimoExamenMedico ? Formato.Fecha(f.UltimoExamenMedico, 'DD/MM/YYYY') : '',
     }));
   }, [filas]);
+
+  const filasTablaFiltradas = filtroCuil
+    ? filasTabla.filter(f => normalizarCuil(f.CUIL).startsWith(normalizarCuil(filtroCuil)))
+    : filasTabla;
 
   // ===== Helpers =====
   const numerosValidos = (v: string) => {
@@ -576,6 +584,7 @@ React.useEffect(() => {
         }
 
         // Agentes
+        try {
         const respAg = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
         const agentes = respAg.ok ? await respAg.json() : [];
         const agArr = Array.isArray(agentes)
@@ -596,10 +605,12 @@ React.useEffect(() => {
 
         if (!cancel) setAgentesCausantes(opcionesAgentes);
       } catch (e) {
-        console.error('Error cargando selects:', e);
+        console.error('Error cargando agentes causantes:', e);
+        }
+      } catch (e) {
+        console.error('Error cargando establecimientos:', e);
         if (!cancel) {
           setOpcionesEstablecimientos([]);
-          setAgentesCausantes([]);
         }
       } finally {
         if (!cancel) setCargandoSelects(false);
@@ -1810,12 +1821,19 @@ React.useEffect(() => {
           {/* TABLA DE TRABAJADORES CARGADOS */}
           {filas.length > 0 && (
             <div className={styles.tablaTrabajadoresContainer}>
-              <h4 className={styles.tablaTrabajadoresTitle}>
-                Trabajadores Cargados
-              </h4>
+
+              <div className={styles.buscadorCuil}>
+                <TextField
+                  label="Buscador por CUIL"
+                  value={filtroCuil}
+                  onChange={(e) => setFiltroCuil(e.target.value)}
+                  size="small"
+                  placeholder="Ingresá el CUIL a buscar..."
+                />
+              </div>
 
               <DataTableImport
-                data={filasTabla}
+                data={filasTablaFiltradas}
                 columns={columnasTabla}
                 size="small"
                 pageSizeOptions={[5, 10, 15]}

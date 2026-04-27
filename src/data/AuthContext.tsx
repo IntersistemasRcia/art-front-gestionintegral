@@ -31,9 +31,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const hasTask = (taskName: string): boolean => {
             
         if (isAuthenticated && user) {
-            const userRol = user.rol || '';
+            const userRol = String(user.rol || '').trim().toLowerCase();
             // Si tiene el rol "Administrador", siempre permite el acceso.
-            if (userRol?.toLowerCase() == "administrador") {
+            if (userRol === "administrador") {
                 return true;
             }
 

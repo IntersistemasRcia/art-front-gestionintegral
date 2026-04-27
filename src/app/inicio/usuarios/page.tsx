@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Box, Typography } from "@mui/material";
 import UsuarioForm, { UsuarioFormFields } from "./UsuarioForm";
 import UsuarioTable from "./UsuarioTable";
 import EmpresaTable from "./EmpresaTable";
 import Tareas from "./Tareas";
 import useUsuarios from "./useUsuarios";
+import { type UsuarioUpdatePayload } from "@/data/usuarioAPI";
 import { useEmpresasStore } from "@/data/empresasStore";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
-import { Empresa } from "@/data/authAPI";
+import {
+  Empresa,
+  USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+} from "@/data/authAPI";
 import { useSearchParams } from "next/navigation";
 import Formato from "@/utils/Formato";
 import { useEmpresasLoader } from "@/data/useEmpresasLoader";
@@ -20,6 +24,18 @@ import UsuarioRow from "./interfaces/UsuarioRow";
 import { useAuth } from "@/data/AuthContext";
 import IUsuarioDarDeBajaReactivar from "./interfaces/IUsuarioDarDeBajaReactivar";
 import CustomTabs from "@/utils/ui/tab/CustomTab";
+
+/** Valor sentinela en `Empresa.empresaId` para la opción "Todas las Empresas" en el listado de usuarios. */
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+
+const EMPRESA_OPCION_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+  cuit: 0,
+  razonSocial: "Todas las Empresas",
+  domicilio: "",
+  localidad: "",
+  provincia: "",
+};
 
 type RequestMethod =
   | "create"
@@ -43,6 +59,20 @@ interface PermisosModulo {
     moduloId: number;
     habilitada: boolean;
   }[];
+}
+
+function buildUsuarioUpdatePayload(data: UsuarioFormFields): UsuarioUpdatePayload {
+  return {
+    phoneNumber: String(data.phoneNumber ?? "").trim(),
+    nombre: String(data.nombre ?? "").trim(),
+    titulo: String(data.titulo ?? "").trim(),
+    matricula: String(data.matricula ?? "").trim(),
+    sectorId: Number(data.sectorId ?? 0),
+    cargoId: Number(data.cargoId ?? 0),
+    ...(data.password ? { password: String(data.password) } : {}),
+    ...(data.confirmPassword ? { confirmPassword: String(data.confirmPassword) } : {}),
+    email: String(data.email ?? "").trim(),
+  };
 }
 
 export default function UsuariosPage() {
@@ -81,18 +111,40 @@ export default function UsuariosPage() {
   const cuitQuery = searchParams?.get("cuit") ?? searchParams?.get("cuil");
   const cuitForzado = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
 
+  const sessionEmpresaIds = useMemo(() => {
+    const fromSession = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => e.empresaId)
+      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
+    const unique = Array.from(new Set(fromSession));
+    if (unique.length > 0) return unique;
+    return Array.from(new Set(empresas.map((e) => e.empresaId)));
+  }, [user?.empresas, empresas]);
+
+  const opcionesEmpresaSelector = useMemo(
+    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    [empresas]
+  );
+
   useEffect(() => {
     if (Number.isFinite(cuitForzado) && cuitForzado > 0) return;
-    if (!isLoadingEmpresas) {
-      if (empresas.length === 1) {
-        setEmpresaSeleccionada(empresas[0]);
-        seleccionAutomaticaRef.current = true;
-      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-        setEmpresaSeleccionada(null);
-        seleccionAutomaticaRef.current = false;
-      }
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
     }
-  }, [empresas.length, isLoadingEmpresas, cuitForzado]);
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresaSeleccionada((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas, cuitForzado]);
 
   useEffect(() => {
     if (isLoadingEmpresas) return;
@@ -117,13 +169,39 @@ export default function UsuariosPage() {
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
     if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return "Todas las Empresas";
     if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
     const cuitFormateado = Formato.CUIP((empresa as any)?.cuit);
     return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
   };
 
+  const porEmpresaIdsListado = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      if (isAdmin) return [];
+      return sessionEmpresaIds;
+    }
+    return [empresaSeleccionada.empresaId];
+  }, [empresaSeleccionada, sessionEmpresaIds, isAdmin]);
+
+  const allowEmptyEmpresasPostUsuarios =
+    isAdmin &&
+    empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID;
+
+  const porEmpresaIdsListadoKey = useMemo(() => {
+    if (allowEmptyEmpresasPostUsuarios) return "admin:all";
+    return porEmpresaIdsListado.slice().sort((a, b) => a - b).join(",");
+  }, [porEmpresaIdsListado, allowEmptyEmpresasPostUsuarios]);
+
+  const [usuariosPageIndex, setUsuariosPageIndex] = useState(1);
+
+  useEffect(() => {
+    setUsuariosPageIndex(1);
+  }, [porEmpresaIdsListadoKey]);
+
   const {
     usuarios,
+    usuariosListadoMeta,
     roles,
     cargos,
     refEmpleadores,
@@ -136,7 +214,12 @@ export default function UsuariosPage() {
     usuarioReactivar,
     usuarioReestablecer,
     usuarioReenviarCorreo
-  } = useUsuarios(empresaSeleccionada?.empresaId);
+  } = useUsuarios({
+    porEmpresaIds: porEmpresaIdsListado,
+    allowEmptyEmpresasPost: allowEmptyEmpresasPostUsuarios,
+    pageIndex: usuariosPageIndex,
+    pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+  });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [requestState, setRequestState] = useState<RequestState>({
@@ -329,7 +412,10 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   if (method === "edit") {
     // Lógica para editar usuario
     {
-      const rawResult = await usuarioUpdate(String(data.id), dataToSubmit);
+      const rawResult = await usuarioUpdate(
+        String(data.id),
+        buildUsuarioUpdatePayload(dataToSubmit)
+      );
       result = {
         success: rawResult.success,
         error: rawResult.error !== undefined ? rawResult.error : null,
@@ -362,10 +448,27 @@ const handleSubmit = async (data: UsuarioFormFields) => {
       };
     }
   } else if (method === "create") {
-    result = (await registrarUsuario(dataToSubmit)) as {
+    const createResult = (await registrarUsuario(dataToSubmit)) as {
       success: boolean;
       error: string | null;
+      data?: { id?: number | string };
     };
+    result = {
+      success: createResult.success,
+      error: createResult.error,
+    };
+    if (createResult.success) {
+      const createdUserId = createResult.data?.id;
+      if (createdUserId !== undefined && createdUserId !== null) {
+        setRequestState({
+          method: "edit",
+          userData: {
+            ...dataToSubmit,
+            id: String(createdUserId),
+          },
+        });
+      }
+    }
   }
 
     if (result.success) {
@@ -377,7 +480,9 @@ const handleSubmit = async (data: UsuarioFormFields) => {
       };
       
       showModalMessage(successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente", "success");
-      handleCloseModal();
+      if (method !== "create") {
+        handleCloseModal();
+      }
     } else {
       const errorMessage = result.error || `Error al ${method} el usuario.`;
       showModalMessage(errorMessage, "error");
@@ -430,7 +535,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
           <Box className={styles.empresaSelectorWrapper}>
             <Box className={styles.empresaSelectorBox}>
               <CustomSelectSearch<Empresa>
-                options={empresas}
+                options={opcionesEmpresaSelector}
                 getOptionLabel={getEmpresaLabel}
                 value={empresaSeleccionada}
                 onChange={handleEmpresaChange}
@@ -438,7 +543,13 @@ const handleSubmit = async (data: UsuarioFormFields) => {
                 placeholder="Buscar empresa..."
                 loading={isLoadingEmpresas}
                 loadingText="Cargando empresas..."
-                noOptionsText={isLoadingEmpresas ? "Cargando..." : empresas.length === 0 ? "No hay empresas disponibles" : "No se encontraron empresas"}
+                noOptionsText={
+                  isLoadingEmpresas
+                    ? "Cargando..."
+                    : opcionesEmpresaSelector.length <= 1
+                      ? "No hay empresas disponibles"
+                      : "No se encontraron empresas"
+                }
                 disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
                 isOptionEqualToValue={(option, value) => option?.empresaId === value?.empresaId}
               />
@@ -456,6 +567,16 @@ const handleSubmit = async (data: UsuarioFormFields) => {
             onPermisos={handleOpenPermisos}
             onReenviarCorreo={handleReenviarCorreo}
             isLoading={loading}
+            serverPagination={
+              porEmpresaIdsListado.length > 0 || allowEmptyEmpresasPostUsuarios
+                ? {
+                    pageIndex: usuariosPageIndex,
+                    pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+                    pageCount: Math.max(1, usuariosListadoMeta?.pages ?? 1),
+                    onPageChange: setUsuariosPageIndex,
+                  }
+                : undefined
+            }
           />
         </>
       ),
