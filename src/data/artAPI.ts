@@ -8,6 +8,7 @@ import srtProvincia from "@/app/inicio/usuarios/interfaces/SrtProvincia";
 import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, EstablecimientoById, ParametersEstablecimientoByCUIT, FormularioRARDetallePostRequest, FormularioRARPostRequest, FormularioRARPutRequest, FormulariosRARApiResponse } from "@/app/inicio/empleador/formularioRAR/types/TformularioRar";
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa, FormularioRGRLDeleteParams, FormularioRGRLDeleteResponse } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
+import type { FormularioVm, TipoFormulario } from "@/app/inicio/empleador/formularioRGRL/generar/types/generar";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores, ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador } from "@/app/inicio/comercializador/polizas/types/poliza";
 import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
@@ -54,6 +55,45 @@ export type EstablecimientoListOptions = SWRConfiguration<EstablecimientoVm[], A
 export type EmpresaParametroPutRequest = {
   nombre: string;
   valor: string;
+};
+
+export type ApiAgenteCausante = {
+  interno: number;
+  codigo: number;
+  agenteCausante: string;
+  agenteTipo: string;
+};
+
+export type ApiFormulariosRGRLParams = {
+  CUIT?: number | string;
+  PageIndex?: number;
+  PageSize?: number;
+  OrderBy?: string;
+};
+
+export type ApiFormulariosRGRLResponse = {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
+  data: ApiFormularioRGRL[];
+};
+
+export type FormularioRGRLCreateRequest = {
+  internoFormulario: number;
+  internoEstablecimiento: number;
+  creacionFechaHora: string | null;
+  completadoFechaHora: string | null;
+  notificacionFecha: string | null;
+  internoPresentacion: number;
+  fechaSRT: string | null;
+};
+
+export type FormularioRGRLUpdateRequest = FormularioRGRLCreateRequest & {
+  respuestasCuestionario: unknown[];
+  respuestasGremio: unknown[];
+  respuestasContratista: unknown[];
+  respuestasResponsable: unknown[];
 };
 
 export type EmpresaParametroPutResponse = unknown;
@@ -294,29 +334,101 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region FormulariosRGRL
-  getFormulariosRGRL = async (cuit: number, all: boolean = false): Promise<ApiFormularioRGRL[]> => {
-    const search: Record<string, string | number> = { CUIT: String(cuit) };
-    if (all) search.pageSize = 99999;
-    const url = this.getURL({
-      path: "/api/FormulariosRGRL",
-      search: toURLSearch(search),
-    });
-    const res = await fetch(url.toString(), { cache: "no-store", headers: { Accept: "application/json" } });
-    if (res.status === 404) return [];
-    if (!res.ok) {
-      const raw = await res.text().catch(() => "");
-      throw new Error(`GET ${url} -> ${res.status} ${raw}`);
-    }
-    const body = await res.json().catch(() => null);
-    const arr = Array.isArray(body?.DATA)
-      ? body.DATA
-      : Array.isArray(body?.data)
-        ? body.data
-        : Array.isArray(body)
-          ? body
-          : [];
-    return arr as ApiFormularioRGRL[];
-  };
+  readonly getFormulariosRGRLURL = (params: ApiFormulariosRGRLParams = {}) =>
+    this.getURL({ path: "/api/FormulariosRGRL", search: toURLSearch({ OrderBy: "-creacionFechaHora", ...params }) }).toString();
+  getFormulariosRGRL = async (params: ApiFormulariosRGRLParams = {}): Promise<ApiFormulariosRGRLResponse> =>
+    tokenizable.get<ApiFormulariosRGRLResponse>(this.getFormulariosRGRLURL(params)).then(({ data }) => data);
+  useGetFormulariosRGRL = (params: ApiFormulariosRGRLParams = {}) =>
+    useSWR(
+      [this.getFormulariosRGRLURL(params), token.getToken()],
+      () => this.getFormulariosRGRL(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+  readonly getTiposFormulariosRGRLURL = () =>
+    this.getURL({ path: "/api/TiposFormulariosRGRL" }).toString();
+  getTiposFormulariosRGRL = async (): Promise<TipoFormulario[]> =>
+    tokenizable.get<TipoFormulario[]>(this.getTiposFormulariosRGRLURL()).then(({ data }) => data);
+  useGetTiposFormulariosRGRL = () =>
+    useSWR(
+      [this.getTiposFormulariosRGRLURL(), token.getToken()],
+      () => this.getTiposFormulariosRGRL(),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+  readonly getFormularioRGRLByIdURL = (id: number) =>
+    this.getURL({ path: `/api/FormulariosRGRL/${id}` }).toString();
+  getFormularioRGRLById = async (id: number): Promise<FormularioVm> =>
+    tokenizable.get<FormularioVm>(this.getFormularioRGRLByIdURL(id)).then(({ data }) => data);
+  useGetFormularioRGRLById = (id?: number) =>
+    useSWR(
+      id && token.getToken()
+        ? [this.getFormularioRGRLByIdURL(id), token.getToken()]
+        : null,
+      () => this.getFormularioRGRLById(id as number),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+  readonly patchEstablecimientoRGRLBaseURL = this.getURL({ path: "/api/Establecimientos" }).toString();
+  readonly patchEstablecimientoRGRLURL = (id: number) =>
+    this.getURL({ path: `/api/Establecimientos/${id}` }).toString();
+  patchEstablecimientoRGRL = async (id: number, payload: { superficie: number; cantTrabajadores: number }): Promise<void> =>
+    tokenizable.patch(this.patchEstablecimientoRGRLURL(id), payload).then(() => undefined);
+  swrPatchEstablecimientoRGRL: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number; payload: { superficie: number; cantTrabajadores: number } } }) => Promise<void>;
+  } = Object.freeze({
+    key: [this.patchEstablecimientoRGRLBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.patchEstablecimientoRGRL(arg.id, arg.payload),
+  });
+  usePatchEstablecimientoRGRL = () =>
+    useSWRMutation<void, Error, [url: string, token: string], { id: number; payload: { superficie: number; cantTrabajadores: number } }>(
+      this.swrPatchEstablecimientoRGRL.key,
+      this.swrPatchEstablecimientoRGRL.fetcher
+    );
+
+  readonly postFormularioRGRLURL = this.getURL({ path: "/api/FormulariosRGRL" }).toString();
+  postFormularioRGRL = async (payload: FormularioRGRLCreateRequest): Promise<{ interno: number }> =>
+    tokenizable.post<{ interno: number }>(this.postFormularioRGRLURL, payload).then(({ data }) => data);
+  swrPostFormularioRGRL: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: FormularioRGRLCreateRequest }) => Promise<{ interno: number }>;
+  } = Object.freeze({
+    key: [this.postFormularioRGRLURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postFormularioRGRL(arg),
+  });
+  usePostFormularioRGRL = () =>
+    useSWRMutation<{ interno: number }, Error, [url: string, token: string], FormularioRGRLCreateRequest>(
+      this.swrPostFormularioRGRL.key,
+      this.swrPostFormularioRGRL.fetcher
+    );
+
+  readonly putFormularioRGRLBaseURL = this.getURL({ path: "/api/FormulariosRGRL" }).toString();
+  readonly putFormularioRGRLURL = (id: number) =>
+    this.getURL({ path: `/api/FormulariosRGRL/${id}` }).toString();
+  putFormularioRGRL = async (id: number, payload: FormularioRGRLUpdateRequest): Promise<void> =>
+    tokenizable.put(this.putFormularioRGRLURL(id), payload).then(() => undefined);
+  swrPutFormularioRGRL: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number; payload: FormularioRGRLUpdateRequest } }) => Promise<void>;
+  } = Object.freeze({
+    key: [this.putFormularioRGRLBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putFormularioRGRL(arg.id, arg.payload),
+  });
+  usePutFormularioRGRL = () =>
+    useSWRMutation<void, Error, [url: string, token: string], { id: number; payload: FormularioRGRLUpdateRequest }>(
+      this.swrPutFormularioRGRL.key,
+      this.swrPutFormularioRGRL.fetcher
+    );
   //#endregion
 
     //#region RGRL DELETE
@@ -680,20 +792,38 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region Establecimientos por CUIT
-  getEstablecimientosEmpresa = async (cuit: number, activos?: string): Promise<ApiEstablecimientoEmpresa[]> => {
-    const opts: any = {
-      path: `/api/Establecimientos/Empresa/${encodeURIComponent(cuit)}`,
-    };
+  readonly getEstablecimientosEmpresaURL = (cuit: number, activos?: string) => {
+    const opts: any = { path: `/api/Establecimientos/Empresa/${encodeURIComponent(cuit)}` };
     if (activos !== undefined) opts.search = toURLSearch({ Activos: activos });
-    const url = this.getURL(opts);
-    const res = await fetch(url.toString(), { cache: "no-store", headers: { Accept: "application/json" } });
-    if (res.status === 404) return [];
-    if (!res.ok) {
-      const raw = await res.text().catch(() => "");
-      throw new Error(`GET ${url} -> ${res.status} ${raw}`);
-    }
-    return (await res.json()) as ApiEstablecimientoEmpresa[];
+    return this.getURL(opts).toString();
   };
+  getEstablecimientosEmpresa = async (cuit: number, activos?: string): Promise<ApiEstablecimientoEmpresa[]> =>
+    tokenizable.get<ApiEstablecimientoEmpresa[]>(this.getEstablecimientosEmpresaURL(cuit, activos)).then(({ data }) => data);
+  useGetEstablecimientosEmpresa = (cuit: number, activos?: string) =>
+    useSWR(
+      [this.getEstablecimientosEmpresaURL(cuit, activos), token.getToken()],
+      () => this.getEstablecimientosEmpresa(cuit, activos),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
+
+  //#region Agentes Causantes
+  readonly getAgentesCausantesURL = () =>
+    this.getURL({ path: "/api/AgentesCausantes" }).toString();
+  getAgentesCausantes = async (): Promise<ApiAgenteCausante[]> =>
+    tokenizable.get<ApiAgenteCausante[]>(this.getAgentesCausantesURL()).then(({ data }) => data);
+  useGetAgentesCausantes = () =>
+    useSWR(
+      [this.getAgentesCausantesURL(), token.getToken()],
+      () => this.getAgentesCausantes(),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
   //#endregion
 
   //#region Empresas por CUIT
