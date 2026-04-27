@@ -2,18 +2,20 @@
 
 import { useMemo, useState, useCallback } from "react";
 import useSWR from "swr";
-import { Box, Typography, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { ColumnDef } from "@tanstack/react-table";
 import axios, { AxiosError } from "axios";
 import AuthAPI, { token, type Empresa } from "@/data/authAPI";
 import { useAuth } from "@/data/AuthContext";
 import { useEmpresasStore } from "@/data/empresasStore";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import DataTable from "@/utils/ui/table/DataTable";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import Formato from "@/utils/Formato";
 
 export type UsuarioEmpresaPorCuitFila = Empresa & { id?: number };
+type EmpresaComboOption = Pick<Empresa, "empresaId" | "cuit" | "razonSocial">;
 
 type UsuarioEmpresasUsuarioTabProps = {
   open: boolean;
@@ -30,7 +32,7 @@ export function UsuarioEmpresasUsuarioTab({
 }: UsuarioEmpresasUsuarioTabProps) {
   const { hasTask } = useAuth();
   const { empresas: empresasStore } = useEmpresasStore();
-  const [empresaAAgregar, setEmpresaAAgregar] = useState<number | "">("");
+  const [empresaAAgregar, setEmpresaAAgregar] = useState<EmpresaComboOption | null>(null);
   const [isMutating, setIsMutating] = useState(false);
   const [modalMsg, setModalMsg] = useState<{
     open: boolean;
@@ -58,7 +60,7 @@ export function UsuarioEmpresasUsuarioTab({
     [data]
   );
 
-  const empresasSesionParaCombo = useMemo(
+  const empresasSesionParaCombo = useMemo<EmpresaComboOption[]>(
     () =>
       (empresasStore ?? []).map((empresa) => ({
         empresaId: Number(empresa.empresaId),
@@ -116,7 +118,7 @@ export function UsuarioEmpresasUsuarioTab({
   );
 
   const handleAgregarEmpresa = useCallback(async () => {
-    if (empresaAAgregar === "" || empresaAAgregar === 0) {
+    if (!empresaAAgregar?.empresaId) {
       showModalMessage("Seleccione una empresa para agregar.", "warning");
       return;
     }
@@ -124,11 +126,11 @@ export function UsuarioEmpresasUsuarioTab({
     try {
       await AuthAPI.postUsuariosEmpresas({
         usuarioId,
-        empresaId: Number(empresaAAgregar),
+        empresaId: Number(empresaAAgregar.empresaId),
         vigencia: "2099-12-31T00:00:00.000Z",
       });
       showModalMessage("Empresa agregada correctamente.", "success");
-      setEmpresaAAgregar("");
+      setEmpresaAAgregar(null);
       await mutate();
     } catch (err) {
       const msg =
@@ -206,32 +208,39 @@ export function UsuarioEmpresasUsuarioTab({
             alignItems: "flex-end",
           }}
         >
-          <FormControl sx={{ minWidth: 280 }} disabled={isMutating}>
-            <InputLabel id="empresa-agregar-label">Empresa</InputLabel>
-            <Select
-              labelId="empresa-agregar-label"
-              label="Empresa"
-              value={empresaAAgregar === "" ? "" : empresaAAgregar}
-              onChange={(e) => {
-                const v = e.target.value as number | "";
-                setEmpresaAAgregar(v === "" ? "" : Number(v));
+          <Box sx={{ minWidth: 380, flex: "1 1 380px" }}>
+            <CustomSelectSearch<EmpresaComboOption>
+              options={empresasDisponiblesParaAgregar}
+              value={empresaAAgregar}
+              onChange={(_event, newValue) => setEmpresaAAgregar(newValue)}
+              getOptionLabel={(empresa) => {
+                if (!empresa) return "";
+                return `${empresa.razonSocial ?? ""} - ${Formato.CUIP(empresa.cuit)}`;
               }}
-              displayEmpty
-            >
-              <MenuItem value="">
-                <em>Seleccionar…</em>
-              </MenuItem>
-              {empresasDisponiblesParaAgregar.map((e) => (
-                <MenuItem key={e.empresaId} value={e.empresaId}>
-                  {e.razonSocial}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              filterOptions={(options, { inputValue }) => {
+                const term = String(inputValue ?? "").toLowerCase().trim();
+                if (!term) return options;
+                const termDigits = term.replace(/\D/g, "");
+                return options.filter((option) => {
+                  const razonSocial = String(option.razonSocial ?? "").toLowerCase();
+                  const cuitDigits = String(option.cuit ?? "").replace(/\D/g, "");
+                  return (
+                    razonSocial.includes(term) ||
+                    (termDigits.length > 0 && cuitDigits.includes(termDigits))
+                  );
+                });
+              }}
+              isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
+              label="Empresa"
+              placeholder="Buscar por razón social o CUIT..."
+              noOptionsText="No se encontraron empresas"
+              disabled={isMutating}
+            />
+          </Box>
           <CustomButton
             type="button"
             onClick={() => void handleAgregarEmpresa()}
-            disabled={isMutating || empresaAAgregar === "" || empresasDisponiblesParaAgregar.length === 0}
+            disabled={isMutating || !empresaAAgregar?.empresaId || empresasDisponiblesParaAgregar.length === 0}
           >
             Agregar Empresa
           </CustomButton>
