@@ -585,27 +585,19 @@ React.useEffect(() => {
 
         // Agentes
         try {
-        const respAg = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
-        const agentes = respAg.ok ? await respAg.json() : [];
-        const agArr = Array.isArray(agentes)
-          ? agentes
-          : agentes?.data
-            ? (Array.isArray(agentes.data) ? agentes.data : [agentes.data])
-            : (agentes ? [agentes] : []);
-
-        const opcionesAgentes: OpcionAgente[] = agArr
-          .filter((a: any) => a && (a.codigo || a.agenteCausante))
-          .map((a: any) => ({
-            interno: Number(a.interno || 0),
-            codigo: Number(a.codigo || 0),
-            agenteCausante: String(a.agenteCausante || ''),
-            agenteTipo: String(a.agenteTipo || ''),
-            displayText: `${a.codigo || 'S/C'} - ${a.agenteCausante || 'Sin descripción'}`
-          }));
-
-        if (!cancel) setAgentesCausantes(opcionesAgentes);
-      } catch (e) {
-        console.error('Error cargando agentes causantes:', e);
+          const agArr = await ArtAPI.getAgentesCausantes();
+          const opcionesAgentes: OpcionAgente[] = agArr
+            .filter(a => a.codigo || a.agenteCausante)
+            .map(a => ({
+              interno: a.interno,
+              codigo: a.codigo,
+              agenteCausante: a.agenteCausante,
+              agenteTipo: a.agenteTipo,
+              displayText: `${a.codigo || 'S/C'} - ${a.agenteCausante || 'Sin descripción'}`
+            }));
+          if (!cancel) setAgentesCausantes(opcionesAgentes);
+        } catch (e) {
+          console.error('Error cargando agentes causantes:', e);
         }
       } catch (e) {
         console.error('Error cargando establecimientos:', e);

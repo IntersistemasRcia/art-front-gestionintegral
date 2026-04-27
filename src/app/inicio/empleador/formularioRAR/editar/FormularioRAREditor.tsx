@@ -12,6 +12,7 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import Formato from '@/utils/Formato';
+import ArtAPI from '@/data/artAPI';
 import CustomButton from '../../../../../utils/ui/button/CustomButton';
 import DataTableImport from '../../../../../utils/ui/table/DataTable';
 import CustomModal from '../../../../../utils/ui/form/CustomModal';
@@ -138,18 +139,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
       }
 
       // agentes
-      const ra = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
-      const agents = ra.ok ? await ra.json() : [];
-      const arrAg = Array.isArray(agents)
-        ? agents
-        : agents?.data
-        ? Array.isArray(agents.data)
-          ? agents.data
-          : [agents.data]
-        : [agents];
-
-      const ags: AgenteOpt[] = arrAg.map((a: any) => ({
-        codigo: Number(a.codigo || 0),
+      const agArr = await ArtAPI.getAgentesCausantes();
+      const ags: AgenteOpt[] = agArr.map(a => ({
+        codigo: a.codigo,
         displayText: `${a.codigo || 'S/C'} - ${a.agenteCausante || ''}`,
       }));
       setAgentesCausantes(ags);

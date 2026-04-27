@@ -49,9 +49,7 @@ let _tiposCache: ApiTiposFormularios | null = null;
 const cargarTipos = async (): Promise<ApiTiposFormularios> => {
   // Descarga (una sola vez) el catálogo de tipos; guarda en _tiposCache para reuso.
   if (_tiposCache) return _tiposCache;
-  const res = await fetch('http://arttest.intersistemas.ar:8302/api/TiposFormulariosRGRL', { cache: 'no-store' });
-  if (!res.ok) throw new Error(`TiposFormulariosRGRL error ${res.status}`);
-  _tiposCache = await res.json();
+  _tiposCache = await ArtAPI.getTiposFormulariosRGRL() as unknown as ApiTiposFormularios;
   return _tiposCache!;
 };
 
@@ -116,39 +114,10 @@ const mapApiToUi = (r: ApiFormularioRGRL): FormularioRGRL => ({
   FechaSRTRaw: r.fechaSRT ?? null,
 });
 
-const CargarConsultaFormulariosRGRL = async (cuit: number): Promise<FormularioRGRL[]> => {
-
-  // GET /FormulariosRGRL/{cuit}: obtiene lista de formularios para la grilla.
-  // Solicitar todos los formularios añadiendo un pageSize alto para evitar la paginación del backend
-  const url = `http://arttest.intersistemas.ar:8302/api/FormulariosRGRL?CUIT=${encodeURIComponent(
-    cuit
-  )}&pageSize=99999`;
-  const res = await fetch(url, {
-    cache: 'no-store',
-    headers: { Accept: 'text/json, application/json' },
-  });
-
-  if (res.status === 404) {
-    console.info('[RGRL] CUIT sin formularios aún:', cuit);
-    return [];
-  }
-
-
-  if (!res.ok) {
-    const raw = await res.text().catch(() => '');
-    throw new Error(`GET ${url} -> ${res.status} ${raw}`);
-  }
-  // La API puede devolver { DATA: [...] } o { data: [...] } o directamente el array.
-  const body = await res.json().catch(() => null);
-  const arr =
-    Array.isArray(body?.DATA) ? body.DATA :
-      Array.isArray(body?.data) ? body.data :
-        Array.isArray(body) ? body :
-          [];
-
-  const data: ApiFormularioRGRL[] = (arr ?? []) as ApiFormularioRGRL[];
-  return data.map(mapApiToUi);
-
+const CargarConsultaFormulariosRGRL = async (cuit: number, pageIndex = 1): Promise<{ data: FormularioRGRL[]; pages: number }> => {
+  // GET /FormulariosRGRL/{cuit}: obtiene lista de formularios para la grilla (paginado server-side).
+  const res = await ArtAPI.getFormulariosRGRL({ CUIT: cuit, PageIndex: pageIndex, PageSize: 10 });
+  return { data: (res.data ?? []).map(mapApiToUi), pages: res.pages ?? 1 };
 };
 
 const CargarEstablecimientoPorId = async (id: number): Promise<ApiEstablecimientoEmpresa | null> => {
@@ -223,9 +192,7 @@ const formatFechaAAAAMMDD = (v?: number | string | null): string => {
 
 const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
   // GET /FormulariosRGRL/{id}: arma el payload completo para impresión y vista de detalle.
-  const res = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRGRL/${id}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Error ${res.status}`);
-  const data: ApiFormularioDetalle = await res.json();
+  const data = await ArtAPI.getFormularioRGRLById(id) as unknown as ApiFormularioDetalle;
 
   const idx = await buildTiposIndex(Number(data.internoFormulario ?? 1));
 
@@ -360,6 +327,8 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const [modalMsg, setModalMsg] = useState<string>('');
   const [modalMsgType, setModalMsgType] = useState<MessageType>('info');
   const [pendingRefresh, setPendingRefresh] = useState<boolean>(false);
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageCount, setTablePageCount] = useState(1);
 
   const { user, hasTask } = useAuth();
   // Accede a las propiedades de la sesión con seguridad
@@ -469,6 +438,8 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     setGremios([]);
     setContratistas([]);
     setResponsables([]);
+    setTablePage(1);
+    setTablePageCount(1);
   }, [empresaSeleccionada?.cuit]);
 
   const handleEmpresaChange = (
@@ -485,7 +456,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   };
 
   const fetchFormularios = useCallback(
-    // Busca cabeceras por CUIT; si CUIT inválido, limpia la grilla.
+    // Busca cabeceras por CUIT; si CUIT inválido, limpia la grilla. Siempre va a página 1.
     async (cuitParam?: number) => {
       try {
         setLoading(true);
@@ -495,8 +466,10 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
           setLoading(false);
           return;
         }
-        const response = await CargarConsultaFormulariosRGRL(c);
-        setFormulariosRGRL(response ?? []);
+        setTablePage(1);
+        const response = await CargarConsultaFormulariosRGRL(c, 1);
+        setFormulariosRGRL(response.data ?? []);
+        setTablePageCount(response.pages ?? 1);
       } finally {
         setLoading(false);
       }
@@ -504,16 +477,29 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     [empresaSeleccionada?.cuit]
   );
 
-    // Variante rápida que solo actualiza la tabla sin activar el loading global
-    const fetchFormulariosTable = useCallback(
-      async (cuitParam?: number) => {
-        const c = Number(cuitParam ?? empresaSeleccionada?.cuit);
-        if (!c || Number.isNaN(c)) return;
-        const response = await CargarConsultaFormulariosRGRL(c);
-        setFormulariosRGRL(response ?? []);
-      },
-      [empresaSeleccionada?.cuit]
-    );
+  // Variante rápida que solo actualiza la tabla sin activar el loading global
+  const fetchFormulariosTable = useCallback(
+    async (cuitParam?: number, page = 1) => {
+      const c = Number(cuitParam ?? empresaSeleccionada?.cuit);
+      if (!c || Number.isNaN(c)) return;
+      const response = await CargarConsultaFormulariosRGRL(c, page);
+      setFormulariosRGRL(response.data ?? []);
+      setTablePageCount(response.pages ?? 1);
+    },
+    [empresaSeleccionada?.cuit]
+  );
+
+  const handlePageChange = useCallback(
+    async (page: number) => {
+      setTablePage(page);
+      const c = Number(empresaSeleccionada?.cuit);
+      if (!c || Number.isNaN(c)) return;
+      const response = await CargarConsultaFormulariosRGRL(c, page);
+      setFormulariosRGRL(response.data ?? []);
+      setTablePageCount(response.pages ?? 1);
+    },
+    [empresaSeleccionada?.cuit]
+  );
   
   // Carga inicial y recarga cuando cambian la empresa seleccionada o "referenteDatos".
   useEffect(() => {
@@ -525,7 +511,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const handleCloseModalMsg = async () => {
     setModalMsgOpen(false);
     if (pendingRefresh && empresaSeleccionada?.cuit) {
-      await fetchFormulariosTable(empresaSeleccionada.cuit);
+      await fetchFormulariosTable(empresaSeleccionada.cuit, tablePage);
       setPendingRefresh(false);
     }
   };
@@ -682,6 +668,11 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     onRowClick?: (row: FormularioRGRL) => void;
     enableSearch?: boolean;
     style?: React.CSSProperties;
+    manualPagination?: boolean;
+    pageIndex?: number;
+    pageSize?: number;
+    pageCount?: number;
+    onPageChange?: (page: number) => void;
   }>;
 
   const onRowClick = async (row: FormularioRGRL) => {
@@ -796,7 +787,17 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
           {/* Tabla principal: resultados de la búsqueda */}
           <div className={styles.compactTable}>
-            <DataTable columns={tableColumns} data={formulariosRGRL} onRowClick={onRowClick} enableSearch={false} />
+            <DataTable
+              columns={tableColumns}
+              data={formulariosRGRL}
+              onRowClick={onRowClick}
+              enableSearch={false}
+              manualPagination
+              pageIndex={tablePage}
+              pageSize={10}
+              pageCount={tablePageCount}
+              onPageChange={handlePageChange}
+            />
           </div>
           {!!internoSeleccionado && (
             <div className={styles.tabsBar}>
