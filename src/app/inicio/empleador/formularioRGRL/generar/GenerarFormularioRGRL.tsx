@@ -32,41 +32,11 @@ import type {
   ResponsableUI
 } from './types/generar';
 
-// URL base de la API (entorno de pruebas)
-const API_BASE = 'http://arttest.intersistemas.ar:8302/api';
-
 // Helper: convierte fecha a ISO (o null)
 const toIsoOrNull = (v?: string | Date | null) => {
   if (!v) return null;
   const d = dayjs(v);
   return d.isValid() ? d.toISOString() : null;
-};
-
-// Llamadas a la API para obtener datos (razón social, establecimientos, tipos, formulario)
-const fetchRazonSocial = async (cuit: number): Promise<string> => {
-  const url = `${API_BASE}/FormulariosRGRL?CUIT=${encodeURIComponent(cuit)}`;
-  const res = await fetch(
-    url,
-    { 
-      cache: 'no-store',
-      headers: { Accept: 'application/json, text/json' }
-     }
-  );
-  if (res.status === 404) return '';
-
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
-
-  // Parse robusto: la API puede devolver { DATA: [...] } o { data: [...] } o el array directamente
-  const body = await res.json().catch(() => null);
-  const arr =
-    Array.isArray(body?.DATA) ? body.DATA :
-    Array.isArray(body?.data) ? body.data :
-    Array.isArray(body) ? body :
-    [];
-
-  // Si no hay elementos, devolver cadena vacía
-  const razon = (arr[0]?.razonSocial ?? arr[0]?.razon ?? '') as string;
-  return (razon ?? '').toString();
 };
 
 const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> => {
@@ -85,21 +55,6 @@ const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> =
     numero: e.numero,
     ciiu: e.ciiu,
   }));
-};
-
-const fetchTipos = async (): Promise<TipoFormulario[]> => {
-  const url = `${API_BASE}/TiposFormulariosRGRL`;
-  const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json, text/json' } });
-  if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
-  return (await res.json()) as TipoFormulario[];
-};
-// Trae un formulario existente por ID (para edición o réplica)
-const fetchFormularioById = async (id: number): Promise<FormularioVm> => {
-  const url = `${API_BASE}/FormulariosRGRL/${id}`;
-  const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json, text/json' } });
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
-  return (await res.json()) as FormularioVm;
 };
 
 // Componente principal: crea, edita o replica formularios RGRL
@@ -186,7 +141,12 @@ const GenerarFormularioRGRL: React.FC<{
     setLoading(true);
     setError('');
     try {
-      const [rs, ests, tfs] = await Promise.all([fetchRazonSocial(cuit!), fetchEstablecimientos(cuit!), fetchTipos()]);
+      const [formulariosRes, ests, tfs] = await Promise.all([
+        ArtAPI.getFormulariosRGRL({ CUIT: cuit!, PageIndex: 1, PageSize: 1 }),
+        fetchEstablecimientos(cuit!),
+        ArtAPI.getTiposFormulariosRGRL(),
+      ]);
+      const rs = (formulariosRes.data?.[0]?.razonSocial ?? '') as string;
       // LÓGICA DE ALERTA A IMPLEMENTAR
       console.log("rs",rs)
       let alertMessage = '';
@@ -236,17 +196,18 @@ const GenerarFormularioRGRL: React.FC<{
     setLoading(true);
     setError('');
     try {
-      const frm = await fetchFormularioById(replId);
+      const frm = await ArtAPI.getFormularioRGRLById(replId);
       setOriginal(frm);
 
       const c = Number((frm as any).cuit ?? 0) || undefined;
       if (c) setCuit(c);
 
-      const [rs, ests, tfs] = await Promise.all([
-        c ? fetchRazonSocial(c) : Promise.resolve(''),
+      const [formulariosRes, ests, tfs] = await Promise.all([
+        c ? ArtAPI.getFormulariosRGRL({ CUIT: c, PageIndex: 1, PageSize: 1 }) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
         c ? fetchEstablecimientos(c) : Promise.resolve([] as Establecimiento[]),
-        fetchTipos(),
+        ArtAPI.getTiposFormulariosRGRL(),
       ]);
+      const rs = (formulariosRes.data?.[0]?.razonSocial ?? '') as string;
       setRazonSocial(rs);
       setEstablecimientos(ests);
       setTipos(tfs);
@@ -285,13 +246,7 @@ const GenerarFormularioRGRL: React.FC<{
           superficie: Number(estSuperficie) || 0,
           cantTrabajadores: Number(estCantTrab) || 0,
         };
-        const respEst = await fetch(`${API_BASE}/Establecimientos/${establecimientoSel}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payloadEst),
-        });
-        const rawEst = await respEst.text().catch(() => '');
-        if (!respEst.ok) throw new Error(`Actualizar establecimiento -> ${respEst.status} ${rawEst}`);
+        await ArtAPI.patchEstablecimientoRGRL(establecimientoSel!, payloadEst);
         // reflejamos en memoria
         setEstablecimientos(prev =>
           prev.map(e =>
@@ -314,15 +269,7 @@ const GenerarFormularioRGRL: React.FC<{
         fechaSRT: null,
       };
 
-      const res = await fetch(`${API_BASE}/FormulariosRGRL`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(`POST /FormulariosRGRL -> ${res.status}`);
-
+      const data = await ArtAPI.postFormularioRGRL(payload);
       const nuevoId = Number(data?.interno ?? 0);
       if (!nuevoId) throw new Error('No se obtuvo el ID del nuevo formulario.');
 
@@ -399,14 +346,7 @@ const GenerarFormularioRGRL: React.FC<{
           fechaSRT: payload.fechaSRT,
         };
 
-        const resPut = await fetch(`${API_BASE}/FormulariosRGRL/${nuevoId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payloadPUT),
-        });
-
-        await resPut.json().catch(() => null);
-        if (!resPut.ok) throw new Error(`PUT /FormulariosRGRL/${nuevoId} -> ${resPut.status}`);
+        await ArtAPI.putFormularioRGRL(nuevoId, payloadPUT);
 
         onDone?.(nuevoId);
         router.push(`/inicio/empleador/formularioRGRL/generar?id=${nuevoId}`);
@@ -592,7 +532,7 @@ const GenerarFormularioRGRL: React.FC<{
     setLoading(true);
     setError('');
     try {
-      const [tfs, frm] = await Promise.all([fetchTipos(), fetchFormularioById(idFromQuery)]);
+      const [tfs, frm] = await Promise.all([ArtAPI.getTiposFormulariosRGRL(), ArtAPI.getFormularioRGRLById(idFromQuery)]);
       setTipos(tfs);
       setForm(frm);
       setFechaSRTEdit(frm.fechaSRT && dayjs(frm.fechaSRT).isValid() ? dayjs(frm.fechaSRT).format('YYYY-MM-DD') : '');
@@ -601,7 +541,11 @@ const GenerarFormularioRGRL: React.FC<{
       setEstablecimientoSel(frm.internoEstablecimiento);
       setTipoSel(frm.internoFormulario);
       if (c) {
-        const [rs, ests] = await Promise.all([fetchRazonSocial(c), fetchEstablecimientos(c)]);
+        const [formulariosRes, ests] = await Promise.all([
+          ArtAPI.getFormulariosRGRL({ CUIT: c, PageIndex: 1, PageSize: 1 }),
+          fetchEstablecimientos(c),
+        ]);
+        const rs = (formulariosRes.data?.[0]?.razonSocial ?? '') as string;
         setRazonSocial(rs);
         setEstablecimientos(ests);
       }
@@ -921,14 +865,7 @@ const GenerarFormularioRGRL: React.FC<{
         fechaSRT: typeof options?.fechaSRTOverride !== 'undefined' ? options!.fechaSRTOverride : (form.fechaSRT ?? null),
       };
 
-      const res = await fetch(`${API_BASE}/FormulariosRGRL/${form.interno}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadPUT),
-      });
-
-      await res.json().catch(() => null);
-      if (!res.ok) throw new Error(`PUT /FormulariosRGRL/${form.interno} -> ${res.status}`);
+      await ArtAPI.putFormularioRGRL(form.interno, payloadPUT);
 
       if (options?.redirigir === false && typeof options?.fechaSRTOverride !== 'undefined') {
         setError('');

@@ -195,7 +195,9 @@ export function DataTable<TData extends object>({
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setLocalPagination,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    ...(manualPagination
+      ? {}
+      : { getPaginationRowModel: getPaginationRowModel() }),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     enableRowSelection,
