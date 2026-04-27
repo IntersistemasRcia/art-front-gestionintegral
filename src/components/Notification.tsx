@@ -71,7 +71,7 @@ export default function Notification({ empresaCUIT }: Props) {
         // Control por año natural: usar fechaSRT o completadoFechaHora o creacionFechaHora para determinar el año
         const currentYear = new Date().getFullYear();
         // Priorizar la fecha de confirmación (`completadoFechaHora`) como criterio
-        const formsThisYear = (forms ?? []).filter((f: any) => {
+        const formsThisYear = (forms?.data ?? []).filter((f: any) => {
           const raw = f.completadoFechaHora ?? f.fechaSRT ?? f.creacionFechaHora;
           const d = parseDate(raw);
           return d !== null && d.getFullYear() === currentYear;
