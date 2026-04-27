@@ -30,7 +30,7 @@ export default function Notification({ empresaCUIT }: Props) {
         }
         const [ests, forms, poliza] = await Promise.all([
           ArtAPI.getEstablecimientosEmpresa(c, "true"),
-          ArtAPI.getFormulariosRGRL(c, true),
+          ArtAPI.getFormulariosRGRL({ CUIT: c }),
           gestionEmpleadorAPI.getPoliza({ CUIT: c }),
         ]);
 
