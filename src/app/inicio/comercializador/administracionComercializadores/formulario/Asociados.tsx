@@ -10,44 +10,19 @@ import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import ArtAPI from "@/data/artAPI";
 import type { OrganizadorComercializador, GrupoOrganizadorComercializador, ParametersComercializadoresAsociados } from "@/app/inicio/comercializador/polizas/types/poliza";
+import type {
+	ApiGrupoItem,
+	ApiOrganizacionItem,
+	AsociadoDetalleRow,
+	AsociadoRow,
+	AsociadosHandle,
+	AsociadosProps,
+	NombreAsociadoCellProps,
+	SelectOption,
+} from "@/app/inicio/comercializador/administracionComercializadores/formulario/types/formulario";
 import styles from "./formulario.module.css";
 
-interface AsociadoRow {
-	interno?: number;
-	asociadoId: number;
-	tipo: string;
-	fechaBaja?: string | null;
-	isNew?: boolean;
-}
-
-interface AsociadoDetalleRow {
-	razonSocial?: string;
-	observacion?: string;
-	observaciones?: string;
-	descripcion?: string;
-}
-
-interface SelectOption {
-	value: number;
-	label: string;
-}
-
-interface AsociadosProps {
-	comercializadorInterno: number;
-	comercializadorNombre: string;
-	readOnly?: boolean;
-}
-
-interface NombreAsociadoCellProps {
-	tipo: string;
-	asociadoId: number;
-}
-
-export interface AsociadosHandle {
-	save: () => Promise<void>;
-	hasUnsaved: () => boolean;
-	getNewAsociados: () => { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
-}
+export type { AsociadosHandle } from "@/app/inicio/comercializador/administracionComercializadores/formulario/types/formulario";
 
 function asArray<T>(value: T[] | { DATA?: T[]; data?: T[] } | undefined): T[] {
 	if (Array.isArray(value)) return value;
@@ -74,19 +49,6 @@ function NombreAsociadoCell({ tipo, asociadoId }: NombreAsociadoCellProps) {
 
 	return <>{detalle?.razonSocial ?? detalle?.descripcion ?? detalle?.observacion ?? ""}</>;
 }
-
-type ApiOrganizacionItem = {
-	interno?: number;
-	razonSocial?: string;
-	observacion?: string;
-	observaciones?: string;
-};
-
-type ApiGrupoItem = {
-	interno?: number | string;
-	razonSocial?: string;
-	descripcion?: string;
-};
 
 const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados(
 	{ comercializadorInterno, comercializadorNombre, readOnly = false },
@@ -311,7 +273,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 					Agregar
 				</CustomButton>
 			</Box>
-			<Box className={styles.asociadosTableWrapper} sx={{ mt: 4 }}>
+			<Box className={styles.asociadosTableWrapper}>
 				<DataTable<AsociadoRow>
 					data={tableRows}
 					columns={columns}
