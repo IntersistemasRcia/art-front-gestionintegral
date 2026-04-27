@@ -36,8 +36,11 @@ export default function DatosReferenteSection({
   const roleKey = String(creationRole ?? form.rol ?? "").toLowerCase();
   const isRoleGrupo = roleKey.includes("grupo");
   const isRoleOrganizador = roleKey.includes("organizador");
-  const showGrupoAutocomplete = !((isCreating || isEditing) && isRoleGrupo);
-  const showOrganizadorAutocomplete = !(((isCreating || isEditing || isViewing) && isRoleOrganizador) || (isEditing && isRoleGrupo));
+
+  const hideForCreateComercializador = isCreating && roleKey === "comercializador";
+  const showGrupoAutocomplete = !hideForCreateComercializador && !((isCreating || isEditing) && isRoleGrupo);
+  const showOrganizadorAutocomplete =
+    !hideForCreateComercializador && !(((isCreating || isEditing || isViewing) && isRoleOrganizador) || (isEditing && isRoleGrupo));
 
   const [provincias, setProvincias] = useState<SrtProvincia[]>([]);
   const [provinciaId, setProvinciaId] = useState<number | null>(null);

@@ -93,6 +93,7 @@ export type ComercializadorPostRequest = {
     domicilioYCalle: string,
     codLocalidad: string,
     codPostal: number
+    comercializadorAsociados?: { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
 }
 
 export type ComercializadorPostResponse = unknown;

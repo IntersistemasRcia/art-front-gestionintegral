@@ -613,11 +613,18 @@ export default function UsuarioForm({
       return;
     }
 
+    const comercializadorAsociados = isCreating && isComercializadorWithTabs
+      ? (asociadosRef.current?.getNewAsociados() ?? [])
+      : [];
+
     console.log("Submitting form data:", formDataWithDefaults);
     setIsSavingAsociados(true);
     await asociadosRef.current?.save();
     setIsSavingAsociados(false);
-    onSubmit(formDataWithDefaults);
+    onSubmit({
+      ...formDataWithDefaults,
+      ...(comercializadorAsociados.length ? { comercializadorAsociados } : {}),
+    });
   };
 
   const handleGrupoChange = (value: string) => {

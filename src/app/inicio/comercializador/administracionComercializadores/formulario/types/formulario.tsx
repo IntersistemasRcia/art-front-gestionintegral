@@ -14,6 +14,7 @@ import type {
 export type RequestMethod = UsuarioRequestMethod;
 export type UsuarioFormFields = BaseUsuarioFormFields & {
   srtComercializadorGOrganizadorInterno?: number;
+  comercializadorAsociados?: { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
 };
 
 export type Props = UsuarioFormProps & {

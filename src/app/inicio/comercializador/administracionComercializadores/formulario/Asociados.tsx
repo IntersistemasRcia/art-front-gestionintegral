@@ -46,6 +46,7 @@ interface NombreAsociadoCellProps {
 export interface AsociadosHandle {
 	save: () => Promise<void>;
 	hasUnsaved: () => boolean;
+	getNewAsociados: () => { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
 }
 
 function asArray<T>(value: T[] | { DATA?: T[]; data?: T[] } | undefined): T[] {
@@ -124,6 +125,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 
 	useImperativeHandle(ref, () => ({
 		save: async () => {
+			if (!comercializadorInterno) return;
 			const newRows = tableRows.filter(r => r.isNew);
 			await Promise.allSettled(
 				newRows.map(r =>
@@ -137,6 +139,13 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 			setTableRows(prev => prev.map(r => r.isNew ? { ...r, isNew: false } : r));
 		},
 		hasUnsaved: () => tableRows.some(r => r.isNew === true),
+		getNewAsociados: () => tableRows
+			.filter(r => r.isNew)
+			.map(r => ({
+				srtComercializadorInterno: 0,
+				tipo: r.tipo === "Organizacion" ? "Organizador" : r.tipo,
+				asociadoId: r.asociadoId,
+			})),
 	}), [tableRows, comercializadorInterno, triggerPost]);
 
 	const grupoOptions = useMemo<SelectOption[]>(

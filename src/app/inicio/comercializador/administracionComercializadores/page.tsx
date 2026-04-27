@@ -858,6 +858,7 @@ export default function AdminUserPage() {
                   domicilioYCalle: String((data as any)?.domicilioEntreCalle2 ?? ''),
                   codLocalidad: String((data as any)?.codLocalidad ?? ''),
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
+                  ...(data.comercializadorAsociados?.length ? { comercializadorAsociados: data.comercializadorAsociados } : {}),
                 } as any);
                 setPendingComercializador(null);
                 await mutateComercializador();
