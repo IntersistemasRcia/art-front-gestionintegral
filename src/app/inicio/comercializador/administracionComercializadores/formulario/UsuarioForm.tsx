@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, SyntheticEvent, useRef } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/data/AuthContext";
 import {
@@ -19,8 +19,11 @@ import styles from "./formulario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
+import CustomTab from "@/utils/ui/tab/CustomTab";
 import DatosUsuarioSection from "./DatosUsuarioSection";
 import DatosReferenteSection from "./DatosReferenteSection";
+import Asociados, { AsociadosHandle } from "./Asociados";
 import ArtAPI from "@/data/artAPI";
 import { CUIP } from "@/utils/Formato";
 
@@ -92,6 +95,11 @@ export default function UsuarioForm({
 
   const [selectedGrupoId, setSelectedGrupoId] = useState<string>("");
   const [selectedOrganizadorId, setSelectedOrganizadorId] = useState<string>("");
+  const [currentFormTab, setCurrentFormTab] = useState<number>(0);
+  const asociadosRef = useRef<AsociadosHandle | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isSavingAsociados, setIsSavingAsociados] = useState(false);
+  const [showValidationError, setShowValidationError] = useState(false);
 
   const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
 
@@ -197,8 +205,11 @@ export default function UsuarioForm({
   const isEditing = method === "edit";
   const isCreating = method === "create";
   const isDeleting = method === "delete";
+  const isComercializadorWithTabs =
+    (isCreating || isEditing || isViewing) && String(creationRole ?? form.rol ?? "").toLowerCase() === "comercializador";
 
   const isDisabled = isViewing || isDeleting
+  const isProcessing = isSubmitting || isSavingAsociados
 
   // --- Buscador Localidad / C.P.
   const [cpBuscado, setCpBuscado] = useState<number | null>(null);
@@ -327,6 +338,8 @@ export default function UsuarioForm({
     setErrors({});
     setTouched({});
     setArcaCUIL(undefined);
+    setCurrentFormTab(0);
+    setShowValidationError(false);
   }, [initialData, open, isEditing, isCreating, initialSelectedGrupoId, initialSelectedOrganizadorId]);
 
   const submitRoleLabel = (() => {
@@ -545,7 +558,15 @@ export default function UsuarioForm({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleClose = () => {
+    if (isComercializadorWithTabs && asociadosRef.current?.hasUnsaved()) {
+      setShowExitConfirm(true);
+      return;
+    }
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isDeleting) {
@@ -587,10 +608,23 @@ export default function UsuarioForm({
     }, {} as TouchedFields);
     setTouched(allTouched);
 
-    if (validateAllFields()) {
-      console.log("Submitting form data:", formDataWithDefaults);
-      onSubmit(formDataWithDefaults);
+    if (!validateAllFields()) {
+      setShowValidationError(true);
+      return;
     }
+
+    const comercializadorAsociados = isCreating && isComercializadorWithTabs
+      ? (asociadosRef.current?.getNewAsociados() ?? [])
+      : [];
+
+    console.log("Submitting form data:", formDataWithDefaults);
+    setIsSavingAsociados(true);
+    await asociadosRef.current?.save();
+    setIsSavingAsociados(false);
+    onSubmit({
+      ...formDataWithDefaults,
+      ...(comercializadorAsociados.length ? { comercializadorAsociados } : {}),
+    });
   };
 
   const handleGrupoChange = (value: string) => {
@@ -614,23 +648,12 @@ export default function UsuarioForm({
     setForm((prev) => ({ ...prev, aplicaIva: checked ? 1 : 0 }));
   };
 
-  return (
-    <CustomModal
-      open={open}
-      onClose={isSubmitting ? () => {} : onClose}
-      title={modalTitle}
-      size={isCreating ? "large" : "mid"}
-    >
-      <Box
-        component="form"
-        className={styles.formContainer}
-        onSubmit={handleSubmit}
-      >
-        {errorMsg && (
-          <Typography className={styles.errorMessage}>{errorMsg}</Typography>
-        )}
-        <div className={styles.formLayout}>
-          <div className={styles.formContent}>
+  const handleFormTabChange = (_event: SyntheticEvent, newTabValue: string | number) => {
+    setCurrentFormTab(Number(newTabValue));
+  };
+
+  const datosComercializadorContent = (
+    <>
             <DatosUsuarioSection
               form={form}
               errors={errors}
@@ -668,6 +691,49 @@ export default function UsuarioForm({
               onSelectChange={handleSelectChange}
               onBlur={handleBlur}
             />
+    </>
+  );
+
+  const tabItems = [
+    {
+      label: "Datos del Comercializador",
+      value: 0,
+      content: datosComercializadorContent,
+    },
+    {
+      label: "Asociados",
+      value: 1,
+      content: <Asociados ref={asociadosRef} comercializadorInterno={Number(form.id ?? 0)} comercializadorNombre={String(form.nombre ?? "")} readOnly={isViewing} />,
+    },
+  ];
+
+  return (
+    <>
+    <CustomModal
+      open={open}
+      onClose={isProcessing ? () => {} : handleClose}
+      title={modalTitle}
+      size={isCreating ? "large" : "large"}
+    >
+      <Box
+        component="form"
+        className={styles.formContainer}
+        onSubmit={handleSubmit}
+      >
+        {errorMsg && (
+          <Typography className={styles.errorMessage}>{errorMsg}</Typography>
+        )}
+        <div className={styles.formLayout}>
+          <div className={styles.formContent}>
+            {isComercializadorWithTabs ? (
+              <CustomTab
+                tabs={tabItems}
+                currentTab={currentFormTab}
+                onTabChange={handleFormTabChange}
+              />
+            ) : (
+              datosComercializadorContent
+            )}
 
             {/* Credenciales de Acceso eliminadas: password/confirmPassword se derivan del CUIT al enviar */}
             <div className={styles.formActions}>
@@ -675,10 +741,10 @@ export default function UsuarioForm({
               {!isViewing && (
                 <CustomButton 
                   type="submit" 
-                  disabled={isSubmitting}
-                  className={isSubmitting ? styles.actionButtonDisabled : undefined}
+                  disabled={isProcessing}
+                  className={isProcessing ? styles.actionButtonDisabled : undefined}
                 >
-                  {isSubmitting ? (
+                  {isProcessing ? (
                     <>
                       <CircularProgress size={20} color="inherit" className={styles.spinner} />
                       {isDeleting
@@ -700,10 +766,10 @@ export default function UsuarioForm({
               )}
 
               <CustomButton
-                onClick={onClose}
+                onClick={handleClose}
                 color="secondary"
-                disabled={isSubmitting}
-                className={isSubmitting ? styles.actionButtonDisabled : undefined}
+                disabled={isProcessing}
+                className={isProcessing ? styles.actionButtonDisabled : undefined}
               >
                 {isViewing ? "Cerrar" : "Cancelar"}
               </CustomButton>
@@ -757,5 +823,26 @@ export default function UsuarioForm({
         </div>
       </Box>
     </CustomModal>
+      <CustomModal
+        open={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        size="small"
+        actions={
+          <>
+            <CustomButton onClick={() => { setShowExitConfirm(false); onClose(); }}>Si</CustomButton>
+            <CustomButton color="secondary" onClick={() => setShowExitConfirm(false)}>No</CustomButton>
+          </>
+        }
+      >
+        No se guardaron los cambios de asociacion. ¿Está seguro que desea salir?
+      </CustomModal>
+      <CustomModalMessage
+        open={showValidationError}
+        type="error"
+        title="Faltan datos"
+        message="Faltan completar datos en la pestaña 'Datos del comercializador' antes de guardar."
+        onClose={() => setShowValidationError(false)}
+      />
+    </>
   );
 }

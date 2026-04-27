@@ -14,6 +14,7 @@ import type {
 export type RequestMethod = UsuarioRequestMethod;
 export type UsuarioFormFields = BaseUsuarioFormFields & {
   srtComercializadorGOrganizadorInterno?: number;
+  comercializadorAsociados?: { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
 };
 
 export type Props = UsuarioFormProps & {
@@ -60,3 +61,53 @@ export interface DatosReferenteSectionProps {
   onSelectChange: (e: SelectChangeEvent<string>) => void;
   onBlur: (field: keyof TouchedFields) => void;
 }
+
+export interface AsociadoRow {
+  interno?: number;
+  asociadoId: number;
+  tipo: string;
+  fechaBaja?: string | null;
+  isNew?: boolean;
+}
+
+export interface AsociadoDetalleRow {
+  razonSocial?: string;
+  observacion?: string;
+  observaciones?: string;
+  descripcion?: string;
+}
+
+export interface SelectOption {
+  value: number;
+  label: string;
+}
+
+export interface AsociadosProps {
+  comercializadorInterno: number;
+  comercializadorNombre: string;
+  readOnly?: boolean;
+}
+
+export interface NombreAsociadoCellProps {
+  tipo: string;
+  asociadoId: number;
+}
+
+export interface AsociadosHandle {
+  save: () => Promise<void>;
+  hasUnsaved: () => boolean;
+  getNewAsociados: () => { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
+}
+
+export type ApiOrganizacionItem = {
+  interno?: number;
+  razonSocial?: string;
+  observacion?: string;
+  observaciones?: string;
+};
+
+export type ApiGrupoItem = {
+  interno?: number | string;
+  razonSocial?: string;
+  descripcion?: string;
+};

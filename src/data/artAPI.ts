@@ -9,8 +9,8 @@ import FormularioRAR, { ParametersFormularioRar, ParametersEmpresaByCUIT, Establ
 import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa, FormularioRGRLDeleteParams, FormularioRGRLDeleteResponse } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores, ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
-import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador } from "@/app/inicio/comercializador/polizas/types/poliza";
-import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
+import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador, ParametersComercializadoresAsociados } from "@/app/inicio/comercializador/polizas/types/poliza";
+import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById, SRTComercializadoresAsociadosPostRequest, SRTComercializadoresAsociadosPostResponse, SRTComercializadoresAsociadosPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
 import { ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
 import { CoberturaPost, CoberturaPostResponse, ParametersCobertura } from "@/app/inicio/empleador/cobertura/types/cobertura";
 import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
@@ -1141,6 +1141,94 @@ export class ArtAPIClass extends ExternalAPI {
       }
     );
   //#endregion
+
+
+
+    //#Region  GET SRTComercializadoresAsociados
+  readonly getComercializadoresAsociadosURL = (params: ParametersComercializadoresAsociados = {}) => {
+    return this.getURL({ path: "/api/SRTComercializadoresAsociados", search: toURLSearch(params) }).toString();
+  };
+  getComercializadoresAsociados = async (params: ParametersComercializadoresAsociados = {}) => tokenizable.get(
+    this.getComercializadoresAsociadosURL(params),
+  ).then(({ data }) => data);
+  useGetComercializadoresAsociadosURL = (params: ParametersComercializadoresAsociados = {}) => useSWR(
+    [this.getComercializadoresAsociadosURL(params), token.getToken()], () => this.getComercializadoresAsociados(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+
+  // # End Region SRTComercializadoresAsociados
+
+
+
+   //#Region  POST SRTComercializadoresAsociados
+  readonly postSRTComercializadoresAsociadosGOrganizadoresURL = this.getURL({ path: "/api/SRTComercializadoresAsociados" }).toString();
+
+  postSRTComercializadoresAsociados = async (data: SRTComercializadoresAsociadosPostRequest) =>
+    tokenizable.post<SRTComercializadoresAsociadosPostResponse>(this.postSRTComercializadoresAsociadosGOrganizadoresURL, data).then(({ data }) => data);
+  swrPostSRTComercializadoresAsociados: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: SRTComercializadoresAsociadosPostRequest }) => Promise<SRTComercializadoresAsociadosPostResponse>;
+  } = Object.freeze({
+    key: [this.postSRTComercializadoresAsociadosGOrganizadoresURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postSRTComercializadoresAsociados(arg),
+  });
+
+  usePostSRTComercializadoresAsociados = () =>
+    useSWRMutation<SRTComercializadoresAsociadosPostResponse, Error, [url: string, token: string], SRTComercializadoresAsociadosPostRequest>(
+      this.swrPostSRTComercializadoresAsociados.key,
+      this.swrPostSRTComercializadoresAsociados.fetcher
+    );
+  //#endregion
+
+
+    //#region Grupo Organizador Comercializador PUT Baja
+  readonly putSRTComercializadoresAsociadosBajaBaseURL = this.getURL({ path: "/api/SRTComercializadoresAsociados" }).toString();
+
+  readonly putSRTComercializadoresAsociadosBajaBasURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadoresAsociados/${id}/Baja` }).toString();
+
+  putSRTComercializadoresAsociadosBajaBas = async (id: number | string, data: SRTComercializadoresAsociadosPutRequest) =>
+    tokenizable.put<ComercializadorPutResponse>(this.putSRTComercializadoresAsociadosBajaBasURL(id), data).then(({ data }) => data);
+  swrPutSRTComercializadoresAsociadosBajaBas: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: SRTComercializadoresAsociadosPutRequest } }) => Promise<ComercializadorPutResponse>;
+  } = Object.freeze({
+    key: [this.putSRTComercializadoresAsociadosBajaBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putSRTComercializadoresAsociadosBajaBas(arg.id, arg.data),
+  });
+
+  usePutSRTComercializadoresAsociadosBajaBas = () =>
+    useSWRMutation<ComercializadorPutResponse, Error, [url: string, token: string], { id: number | string; data: SRTComercializadoresAsociadosPutRequest }>(
+      this.swrPutSRTComercializadoresAsociadosBajaBas.key,
+      this.swrPutSRTComercializadoresAsociadosBajaBas.fetcher
+    );
+  //#endregion
+
+  //#region SRTComercializadoresAsociados PUT
+  readonly putSRTComercializadoresAsociadosEditURL = (id: number | string) =>
+    this.getURL({ path: `/api/SRTComercializadoresAsociados/${id}` }).toString();
+
+  putSRTComercializadoresAsociadosEdit = async (id: number | string, data: SRTComercializadoresAsociadosPutRequest) =>
+    tokenizable.put<ComercializadorPutResponse>(this.putSRTComercializadoresAsociadosEditURL(id), data).then(({ data }) => data);
+
+  swrPutSRTComercializadoresAsociadosEdit: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: SRTComercializadoresAsociadosPutRequest } }) => Promise<ComercializadorPutResponse>;
+  } = Object.freeze({
+    key: [this.putSRTComercializadoresAsociadosBajaBaseURL + "#edit", token.getToken()],
+    fetcher: (_key, { arg }) => this.putSRTComercializadoresAsociadosEdit(arg.id, arg.data),
+  });
+
+  usePutSRTComercializadoresAsociadosEdit = () =>
+    useSWRMutation<ComercializadorPutResponse, Error, [url: string, token: string], { id: number | string; data: SRTComercializadoresAsociadosPutRequest }>(
+      this.swrPutSRTComercializadoresAsociadosEdit.key,
+      this.swrPutSRTComercializadoresAsociadosEdit.fetcher
+    );
+  //#endregion
+
 
   // # Region Empleador Pago Comercializador
   readonly getEmpleadorPagoComercializadorURL = (params: ParametersEmpleadorPagosComercializador = {}) => {

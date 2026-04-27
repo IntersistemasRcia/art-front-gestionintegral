@@ -17,6 +17,11 @@ export type GrupoOrganizadorComercializador = {
     CUIL?: number;
 }
 
+export type ParametersComercializadoresAsociados = {
+    SRTComercializadorInterno?: number;
+    IncluirInactivos?: boolean;
+}
+
 export type Poliza = {
     interno: string;
     numero: string;

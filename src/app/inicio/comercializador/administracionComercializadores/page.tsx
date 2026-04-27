@@ -293,6 +293,7 @@ export default function AdminUserPage() {
       case 1:
         return { label: 'Crear Organizador Comercializador', role: 'OrganizadorComercializador' };
       case 2:
+        return { label: 'Crear Comercializador', role: 'Comercializador' };
       default:
         return { label: 'Crear Comercializador', role: 'Comercializador' };
     }
@@ -857,6 +858,7 @@ export default function AdminUserPage() {
                   domicilioYCalle: String((data as any)?.domicilioEntreCalle2 ?? ''),
                   codLocalidad: String((data as any)?.codLocalidad ?? ''),
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
+                  ...(data.comercializadorAsociados?.length ? { comercializadorAsociados: data.comercializadorAsociados } : {}),
                 } as any);
                 setPendingComercializador(null);
                 await mutateComercializador();
