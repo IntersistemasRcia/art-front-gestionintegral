@@ -12,6 +12,7 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import Formato from '@/utils/Formato';
+import ArtAPI from '@/data/artAPI';
 import CustomButton from '../../../../../utils/ui/button/CustomButton';
 import DataTableImport from '../../../../../utils/ui/table/DataTable';
 import CustomModal from '../../../../../utils/ui/form/CustomModal';
@@ -79,6 +80,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
   const [editandoIndex, setEditandoIndex] = React.useState<number>(-1);
   const [modoEdicion, setModoEdicion] = React.useState<boolean>(false);
 
+  // Filtro por CUIL en la tabla de trabajadores cargados
+  const [filtroCuil, setFiltroCuil] = React.useState<string>('');
+
   // CARGA INICIAL
   React.useEffect(() => {
     (async () => {
@@ -135,18 +139,9 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
       }
 
       // agentes
-      const ra = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
-      const agents = ra.ok ? await ra.json() : [];
-      const arrAg = Array.isArray(agents)
-        ? agents
-        : agents?.data
-        ? Array.isArray(agents.data)
-          ? agents.data
-          : [agents.data]
-        : [agents];
-
-      const ags: AgenteOpt[] = arrAg.map((a: any) => ({
-        codigo: Number(a.codigo || 0),
+      const agArr = await ArtAPI.getAgentesCausantes();
+      const ags: AgenteOpt[] = agArr.map(a => ({
+        codigo: a.codigo,
         displayText: `${a.codigo || 'S/C'} - ${a.agenteCausante || ''}`,
       }));
       setAgentesCausantes(ags);
@@ -476,9 +471,18 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
       {filas.length > 0 && (
         <div className={styles.tableBlock}>
           <span className={`${styles.bold} ${styles.fs20}`}>Datos del Trabajador:</span>
+          <div className={styles.buscadorCuil}>
+            <TextField
+              label="Buscador por CUIL"
+              value={filtroCuil}
+              onChange={(e) => setFiltroCuil(e.target.value)}
+              size="small"
+              placeholder="Ingresá el CUIL a buscar..."
+            />
+          </div>
           <DataTableImport
             columns={[
-              { accessorKey: 'CUIL', header: 'CUIL' },
+              { accessorKey: 'CUIL', header: 'CUIL', cell: ({ getValue }: { getValue: () => string }) => Formato.CUIP(getValue()) },
               { accessorKey: 'Nombre', header: 'Nombre' },
               { accessorKey: 'SectorTareas', header: 'Sector/Tareas' },
               { accessorKey: 'Ingreso', header: 'F. Ingreso', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
@@ -521,7 +525,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
                 enableSorting: false,
               },
             ]}
-            data={filas}
+            data={filtroCuil ? filas.filter(f => (f.CUIL || '').replace(/\D/g, '').startsWith(filtroCuil.replace(/\D/g, ''))) : filas}
           />
         </div>
       )}

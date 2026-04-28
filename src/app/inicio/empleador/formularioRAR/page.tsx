@@ -990,7 +990,7 @@ const FormulariosRAR: React.FC = () => {
                 <div>
                   <div className={styles.trabajadoresHeader}>
                     <p className={`${styles.detallesInfo} ${styles.trabajadoresCount}`}>
-                      <strong>👥 Trabajadores registrados: {detallesInterno.length}</strong>
+                      <strong>👥 Trabajadores registrados: {new Set(detallesInterno.map((detalle) => detalle.cuil)).size}</strong>
                     </p>
                   </div>
 

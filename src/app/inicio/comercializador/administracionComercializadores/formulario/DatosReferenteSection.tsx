@@ -1,55 +1,22 @@
 import {
   TextField,
-  Typography,
   Autocomplete,
 } from "@mui/material";
+import { useEffect, useState } from "react";
+import ArtAPI from "@/data/artAPI";
+import SrtProvincia from "@/app/inicio/usuarios/interfaces/SrtProvincia";
 import styles from "./formulario.module.css";
-import CustomButton from "@/utils/ui/button/CustomButton";
-import { FaSearch } from "react-icons/fa";
-import { SelectChangeEvent } from "@mui/material/Select";
 import {
-  UsuarioFormFields,
-  ValidationErrors,
-  TouchedFields,
+  DatosReferenteSectionProps,
+  SrtLocalidad,
+  SrtLocalidadByCodigo,
 } from "./types/formulario";
-
-interface Props {
-  form: UsuarioFormFields;
-  creationRole?: string | null;
-  errors: ValidationErrors;
-  touched: TouchedFields;
-  busqueda: string;
-  onBusquedaChange: (value: string) => void;
-  onBuscarLocalidades: () => void;
-  localidadesOptions: any[];
-  isValidating: boolean;
-  isDisabled: boolean;
-  isCreating: boolean;
-  isEditing: boolean;
-  isViewing: boolean;
-  isGrupoOrganizador: boolean;
-  isOrganizadorComercializador: boolean;
-  grupoOptions: { value: string; label: string }[];
-  organizadorOptions: { value: string; label: string; gOrgInterno?: number }[];
-  selectedGrupoId: string;
-  selectedOrganizadorId: string;
-  onGrupoChange: (value: string) => void;
-  onOrganizadorChange: (value: string) => void;
-  onTextFieldChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSelectChange: (e: SelectChangeEvent<string>) => void;
-  onBlur: (field: keyof TouchedFields) => void;
-}
 
 export default function DatosReferenteSection({
   form,
   creationRole = null,
   errors,
   touched,
-  busqueda,
-  onBusquedaChange,
-  onBuscarLocalidades,
-  localidadesOptions,
-  isValidating,
   isDisabled,
   isCreating,
   isEditing,
@@ -65,130 +32,124 @@ export default function DatosReferenteSection({
   onTextFieldChange,
   onSelectChange,
   onBlur,
-}: Props) {
+}: DatosReferenteSectionProps) {
   const roleKey = String(creationRole ?? form.rol ?? "").toLowerCase();
   const isRoleGrupo = roleKey.includes("grupo");
   const isRoleOrganizador = roleKey.includes("organizador");
-  const showGrupoAutocomplete = !((isCreating || isEditing) && isRoleGrupo);
-  const showOrganizadorAutocomplete = !(((isCreating || isEditing) && isRoleOrganizador) || (isEditing && isRoleGrupo));
+
+  const hideForCreateComercializador = isCreating && roleKey === "comercializador";
+  const showGrupoAutocomplete = !hideForCreateComercializador && !((isCreating || isEditing) && isRoleGrupo);
+  const showOrganizadorAutocomplete =
+    !hideForCreateComercializador && !(((isCreating || isEditing || isViewing) && isRoleOrganizador) || (isEditing && isRoleGrupo));
+
+  const [provincias, setProvincias] = useState<SrtProvincia[]>([]);
+  const [provinciaId, setProvinciaId] = useState<number | null>(null);
+  const [localidadesSrt, setLocalidadesSrt] = useState<SrtLocalidad[]>([]);
+  const [provinciaInput, setProvinciaInput] = useState<string>(String(form.domicilioProvincia ?? ""));
+  const [localidadInput, setLocalidadInput] = useState<string>(String(form.domicilioLocalidad ?? ""));
+
+  const setField = (name: string, value: string) => {
+    onTextFieldChange({ target: { name, value } } as React.ChangeEvent<HTMLInputElement>);
+  };
+
+  useEffect(() => {
+    ArtAPI.getsrtProvinciaURL().then(setProvincias);
+  }, []);
+
+  useEffect(() => {
+    if (provinciaId == null) return;
+    ArtAPI.getLocalidadesSRT({ provinciaId }).then(setLocalidadesSrt);
+  }, [provinciaId]);
+
+  useEffect(() => {
+    if (!isEditing && !isViewing) return;
+    const codigo = String(form.domicilioCodLocalidad ?? "");
+    if (!codigo) return;
+
+    ArtAPI.getLocalidadById({ codigo }).then((loc: SrtLocalidadByCodigo) => {
+      const localidad = `${loc.codPostal} - ${loc.nombre}`;
+      setField("domicilioProvincia", loc.nombreProvincia);
+      setField("domicilioLocalidad", localidad);
+      setField("domicilioCodPostal", String(loc.codPostal));
+      setField("codLocalidad", loc.codigo);
+      setField("codPostal", String(loc.codPostal));
+      setProvinciaId(loc.provinciaId);
+      setProvinciaInput(loc.nombreProvincia);
+      setLocalidadInput(localidad);
+    });
+  }, [isEditing, isViewing, form.domicilioCodLocalidad]);
 
   return (
     <div className={styles.formSection}>
 
       <div className={styles.formRow}>
+        <Autocomplete<SrtProvincia, false, false, false>
+          disabled={isDisabled}
+          options={provincias}
+          inputValue={provinciaInput}
+          onInputChange={(_e, v) => setProvinciaInput(v)}
+          getOptionLabel={(opt) => opt.nombre}
+          isOptionEqualToValue={(opt, val) => String(opt.interno) === String(val?.interno)}
+          value={provincias.find((p) => String(p.nombre) === String(form.domicilioProvincia)) ?? null}
+          onChange={(_e, newVal) => {
+            const nombre = newVal ? newVal.nombre : "";
+            setField("domicilioProvincia", nombre);
+            setProvinciaId(newVal ? newVal.interno : null);
+            setProvinciaInput(nombre);
+          }}
+          renderInput={(params) => (
         <TextField
-          label="Búsqueda Localidad / C.P."
-          name="busqueda"
-          value={busqueda}
-          onChange={(e) => onBusquedaChange(e.target.value)}
+              {...params}
+              label="Provincia"
+              placeholder="Seleccione provincia"
+              fullWidth
+              disabled={isDisabled}
+              onBlur={() => onBlur("domicilioProvincia")}
+            />
+          )}
           fullWidth
-          className={styles.searchInput}
-          disabled={isDisabled}
-          placeholder="Buscar..."
         />
-
-        <CustomButton
-          color="primary"
-          size="small"
-          aria-label="buscar localidad"
-          onClick={onBuscarLocalidades}
+        <Autocomplete<SrtLocalidad, false, false, false>
           disabled={isDisabled}
-          className={styles.searchButton}
-        >
-          <FaSearch size={14} />
-        </CustomButton>
-
-        <div>
-          <Autocomplete
-            disabled={isDisabled}
-            options={localidadesOptions}
-            getOptionLabel={(opt: any) =>
-              String(opt?.nombreCompleto ?? opt?.nombre ?? "")
-            }
-            isOptionEqualToValue={(opt: any, val: any) =>
-              String(opt?.codigo) === String(val?.codigo)
-            }
-            value={
-              localidadesOptions.find(
-                (loc) => String(loc.codigo) === String(form.domicilioCodLocalidad)
-              ) ?? null
-            }
-            onChange={(_e, newValue: any) => {
-              const codigo = newValue ? String(newValue.codigo ?? "") : "";
-              const nombre = newValue
-                ? String(newValue.nombreCompleto ?? newValue.nombre ?? "")
-                : "";
-              const syntheticSelect = {
-                target: { name: "domicilioCodLocalidad", value: codigo },
-              } as any;
-              onSelectChange(syntheticSelect as any);
-              const syntheticText = {
-                target: { name: "domicilioLocalidad", value: nombre },
-              } as any;
-              onTextFieldChange(syntheticText as any);
-              const codigoPostal = newValue
-                ? String(newValue.codPostal ?? newValue.CodPostal ?? "")
-                : "";
-              const syntheticPostal = {
-                target: { name: "domicilioCodPostal", value: codigoPostal },
-              } as any;
-              onTextFieldChange(syntheticPostal as any);
-              const provincia = newValue
-                ? String(newValue.litProvincia ?? newValue.provincia ?? "")
-                : "";
-              const syntheticProvincia = {
-                target: { name: "domicilioProvincia", value: provincia },
-              } as any;
-              onTextFieldChange(syntheticProvincia as any);
+          options={localidadesSrt}
+          inputValue={localidadInput}
+          onInputChange={(_e, v) => setLocalidadInput(v)}
+          getOptionLabel={(opt) => `${opt.codPostal} - ${opt.nombre}`}
+          isOptionEqualToValue={(opt, val) => String(opt.interno) === String(val?.interno)}
+          value={
+            localidadesSrt.find(
+              (l) => `${l.codPostal} - ${l.nombre}` === String(form.domicilioLocalidad)
+            ) ?? null
+          }
+          onChange={(_e, newVal) => {
+            const txt = newVal ? `${newVal.codPostal} - ${newVal.nombre}` : "";
+            setField("domicilioLocalidad", txt);
+            setField("domicilioCodPostal", newVal ? String(newVal.codPostal) : "");
+            setField("domicilioCodLocalidad", newVal ? String(newVal.codigo) : "");
+            setField("codLocalidad", newVal ? String(newVal.codigo) : "");
+            setField("codPostal", newVal ? String(newVal.codPostal) : "");
+            setLocalidadInput(txt);
             }}
-            onBlur={() => onBlur("domicilioCodLocalidad")}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label="Localidad"
                 placeholder="Seleccione localidad"
-                InputLabelProps={{ shrink: !!form.domicilioLocalidad }}
-                error={
-                  touched.domicilioCodLocalidad &&
-                  !!errors.domicilioCodLocalidad
-                }
-                helperText={
-                  touched.domicilioCodLocalidad &&
-                  errors.domicilioCodLocalidad
-                }
-              />
-            )}
-          />
-
-          {isValidating && <Typography variant="caption">cargando...</Typography>}
-        </div>
-      </div>
-
-      <div className={styles.formRow}>
-        <TextField
-          label="Cód. Postal"
-          name="domicilioCodPostal"
-          value={form.domicilioCodPostal}
-          onChange={onTextFieldChange}
+              fullWidth
+              disabled={isDisabled}
+              onBlur={() => onBlur("domicilioLocalidad")}
+            />
+          )}
           fullWidth
-          disabled={isDisabled}
-          InputProps={{ readOnly: true }}
-          inputProps={{ maxLength: 4 }}
-          placeholder="Código postal"
-          className={styles.postalField}
         />
-
         <TextField
-          label="Provincia"
-          name="domicilioProvincia"
-          value={form.domicilioProvincia}
-          onChange={onTextFieldChange}
-          onBlur={() => onBlur("domicilioProvincia")}
+          label="Código postal"
+          name="domicilioCodPostal"
+          value={form.domicilioCodPostal ?? ""}
           fullWidth
           disabled={isDisabled}
           InputProps={{ readOnly: true }}
-          placeholder="Provincia"
-          InputLabelProps={{ shrink: !!form.domicilioProvincia }}
+          className={styles.postalField}
         />
       </div>
 

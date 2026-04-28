@@ -93,6 +93,7 @@ export type ComercializadorPostRequest = {
     domicilioYCalle: string,
     codLocalidad: string,
     codPostal: number
+    comercializadorAsociados?: { srtComercializadorInterno: number; tipo: string; asociadoId: number }[];
 }
 
 export type ComercializadorPostResponse = unknown;
@@ -204,3 +205,19 @@ export type ComercializadorOrganizadorById = {
 export type ComercializadorById = {
   id: number;
 } 
+
+export type SRTComercializadoresAsociadosPostRequest = {
+  srtComercializadorInterno: number,
+  tipo: string,
+  asociadoId: number
+}
+
+export type SRTComercializadoresAsociadosPostResponse = unknown;
+
+export type SRTComercializadoresAsociadosPutRequest = {
+  interno: number,
+  srtComercializadorInterno: number,
+  tipo: string,
+  asociadoId: number
+  fechaBaja: string | null;
+}
