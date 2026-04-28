@@ -27,12 +27,13 @@ const columns: ColumnDef<EvolucionRow>[] = [
 ];
 
 type EvolucionesTableProps = {
+	denunciaId?: number | string | null;
 	denunciaNro?: number | string | null;
 	empleadoNombre?: string | null;
 	empleadoCuil?: number | string | null;
 };
 
-export default function CustomTab({ denunciaNro, empleadoNombre, empleadoCuil }: EvolucionesTableProps) {
+export default function CustomTab({ denunciaId, denunciaNro, empleadoNombre, empleadoCuil }: EvolucionesTableProps) {
 	const [modalTitle, setModalTitle] = useState<string>("");
 	const [openModal, setOpenModal] = useState(false);
 
@@ -57,6 +58,7 @@ export default function CustomTab({ denunciaNro, empleadoNombre, empleadoCuil }:
 				open={openModal}
 				onClose={() => setOpenModal(false)}
 				title={modalTitle}
+				denunciaId={denunciaId}
 				denunciaNro={denunciaNro}
 				empleadoNombre={empleadoNombre ?? null}
 				empleadoCuil={empleadoCuil ?? null}

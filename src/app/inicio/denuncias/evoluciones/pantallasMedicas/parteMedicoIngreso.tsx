@@ -1,25 +1,21 @@
 import { useState } from "react";
 import { TextField } from "@mui/material";
+import DatosTrabajador from "./cabecera/datosTrabajador";
+import DatosEmpleador from "./cabecera/datosEmpleador";
+import DatosEstablecimiento from "./cabecera/datosEstablecimiento";
+import DatosSiniestro from "./cabecera/datosSiniestro";
 import { PantallaAdministrativaProps } from "../pantallasAdministrativas/types/pantallaAdministrativa";
 import CabeceraComun from "../CabeceraComun";
 import trasladoStyles from "../pantallasAdministrativas/solicitudTraslado.module.css";
 import denunciasStyles from "../../denuncias.module.css";
 
-type ConstanciaAtencionProps = PantallaAdministrativaProps;
+type ParteMedicoIngresoProps = PantallaAdministrativaProps;
 
-export default function ConstanciaAtencionMedica({
-    denunciaNro,
-    empleadoCuil,
-    empleadoNombre,
-    empleadoDocTipo,
-    empleadoDocNumero,
-    empleadorCuit,
-    empleadorRazonSocial,
-    cabecera,
-}: ConstanciaAtencionProps) {
+export default function ParteMedicoIngreso({ denunciaNro, empleadoCuil, empleadoNombre, cabecera }: ParteMedicoIngresoProps) {
     const trabajador = cabecera?.trabajador;
     const empleador = cabecera?.empleador;
-    const [descripcion, setDescripcion] = useState("");
+    const establecimiento = cabecera?.establecimiento;
+    const siniestro = cabecera?.siniestro;
     const [fecha, setFecha] = useState("");
     const [hora, setHora] = useState("");
     const [comentario, setComentario] = useState("");
@@ -28,43 +24,51 @@ export default function ConstanciaAtencionMedica({
         <div className={trasladoStyles.container}>
             <CabeceraComun denunciaNro={denunciaNro} />
             <div className={trasladoStyles.sectionBox}>
-                <div className={denunciasStyles.sectionTitle}>Datos del trabajador</div>
-                <div className={denunciasStyles.formRow}>
-                    <div className={denunciasStyles.compactField}>
-                        <TextField label="C.U.I.L." value={String(trabajador?.cuil ?? empleadoCuil ?? "")} fullWidth disabled />
-                    </div>
-                    <div className={denunciasStyles.wideField}>
-                        <TextField label="Nombre" value={trabajador?.nombre ?? empleadoNombre ?? ""} fullWidth disabled />
-                    </div>
-                    <div className={denunciasStyles.compactField}>
-                        <TextField label="Documento" value={trabajador?.docTipo ?? empleadoDocTipo ?? ""} fullWidth disabled />
-                    </div>
-                    <div className={denunciasStyles.compactFieldSmall}>
-                        <TextField label="" value={String(trabajador?.docNumero ?? empleadoDocNumero ?? "")} fullWidth disabled />
-                    </div>
-                </div>
+                <DatosTrabajador
+                    cuil={trabajador?.cuil ?? empleadoCuil ?? ""}
+                    nombre={trabajador?.nombre ?? empleadoNombre ?? ""}
+                    docTipo={trabajador?.docTipo}
+                    docNumero={trabajador?.docNumero}
+                    fechaNacimiento={trabajador?.fechaNacimiento}
+                    sexo={trabajador?.sexo}
+                    correo={trabajador?.correo}
+                    domicilioCalle={trabajador?.domicilioCalle}
+                    domicilioNro={trabajador?.domicilioNro}
+                    domicilioPiso={trabajador?.domicilioPiso}
+                    domicilioDpto={trabajador?.domicilioDpto}
+                />
             </div>
 
             <div className={trasladoStyles.sectionBox}>
-                <div className={denunciasStyles.sectionTitle}>Datos del empleador</div>
-                <div className={denunciasStyles.formRow}>
-                    <div className={denunciasStyles.compactField}>
-                        <TextField label="C.U.I.T." value={String(empleador?.cuit ?? empleadorCuit ?? "")} fullWidth disabled />
-                    </div>
-                    <div className={denunciasStyles.wideField}>
-                        <TextField label="Razón social" value={empleador?.razonSocial ?? empleadorRazonSocial ?? ""} fullWidth disabled />
-                    </div>
-                </div>
+                <DatosEmpleador
+                    cuit={empleador?.cuit}
+                    razonSocial={empleador?.razonSocial}
+                    domicilioCalle={empleador?.domicilioCalle}
+                    domicilioNro={empleador?.domicilioNro}
+                    domicilioPiso={empleador?.domicilioPiso}
+                    domicilioDpto={empleador?.domicilioDpto}
+                    telefonos={empleador?.telefonos}
+                    correos={empleador?.correos}
+                />
             </div>
 
             <div className={trasladoStyles.sectionBox}>
-                <div className={denunciasStyles.sectionTitle}>Descripción del motivo de la consulta</div>
-                <TextField
-                    multiline
-                    rows={5}
-                    fullWidth
-                    value={descripcion}
-                    onChange={(e) => setDescripcion(e.target.value)}
+                <DatosEstablecimiento
+                    cuit={establecimiento?.cuit}
+                    razonSocial={establecimiento?.razonSocial}
+                    domicilioCalle={establecimiento?.domicilioCalle}
+                    domicilioNro={establecimiento?.domicilioNro}
+                    domicilioPiso={establecimiento?.domicilioPiso}
+                    domicilioDpto={establecimiento?.domicilioDpto}
+                />
+            </div>
+
+            <div className={trasladoStyles.sectionBox}>
+                <DatosSiniestro
+                    dia={siniestro?.dia}
+                    hora={siniestro?.hora}
+                    inicioInasistencia={siniestro?.inicioInasistencia}
+                    descripcion={siniestro?.descripcion}
                 />
             </div>
 

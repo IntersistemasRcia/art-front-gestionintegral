@@ -6,7 +6,7 @@
 
 .topRow {
   display: grid;
-  grid-template-columns: 1fr 180px 140px;
+  grid-template-columns: 80px 104px 70px;
   gap: 12px;
 }
 

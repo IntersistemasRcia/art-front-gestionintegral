@@ -1154,6 +1154,7 @@ function DenunciasPage() {
       value: 1,
       content: (
         <EvolucionesTable
+          denunciaId={selectedDenunciaRow?.interno ?? null}
           denunciaNro={selectedDenunciaRow?.denunciaNro ?? null}
           empleadoNombre={selectedDenunciaRow?.empleadoNombre ?? null}
           empleadoCuil={selectedDenunciaRow?.empleadoCuil ?? null}

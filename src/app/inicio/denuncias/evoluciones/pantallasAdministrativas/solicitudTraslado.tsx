@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import dayjs from "dayjs";
+import { useState } from "react";
 import {
 	Button,
 	Checkbox,
@@ -13,26 +12,20 @@ import {
 	TextField,
 } from "@mui/material";
 import { PantallaAdministrativaProps } from "./types/pantallaAdministrativa";
+import CabeceraComun from "../CabeceraComun";
 import styles from "./solicitudTraslado.module.css";
+import denunciasStyles from "../../denuncias.module.css";
 
 export default function SolicitudTraslado({ denunciaNro, empleadoNombre, empleadoCuil }: PantallaAdministrativaProps) {
 	const [tipoTrayecto, setTipoTrayecto] = useState("soloIda");
 	const isSoloIda = tipoTrayecto === "soloIda";
 
-	const hoy = dayjs();
-	const fecha = hoy.format("DD/MM/YYYY");
-	const hora = hoy.format("HH:mm");
-
 	return (
 		<div className={styles.container}>
-			<div className={styles.topRow}>
-				<TextField label="Denuncia" value={denunciaNro ?? ""} disabled />
-				<TextField label="Fecha" value={fecha} disabled />
-				<TextField label="Hora" value={hora} disabled />
-			</div>
+			<CabeceraComun denunciaNro={denunciaNro} />
 
 			<div className={styles.sectionBox}>
-				<div className={styles.sectionTitle}>Trabajador</div>
+				<div className={denunciasStyles.sectionTitle}>Trabajador</div>
 				<div className={styles.workerRow}>
 					<TextField label="CUIL" value={empleadoCuil ?? ""} fullWidth disabled />
 					<TextField label="Nombre" value={empleadoNombre ?? ""} fullWidth disabled />
@@ -40,7 +33,7 @@ export default function SolicitudTraslado({ denunciaNro, empleadoNombre, emplead
 			</div>
 
 			<div className={styles.sectionBox}>
-				<div className={styles.sectionTitle}>Traslado (Ida)</div>
+				<div className={denunciasStyles.sectionTitle}>Traslado (Ida)</div>
 
 				<div className={styles.tripRow}>
 					<TextField label="Fecha" />
@@ -103,7 +96,7 @@ export default function SolicitudTraslado({ denunciaNro, empleadoNombre, emplead
 				</div>
 
 				<div className={`${styles.vueltaContainer} ${isSoloIda ? styles.vueltaDisabled : ""}`}>
-					<div className={`${styles.sectionTitle} ${isSoloIda ? styles.vueltaTitleDisabled : ""}`}>Traslado (vuelta)</div>
+					<div className={`${denunciasStyles.sectionTitle} ${isSoloIda ? styles.vueltaTitleDisabled : ""}`}>Traslado (vuelta)</div>
 
 					<div className={styles.routeBox}>
 						<div className={styles.routeTitle}>Desde</div>
