@@ -1,113 +1,22 @@
 import { AxiosError } from "axios";
-import UsuarioAPI, { type UsuarioUpdatePayload } from "@/data/usuarioAPI";
+import UsuarioAPI from "@/data/usuarioAPI";
 import { useAuth } from '@/data/AuthContext';
 import ArtAPI from "@/data/artAPI";
-import AuthAPI, {
-  USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX,
-  USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
-  type UsuarioEmpresasUsuarioLogueadoItem,
-} from "@/data/authAPI";
+import AuthAPI from "@/data/authAPI";
 import IUsuarioDarDeBaja from "./interfaces/IUsuarioDarDeBajaReactivar";
 import UsuarioRow from "./interfaces/UsuarioRow";
 
 const { useGetAll, useGetRoles, registrar, tareasUpdate, update, darDeBaja, reactivar, useGetCargos, reestablecer, reenviarCorreo } = UsuarioAPI;
 const { useGetRefEmpleadores } = ArtAPI;
 
-export type UseUsuariosListFilter = {
-  porEmpresaIds: number[];
-  /**
-   * Si true, se llama al POST aunque `porEmpresaIds` esté vacío
-   * (Administrador + "Todas las empresas" → `empresasId: []` en el body).
-   */
-  allowEmptyEmpresasPost?: boolean;
-  /** Página actual (1-based), igual que en el body del POST. */
-  pageIndex?: number;
-  pageSize?: number;
-};
+export default function useUsuarios(empresaId?: number) {
+  
+  const { user, status } = useAuth();   
+  const params = empresaId !== undefined
+    ? { empresaId }
+    : (user?.empresaId == 0 ? {} : { empresaId: user?.empresaId });
 
-function mapUsuarioEmpresasLogueadoItemToRow(
-  u: UsuarioEmpresasUsuarioLogueadoItem
-): UsuarioRow {
-  const firstEmpresa = u.empresas?.[0];
-  return {
-    id: u.id,
-    cuit: String(u.cuit ?? ""),
-    nombre: u.nombre ?? "",
-    tipo: u.tipo ?? "",
-    sectorId: u.sectorId,
-    titulo: u.titulo,
-    matricula: u.matricula,
-    userName: u.userName ?? "",
-    email: u.email ?? "",
-    estado: u.estado ?? "",
-    phoneNumber: u.phoneNumber ?? "",
-    phoneNumberConfirmed: Boolean(u.phoneNumberConfirmed),
-    cargoId: u.cargoId ?? 0,
-    cargoDescripcion: u.cargoDescripcion ?? "",
-    rol: u.rol ?? "",
-    empresaId: firstEmpresa?.empresaId ?? 0,
-    deletedDate: u.deletedDate ?? null,
-    modulos: (u.modulos ?? []) as UsuarioRow["modulos"],
-  };
-}
-
-export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
-  const { user } = useAuth();
-  const legacyParams =
-    listFilter === undefined
-      ? user?.empresaId === 0
-        ? {}
-        : { empresaId: user?.empresaId }
-      : null;
-
-  const {
-    data: usuariosData,
-    error: usuariosError,
-    isLoading: usuariosLoading,
-    mutate: mutateUsuariosLegacy,
-  } = useGetAll(legacyParams);
-
-  const quierePostListadoUsuariosEmpresa =
-    listFilter !== undefined &&
-    (listFilter.porEmpresaIds.length > 0 ||
-      Boolean(listFilter.allowEmptyEmpresasPost));
-
-  const listadoSinEmpresasSinPost =
-    listFilter !== undefined &&
-    listFilter.porEmpresaIds.length === 0 &&
-    !listFilter.allowEmptyEmpresasPost;
-
-  const postBody = quierePostListadoUsuariosEmpresa
-    ? {
-        empresasId: listFilter!.porEmpresaIds,
-        pageIndex:
-          listFilter!.pageIndex ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX,
-        pageSize:
-          listFilter!.pageSize ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
-      }
-    : null;
-
-  const {
-    data: usuariosPorEmpresasData,
-    error: usuariosPorEmpresasError,
-    isLoading: usuariosPorEmpresasLoading,
-    mutate: mutateUsuariosPorEmpresas,
-  } = AuthAPI.useUsuariosEmpresasUsuarioLogueado(postBody);
-
-  const usuariosDataResolved =
-    listFilter !== undefined
-      ? listadoSinEmpresasSinPost
-        ? { data: [] as UsuarioRow[] }
-        : usuariosPorEmpresasData
-      : usuariosData;
-  const usuariosLoadingResolved =
-    listFilter !== undefined
-      ? listadoSinEmpresasSinPost
-        ? false
-        : usuariosPorEmpresasLoading
-      : usuariosLoading;
-  const usuariosErrorResolved =
-    listFilter !== undefined ? usuariosPorEmpresasError : usuariosError;
+  const { data: usuariosData, error: usuariosError, isLoading: usuariosLoading, mutate: mutateUsuarios } = useGetAll(params);
   const { data: roles, error: rolesError, isLoading: rolesLoading } = useGetRoles();  
   const {
     data: cargos,
@@ -120,35 +29,7 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
   const { data: refEmpleadores } = useGetRefEmpleadores();
   const { data: sectores } = AuthAPI.useGetRefSectores();
 
-  const mutateUsuarios = async () => {
-    if (listFilter !== undefined && quierePostListadoUsuariosEmpresa) {
-      await mutateUsuariosPorEmpresas();
-    } else if (listFilter === undefined) {
-      await mutateUsuariosLegacy();
-    }
-  };
-
-  const rawUsuarios = usuariosDataResolved?.data ?? [];
-  const usuariosNormalizados: UsuarioRow[] =
-    listFilter !== undefined
-      ? (rawUsuarios as UsuarioEmpresasUsuarioLogueadoItem[]).map(
-          mapUsuarioEmpresasLogueadoItemToRow
-        )
-      : (rawUsuarios as UsuarioRow[]);
-
-  const usuariosListadoMeta =
-    listFilter !== undefined &&
-    quierePostListadoUsuariosEmpresa &&
-    usuariosPorEmpresasData
-      ? {
-          index: usuariosPorEmpresasData.index,
-          size: usuariosPorEmpresasData.size,
-          pages: usuariosPorEmpresasData.pages,
-          count: usuariosPorEmpresasData.count,
-        }
-      : null;
-
-  const usuarios: UsuarioRow[] = usuariosNormalizados.map((usuario) => {
+  const usuarios: UsuarioRow[] = (usuariosData?.data || []).map((usuario) => {
     const usuarioConSector = usuario as UsuarioRow & { SectorId?: number | string };
     const resolvedSectorId =
       usuarioConSector.sectorId ??
@@ -169,10 +50,10 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
     try {
       // Usa el fetcher importado para la petición POST, especificando los tipos genéricos
       // await fetcher("UsuarioAPI", "registrar", { data: formData });
-      const createdUser = await registrar(formData);
+      await registrar(formData);
       // Con SWR, usa mutate para revalidar automáticamente los datos.
       await mutateUsuarios();
-      return { success: true, data: createdUser };
+      return { success: true };
     } catch (err) {
       console.log("error",err)
       const error = (err instanceof AxiosError) ? err : new AxiosError("Error desconocido al registrar usuario");
@@ -180,7 +61,7 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
     }
   };
 
-  const usuarioUpdate = async (usuarioId: string, formData: UsuarioUpdatePayload) => {
+  const usuarioUpdate = async (usuarioId: string, formData: any) => {
     // Obtener email previo para comparar después del update
     const existing = usuarios.find((u) => String(u.id) === String(usuarioId));
     const previousEmail = existing?.email;
@@ -286,12 +167,11 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
 
   return {
     usuarios,
-    usuariosListadoMeta,
     roles: roles || [],
     cargos: cargos || [],
     refEmpleadores: refEmpleadores || [],
-    loading: usuariosLoadingResolved || rolesLoading,
-    error: usuariosErrorResolved || rolesError,
+    loading: usuariosLoading || rolesLoading,
+    error: usuariosError || rolesError,
     registrarUsuario,
     actualizarPermisosUsuario,
     usuarioUpdate,

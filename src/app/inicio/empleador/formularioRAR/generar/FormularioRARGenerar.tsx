@@ -128,9 +128,6 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     // Estado para mostrar errores
   const [mensajeError, setMensajeError] = React.useState<string>('');
 
-  // Filtro por CUIL en la tabla de trabajadores cargados
-  const [filtroCuil, setFiltroCuil] = React.useState<string>('');
-
   const guardandoRef = React.useRef(false);
 
   // ===== Funciones para manejo de trabajadores =====
@@ -163,7 +160,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   // ===== Configuración de columnas para DataTable =====
   const columnasTabla = React.useMemo(() => [
     {
-      accessorKey: 'CUILDisplay',
+      accessorKey: 'CUIL',
       header: 'CUIL',
       size: 120,
     },
@@ -272,17 +269,12 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   const filasTabla = React.useMemo(() => {
     return filas.map((f) => ({
       ...f,
-      CUILDisplay: f.CUIL ? Formato.CUIP(f.CUIL) : '',
       IngresoDisplay: f.Ingreso ? Formato.Fecha(f.Ingreso, 'DD/MM/YYYY') : '',
       FechaInicioDisplay: f.FechaInicio ? Formato.Fecha(f.FechaInicio, 'DD/MM/YYYY') : '',
       FechaFinExposicionDisplay: f.FechaFinExposicion ? Formato.Fecha(f.FechaFinExposicion, 'DD/MM/YYYY') : '',
       UltimoExamenMedicoDisplay: f.UltimoExamenMedico ? Formato.Fecha(f.UltimoExamenMedico, 'DD/MM/YYYY') : '',
     }));
   }, [filas]);
-
-  const filasTablaFiltradas = filtroCuil
-    ? filasTabla.filter(f => normalizarCuil(f.CUIL).startsWith(normalizarCuil(filtroCuil)))
-    : filasTabla;
 
   // ===== Helpers =====
   const numerosValidos = (v: string) => {
@@ -584,25 +576,30 @@ React.useEffect(() => {
         }
 
         // Agentes
-        try {
-          const agArr = await ArtAPI.getAgentesCausantes();
-          const opcionesAgentes: OpcionAgente[] = agArr
-            .filter(a => a.codigo || a.agenteCausante)
-            .map(a => ({
-              interno: a.interno,
-              codigo: a.codigo,
-              agenteCausante: a.agenteCausante,
-              agenteTipo: a.agenteTipo,
-              displayText: `${a.codigo || 'S/C'} - ${a.agenteCausante || 'Sin descripción'}`
-            }));
-          if (!cancel) setAgentesCausantes(opcionesAgentes);
-        } catch (e) {
-          console.error('Error cargando agentes causantes:', e);
-        }
+        const respAg = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
+        const agentes = respAg.ok ? await respAg.json() : [];
+        const agArr = Array.isArray(agentes)
+          ? agentes
+          : agentes?.data
+            ? (Array.isArray(agentes.data) ? agentes.data : [agentes.data])
+            : (agentes ? [agentes] : []);
+
+        const opcionesAgentes: OpcionAgente[] = agArr
+          .filter((a: any) => a && (a.codigo || a.agenteCausante))
+          .map((a: any) => ({
+            interno: Number(a.interno || 0),
+            codigo: Number(a.codigo || 0),
+            agenteCausante: String(a.agenteCausante || ''),
+            agenteTipo: String(a.agenteTipo || ''),
+            displayText: `${a.codigo || 'S/C'} - ${a.agenteCausante || 'Sin descripción'}`
+          }));
+
+        if (!cancel) setAgentesCausantes(opcionesAgentes);
       } catch (e) {
-        console.error('Error cargando establecimientos:', e);
+        console.error('Error cargando selects:', e);
         if (!cancel) {
           setOpcionesEstablecimientos([]);
+          setAgentesCausantes([]);
         }
       } finally {
         if (!cancel) setCargandoSelects(false);
@@ -1813,19 +1810,12 @@ React.useEffect(() => {
           {/* TABLA DE TRABAJADORES CARGADOS */}
           {filas.length > 0 && (
             <div className={styles.tablaTrabajadoresContainer}>
-
-              <div className={styles.buscadorCuil}>
-                <TextField
-                  label="Buscador por CUIL"
-                  value={filtroCuil}
-                  onChange={(e) => setFiltroCuil(e.target.value)}
-                  size="small"
-                  placeholder="Ingresá el CUIL a buscar..."
-                />
-              </div>
+              <h4 className={styles.tablaTrabajadoresTitle}>
+                Trabajadores Cargados
+              </h4>
 
               <DataTableImport
-                data={filasTablaFiltradas}
+                data={filasTabla}
                 columns={columnasTabla}
                 size="small"
                 pageSizeOptions={[5, 10, 15]}

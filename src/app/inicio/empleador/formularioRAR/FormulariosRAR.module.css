@@ -58,9 +58,6 @@
 /* Contenedor de tabla con título */
 .tableBlock { margin-top: 60px; width: 100%; }
 
-/* Buscador por CUIL en tabla de trabajadores */
-.buscadorCuil { margin-bottom: 12px; }
-
 /* Compactar tabla (antes estaba en <style jsx>) */
 .compactTable :global(table) {
   font-size: 12px;

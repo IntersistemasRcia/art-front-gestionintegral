@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import AuthAPI from "./authAPI";
-import ArtAPI from "./artAPI";
 import { useEmpresasStore } from "./empresasStore";
 
 export const useEmpresasLoader = () => {
@@ -34,30 +33,15 @@ export const useEmpresasLoader = () => {
         try {
           setLoading(true);
           setError(null);
-
-          const userRole = String((session.user as any)?.rol ?? "").toLowerCase();
-          const isAdministrador = userRole === "administrador";
-
-          if (isAdministrador) {
-            // Para Administrador, cargar TODAS las empresas desde /api/Empresas.
-            const empresasRef = await ArtAPI.getRefEmpleadores();
-            const empresasData = (empresasRef ?? []).map((empresa) => ({
-              empresaId: Number(empresa.interno),
-              cuit: Number(empresa.cuit),
-              razonSocial: String(empresa.razonSocial ?? ""),
-              domicilio: "",
-              localidad: "",
-              provincia: "",
-            }));
-            setEmpresas(empresasData);
-            return;
-          }
-
-          // Para el resto de roles, mantener filtro por CUIT del usuario.
+          
+          // Obtener el CUIT del usuario si está disponible
           const userCuit = (session.user as any)?.cuit;
+          
+          // Llamar al endpoint con el CUIT si está disponible
           const empresasData = await AuthAPI.getEmpresas(
             userCuit ? { CUIT: userCuit } : {}
           );
+          
           setEmpresas(empresasData || []);
         } catch (error) {
           console.error("Error al cargar empresas:", error);

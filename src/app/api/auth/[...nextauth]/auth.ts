@@ -43,14 +43,8 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         const { token: tkn, ...usr } = user as UsuarioVm;
-        // Evita inflar la cookie JWT con estructuras grandes (ej: empresas).
-        // NextAuth guarda el JWT en cookie y puede provocar HTTP 431.
-        const { empresas: _empresas, ...usrSinEmpresas } = usr;
-        token.user = usrSinEmpresas;
+        token.user = usr;
         token.data = tkn;
-      }
-      if (token.user && typeof token.user === "object" && "empresas" in (token.user as Record<string, unknown>)) {
-        delete (token.user as Record<string, unknown>).empresas;
       }
       return token;
     },

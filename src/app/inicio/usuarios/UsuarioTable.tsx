@@ -15,14 +15,6 @@ import { BsEnvelopeArrowUpFill } from "react-icons/bs";
 import Formato from "@/utils/Formato";
 import styles from "./UsuarioTable.module.css";
 
-type UsuarioTableServerPagination = {
-  /** Página actual (1-based), alineado al POST y al `DataTable`. */
-  pageIndex: number;
-  pageSize: number;
-  pageCount: number;
-  onPageChange: (pageIndex1Based: number) => void;
-};
-
 interface Props {
   data: UsuarioRow[];
   onEdit: (row: UsuarioRow) => void;
@@ -34,23 +26,9 @@ interface Props {
   onReestablecer: (row: UsuarioRow) => Promise<void>;
   onReenviarCorreo: (row: UsuarioRow) => Promise<void>;
   isLoading: boolean;
-  /** Paginación en servidor (listado por empresas). */
-  serverPagination?: UsuarioTableServerPagination;
 }
 
-export default function UsuarioTable({
-  data,
-  onEdit,
-  onDelete,
-  onView,
-  onActivate,
-  onRemove,
-  onPermisos,
-  onReestablecer,
-  onReenviarCorreo,
-  isLoading,
-  serverPagination,
-}: Props) {
+export default function UsuarioTable({ data, onEdit, onDelete, onView, onActivate, onRemove, onPermisos, onReestablecer, onReenviarCorreo, isLoading }: Props) {
   const { user } = useAuth();  
   const { hasTask } = useAuth();
   const isAdmin = user?.rol?.toLowerCase() === "administrador"
@@ -339,17 +317,5 @@ export default function UsuarioTable({
     [onEdit, onDelete, onView, onPermisos, onActivate, hasTask, disabledButtons.reestablecer, disabledButtons.reenviarCorreo, handleReestablecerClick, handleReenviarCorreoClick]
   );
 
-  return (
-    <DataTable
-      data={data}
-      columns={columns}
-      isLoading={isLoading}
-      size="small"
-      manualPagination={Boolean(serverPagination)}
-      pageIndex={serverPagination?.pageIndex}
-      pageSize={serverPagination?.pageSize}
-      pageCount={serverPagination?.pageCount}
-      onPageChange={serverPagination?.onPageChange}
-    />
-  );
+  return <DataTable data={data} columns={columns} isLoading={isLoading} size="small" />;
 }

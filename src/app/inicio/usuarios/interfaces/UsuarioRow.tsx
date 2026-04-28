@@ -1,7 +1,7 @@
 import IModulo from "./IModulo";
 
 export default interface UsuarioRow {
-  id: number | string;
+  id: number;
   cuit: string;
   nombre: string;
   tipo: string;
