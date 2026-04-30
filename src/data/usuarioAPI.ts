@@ -118,6 +118,10 @@ export interface UsuarioGetAllParams {
   pageSize?: number;
 }
 export interface UsuarioGetAllResult {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
   data: UsuarioRow[];
 }
 //#endregion /api/Usuario/GetAll types
