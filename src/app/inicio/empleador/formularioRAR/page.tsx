@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState, SyntheticEvent, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, SyntheticEvent, useRef } from 'react';
 import { IconButton, Box, Tooltip } from "@mui/material";
 import { useAuth } from '@/data/AuthContext';
 import Formato from '@/utils/Formato';
@@ -24,6 +24,7 @@ import FormularioRARGenerar from './generar/FormularioRARGenerar';
 
 // Ruta del logo para el PDF
 const pdfLogoSrc = '/icons/LogoTexto.png';
+const API_ART_BASE_URL = (process.env.NEXT_PUBLIC_API_ART_URL ?? '').replace(/\/$/, '');
 
 
 /* Helpers */
@@ -39,15 +40,38 @@ const Spinner: React.FC = () => (
 );
 
 type ViewMode = 'list' | 'crear' | 'editar';
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+const EMPRESA_OPCION_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+  cuit: 0,
+  razonSocial: "Todas las Empresas",
+  domicilio: "",
+  localidad: "",
+  provincia: "",
+};
 
 const FormulariosRAR: React.FC = () => {
   const { user } = useAuth();
+  const isAdmin = user?.rol?.toLowerCase() === "administrador";
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT, cuit } = user as any;
 
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
+  const sessionEmpresaIds = useMemo(() => {
+    const fromSession = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => e.empresaId)
+      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
+    const unique = Array.from(new Set(fromSession));
+    if (unique.length > 0) return unique;
+    return Array.from(new Set(empresas.map((e) => e.empresaId)));
+  }, [user?.empresas, empresas]);
+  const opcionesEmpresaSelector = useMemo(
+    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    [empresas]
+  );
 
   const [loading, setLoading] = useState<boolean>(false);
   const [internoFormularioRAR, setInternoFormularioRAR] = useState<number>(0);
@@ -86,16 +110,23 @@ const FormulariosRAR: React.FC = () => {
 
   // Seleccionar automáticamente si solo hay una empresa
   useEffect(() => {
-    if (!isLoadingEmpresas) {
-      if (empresas.length === 1) {
-        setEmpresaSeleccionada(empresas[0]);
-        seleccionAutomaticaRef.current = true;
-      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-        setEmpresaSeleccionada(null);
-        seleccionAutomaticaRef.current = false;
-      }
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
     }
-  }, [empresas.length, isLoadingEmpresas]);
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresaSeleccionada((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas]);
 
   // Limpiar formularios cuando cambia la empresa seleccionada
   useEffect(() => {
@@ -105,7 +136,7 @@ const FormulariosRAR: React.FC = () => {
     setDetallesInterno([]);
     setErrorDetalles('');
     setPageIndex(0);
-  }, [empresaSeleccionada?.cuit]);
+  }, [empresaSeleccionada?.empresaId]);
 
   const handleEmpresaChange = (
     _event: React.SyntheticEvent,
@@ -117,15 +148,31 @@ const FormulariosRAR: React.FC = () => {
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
     if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return "Todas las Empresas";
     return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
   };
+
+  const empresaIdsFiltro = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      if (isAdmin) return [];
+      return sessionEmpresaIds;
+    }
+    return [empresaSeleccionada.empresaId];
+  }, [empresaSeleccionada, isAdmin, sessionEmpresaIds]);
+
+  const canFetchFormularios = useMemo(() => {
+    if (!empresaSeleccionada) return false;
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return true;
+    return empresaIdsFiltro.length > 0;
+  }, [empresaSeleccionada, empresaIdsFiltro]);
 
   // Usamos el hook SWR del API (solo hace fetch si existe token y respeta las opciones de revalidate)
   // Solo hace fetch si hay una empresa seleccionada
   // SWR detectará automáticamente cuando cambia el CUIT porque está en la clave
   const apiPageIndex = PageIndex;
-  const paramsFormularios = empresaSeleccionada?.cuit 
-    ? { CUIT: empresaSeleccionada.cuit, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' } 
+  const paramsFormularios = canFetchFormularios
+    ? { empresasId: empresaIdsFiltro, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' }
     : undefined;
   
   const { data: formulariosData, error: formulariosError, isLoading: isLoadingSWR, isValidating, mutate: mutateFormularios } =
@@ -134,7 +181,7 @@ const FormulariosRAR: React.FC = () => {
   // Sincronizar el estado de loading con SWR
   useEffect(() => {
     // Si no hay empresa seleccionada, mantener tabla vacía y no mostrar loading
-    if (!empresaSeleccionada?.cuit) {
+    if (!canFetchFormularios) {
       setFormulariosRAR([]);
       setLoading(false);
       setPageCount(1);
@@ -143,12 +190,12 @@ const FormulariosRAR: React.FC = () => {
 
     // Usar el estado de loading de SWR directamente
     setLoading(isLoadingSWR || isValidating);
-  }, [empresaSeleccionada?.cuit, isLoadingSWR, isValidating]);
+  }, [canFetchFormularios, isLoadingSWR, isValidating]);
 
   // Una sola vez: cuando llegan datos, los mapeamos al estado local
   useEffect(() => {
     // Si no hay empresa seleccionada, no procesar datos
-    if (!empresaSeleccionada?.cuit) {
+    if (!canFetchFormularios) {
       return;
     }
 
@@ -199,7 +246,7 @@ const FormulariosRAR: React.FC = () => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formulariosData, formulariosError, empresaSeleccionada?.cuit, isLoadingSWR, isValidating]);
+  }, [formulariosData, formulariosError, canFetchFormularios, isLoadingSWR, isValidating]);
 
   // Handler que se pasa al DataTable para solicitar otra página
   const handlePageChange = (newPageIndex: number) => {
@@ -300,7 +347,7 @@ const FormulariosRAR: React.FC = () => {
 
           let mapaAgentes = new Map<number, string>();
           try {
-            const rAg = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
+            const rAg = await fetch(`${API_ART_BASE_URL}/api/AgentesCausantes`);
             if (rAg.ok) {
               const agentes = await rAg.json();
               const arr = Array.isArray(agentes) ? agentes : agentes?.data ? (Array.isArray(agentes.data) ? agentes.data : [agentes.data]) : [agentes];
@@ -1019,7 +1066,7 @@ const FormulariosRAR: React.FC = () => {
           {/* Selector de empresa */}
           <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
             <CustomSelectSearch<Empresa>
-              options={empresas}
+              options={opcionesEmpresaSelector}
               getOptionLabel={getEmpresaLabel}
               value={empresaSeleccionada}
               onChange={handleEmpresaChange}
@@ -1030,7 +1077,7 @@ const FormulariosRAR: React.FC = () => {
               noOptionsText={
                 isLoadingEmpresas
                   ? "Cargando..."
-                  : empresas.length === 0
+                  : opcionesEmpresaSelector.length <= 1
                   ? "No hay empresas disponibles"
                   : "No se encontraron empresas"
               }

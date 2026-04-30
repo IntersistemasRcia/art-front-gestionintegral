@@ -11,6 +11,7 @@ import styles from './ClientLayoutWrapper.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/data/AuthContext'; // Importa el hook de contexto
 import { useEmpresasLoader } from '@/data/useEmpresasLoader';
+import { useEmpresasStore } from '@/data/empresasStore';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 
 const formatTitleFromPath = (pathname: string): string => {
@@ -54,6 +55,8 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   const router = useRouter();
   const { status, session } = useAuth(); // Obtén el estado y la sesión del contexto
   const [isExpiredSessionModalOpen, setIsExpiredSessionModalOpen] = useState(false);
+  const [isEmptyEmpresasModalOpen, setIsEmptyEmpresasModalOpen] = useState(false);
+  const { emptyEmpresasMessage, setEmptyEmpresasMessage } = useEmpresasStore();
   
   // Cargar empresas automáticamente cuando el usuario esté autenticado
   useEmpresasLoader();
@@ -100,8 +103,20 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     return () => window.clearTimeout(timeoutId);
   }, [status, sessionExpires]);
 
+  useEffect(() => {
+    if (emptyEmpresasMessage) {
+      setIsEmptyEmpresasModalOpen(true);
+    }
+  }, [emptyEmpresasMessage]);
+
   const handleExpiredSessionModalClose = async () => {
     setIsExpiredSessionModalOpen(false);
+    await signOut({ callbackUrl: '/login' });
+  };
+
+  const handleEmptyEmpresasModalClose = async () => {
+    setIsEmptyEmpresasModalOpen(false);
+    setEmptyEmpresasMessage(null);
     await signOut({ callbackUrl: '/login' });
   };
 
@@ -125,6 +140,13 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         message="La sesion expiró. Por favor vuelva a Iniciar Sesión."
         type="warning"
         title="Sesión expirada"
+      />
+      <CustomModalMessage
+        open={isEmptyEmpresasModalOpen}
+        onClose={handleEmptyEmpresasModalClose}
+        message={emptyEmpresasMessage ?? ""}
+        type="warning"
+        title="Atención"
       />
       <Navbar />
       <div className={styles.mainLayout}>

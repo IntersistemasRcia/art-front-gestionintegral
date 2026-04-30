@@ -8,8 +8,15 @@ import { useEmpresasStore } from "./empresasStore";
 
 export const useEmpresasLoader = () => {
   const { data: session, status } = useSession();
-  const { setEmpresas, setLoading, setError, empresas, isLoading, clearEmpresas } =
-    useEmpresasStore();
+  const {
+    setEmpresas,
+    setLoading,
+    setError,
+    setEmptyEmpresasMessage,
+    empresas,
+    isLoading,
+    clearEmpresas,
+  } = useEmpresasStore();
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -34,6 +41,7 @@ export const useEmpresasLoader = () => {
         try {
           setLoading(true);
           setError(null);
+          setEmptyEmpresasMessage(null);
 
           const userRole = String((session.user as any)?.rol ?? "").toLowerCase();
           const isAdministrador = userRole === "administrador";
@@ -58,7 +66,15 @@ export const useEmpresasLoader = () => {
           const empresasData = await AuthAPI.getEmpresas(
             userCuit ? { CUIT: userCuit } : {}
           );
-          setEmpresas(empresasData || []);
+          const resolvedEmpresas = empresasData || [];
+          setEmpresas(resolvedEmpresas);
+          if (resolvedEmpresas.length === 0) {
+            const userName = String((session.user as any)?.userName ?? "").trim();
+            const nombreUsuario = userName || "sin nombre";
+            setEmptyEmpresasMessage(
+              `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
+            );
+          }
         } catch (error) {
           console.error("Error al cargar empresas:", error);
           setError(
@@ -82,6 +98,7 @@ export const useEmpresasLoader = () => {
     setEmpresas,
     setLoading,
     setError,
+    setEmptyEmpresasMessage,
     clearEmpresas,
   ]);
 };

@@ -65,10 +65,14 @@ export type ApiAgenteCausante = {
 };
 
 export type ApiFormulariosRGRLParams = {
+  empresasId?: number[];
   CUIT?: number | string;
   PageIndex?: number;
   PageSize?: number;
   OrderBy?: string;
+  pageIndex?: number;
+  pageSize?: number;
+  orderBy?: string;
 };
 
 export type ApiFormulariosRGRLResponse = {
@@ -77,6 +81,22 @@ export type ApiFormulariosRGRLResponse = {
   pages: number;
   count: number;
   data: ApiFormularioRGRL[];
+};
+
+type GetFormulariosRARBySpecsBody = {
+  empresasId: number[];
+  fechaPresentacion?: string;
+  refEstablecimientoId?: number;
+  pageIndex: number;
+  pageSize: number;
+  orderBy: string;
+};
+
+type GetFormulariosRGRLBySpecsBody = {
+  empresasId: number[];
+  pageIndex: number;
+  pageSize: number;
+  orderBy: string;
 };
 
 export type FormularioRGRLCreateRequest = {
@@ -217,30 +237,46 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion Establecimiento CUIT
 
   //#region FormulariosRAR
-  readonly getFormulariosRARURL = (params: ParametersFormularioRar = {}) => {
-    //params.CUIT ??= useAuth().user?.empresaCUIT ?? 0; este parametro lo paso desde el componente que lo usa
-    return this.getURL({ path: "/api/FormulariosRAR", search: toURLSearch(params) }).toString();
+  readonly getFormulariosRARURL = () =>
+    this.getURL({ path: "/api/FormulariosRAR/GetBySpecs" }).toString();
+  getFormulariosRAR = async (params: ParametersFormularioRar & { empresasId?: number[] } = {}) => {
+    const body: GetFormulariosRARBySpecsBody = {
+      empresasId: Array.isArray(params.empresasId) ? params.empresasId : [],
+      fechaPresentacion: params.FechaPresentacion,
+      refEstablecimientoId: params.RefEstablecimientoId,
+      pageIndex: params.PageIndex ?? 0,
+      pageSize: params.PageSize ?? 10,
+      orderBy: params.OrderBy ?? "-Interno",
+    };
+    return tokenizable.post(this.getFormulariosRARURL(), body).then(({ data }) => data);
   };
-  getFormulariosRAR = async (params: ParametersFormularioRar = {}) => tokenizable.get(
-    this.getFormulariosRARURL(params),
-  ).then(({ data }) => data);
-  useGetFormulariosRARURL = (params?: ParametersFormularioRar) => {
+  useGetFormulariosRARURL = (params?: ParametersFormularioRar & { empresasId?: number[] }) => {
     // Obtener el token de la sesión de forma confiable
     const { data: session } = useSession();
     const accessToken = session?.accessToken;
 
-    // Construir la clave SWR de forma estable
-    // La clave debe cambiar cuando cambia el CUIT para que SWR detecte el cambio automáticamente
-    // SWR detectará el cambio en la clave y ejecutará el query automáticamente
-    const key = params && params.CUIT && params.CUIT > 0 && accessToken
-      ? [this.getFormulariosRARURL(params), accessToken, params.CUIT, params.PageIndex ?? 0, params.PageSize ?? 10]
+    const paramsWithEmpresas = params as (ParametersFormularioRar & { empresasId?: number[] }) | undefined;
+    const hasEmpresasArray = Boolean(
+      paramsWithEmpresas && Array.isArray(paramsWithEmpresas.empresasId)
+    );
+    const key = paramsWithEmpresas && hasEmpresasArray && accessToken
+      ? [
+          this.getFormulariosRARURL(),
+          accessToken,
+          JSON.stringify(paramsWithEmpresas.empresasId),
+          paramsWithEmpresas.PageIndex ?? 0,
+          paramsWithEmpresas.PageSize ?? 10,
+          paramsWithEmpresas.OrderBy ?? "-Interno",
+          paramsWithEmpresas.FechaPresentacion ?? "",
+          paramsWithEmpresas.RefEstablecimientoId ?? 0,
+        ]
       : null;
 
     // Log para debug en desarrollo
     if (process.env.NODE_ENV === 'development') {
       if (key) {
         console.log('[useGetFormulariosRARURL] Clave SWR:', key);
-        console.log('[useGetFormulariosRARURL] CUIT:', params?.CUIT);
+        console.log('[useGetFormulariosRARURL] empresasId:', paramsWithEmpresas?.empresasId);
       } else {
         console.log('[useGetFormulariosRARURL] Clave SWR es null - params:', params, 'accessToken:', !!accessToken);
       }
@@ -250,9 +286,9 @@ export class ArtAPIClass extends ExternalAPI {
       key,
       key ? () => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[useGetFormulariosRARURL] Ejecutando fetcher con CUIT:', params?.CUIT);
+          console.log('[useGetFormulariosRARURL] Ejecutando fetcher con empresasId:', paramsWithEmpresas?.empresasId);
         }
-        return this.getFormulariosRAR(params!);
+        return this.getFormulariosRAR(paramsWithEmpresas ?? {});
       } : null,
       {
         // No volver a revalidar al volver al foco o reconectar
@@ -334,13 +370,29 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region FormulariosRGRL
-  readonly getFormulariosRGRLURL = (params: ApiFormulariosRGRLParams = {}) =>
-    this.getURL({ path: "/api/FormulariosRGRL", search: toURLSearch({ OrderBy: "-creacionFechaHora", ...params }) }).toString();
-  getFormulariosRGRL = async (params: ApiFormulariosRGRLParams = {}): Promise<ApiFormulariosRGRLResponse> =>
-    tokenizable.get<ApiFormulariosRGRLResponse>(this.getFormulariosRGRLURL(params)).then(({ data }) => data);
+  readonly getFormulariosRGRLURL = () =>
+    this.getURL({ path: "/api/FormulariosRGRL/GetBySpecs" }).toString();
+  getFormulariosRGRL = async (params: ApiFormulariosRGRLParams = {}): Promise<ApiFormulariosRGRLResponse> => {
+    const body: GetFormulariosRGRLBySpecsBody = {
+      empresasId: Array.isArray(params.empresasId) ? params.empresasId : [],
+      pageIndex: params.pageIndex ?? params.PageIndex ?? 0,
+      pageSize: params.pageSize ?? params.PageSize ?? 10,
+      orderBy: params.orderBy ?? params.OrderBy ?? "-creacionFechaHora",
+    };
+    return tokenizable
+      .post<ApiFormulariosRGRLResponse>(this.getFormulariosRGRLURL(), body)
+      .then(({ data }) => data);
+  };
   useGetFormulariosRGRL = (params: ApiFormulariosRGRLParams = {}) =>
     useSWR(
-      [this.getFormulariosRGRLURL(params), token.getToken()],
+      [
+        this.getFormulariosRGRLURL(),
+        token.getToken(),
+        JSON.stringify(params.empresasId ?? []),
+        params.pageIndex ?? params.PageIndex ?? 0,
+        params.pageSize ?? params.PageSize ?? 10,
+        params.orderBy ?? params.OrderBy ?? "-creacionFechaHora",
+      ],
       () => this.getFormulariosRGRL(params),
       {
         revalidateOnFocus: false,
