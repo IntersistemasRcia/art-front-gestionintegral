@@ -4,6 +4,8 @@ import DataTable from "@/utils/ui/table/DataTable";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import styles from "../denuncias.module.css";
 import FormularioEvoluciones from "./FormularioEvoluciones";
+import ArtAPI from "@/data/artAPI";
+import { DenunciaInstanciaItem } from "./types/evoluciones";
 
 type EvolucionRow = {
 	fecha: string;
@@ -11,13 +13,6 @@ type EvolucionRow = {
 	tipoEvolucion: string;
 	estado: string;
 };
-
-const data: EvolucionRow[] = [
-	{ fecha: "22/04/2026", hora: "08:15", tipoEvolucion: "Carga inicial", estado: "Pendiente" },
-	{ fecha: "22/04/2026", hora: "09:40", tipoEvolucion: "Validacion medica", estado: "En revision" },
-	{ fecha: "22/04/2026", hora: "11:05", tipoEvolucion: "Actualizacion de datos", estado: "Aprobada" },
-	{ fecha: "22/04/2026", hora: "12:30", tipoEvolucion: "Cierre de evolucion", estado: "Finalizada" },
-];
 
 const columns: ColumnDef<EvolucionRow>[] = [
 	{ accessorKey: "fecha", header: "Fecha" },
@@ -37,6 +32,24 @@ export default function CustomTab({ denunciaId, denunciaNro, empleadoNombre, emp
 	const [modalTitle, setModalTitle] = useState<string>("");
 	const [openModal, setOpenModal] = useState(false);
 
+	const { data: evolucionesData, isLoading } = ArtAPI.useGetDenunciaInstancia({
+		denunciaNro: denunciaNro ? Number(denunciaNro) : undefined,
+		VerTodas: true,
+	});
+
+	const tableData: EvolucionRow[] = (evolucionesData as DenunciaInstanciaItem[] ?? []).map((item) => {
+		const [fecha = "", horaCompleta = ""] = (item.fechaHora ?? "").split("T");
+		const [anio, mes, dia] = fecha.split("-");
+		const fechaFormateada = fecha ? `${dia}/${mes}/${anio}` : "";
+		const hora = horaCompleta.slice(0, 5);
+		return {
+			fecha: fechaFormateada,
+			hora,
+			tipoEvolucion: item.tipoInstancia ?? "",
+			estado: item.autorizacionEstado ?? "",
+		};
+	});
+
 	const handleOpenAdministrativa = () => {
 		setModalTitle("Evoluciones Administrativa");
 		setOpenModal(true);
@@ -53,7 +66,7 @@ export default function CustomTab({ denunciaId, denunciaNro, empleadoNombre, emp
 				<CustomButton onClick={handleOpenAdministrativa}>Cargar Evoluciones Administrativa</CustomButton>
 				<CustomButton onClick={handleOpenMedicas}>Cargar Evoluciones Medicas</CustomButton>
 			</div>
-			<DataTable data={data} columns={columns} size="mid" />
+			<DataTable data={tableData} columns={columns} size="mid" isLoading={isLoading} />
 			<FormularioEvoluciones
 				open={openModal}
 				onClose={() => setOpenModal(false)}

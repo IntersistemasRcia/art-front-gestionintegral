@@ -10,6 +10,7 @@ import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa, FormularioRGRLDeleteParams, FormularioRGRLDeleteResponse } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import type { FormularioVm, TipoFormulario } from "@/app/inicio/empleador/formularioRGRL/generar/types/generar";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores, ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
+import {ParametersDenunciaInstancia} from "@/app/inicio/denuncias/evoluciones/types/evoluciones";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador, ParametersComercializadoresAsociados } from "@/app/inicio/comercializador/polizas/types/poliza";
 import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById, SRTComercializadoresAsociadosPostRequest, SRTComercializadoresAsociadosPostResponse, SRTComercializadoresAsociadosPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
 import { ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
@@ -707,6 +708,31 @@ export class ArtAPIClass extends ExternalAPI {
       this.swrPatchDenuncia.fetcher
     );
   //#endregion
+
+
+  //Region DenunciaInstancia GET
+
+    readonly getDenunciaInstanciaURL = (params: ParametersDenunciaInstancia = {}) => {
+    return this.getURL({ path: `/api/Denuncias/${params.denunciaNro}/Evoluciones`, search: toURLSearch(params) }).toString();
+  };
+  getDenunciaInstancia = async (params: ParametersDenunciaInstancia = {}) => tokenizable.get(
+    this.getDenunciaInstanciaURL(params),
+  ).then(({ data }) => data);
+  useGetDenunciaInstancia = (params: ParametersDenunciaInstancia = {}) => useSWR(
+    params.denunciaNro && token.getToken()
+      ? [this.getDenunciaInstanciaURL(params), token.getToken()]
+      : null,
+    () => this.getDenunciaInstancia(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+
+
+
+
+  //Endregion
 
 
   //#region Afiliado por CUIL

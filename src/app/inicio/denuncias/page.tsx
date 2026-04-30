@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, SyntheticEvent } from 'react';
+import { useState, useMemo, useEffect, useRef, SyntheticEvent } from 'react';
 import { Box, IconButton, Tooltip } from "@mui/material";
 import styles from './denuncias.module.css';
 import ArtAPI from '@/data/artAPI';
@@ -544,6 +544,7 @@ function DenunciasPage() {
   const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [pageCount, setPageCount] = useState<number>(0);
+  const hasLoadedOnce = useRef(false);
 
   // Buscador por CUIT (arriba de "Registrar Denuncia")
   const [cuitBusqueda, setCuitBusqueda] = useState<string>("");
@@ -621,14 +622,16 @@ function DenunciasPage() {
     if (typeof empCuit === 'number' && String(empCuit).length === 11) {
       params.EmpCuit = empCuit;
     }
-    // Si el usuario tiene la tarea Denuncia_VerDenuncia, aplicar filtro Tipo=2
     try {
       if (hasTask && typeof hasTask === 'function') {
-        if (hasTask('Denuncia_VerPreDenuncia')) {
+        const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
+        const verDenuncia = hasTask('Denuncia_VerDenuncia');
+        if (verPreDenuncia && !verDenuncia) {
           (params as any).Tipo = 1;
-        } else if (hasTask('Denuncia_VerDenuncia')) {
+        } else if (verDenuncia && !verPreDenuncia) {
           (params as any).Tipo = 2;
         }
+        // ambas tareas → sin filtro Tipo (muestra denuncias y predenuncias)
       }
     } catch (e) {
       // noop: en caso de error con hasTask, no aplicamos el filtro
@@ -653,7 +656,7 @@ function DenunciasPage() {
   // Process data and update states
   useMemo(() => {
     if (!data && !error) {
-      setLoading(true);
+      if (!hasLoadedOnce.current) setLoading(true);
       return;
     }
 
@@ -670,6 +673,7 @@ function DenunciasPage() {
       setPageCount(data.data.length > 0 ? Math.ceil(data.data.length / pageSize) : 1);
     }
 
+    hasLoadedOnce.current = true;
     setLoading(false);
   }, [data, error, pageSize, is404Error]);
 
@@ -1052,12 +1056,15 @@ function DenunciasPage() {
   const tableColumns = useMemo(() => {
     try {
       if (hasTask && typeof hasTask === 'function') {
-        if (hasTask('Denuncia_VerPreDenuncia')) {
+        const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
+        const verDenuncia = hasTask('Denuncia_VerDenuncia');
+        if (verPreDenuncia && !verDenuncia) {
           return baseTableColumns.filter(c => (c as any).accessorKey !== 'denunciaNro');
         }
-        if (hasTask('Denuncia_VerDenuncia')) {
+        if (verDenuncia && !verPreDenuncia) {
           return baseTableColumns.filter(c => (c as any).accessorKey !== 'nroPreDenuncia');
         }
+        // ambas → muestra ambas columnas, la celda de denunciaNro ya muestra 0 si hay nroPreDenuncia
       }
     } catch (e) {
       // noop
