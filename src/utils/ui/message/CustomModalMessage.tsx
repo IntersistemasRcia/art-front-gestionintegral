@@ -2,11 +2,12 @@
 "use client";
 
 import React from 'react';
-import { Dialog, DialogContent, DialogTitle, Typography, Box } from '@mui/material';
+import { Dialog, DialogContent, DialogTitle, Typography, Box, DialogActions } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import InfoOutlineIcon from '@mui/icons-material/InfoOutline';
+import CustomButton from '@/utils/ui/button/CustomButton';
 import styles from './CustomModalMessage.module.css';
 export type MessageType = 'success' | 'error' | 'warning' | 'info';
 interface CustomModalMessageProps {
@@ -82,11 +83,11 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
         </Typography>
       </DialogContent>
       
-      {/* <DialogActions>
-        <Button onClick={onClose} color="primary">
+      <DialogActions>
+        <CustomButton onClick={onClose} color="primary" variant="contained">
           Cerrar
-        </Button>
-      </DialogActions> */}
+        </CustomButton>
+      </DialogActions>
     </Dialog>
   );
 };
