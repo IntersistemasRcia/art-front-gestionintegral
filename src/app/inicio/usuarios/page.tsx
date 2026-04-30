@@ -499,9 +499,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   }
 };
 
-  if (loading) {
-    return <Typography variant="h6">Cargando...</Typography>;
-  }
+
 
   if (error) {
     return (
