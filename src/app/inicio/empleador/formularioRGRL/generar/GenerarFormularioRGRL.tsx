@@ -709,26 +709,98 @@ const GenerarFormularioRGRL: React.FC<{
 
   const guardarPUT = async (completar: boolean, options?: { redirigir?: boolean; fechaSRTOverride?: string | null }) => {
     if (!form) return;
-    if (completar) {
-      for (let i = 0; i < responsablesUI.length; i++) {
+
+    for (let i = 0; i < gremiosUI.length; i++) {
+      const g = gremiosUI[i] ?? {};
+      const tieneLegajo = Number(g.legajo ?? 0) > 0;
+      const tieneNombre = String(g.nombre ?? '').trim() !== '';
+      if (tieneLegajo !== tieneNombre) {
+        setError('');
+        setModalMsg(`En Representación Gremial, la fila ${i + 1} tiene datos incompletos. Complete Legajo y Nombre.`);
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+    }
+
+    for (let i = 0; i < contratistasUI.length; i++) {
+      const c = contratistasUI[i] ?? {};
+      const tieneCuit = Number(c.cuit ?? 0) > 0;
+      const tieneContratista = String(c.contratista ?? '').trim() !== '';
+      if (tieneCuit !== tieneContratista) {
+        setError('');
+        setModalMsg(`En Contratista, la fila ${i + 1} tiene datos incompletos. Complete CUIT y Contratista.`);
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+      if (tieneCuit && String(c.cuit).length !== 11) {
+        setError('');
+        setModalMsg(`En Contratista, la fila ${i + 1}: el CUIT debe tener 11 dígitos.`);
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+    }
+
+    for (let i = 0; i < responsablesUI.length; i++) {
         const r = responsablesUI[i] ?? {};
         const tieneDatos =
-          String(r.cuit ?? '').trim() !== '' ||
+        Number(r.cuit ?? 0) > 0 ||
           String(r.responsable ?? '').trim() !== '' ||
           String(r.cargo ?? '').trim() !== '' ||
           typeof r.esContratado === 'number' ||
+          typeof r.representacion === 'number' ||
           String(r.tituloHabilitante ?? '').trim() !== '' ||
           String(r.matricula ?? '').trim() !== '' ||
           String(r.entidadOtorganteTitulo ?? '').trim() !== '';
-        if (tieneDatos && typeof r.representacion !== 'number') {
+      if (tieneDatos) {
+        if (!Number(r.cuit ?? 0)) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere CUIT (distinto de 0).`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (String(r.cuit).length !== 11) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1}: el CUIT debe tener 11 dígitos.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (!String(r.responsable ?? '').trim()) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere Nombre y apellido.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (!String(r.cargo ?? '').trim()) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere Cargo.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (typeof r.representacion !== 'number') {
           setError('');
           setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Representación.`);
           setModalMsgType('error');
           setModalMsgOpen(true);
           return;
         }
+        if (typeof r.esContratado !== 'number') {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Propio/Contratado.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
       }
+    }
 
+    if (completar) {
       // Requerir al menos un Responsable de Datos del Formulario con datos completos
       const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && typeof r.esContratado === 'number');
       if (!tieneRespDatos) {
@@ -814,7 +886,9 @@ const GenerarFormularioRGRL: React.FC<{
         });
       }
 
-      const gremiosFull = gremiosUI.map((g, i) => ({
+      const gremiosFull = gremiosUI
+        .filter((g) => Number(g.legajo ?? 0) > 0)
+        .map((g, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         legajo: Number(g.legajo ?? 0),
         nombre: g.nombre ?? '',
@@ -824,7 +898,9 @@ const GenerarFormularioRGRL: React.FC<{
         bajaMotivo: 0,
         renglon: i,
       }));
-      const contratistasFull = contratistasUI.map((c, i) => ({
+      const contratistasFull = contratistasUI
+        .filter((c) => Number(c.cuit ?? 0) > 0)
+        .map((c, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         cuit: Number(c.cuit ?? 0),
         contratista: c.contratista ?? '',
@@ -834,7 +910,9 @@ const GenerarFormularioRGRL: React.FC<{
         bajaMotivo: 0,
         renglon: i,
       }));
-      const responsablesFull = responsablesUI.map((r, i) => ({
+      const responsablesFull = responsablesUI
+        .filter((r) => Number(r.cuit ?? 0) > 0)
+        .map((r, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         cuit: Number(r.cuit ?? 0),
         responsable: r.responsable ?? '',
@@ -1169,20 +1247,6 @@ const GenerarFormularioRGRL: React.FC<{
             </div>
           </div>
         ) : null}
-        
-        {panel === 'contratistas' && (
-          <div className={styles.contratistasLegendFixed}>
-            <p>En caso de tener contratistas, indicar nro de CUIT y Nombre - Razón Social</p>
-          </div>
-        )}
-
-        {panel === 'gremios' && (
-          <div className={styles.gremiosLegendFixed}>
-            <p>En caso de contar con delegados gremiales indicar número de legajo conforme a la inscripción en el Ministerio de Trabajo, Empleo y Seguridad Social</p>
-            <p><a href="http://www.trabajo.gov.ar" target="_blank" rel="noreferrer">http://www.trabajo.gov.ar</a></p>
-          </div>
-        )}
-
         {panel === 'contratistas' ? (
           <div className={styles.questionsBox}>
             <div className="formGrid">
@@ -1196,7 +1260,7 @@ const GenerarFormularioRGRL: React.FC<{
                         : String(contratistasUI[idx]?.cuit ?? '')
                     }
                     onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, '');
+                      const digits = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
                       const val = digits ? Number(digits) : undefined;
                       setContratistasUI((prev) => {
                         const next = [...prev];
@@ -1237,7 +1301,7 @@ const GenerarFormularioRGRL: React.FC<{
                       return digits.length === 11 ? CUIP(digits) : (digits ? digits : '');
                     })()}
                     onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, '');
+                      const digits = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
                       const val = digits ? Number(digits) : undefined;
                       setResponsablesUI((prev) => {
                         const next = [...prev];
@@ -1517,6 +1581,18 @@ const GenerarFormularioRGRL: React.FC<{
           <CustomButton onClick={() => setConfirmOpen(true)} disabled={loading}>GUARDAR Y CONFIRMAR</CustomButton>
           <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR BORRADOR</CustomButton>
         </div>
+
+        {panel === 'gremios' && (
+          <div className={styles.gremiosLegendFixed}>
+            <p>En caso de contar con delegados gremiales indicar número de legajo conforme a la inscripción en el Ministerio de Trabajo, Empleo y Seguridad Social</p>
+            <p><a href="http://www.trabajo.gov.ar" target="_blank" rel="noreferrer">http://www.trabajo.gov.ar</a></p>
+          </div>
+        )}
+        {panel === 'contratistas' && (
+          <div className={styles.contratistasLegendFixed}>
+            <p>En caso de tener contratistas, indicar nro de CUIT y Nombre - Razón Social</p>
+          </div>
+        )}
 
         {loading && <div className={styles.savingMsg}>Guardando…</div>}
         {!!error && <div className={styles.errorMsg}>{error}</div>}
