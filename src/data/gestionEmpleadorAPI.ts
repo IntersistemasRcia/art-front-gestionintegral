@@ -14,12 +14,6 @@ const getCurrentPeriodo = (): number => {
   return Number(dayjs().subtract(2, 'month').format('YYYYMM'));
 };
 
-export interface UsuarioGetAllParams {
-  CUIT?: number;
-  Sort?: string;
-  Page?: string;
-}
-
 export type Pagination<T> = {
   index: number;
   size: number;
@@ -662,47 +656,6 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
       }
     );
   };
-  //#endregion
-
-  //#region AvisoObra
-  readonly getAvisoObraURL = (params: UsuarioGetAllParams = {}) => {
-    return this.getURL({ path: "/api/AvisoObra/ultimos/?Sort=-ObraNumero&Page=0,1000", search: toURLSearch(params) }).toString();
-  };
-  getAvisoObra = async (params: UsuarioGetAllParams = {}) => tokenizable.get(
-    this.getAvisoObraURL(params),
-  ).then(({ data }) => data);
-  useGetAvisoObra = (params: UsuarioGetAllParams = {}) => {
-    // Solo hacer fetch si hay CUIT en los parámetros
-    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
-    const swrKey = hasCUIT ? [this.getAvisoObraURL(params), token.getToken()] : null;
-    return useSWR(
-      swrKey,
-      () => this.getAvisoObra(params),
-      {
-        // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-      }
-    );
-  };
-
-  // Métodos de mutación para AvisoObra
-  readonly avisoObraInsertURL = this.getURL({ path: "/api/AvisoObra" }).toString();
-  avisoObraInsert = async (data: any) => tokenizable.post(
-    this.avisoObraInsertURL,
-    data
-  ).then(({ data }) => data);
-
-  readonly avisoObraUpdateURL = (interno: number) => this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
-  avisoObraUpdate = async (interno: number, data: any) => tokenizable.put(
-    this.avisoObraUpdateURL(interno),
-    data
-  ).then(({ data }) => data);
-
-  readonly avisoObraDeleteURL = (interno: number) => this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
-  avisoObraDelete = async (interno: number) => tokenizable.delete(
-    this.avisoObraDeleteURL(interno)
-  ).then(({ data }) => data);
   //#endregion
 
   //#region SVCC

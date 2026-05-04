@@ -416,7 +416,8 @@ export class UsuarioAPIClass extends ExternalAPI {
   //#region Cargos
 
   readonly getCargosUrl = (empresaId: number) =>
-    this.getURL({ path: `/api/Cargos/Empresa/${empresaId}` }).toString();
+    //this.getURL({ path: `/api/Cargos/Empresa/${empresaId}` }).toString();
+    this.getURL({ path: `/api/Cargos/Empresa` }).toString();
   getCargos = async (query: any = {}) =>
     tokenizable
       .get<CargoInterface[]>(this.getCargosUrl(query.empresaId), {

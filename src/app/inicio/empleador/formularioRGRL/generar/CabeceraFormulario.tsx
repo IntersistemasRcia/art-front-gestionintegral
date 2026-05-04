@@ -27,6 +27,8 @@ type CabeceraFormularioProps = {
 	onCrear: () => void;
 	disableCrear: boolean;
 	soloLectura?: boolean;
+	/** Solo bloquea el campo CUIT (p. ej. CUIT fijado desde el selector de empresa del listado). */
+	cuitSoloLectura?: boolean;
 	mostrarAcciones?: boolean;
 };
 
@@ -49,6 +51,7 @@ const CabeceraFormulario: React.FC<CabeceraFormularioProps> = ({
 	onCrear,
 	disableCrear,
 	soloLectura = false,
+	cuitSoloLectura = false,
 	mostrarAcciones = true,
 }) => {
 	return (
@@ -68,7 +71,7 @@ const CabeceraFormulario: React.FC<CabeceraFormularioProps> = ({
 					placeholder="Ingresá CUIT"
 					inputMode="numeric"
 					fullWidth
-					disabled={soloLectura}
+					disabled={soloLectura || cuitSoloLectura}
 				/>
 			</Box>
 			<Box className={styles.razonSocialBox}>
