@@ -128,9 +128,13 @@ export type AvisoObraUltimosBody = {
   obraSecuencia?: number;
 };
 
-/** Parámetros de consulta (la UI suele enviar solo `CUIT`). */
+/** Parámetros de consulta (una empresa con `CUIT`, o "todas" con `todasLasEmpresas`). */
 export type AvisoObraUltimosParams = {
   CUIT?: number;
+  /** Listado "Todas las empresas": admin envía `cuits: []`; resto envía `cuitsRelacionados`. */
+  todasLasEmpresas?: boolean;
+  esAdministrador?: boolean;
+  cuitsRelacionados?: number[];
   obraNumero?: number;
   obraSecuencia?: number;
   pageIndex?: number;
@@ -170,9 +174,21 @@ export function normalizeAvisoObraUltimosResponse(raw: unknown): AvisoObraUltimo
 }
 
 export function buildAvisoObraUltimosBody(params: AvisoObraUltimosParams = {}): AvisoObraUltimosBody {
-  const cuit = params.CUIT;
-  const cuits =
-    cuit != null && !Number.isNaN(Number(cuit)) && Number(cuit) !== 0 ? [Number(cuit)] : [0];
+  let cuits: number[];
+  if (params.todasLasEmpresas) {
+    if (params.esAdministrador) {
+      cuits = [];
+    } else {
+      const raw = params.cuitsRelacionados ?? [];
+      cuits = Array.from(
+        new Set(raw.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n !== 0))
+      );
+    }
+  } else {
+    const cuit = params.CUIT;
+    cuits =
+      cuit != null && !Number.isNaN(Number(cuit)) && Number(cuit) !== 0 ? [Number(cuit)] : [0];
+  }
   const body: AvisoObraUltimosBody = {
     cuits,
     pageIndex: params.pageIndex ?? 1,
@@ -239,9 +255,14 @@ export class ArtAPIClass extends ExternalAPI {
   };
 
   useGetAvisoObra = (params: AvisoObraUltimosParams = {}) => {
-    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
+    const todas = Boolean(params.todasLasEmpresas);
+    const admin = Boolean(params.esAdministrador);
+    const relacionados = params.cuitsRelacionados ?? [];
+    const puedeFetch =
+      (todas && (admin || relacionados.length > 0)) ||
+      (!todas && params?.CUIT != null && params.CUIT !== 0);
     const body = buildAvisoObraUltimosBody(params);
-    const swrKey = hasCUIT
+    const swrKey = puedeFetch
       ? [this.postAvisoObraUltimosURL(), token.getToken(), JSON.stringify(body)] as const
       : null;
     return useSWR(

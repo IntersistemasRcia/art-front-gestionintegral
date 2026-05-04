@@ -19,23 +19,63 @@ const { useGetAvisoObra, avisoObraInsert, avisoObraUpdate, avisoObraDelete } = A
 import { getDefaultAvisoObra } from "./data/defaultAvisoObra";
 import AvisosObraPdfGenerator from "./AvisoObraPdfGenerator";
 
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+
+const EMPRESA_OPCION_TODAS: Empresa = {
+    empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+    cuit: 0,
+    razonSocial: "Todas las Empresas",
+    domicilio: "",
+    localidad: "",
+    provincia: "",
+};
+
 const AvisosObraHandler: React.FC = () => {
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+    const { user } = useAuth();
+    const isAdmin = user?.rol?.toLowerCase() === "administrador";
+    const empresaCUIT = user?.empresaCUIT;
+    const empresaRazonSocial = user?.empresaRazonSocial;
+
+    const opcionesEmpresaSelector = useMemo(
+        () => [EMPRESA_OPCION_TODAS, ...empresas],
+        [empresas]
+    );
+
+    const cuitsEmpresasRelacionadas = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    empresas
+                        .map((e) => Number(e.cuit))
+                        .filter((n) => Number.isFinite(n) && n !== 0)
+                )
+            ).sort((a, b) => a - b),
+        [empresas]
+    );
+
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
 
-    // Seleccionar automáticamente si solo hay una empresa
+    // Una sola empresa → selección automática; varias → "Todas las Empresas" por defecto
     useEffect(() => {
-        if (!isLoadingEmpresas) {
-            if (empresas.length === 1) {
-                setEmpresaSeleccionada(empresas[0]);
-                seleccionAutomaticaRef.current = true;
-            } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-                setEmpresaSeleccionada(null);
-                seleccionAutomaticaRef.current = false;
-            }
+        if (isLoadingEmpresas) return;
+        if (empresas.length === 1) {
+            setEmpresaSeleccionada(empresas[0]);
+            seleccionAutomaticaRef.current = true;
+            return;
         }
-    }, [empresas.length, isLoadingEmpresas]);
+        if (empresas.length === 0) {
+            setEmpresaSeleccionada(null);
+            seleccionAutomaticaRef.current = false;
+            return;
+        }
+        setEmpresaSeleccionada((prev) => {
+            if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+            return EMPRESA_OPCION_TODAS;
+        });
+        seleccionAutomaticaRef.current = true;
+    }, [empresas, isLoadingEmpresas]);
 
     const handleEmpresaChange = (
         _event: React.SyntheticEvent,
@@ -47,25 +87,29 @@ const AvisosObraHandler: React.FC = () => {
 
     const getEmpresaLabel = (empresa: Empresa | null): string => {
         if (!empresa) return "";
+        if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return "Todas las Empresas";
         return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
     };
 
-    // Parámetros para la consulta de avisos de obra
     const paramsAvisoObra = useMemo(() => {
-        return empresaSeleccionada?.cuit ? { CUIT: empresaSeleccionada.cuit } : {};
-    }, [empresaSeleccionada?.cuit]);
+        if (!empresaSeleccionada) return {};
+        if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+            return {
+                todasLasEmpresas: true,
+                esAdministrador: isAdmin,
+                cuitsRelacionados: cuitsEmpresasRelacionadas,
+            };
+        }
+        if (!empresaSeleccionada.cuit) return {};
+        return { CUIT: empresaSeleccionada.cuit };
+    }, [empresaSeleccionada, isAdmin, cuitsEmpresasRelacionadas]);
 
-    // Obtención de datos con SWR
-    const { 
-        data: avisoObraRawData, 
-        isLoading: isDataLoading, 
+    const {
+        data: avisoObraRawData,
+        isLoading: isDataLoading,
         error: fetchError,
-        mutate: refetchAvisos // Función de SWR para forzar la recarga
-    } = useGetAvisoObra(paramsAvisoObra); 
-
-    const { user } = useAuth(); 
-    const empresaCUIT = user?.empresaCUIT;
-    const empresaRazonSocial = user?.empresaRazonSocial;
+        mutate: refetchAvisos,
+    } = useGetAvisoObra(paramsAvisoObra);
     const [avisosObrasArray, setAvisosObrasArray] = useState<AvisoObraRecord[]>([]);
     const [formData, setFormData] = useState<FormDataState>({ request: null });
     const [dialogPDF, setDialogPDF] = useState<React.ReactNode | null>(null);
@@ -78,10 +122,12 @@ const AvisosObraHandler: React.FC = () => {
     });
     // Sincronización de datos (SWR -> ESTADO LOCAL)
     useEffect(() => {
-        if (avisoObraRawData && Array.isArray(avisoObraRawData.data)) {
+        if (!avisoObraRawData) {
+            setAvisosObrasArray([]);
+        } else if (Array.isArray(avisoObraRawData.data)) {
             setAvisosObrasArray(avisoObraRawData.data);
         }
-        
+
         if (fetchError) {
             abrirError(fetchError);
         }
@@ -285,7 +331,7 @@ const AvisosObraHandler: React.FC = () => {
                     <Grid style={{ marginBottom: '16px' }}>
                         <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
                             <CustomSelectSearch<Empresa>
-                                options={empresas}
+                                options={opcionesEmpresaSelector}
                                 getOptionLabel={getEmpresaLabel}
                                 value={empresaSeleccionada}
                                 onChange={handleEmpresaChange}
@@ -296,7 +342,7 @@ const AvisosObraHandler: React.FC = () => {
                                 noOptionsText={
                                     isLoadingEmpresas
                                         ? "Cargando..."
-                                        : empresas.length === 0
+                                        : opcionesEmpresaSelector.length <= 1
                                         ? "No hay empresas disponibles"
                                         : "No se encontraron empresas"
                                 }
@@ -310,7 +356,11 @@ const AvisosObraHandler: React.FC = () => {
                             color="primary"
                             startIcon={<AddCircleOutline />}
                             onClick={() => handleFormOpen(Request.Insert, getDefaultAvisoObra())}
-                            disabled={isDataLoading || !empresaSeleccionada} 
+                            disabled={
+                                isDataLoading ||
+                                !empresaSeleccionada ||
+                                empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID
+                            }
                         >
                             Agregar Aviso
                         </CustomButton>
