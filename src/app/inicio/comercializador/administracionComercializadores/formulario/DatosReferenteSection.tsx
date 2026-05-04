@@ -37,7 +37,7 @@ export default function DatosReferenteSection({
   const isRoleGrupo = roleKey.includes("grupo");
   const isRoleOrganizador = roleKey.includes("organizador");
 
-  const hideForCreateComercializador = isCreating && roleKey === "comercializador";
+  const hideForCreateComercializador = (isCreating || isEditing) && roleKey === "comercializador";
   const showGrupoAutocomplete = !hideForCreateComercializador && !((isCreating || isEditing) && isRoleGrupo);
   const showOrganizadorAutocomplete =
     !hideForCreateComercializador && !(((isCreating || isEditing || isViewing) && isRoleOrganizador) || (isEditing && isRoleGrupo));

@@ -333,7 +333,7 @@ function CuentaCorrienteComercializador() {
         { header: 'Origen', accessorKey: 'origen', meta: { align: 'center'} },
         { header: 'Nro. Póliza', accessorKey: 'polizaNumero', meta: { align: 'center'} },
         { header: 'CUIT Empleador', accessorKey: 'empleadorCUIT', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center'} },
-        { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'center'} },
+        { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'left'} },
         { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
         { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
         { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
@@ -345,7 +345,7 @@ function CuentaCorrienteComercializador() {
     
     const columnsEmpleadorPeriodo: ColumnDef<any>[] = useMemo(() => [
         { header: 'CUIT', accessorKey: 'cuit', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center' } },
-        { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'center' } },
+        { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'left' } },
         { header: 'Póliza Nro.', accessorKey: 'poliza', meta: { align: 'center' } },
         { header: 'Monto Premio', accessorKey: 'montoPremio', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Monto Prima', accessorKey: 'montoPrima', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
@@ -357,8 +357,9 @@ function CuentaCorrienteComercializador() {
     ], []);
 
     const columnsAfipTransferencias: ColumnDef<any>[] = useMemo(() => [
-        { header: 'Trabajador', accessorKey: 'cuitContribuyente', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center' } },
+        // { header: 'Trabajador', accessorKey: 'cuitContribuyente', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center' } },
         { header: 'Fecha Transferencia', accessorKey: 'fechProc', cell: (info: any) => Formato.Fecha(info.getValue()), meta: { align: 'center' } },
+        { header: 'Origen', accessorKey: 'origen', meta: { align: 'center' } },
         { header: 'Periodo Fiscal', accessorKey: 'periodo', meta: { align: 'center' } },
         { header: 'Cód. Concepto', accessorKey: 'codConcepto', meta: { align: 'center' } },
         { header: 'Importe', accessorKey: 'importe', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
@@ -366,7 +367,9 @@ function CuentaCorrienteComercializador() {
 
 
     const ctacteData = forceEmpty ? [] : (CtaCteRawData?.data || []);
-    const ctacteDetalleData = forceEmpty ? [] : (CtaCteRawDetalleData?.data || []);
+    const ctacteDetalleData = forceEmpty ? [] : (
+        Array.isArray(CtaCteRawDetalleData) ? CtaCteRawDetalleData : (CtaCteRawDetalleData?.data || [])
+    );
 
     // Params para consultar EmpleadorPagosComercializador
     const empleadorPagosParams = useMemo(() => ({
@@ -442,11 +445,23 @@ function CuentaCorrienteComercializador() {
     const shouldShowAfip = !!(empleadorPagoSelected?.periodo && empleadorPagoSelected?.cuit);
     const selectedAfipCuit = Number(digits(empleadorPagoSelected?.cuit));
     const selectedAfipPeriodo = Number(empleadorPagoSelected?.periodo || 0);
+
+    const { data: origenDetalleRaw } = gestionComercializadorAPI.useGetViewCtaCteDetalle(
+        shouldShowAfip
+            ? { CUIL: cuilConsulta || (hasAnyFiltro ? 0 : cuil), periodo: selectedAfipPeriodo }
+            : undefined
+    );
+    const origenEmpleador = useMemo(() => {
+        if (!selectedAfipCuit) return '';
+        const arr: any[] = Array.isArray(origenDetalleRaw) ? origenDetalleRaw : (origenDetalleRaw?.data || []);
+        return arr.find((d: any) => Number(d.empleadorCUIT) === selectedAfipCuit)?.origen ?? '';
+    }, [origenDetalleRaw, selectedAfipCuit]);
+
     const afipTransferData = forceEmpty || !shouldShowAfip ? [] : (
         Array.isArray(afipTransferRaw) ? afipTransferRaw : (afipTransferRaw?.data || afipTransferRaw || [])
     ).filter((x: any) =>
         Number(digits(x?.cuitContribuyente)) === selectedAfipCuit && Number(x?.periodo || 0) === selectedAfipPeriodo
-    );
+    ).map((x: any) => ({ ...x, origen: origenEmpleador }));
     const isAfipTransferLoading = shouldShowAfip ? isAfipTransferLoadingRaw : false;
 
     useEffect(() => {
