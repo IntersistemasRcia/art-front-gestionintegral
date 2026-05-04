@@ -18,6 +18,7 @@ import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/AR
 import { EmpresaParamsID } from "@/app/inicio/usuarios/types/empresa";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
+import type { AvisoObraRecord } from "@/app/inicio/empleador/avisosDeObra/types/types";
 
 const tokenizable = token.configure();
 
@@ -118,6 +119,76 @@ export type FormularioRGRLUpdateRequest = FormularioRGRLCreateRequest & {
 
 export type EmpresaParametroPutResponse = unknown;
 
+/** Cuerpo POST `/api/AvisoObra/ultimos` (obraNumero/obraSecuencia solo si filtrás por obra). */
+export type AvisoObraUltimosBody = {
+  cuits: number[];
+  pageIndex: number;
+  pageSize: number;
+  obraNumero?: number;
+  obraSecuencia?: number;
+};
+
+/** Parámetros de consulta (la UI suele enviar solo `CUIT`). */
+export type AvisoObraUltimosParams = {
+  CUIT?: number;
+  obraNumero?: number;
+  obraSecuencia?: number;
+  pageIndex?: number;
+  pageSize?: number;
+};
+
+export type AvisoObraUltimosResponse = {
+  index?: number;
+  size?: number;
+  pages?: number;
+  count?: number;
+  data: AvisoObraRecord[];
+};
+
+/** La API puede devolver un array plano o un objeto paginado con `data`. */
+export function normalizeAvisoObraUltimosResponse(raw: unknown): AvisoObraUltimosResponse {
+  if (Array.isArray(raw)) {
+    const rows = raw as AvisoObraRecord[];
+    return {
+      data: rows,
+      index: 1,
+      size: rows.length,
+      pages: 1,
+      count: rows.length,
+    };
+  }
+  if (raw != null && typeof raw === 'object' && Array.isArray((raw as AvisoObraUltimosResponse).data)) {
+    return raw as AvisoObraUltimosResponse;
+  }
+  return {
+    data: [],
+    index: 1,
+    size: 0,
+    pages: 0,
+    count: 0,
+  };
+}
+
+export function buildAvisoObraUltimosBody(params: AvisoObraUltimosParams = {}): AvisoObraUltimosBody {
+  const cuit = params.CUIT;
+  const cuits =
+    cuit != null && !Number.isNaN(Number(cuit)) && Number(cuit) !== 0 ? [Number(cuit)] : [0];
+  const body: AvisoObraUltimosBody = {
+    cuits,
+    pageIndex: params.pageIndex ?? 1,
+    pageSize: params.pageSize ?? 10,
+  };
+  const on = params.obraNumero;
+  const os = params.obraSecuencia;
+  if (on != null && !Number.isNaN(Number(on)) && Number(on) !== 0) {
+    body.obraNumero = Number(on);
+  }
+  if (os != null && !Number.isNaN(Number(os)) && Number(os) !== 0) {
+    body.obraSecuencia = Number(os);
+  }
+  return body;
+}
+
 //#endregion Types
 
 export function EstablecimientoVmDescripcion(establecimiento?: EstablecimientoVm) {
@@ -154,6 +225,49 @@ export class ArtAPIClass extends ExternalAPI {
     [this.refEmpleadoresURL(), token.getToken()], () => this.getRefEmpleadores()
   );
   //#endregion
+
+  //#region AvisoObra
+  readonly postAvisoObraUltimosURL = () =>
+    this.getURL({ path: "/api/AvisoObra/ultimos" }).toString();
+
+  getAvisoObra = async (params: AvisoObraUltimosParams = {}) => {
+    const body = buildAvisoObraUltimosBody(params);
+    const raw = await tokenizable
+      .post<unknown>(this.postAvisoObraUltimosURL(), body)
+      .then(({ data }) => data);
+    return normalizeAvisoObraUltimosResponse(raw);
+  };
+
+  useGetAvisoObra = (params: AvisoObraUltimosParams = {}) => {
+    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
+    const body = buildAvisoObraUltimosBody(params);
+    const swrKey = hasCUIT
+      ? [this.postAvisoObraUltimosURL(), token.getToken(), JSON.stringify(body)] as const
+      : null;
+    return useSWR(
+      swrKey,
+      () => this.getAvisoObra(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  };
+
+  readonly avisoObraInsertURL = this.getURL({ path: "/api/AvisoObra" }).toString();
+  avisoObraInsert = async (payload: unknown) =>
+    tokenizable.post(this.avisoObraInsertURL, payload).then(({ data }) => data);
+
+  readonly avisoObraUpdateURL = (interno: number) =>
+    this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
+  avisoObraUpdate = async (interno: number, payload: unknown) =>
+    tokenizable.put(this.avisoObraUpdateURL(interno), payload).then(({ data }) => data);
+
+  readonly avisoObraDeleteURL = (interno: number) =>
+    this.getURL({ path: `/api/AvisoObra/${interno}` }).toString();
+  avisoObraDelete = async (interno: number) =>
+    tokenizable.delete(this.avisoObraDeleteURL(interno)).then(({ data }) => data);
+  //#endregion AvisoObra
 
   //#region Establecimientos
   readonly getEstablecimientosURL = (params: ParametersEstablecimientoByCUIT = {}) => {

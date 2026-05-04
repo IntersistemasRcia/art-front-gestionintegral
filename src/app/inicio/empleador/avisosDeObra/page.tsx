@@ -8,14 +8,14 @@ import { AddCircleOutline } from "@mui/icons-material";
 import AvisosObraList from "./AvisosObraList";
 import AvisoObraForm from "./AvisoObraForm";
 import {AvisoObraRecord,Request,Response,ApiQueryState,ApiError,FormDataState } from "./types/types";
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import ArtAPI from "@/data/artAPI";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import Formato from "@/utils/Formato";
 import { useAuth } from "@/data/AuthContext";
 import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
-const { useGetAvisoObra, avisoObraInsert, avisoObraUpdate, avisoObraDelete } = gestionEmpleadorAPI;
+const { useGetAvisoObra, avisoObraInsert, avisoObraUpdate, avisoObraDelete } = ArtAPI;
 import { getDefaultAvisoObra } from "./data/defaultAvisoObra";
 import AvisosObraPdfGenerator from "./AvisoObraPdfGenerator";
 
