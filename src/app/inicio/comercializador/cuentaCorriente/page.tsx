@@ -367,7 +367,9 @@ function CuentaCorrienteComercializador() {
 
 
     const ctacteData = forceEmpty ? [] : (CtaCteRawData?.data || []);
-    const ctacteDetalleData = forceEmpty ? [] : (CtaCteRawDetalleData?.data || []);
+    const ctacteDetalleData = forceEmpty ? [] : (
+        Array.isArray(CtaCteRawDetalleData) ? CtaCteRawDetalleData : (CtaCteRawDetalleData?.data || [])
+    );
 
     // Params para consultar EmpleadorPagosComercializador
     const empleadorPagosParams = useMemo(() => ({
@@ -444,16 +446,16 @@ function CuentaCorrienteComercializador() {
     const selectedAfipCuit = Number(digits(empleadorPagoSelected?.cuit));
     const selectedAfipPeriodo = Number(empleadorPagoSelected?.periodo || 0);
 
-    // Llamada sin paginación para obtener el origen del empleador seleccionado
-    const { data: detalleEmpleadorRaw } = gestionComercializadorAPI.useGetViewCtaCteDetalle(
-        shouldShowAfip && periodoFiltro
-            ? { CUIL: cuilConsulta || (hasAnyFiltro ? 0 : cuil), periodo: periodoFiltro }
-            : {}
+    const { data: origenDetalleRaw } = gestionComercializadorAPI.useGetViewCtaCteDetalle(
+        shouldShowAfip
+            ? { CUIL: cuilConsulta || (hasAnyFiltro ? 0 : cuil), periodo: selectedAfipPeriodo }
+            : undefined
     );
     const origenEmpleador = useMemo(() => {
-        const arr: any[] = Array.isArray(detalleEmpleadorRaw) ? detalleEmpleadorRaw : (detalleEmpleadorRaw?.data || []);
+        if (!selectedAfipCuit) return '';
+        const arr: any[] = Array.isArray(origenDetalleRaw) ? origenDetalleRaw : (origenDetalleRaw?.data || []);
         return arr.find((d: any) => Number(d.empleadorCUIT) === selectedAfipCuit)?.origen ?? '';
-    }, [detalleEmpleadorRaw, selectedAfipCuit]);
+    }, [origenDetalleRaw, selectedAfipCuit]);
 
     const afipTransferData = forceEmpty || !shouldShowAfip ? [] : (
         Array.isArray(afipTransferRaw) ? afipTransferRaw : (afipTransferRaw?.data || afipTransferRaw || [])
