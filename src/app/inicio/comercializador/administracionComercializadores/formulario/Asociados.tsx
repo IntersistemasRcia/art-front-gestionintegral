@@ -316,7 +316,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 			<CustomModalMessage
 				open={showDuplicate}
 				type="warning"
-				title="Advertencia"
+				title="Asociación duplicada"
 				message="Esta asociación ya se encuentra registrada en el sistema."
 				onClose={() => setShowDuplicate(false)}
 			/>
