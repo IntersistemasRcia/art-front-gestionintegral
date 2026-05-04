@@ -17,7 +17,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 import DataTableImport from '@/utils/ui/table/DataTable';
 
-import ArtAPI from '@/data/artAPI';
+import ArtAPI, { type ApiFormulariosRGRLParams } from '@/data/artAPI';
 import CabeceraFormulario from './CabeceraFormulario';
 import { useAuth } from '@/data/AuthContext';
 
@@ -60,15 +60,27 @@ const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> =
 // Componente principal: crea, edita o replica formularios RGRL
 const GenerarFormularioRGRL: React.FC<{
   initialCuit?: number;
+  /** Ids de empresa del combo del listado; se envían en GetBySpecs (empresasId). */
+  empresasIdGetBySpecs?: number[];
   replicaDe?: number;
   onDone?: (nuevoId: number) => void;
-}> = ({ initialCuit, replicaDe, onDone }) => {
+  onClose?: () => void;
+}> = ({ initialCuit, empresasIdGetBySpecs, replicaDe, onDone, onClose }) => {
 
   const router = useRouter();
   const { hasTask } = useAuth();
   const search = useSearchParams();
   // En modal (onDone) se ignoran query params.
-  const isModal = Boolean(onDone);
+  const isModal = Boolean(onDone || onClose);
+
+  const buildGetBySpecsParams = useCallback(
+    (extra: Partial<ApiFormulariosRGRLParams> = {}): ApiFormulariosRGRLParams => ({
+      empresasId: empresasIdGetBySpecs ?? [],
+      ...extra,
+    }),
+    [empresasIdGetBySpecs]
+  );
+
   const cuitFromQuery = useMemo(() => {
     if (isModal) return undefined;
     const v = search?.get('cuit');
@@ -88,6 +100,18 @@ const GenerarFormularioRGRL: React.FC<{
     const v = search?.get('replicaDe');
     return v ? Number(v) : undefined;
   }, [search, isModal]);
+
+  const cuitSoloLecturaDesdeEmpresaLista = useMemo(
+    () =>
+      Boolean(
+        onClose &&
+          !replicaDe &&
+          !replicaDeQuery &&
+          typeof initialCuit === 'number' &&
+          initialCuit > 0
+      ),
+    [onClose, replicaDe, replicaDeQuery, initialCuit]
+  );
 
   const [original, setOriginal] = useState<FormularioVm | null>(null);
   // Marca si el flujo actual es de réplica
@@ -142,7 +166,7 @@ const GenerarFormularioRGRL: React.FC<{
     setError('');
     try {
       const [formulariosRes, ests, tfs] = await Promise.all([
-        ArtAPI.getFormulariosRGRL({ CUIT: cuit!, PageIndex: 1, PageSize: 1 }),
+        ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: cuit!, PageIndex: 1, PageSize: 1 })),
         fetchEstablecimientos(cuit!),
         ArtAPI.getTiposFormulariosRGRL(),
       ]);
@@ -174,7 +198,7 @@ const GenerarFormularioRGRL: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [cuit, canBuscar]);
+  }, [cuit, canBuscar, buildGetBySpecsParams]);
 
   useEffect(() => {
     // Ejecutar la carga automáticamente solo cuando el CUIT tiene 11 dígitos
@@ -203,7 +227,7 @@ const GenerarFormularioRGRL: React.FC<{
       if (c) setCuit(c);
 
       const [formulariosRes, ests, tfs] = await Promise.all([
-        c ? ArtAPI.getFormulariosRGRL({ CUIT: c, PageIndex: 1, PageSize: 1 }) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
+        c ? ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: c, PageIndex: 1, PageSize: 1 })) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
         c ? fetchEstablecimientos(c) : Promise.resolve([] as Establecimiento[]),
         ArtAPI.getTiposFormulariosRGRL(),
       ]);
@@ -224,7 +248,7 @@ const GenerarFormularioRGRL: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [replicaDe, replicaDeQuery]);
+  }, [replicaDe, replicaDeQuery, buildGetBySpecsParams]);
 
   useEffect(() => {
     if (!idFromQuery && (replicaDe || replicaDeQuery)) cargarReplicaDe();
@@ -542,7 +566,7 @@ const GenerarFormularioRGRL: React.FC<{
       setTipoSel(frm.internoFormulario);
       if (c) {
         const [formulariosRes, ests] = await Promise.all([
-          ArtAPI.getFormulariosRGRL({ CUIT: c, PageIndex: 1, PageSize: 1 }),
+          ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: c, PageIndex: 1, PageSize: 1 })),
           fetchEstablecimientos(c),
         ]);
         const rs = (formulariosRes.data?.[0]?.razonSocial ?? '') as string;
@@ -630,7 +654,7 @@ const GenerarFormularioRGRL: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [idFromQuery]);
+  }, [idFromQuery, buildGetBySpecsParams]);
 
   useEffect(() => {
     if (idFromQuery && !isModal) cargarPaso2();
@@ -1648,7 +1672,12 @@ const GenerarFormularioRGRL: React.FC<{
         tipos={tipos}
         tipoSel={tipoSel}
         onTipoChange={setTipoSel}
+        cuitSoloLectura={cuitSoloLecturaDesdeEmpresaLista}
         onVolver={() => {
+          if (onClose) {
+            onClose();
+            return;
+          }
           router.back();
         }}
         onCrear={crearFormulario}
