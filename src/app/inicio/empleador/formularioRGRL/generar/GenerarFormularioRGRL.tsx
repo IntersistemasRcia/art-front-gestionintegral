@@ -911,7 +911,7 @@ const GenerarFormularioRGRL: React.FC<{
       }
 
       const gremiosFull = gremiosUI
-        .filter((g) => Number(g.legajo ?? 0) > 0)
+        .filter((g) => g && Number(g.legajo ?? 0) > 0)
         .map((g, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         legajo: Number(g.legajo ?? 0),
@@ -923,7 +923,7 @@ const GenerarFormularioRGRL: React.FC<{
         renglon: i,
       }));
       const contratistasFull = contratistasUI
-        .filter((c) => Number(c.cuit ?? 0) > 0)
+        .filter((c) => c && Number(c.cuit ?? 0) > 0)
         .map((c, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         cuit: Number(c.cuit ?? 0),
@@ -935,7 +935,7 @@ const GenerarFormularioRGRL: React.FC<{
         renglon: i,
       }));
       const responsablesFull = responsablesUI
-        .filter((r) => Number(r.cuit ?? 0) > 0)
+        .filter((r) => r && Number(r.cuit ?? 0) > 0)
         .map((r, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         cuit: Number(r.cuit ?? 0),
@@ -1601,9 +1601,33 @@ const GenerarFormularioRGRL: React.FC<{
         ) : null}
 
         <div className={styles.row}>
-          <CustomButton onClick={() => router.back()} disabled={loading}>VOLVER</CustomButton>
-          <CustomButton onClick={() => setConfirmOpen(true)} disabled={loading}>GUARDAR Y CONFIRMAR</CustomButton>
-          <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR BORRADOR</CustomButton>
+          <div className={styles.rowGroup}>
+            <CustomButton onClick={() => router.back()} disabled={loading}>VOLVER</CustomButton>
+            <CustomButton onClick={() => setConfirmOpen(true)} disabled={loading}>GUARDAR Y CONFIRMAR</CustomButton>
+            <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR BORRADOR</CustomButton>
+          </div>
+          <div className={styles.rowGroup}>
+            <CustomButton
+              disabled={panel === 'preguntas' && page === 0}
+              onClick={() => {
+                if (panel === 'responsables') setPanel('contratistas');
+                else if (panel === 'contratistas') setPanel('gremios');
+                else if (panel === 'gremios') setPanel('preguntas');
+                else setPage(p => Math.max(0, p - 1));
+              }}
+            >Anterior</CustomButton>
+            <CustomButton
+              disabled={panel === 'responsables'}
+              onClick={() => {
+                const last = (pagesMap.pages?.length ?? Math.ceil(totalSecs / PAGE_SIZE)) - 1;
+                if (panel === 'preguntas') {
+                  if (page >= last) setPanel('gremios');
+                  else setPage(p => Math.min(last, p + 1));
+                } else if (panel === 'gremios') setPanel('contratistas');
+                else if (panel === 'contratistas') setPanel('responsables');
+              }}
+            >Siguiente</CustomButton>
+          </div>
         </div>
 
         {panel === 'gremios' && (
