@@ -10,6 +10,11 @@
   gap: 8px;
   align-items: center;
   margin-bottom: 12px;
+  justify-content: space-between;
+}
+.rowGroup {
+  display: flex;
+  gap: 8px;
 }
 .rowTopSpace {
   display: flex;

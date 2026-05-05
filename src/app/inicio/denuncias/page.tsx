@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, SyntheticEvent } from 'react';
 import { Box, IconButton, Tooltip } from "@mui/material";
 import styles from './denuncias.module.css';
 import ArtAPI from '@/data/artAPI';
@@ -8,6 +8,7 @@ import { useAuth } from '@/data/AuthContext';
 import DataTable from '@/utils/ui/table/DataTable';
 import Formato from '@/utils/Formato';
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomTabs from '@/utils/ui/tab/CustomTab';
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import DenunciaForm from './denunciaForm';
 import dayjs from 'dayjs';
@@ -542,6 +543,7 @@ function DenunciasPage() {
   const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [pageCount, setPageCount] = useState<number>(0);
+  const hasLoadedOnce = useRef(false);
 
   // Buscador por CUIT (arriba de "Registrar Denuncia")
   const [cuitBusqueda, setCuitBusqueda] = useState<string>("");
@@ -590,6 +592,7 @@ function DenunciasPage() {
   });
   const [selectedDenunciaId, setSelectedDenunciaId] = useState<number | null>(null);
   const [initialFiles, setInitialFiles] = useState<File[]>([]);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
 
   // Fetch denuncia by ID when editing
   const denunciaIdParams: DenunciaQueryParamsID | undefined = selectedDenunciaId ? { id: selectedDenunciaId } : undefined;
@@ -617,14 +620,16 @@ function DenunciasPage() {
     if (typeof empCuit === 'number' && String(empCuit).length === 11) {
       params.EmpCuit = empCuit;
     }
-    // Si el usuario tiene la tarea Denuncia_VerDenuncia, aplicar filtro Tipo=2
     try {
       if (hasTask && typeof hasTask === 'function') {
-        if (hasTask('Denuncia_VerPreDenuncia')) {
+        const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
+        const verDenuncia = hasTask('Denuncia_VerDenuncia');
+        if (verPreDenuncia && !verDenuncia) {
           (params as any).Tipo = 1;
-        } else if (hasTask('Denuncia_VerDenuncia')) {
+        } else if (verDenuncia && !verPreDenuncia) {
           (params as any).Tipo = 2;
         }
+        // ambas tareas → sin filtro Tipo (muestra denuncias y predenuncias)
       }
     } catch (e) {
       // noop: en caso de error con hasTask, no aplicamos el filtro
@@ -649,7 +654,7 @@ function DenunciasPage() {
   // Process data and update states
   useMemo(() => {
     if (!data && !error) {
-      setLoading(true);
+      if (!hasLoadedOnce.current) setLoading(true);
       return;
     }
 
@@ -666,6 +671,7 @@ function DenunciasPage() {
       setPageCount(data.data.length > 0 ? Math.ceil(data.data.length / pageSize) : 1);
     }
 
+    hasLoadedOnce.current = true;
     setLoading(false);
   }, [data, error, pageSize, is404Error]);
 
@@ -720,6 +726,10 @@ function DenunciasPage() {
   const handleCloseModal = () => {
     setRequestState({ method: null, denunciaData: null });
     setSelectedDenunciaId(null);
+  };
+
+  const handleTabChange = (_event: SyntheticEvent, newTabValue: number) => {
+    setActiveTabIndex(newTabValue);
   };
 
   // Map API DenunciaById response into DenunciaFormData when available
@@ -1044,10 +1054,12 @@ function DenunciasPage() {
   const tableColumns = useMemo(() => {
     try {
       if (hasTask && typeof hasTask === 'function') {
-        if (hasTask('Denuncia_VerPreDenuncia')) {
+        const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
+        const verDenuncia = hasTask('Denuncia_VerDenuncia');
+        if (verPreDenuncia && !verDenuncia) {
           return baseTableColumns.filter(c => (c as any).accessorKey !== 'denunciaNro');
         }
-        if (hasTask('Denuncia_VerDenuncia')) {
+        if (verDenuncia && !verPreDenuncia) {
           return baseTableColumns.filter(c => (c as any).accessorKey !== 'nroPreDenuncia');
         }
       }
@@ -1071,9 +1083,12 @@ function DenunciasPage() {
   // Current initial data for the form
   const currentInitialData = requestState.denunciaData || initialDenunciaFormData;
 
-  return (
-    <Box className={styles.inicioContainer}>
-
+  const tabItems = [
+    {
+      label: 'Denuncias',
+      value: 0,
+      content: (
+        <>
       {/* Filters */}
       <div className={styles.filtersContainer}>
         <div className={styles.filterGroup}>
@@ -1134,6 +1149,18 @@ function DenunciasPage() {
           <p>No se encontraron denuncias con los filtros seleccionados.</p>
         </div>
       )}
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Box className={styles.inicioContainer}>
+      <CustomTabs
+        tabs={tabItems}
+        currentTab={activeTabIndex}
+        onTabChange={handleTabChange}
+      />
 
       {/* Denuncia Form Modal */}
       <DenunciaForm

@@ -483,7 +483,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
           </div>
           <DataTableImport
             columns={[
-              { accessorKey: 'CUIL', header: 'CUIL', cell: ({ getValue }: { getValue: () => string }) => Formato.CUIP(getValue()) },
+              { accessorKey: 'CUIL', header: 'CUIL', cell: ({ getValue }: { getValue: () => string }) => Formato.CUIP(getValue().replace(/\D/g, '')) },
               { accessorKey: 'Nombre', header: 'Nombre' },
               { accessorKey: 'SectorTareas', header: 'Sector/Tareas' },
               { accessorKey: 'Ingreso', header: 'F. Ingreso', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },
