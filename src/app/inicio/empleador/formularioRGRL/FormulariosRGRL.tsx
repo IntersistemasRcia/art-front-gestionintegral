@@ -834,7 +834,16 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
           {/* Acciones: editar, generar, replicar y exportar */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <CustomButton onClick={handleClickGenerar}>Generar Formulario</CustomButton>
+            <CustomButton
+              onClick={handleClickGenerar}
+              disabled={
+                !empresaSeleccionada ||
+                empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID ||
+                !empresaSeleccionada.cuit
+              }
+            >
+              Generar Formulario
+            </CustomButton>
 
             <CustomButton onClick={handleExportExcel}>Exportar a Excel</CustomButton>
           </div>
@@ -1149,7 +1158,9 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         <GenerarFormularioRGRL
           //Generar
           initialCuit={empresaSeleccionada?.cuit || undefined}
+          empresasIdGetBySpecs={empresaIdsFiltro}
           replicaDe={replicaDe}
+          onClose={() => setOpenGenerar(false)}
           onDone={async () => {
             setOpenGenerar(false);
             if (canFetchFormularios) {
