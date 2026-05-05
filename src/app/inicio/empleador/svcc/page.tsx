@@ -1,30 +1,76 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import Formato from '@/utils/Formato';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
+import { useAuth } from '@/data/AuthContext';
 import { SVCCPresentacionContextProvider } from './context';
+import type { SVCCPresentacionFilterBase } from './context';
+import type { SVCCPresentacionUltimaParams } from '@/data/artAPI';
 import PresentacionesHandler from './Presentaciones/PresentacionesHandler';
+
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+
+const EMPRESA_OPCION_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+  cuit: 0,
+  razonSocial: 'Todas las Empresas',
+  domicilio: '',
+  localidad: '',
+  provincia: '',
+};
+
+type FiltrosSvccMemo = {
+  empresaCUITParaAcciones?: number;
+  filtrosPresentacionesBase: SVCCPresentacionFilterBase;
+  filtrosUltimaPresentacion: SVCCPresentacionUltimaParams;
+};
 
 export default function SVCCPage() {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const { user } = useAuth();
+  const isAdmin = user?.rol?.toLowerCase() === 'administrador';
+
+  const cuitsEmpresasRelacionadas = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          empresas
+            .map((e) => Number(e.cuit))
+            .filter((n) => Number.isFinite(n) && n !== 0)
+        )
+      ).sort((a, b) => a - b),
+    [empresas]
+  );
+
+  const opcionesEmpresaSelector = useMemo(
+    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    [empresas]
+  );
+
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
 
-  // Seleccionar automáticamente si solo hay una empresa
   useEffect(() => {
-    if (!isLoadingEmpresas) {
-      if (empresas.length === 1) {
-        setEmpresaSeleccionada(empresas[0]);
-        seleccionAutomaticaRef.current = true;
-      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-        setEmpresaSeleccionada(null);
-        seleccionAutomaticaRef.current = false;
-      }
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
     }
-  }, [empresas.length, isLoadingEmpresas]);
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresaSeleccionada((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas]);
 
   const handleEmpresaChange = (
     _event: React.SyntheticEvent,
@@ -35,15 +81,40 @@ export default function SVCCPage() {
   };
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
-    if (!empresa) return "";
+    if (!empresa) return '';
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return 'Todas las Empresas';
     return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
   };
 
+  const filtrosMemo = useMemo((): FiltrosSvccMemo | null => {
+    if (empresaSeleccionada == null) return null;
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      const empleadorCuit = isAdmin ? [] : cuitsEmpresasRelacionadas;
+      if (!isAdmin && empleadorCuit.length === 0) return null;
+      return {
+        empresaCUITParaAcciones: undefined,
+        filtrosPresentacionesBase: { empleadorCuit },
+        filtrosUltimaPresentacion: { empleadorCuit },
+      };
+    }
+    const cuitNum = Number(empresaSeleccionada.cuit);
+    if (!Number.isFinite(cuitNum) || cuitNum === 0) return null;
+    return {
+      empresaCUITParaAcciones: cuitNum,
+      filtrosPresentacionesBase: { empleadorCUIT: cuitNum },
+      filtrosUltimaPresentacion: { empleadorCuit: [cuitNum] },
+    };
+  }, [empresaSeleccionada, isAdmin, cuitsEmpresasRelacionadas]);
+
   return (
-    <SVCCPresentacionContextProvider empresaCUIT={empresaSeleccionada?.cuit}>
+    <SVCCPresentacionContextProvider
+      empresaCUITParaAcciones={filtrosMemo?.empresaCUITParaAcciones}
+      filtrosPresentacionesBase={filtrosMemo?.filtrosPresentacionesBase}
+      filtrosUltimaPresentacion={filtrosMemo?.filtrosUltimaPresentacion}
+    >
       <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
         <CustomSelectSearch<Empresa>
-          options={empresas}
+          options={opcionesEmpresaSelector}
           getOptionLabel={getEmpresaLabel}
           value={empresaSeleccionada}
           onChange={handleEmpresaChange}
@@ -53,18 +124,23 @@ export default function SVCCPage() {
           loadingText="Cargando empresas..."
           noOptionsText={
             isLoadingEmpresas
-              ? "Cargando..."
+              ? 'Cargando...'
               : empresas.length === 0
-              ? "No hay empresas disponibles"
-              : "No se encontraron empresas"
+              ? 'No hay empresas disponibles'
+              : 'No se encontraron empresas'
           }
           disabled={isLoadingEmpresas}
         />
       </Box>
-      {empresaSeleccionada == null
-        ? (<Typography color="error">Debe seleccionar una empresa</Typography>)
-        : (<PresentacionesHandler/>)
-      }
+      {empresaSeleccionada == null || filtrosMemo == null ? (
+        <Typography color="error">
+          {isLoadingEmpresas
+            ? 'Cargando empresas...'
+            : 'Debe seleccionar una empresa o no hay filtros válidos para su usuario.'}
+        </Typography>
+      ) : (
+        <PresentacionesHandler />
+      )}
     </SVCCPresentacionContextProvider>
   );
 }

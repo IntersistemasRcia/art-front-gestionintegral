@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/data/AuthContext";
-import gestionEmpleadorAPI, { Pagination, PresentacionCreateDTO, PresentacionDTO, PresentacionFinalizaDTO, RefCIIU, SRTSiniestralidadCIUO88, SVCCPresentacionTodasParams } from '@/data/gestionEmpleadorAPI';
+import gestionEmpleadorAPI, { PresentacionCreateDTO, PresentacionDTO, PresentacionFinalizaDTO, RefCIIU, SRTSiniestralidadCIUO88 } from '@/data/gestionEmpleadorAPI';
+import type { SVCCPresentacionTodasParams, SVCCPresentacionUltimaParams } from '@/data/artAPI';
 import ArtAPI, { EstablecimientoVm, EstablecimientoVmDescripcion } from "@/data/artAPI";
 import { arrayToRecord } from "@/utils/utils";
 import { AxiosError } from "axios";
@@ -73,49 +73,85 @@ const {
   useSVCCPresentacionNueva,
   useSVCCPresentacionFinaliza,
   useSVCCPresentacionConstancia,
+  useEstablecimientoList,
+} = ArtAPI;
 
+const {
   useSRTSiniestralidadCIUO88List,
   useRefCIIUList,
 } = gestionEmpleadorAPI;
 
-const { useEstablecimientoList } = ArtAPI;
+export type SVCCPresentacionFilterBase = Omit<SVCCPresentacionTodasParams, "PageIndex" | "PageSize" | "Order">;
 
-export function SVCCPresentacionContextProvider({ 
+export function SVCCPresentacionContextProvider({
   children,
-  empresaCUIT
-}: { 
+  empresaCUITParaAcciones,
+  filtrosPresentacionesBase,
+  filtrosUltimaPresentacion,
+}: {
   children: ReactNode;
-  empresaCUIT?: number;
+  empresaCUITParaAcciones?: number;
+  filtrosPresentacionesBase?: SVCCPresentacionFilterBase;
+  filtrosUltimaPresentacion?: SVCCPresentacionUltimaParams;
 }) {
-  const { user } = useAuth();
-  
-  // Solo hacer fetch si hay empresa seleccionada (empresaCUIT debe ser válido y diferente de 0)
-  const cuitParaUsar = empresaCUIT && empresaCUIT !== 0 ? empresaCUIT : undefined;
-  
   const [presentacionInfo, setPresentacionInfo] = useState<
     {
       index: number,
       size: number,
       selected?: PresentacionDTO
     }
-  >({ index: 0, size: 100 });
+  >({ index: 0, size: 10 });
   const [presentacionData, setPresentacionData] = useState<Data<PresentacionDTO>>({ index: presentacionInfo.index, size: presentacionInfo.size, count: 0, pages: 0, data: [] });
   
   useEffect(() => {
     setPresentacionInfo((o) => ({ ...o, selected: undefined }));
-  }, [cuitParaUsar]);
+  }, [filtrosPresentacionesBase]);
 
-  const presentacionTodas = useSVCCPresentacionTodas(
-    cuitParaUsar ? { empleadorCUIT: cuitParaUsar, page: `${presentacionInfo.index + 1},${presentacionInfo.size}`, sort: "-interno" } : undefined,
-    {
-      revalidateOnFocus: false,
-      onSuccess(data) {
-        setPresentacionData({ ...data, index: data.index - 1 });
-      },
+  const presentacionTodasPaginated = useMemo((): SVCCPresentacionTodasParams | undefined => {
+    if (filtrosPresentacionesBase == null) return undefined;
+    return {
+      ...filtrosPresentacionesBase,
+      PageIndex: presentacionInfo.index + 1,
+      PageSize: presentacionInfo.size,
+      Order: "-interno",
+    };
+  }, [filtrosPresentacionesBase, presentacionInfo.index, presentacionInfo.size]);
+
+  const presentacionTodas = useSVCCPresentacionTodas(presentacionTodasPaginated, {
+    revalidateOnFocus: false,
+  });
+
+  const ultima = useSVCCPresentacionUltima(filtrosUltimaPresentacion, { revalidateOnFocus: false });
+
+  useEffect(() => {
+    const pag = presentacionTodas.data;
+    const ultRows = ultima.data ?? [];
+    if (pag != null && Array.isArray(pag.data) && pag.data.length > 0) {
+      setPresentacionData({ ...pag, index: Math.max(0, pag.index - 1) });
+      return;
     }
-  );
+    if (ultRows.length > 0) {
+      const n = ultRows.length;
+      setPresentacionData({
+        index: presentacionInfo.index,
+        size: Math.max(presentacionInfo.size, n),
+        pages: 1,
+        count: n,
+        data: ultRows,
+      });
+      return;
+    }
+    if (pag != null) {
+      setPresentacionData({ ...pag, index: Math.max(0, pag.index - 1) });
+    }
+  }, [presentacionTodas.data, ultima.data, presentacionInfo.index, presentacionInfo.size]);
 
-  const ultima = useSVCCPresentacionUltima(cuitParaUsar ? { empleadorCUIT: cuitParaUsar } : undefined, { revalidateOnFocus: false });
+  const ultimaFilaSeleccionada = useMemo(() => {
+    const rows = ultima.data ?? [];
+    const sel = presentacionInfo.selected;
+    if (sel == null) return undefined;
+    return rows.find((r) => r.interno === sel.interno);
+  }, [ultima.data, presentacionInfo.selected]);
 
   const constancia = useSVCCPresentacionConstancia(
     presentacionInfo.selected?.interno != null && presentacionInfo.selected.presentacionFecha != null
@@ -136,9 +172,10 @@ export function SVCCPresentacionContextProvider({
     // constancia.mutate();
   }});
 
-  // Solo hacer fetch de establecimientos si hay empresa seleccionada
   const establecimientoList = useEstablecimientoList(
-    cuitParaUsar ? { cuit: cuitParaUsar } : undefined,
+    empresaCUITParaAcciones && empresaCUITParaAcciones !== 0
+      ? { cuit: empresaCUITParaAcciones }
+      : undefined,
     { revalidateOnFocus: false }
   );
 
@@ -171,7 +208,7 @@ export function SVCCPresentacionContextProvider({
   return (
     <SVCCPresentacionContext.Provider
       value={{
-        empresaCUIT,
+        empresaCUIT: empresaCUITParaAcciones,
         presentacion: {
           isLoading: presentacionTodas.isLoading,
           isValidating: presentacionTodas.isValidating,
@@ -184,7 +221,7 @@ export function SVCCPresentacionContextProvider({
         ultima: {
           isLoading: ultima.isLoading,
           isValidating: ultima.isValidating,
-          data: ultima.data,
+          data: ultimaFilaSeleccionada,
           error: ultima.error
         },
         isMutating: nueva.isMutating || finaliza.isMutating,

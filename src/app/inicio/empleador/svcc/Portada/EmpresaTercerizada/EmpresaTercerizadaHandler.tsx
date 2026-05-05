@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
-import gestionEmpleadorAPI, {
+import ArtAPI from "@/data/artAPI";
+import type {
   EmpresaTercerizadaBaseDTO,
   EmpresaTercerizadaCreateDTO,
   EmpresaTercerizadaDTO,
@@ -21,7 +22,7 @@ const {
   useSVCCEmpresaTercerizadaCreate,
   useSVCCEmpresaTercerizadaUpdate,
   useSVCCEmpresaTercerizadaDelete,
-} = gestionEmpleadorAPI;
+} = ArtAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<EmpresaTercerizadaDTO>, "onChange"> & {
@@ -31,10 +32,10 @@ type EditState = Omit<FormProps<EmpresaTercerizadaDTO>, "onChange"> & {
 export default function EmpresaTercerizadaHandler() {
   const [edit, setEdit] = useState<EditState>({ data: {} });
   const { presentacion: { selected: presentacion }, establecimientos, refCIIU } = useSVCCPresentacionContext();
-  const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
+  const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<EmpresaTercerizadaDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCEmpresaTercerizadaList(
-    { presentacionId: presentacion?.interno ?? 0, page: `${index + 1},${size}` },
+    { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: size },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },

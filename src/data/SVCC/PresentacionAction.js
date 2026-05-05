@@ -3,7 +3,7 @@ import urlAPIEmpleador from "../../components/api/apiEmpleador";
 
 export class PresentaicionActions {
 	static #instance = axios.create({
-		baseURL: `${urlAPIEmpleador}SVCC/Presentacion/`,
+		baseURL: `${urlAPIEmpleador}SVCC/Presentaciones/`,
 	});
 
 	static ultima() {
