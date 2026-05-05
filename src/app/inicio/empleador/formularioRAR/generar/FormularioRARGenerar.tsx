@@ -272,7 +272,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   const filasTabla = React.useMemo(() => {
     return filas.map((f) => ({
       ...f,
-      CUILDisplay: f.CUIL ? Formato.CUIP(f.CUIL) : '',
+      CUILDisplay: f.CUIL ? Formato.CUIP(f.CUIL.replace(/\D/g, '')) : '',
       IngresoDisplay: f.Ingreso ? Formato.Fecha(f.Ingreso, 'DD/MM/YYYY') : '',
       FechaInicioDisplay: f.FechaInicio ? Formato.Fecha(f.FechaInicio, 'DD/MM/YYYY') : '',
       FechaFinExposicionDisplay: f.FechaFinExposicion ? Formato.Fecha(f.FechaFinExposicion, 'DD/MM/YYYY') : '',
