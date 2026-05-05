@@ -55,7 +55,7 @@ export default function PresentacionesHandler() {
         }
       </Grid>
       <Grid size={12}>
-        {ultima.data != null && presentacion.selected == null
+        {(presentacion.data?.data?.length ?? 0) > 0 && presentacion.selected == null
           ? (<Typography color="error">Debe seleccionar una presentacion</Typography>)
           : (
             <CustomTabs
