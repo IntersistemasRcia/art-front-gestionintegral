@@ -31,7 +31,7 @@ export function NominaContextProvider({
   const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
 
   const sustancias = useSVCCSustanciaList(
-    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 500 } : undefined,
+    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 10 } : undefined,
     {},
   );
 

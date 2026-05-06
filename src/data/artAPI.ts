@@ -2359,7 +2359,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/EstablecimientoDeclarado
   //#region SVCC/EstablecimientoDeclarado - List
   readonly svccEstablecimientoDeclaradoListURL = (params?: SVCCEstablecimientoDeclaradoListParams) =>
-    this.getURL({ path: "/api/SVCC/EstablecimientoDeclarado", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/SVCC/EstablecimientosDeclarados", search: toURLSearch(params) }).toString();
   svccEstablecimientoDeclaradoList = async (params?: SVCCEstablecimientoDeclaradoListParams) => tokenizable.get<Pagination<EstablecimientoDeclaradoDTO>>(
     this.svccEstablecimientoDeclaradoListURL(params)
   ).then(({ data }) => data);
@@ -2375,7 +2375,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/EstablecimientoDeclarado - List
 
   //#region SVCC/EstablecimientoDeclarado - Create
-  readonly svccEstablecimientoDeclaradoCreateURL = this.getURL({ path: "/api/SVCC/EstablecimientoDeclarado" }).toString();
+  readonly svccEstablecimientoDeclaradoCreateURL = this.getURL({ path: "/api/SVCC/EstablecimientosDeclarados" }).toString();
   svccEstablecimientoDeclaradoCreate = async (data?: EstablecimientoDeclaradoCreateDTO) => tokenizable.post<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoCreateURL, data
   ).then(({ data }) => data);
@@ -2391,7 +2391,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/EstablecimientoDeclarado - Create
 
   //#region SVCC/EstablecimientoDeclarado - Update
-  readonly svccEstablecimientoDeclaradoUpdateURL = ({ id }: SVCCEstablecimientoDeclaradoUpdateParams) => this.getURL({ path: `/api/SVCC/EstablecimientoDeclarado/${id}` }).toString();
+  readonly svccEstablecimientoDeclaradoUpdateURL = ({ id }: SVCCEstablecimientoDeclaradoUpdateParams) => this.getURL({ path: `/api/SVCC/EstablecimientosDeclarados/${id}` }).toString();
   svccEstablecimientoDeclaradoUpdate = async (params: SVCCEstablecimientoDeclaradoUpdateParams, data?: EstablecimientoDeclaradoBaseDTO) => tokenizable.put<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoUpdateURL(params), data
   ).then(({ data }) => data);
@@ -2407,7 +2407,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/EstablecimientoDeclarado - Update
 
   //#region SVCC/EstablecimientoDeclarado - Delete
-  readonly svccEstablecimientoDeclaradoDeleteURL = ({ id }: SVCCEstablecimientoDeclaradoDeleteParams) => this.getURL({ path: `/api/SVCC/EstablecimientoDeclarado/${id}` }).toString();
+  readonly svccEstablecimientoDeclaradoDeleteURL = ({ id }: SVCCEstablecimientoDeclaradoDeleteParams) => this.getURL({ path: `/api/SVCC/EstablecimientosDeclarados/${id}` }).toString();
   svccEstablecimientoDeclaradoDelete = async (params: SVCCEstablecimientoDeclaradoDeleteParams) => tokenizable.delete<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoDeleteURL(params)
   ).then(({ data }) => data);
@@ -2426,7 +2426,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/Sustancia
   //#region SVCC/Sustancia - List
   readonly svccSustanciaListURL = (params?: SVCCSustanciaListParams) =>
-    this.getURL({ path: "/api/SVCC/Sustancia", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/SVCC/Sustancias", search: toURLSearch(params) }).toString();
   svccSustanciaList = async (params?: SVCCSustanciaListParams) => tokenizable.get<Pagination<SustanciaDTO>>(
     this.svccSustanciaListURL(params)
   ).then(({ data }) => data);
@@ -2442,7 +2442,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - List
 
   //#region SVCC/Sustancia - Create
-  readonly svccSustanciaCreateURL = this.getURL({ path: "/api/SVCC/Sustancia" }).toString();
+  readonly svccSustanciaCreateURL = this.getURL({ path: "/api/SVCC/Sustancias" }).toString();
   svccSustanciaCreate = async (data?: SustanciaCreateDTO) => tokenizable.post<SustanciaDTO>(
     this.svccSustanciaCreateURL, data
   ).then(({ data }) => data);
@@ -2458,7 +2458,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - Create
 
   //#region SVCC/Sustancia - Read
-  readonly svccSustanciaReadURL = ({ id }: SVCCSustanciaReadParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
+  readonly svccSustanciaReadURL = ({ id }: SVCCSustanciaReadParams) => this.getURL({ path: `/api/SVCC/Sustancias/${id}` }).toString();
   svccSustanciaRead = async (params: SVCCSustanciaReadParams) => tokenizable.get<SustanciaDTO>(
     this.svccSustanciaReadURL(params)
   ).then(({ data }) => data);
@@ -2474,7 +2474,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - Read
 
   //#region SVCC/Sustancia - Update
-  readonly svccSustanciaUpdateURL = ({ id }: SVCCSustanciaUpdateParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
+  readonly svccSustanciaUpdateURL = ({ id }: SVCCSustanciaUpdateParams) => this.getURL({ path: `/api/SVCC/Sustancias/${id}` }).toString();
   svccSustanciaUpdate = async (params: SVCCSustanciaUpdateParams, data?: SustanciaBaseDTO) => tokenizable.put<SustanciaDTO>(
     this.svccSustanciaUpdateURL(params), data
   ).then(({ data }) => data);
@@ -2490,7 +2490,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - Update
 
   //#region SVCC/Sustancia - Delete
-  readonly svccSustanciaDeleteURL = ({ id }: SVCCSustanciaDeleteParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
+  readonly svccSustanciaDeleteURL = ({ id }: SVCCSustanciaDeleteParams) => this.getURL({ path: `/api/SVCC/Sustancias/${id}` }).toString();
   svccSustanciaDelete = async (params: SVCCSustanciaDeleteParams) => tokenizable.delete<SustanciaDTO>(
     this.svccSustanciaDeleteURL(params)
   ).then(({ data }) => data);
@@ -2509,7 +2509,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/Trabajador
   //#region SVCC/Trabajador - List
   readonly svccTrabajadorListURL = (params?: SVCCTrabajadorListParams) =>
-    this.getURL({ path: "/api/SVCC/Trabajador", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/SVCC/Trabajadores", search: toURLSearch(params) }).toString();
   svccTrabajadorList = async (params?: SVCCTrabajadorListParams) => tokenizable.get<Pagination<TrabajadorDTO>>(
     this.svccTrabajadorListURL(params)
   ).then(({ data }) => data);
@@ -2525,7 +2525,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - List
 
   //#region SVCC/Trabajador - Create
-  readonly svccTrabajadorCreateURL = this.getURL({ path: "/api/SVCC/Trabajador" }).toString();
+  readonly svccTrabajadorCreateURL = this.getURL({ path: "/api/SVCC/Trabajadores" }).toString();
   svccTrabajadorCreate = async (data?: TrabajadorCreateDTO) => tokenizable.post<TrabajadorDTO>(
     this.svccTrabajadorCreateURL, data
   ).then(({ data }) => data);
@@ -2541,7 +2541,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Create
 
   //#region SVCC/Trabajador - Read
-  readonly svccTrabajadorReadURL = ({ id }: SVCCTrabajadorReadParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
+  readonly svccTrabajadorReadURL = ({ id }: SVCCTrabajadorReadParams) => this.getURL({ path: `/api/SVCC/Trabajadores/${id}` }).toString();
   svccTrabajadorRead = async (params: SVCCTrabajadorReadParams) => tokenizable.get<TrabajadorDTO>(
     this.svccTrabajadorReadURL(params)
   ).then(({ data }) => data);
@@ -2557,7 +2557,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Read
 
   //#region SVCC/Trabajador - Update
-  readonly svccTrabajadorUpdateURL = ({ id }: SVCCTrabajadorUpdateParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
+  readonly svccTrabajadorUpdateURL = ({ id }: SVCCTrabajadorUpdateParams) => this.getURL({ path: `/api/SVCC/Trabajadores/${id}` }).toString();
   svccTrabajadorUpdate = async (params: SVCCTrabajadorUpdateParams, data?: TrabajadorBaseDTO) => tokenizable.put<TrabajadorDTO>(
     this.svccTrabajadorUpdateURL(params), data
   ).then(({ data }) => data);
@@ -2573,7 +2573,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Update
 
   //#region SVCC/Trabajador - Delete
-  readonly svccTrabajadorDeleteURL = ({ id }: SVCCTrabajadorDeleteParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
+  readonly svccTrabajadorDeleteURL = ({ id }: SVCCTrabajadorDeleteParams) => this.getURL({ path: `/api/SVCC/Trabajadores/${id}` }).toString();
   svccTrabajadorDelete = async (params: SVCCTrabajadorDeleteParams) => tokenizable.delete<TrabajadorDTO>(
     this.svccTrabajadorDeleteURL(params)
   ).then(({ data }) => data);

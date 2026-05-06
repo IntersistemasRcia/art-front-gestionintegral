@@ -112,7 +112,7 @@ export function SVCCPresentacionContextProvider({
     return {
       ...filtrosPresentacionesBase,
       PageIndex: presentacionInfo.index + 1,
-      PageSize: presentacionInfo.size,
+      PageSize: 10,
       Order: "-interno",
     };
   }, [filtrosPresentacionesBase, presentacionInfo.index, presentacionInfo.size]);
