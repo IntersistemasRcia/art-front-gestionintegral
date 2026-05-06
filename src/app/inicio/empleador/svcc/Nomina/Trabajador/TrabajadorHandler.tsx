@@ -36,7 +36,7 @@ export default function NominaHandler() {
   const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<TrabajadorDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCTrabajadorList(
-    { presentacionId: presentacionActiva?.interno ?? 0, PageIndex: index + 1, PageSize: size },
+    { presentacionId: presentacionActiva?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },

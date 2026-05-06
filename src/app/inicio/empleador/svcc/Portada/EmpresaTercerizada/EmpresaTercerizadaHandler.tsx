@@ -35,7 +35,7 @@ export default function EmpresaTercerizadaHandler() {
   const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<EmpresaTercerizadaDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCEmpresaTercerizadaList(
-    { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: size },
+    { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },

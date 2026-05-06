@@ -3,7 +3,7 @@ import urlAPIEmpleador from "../../components/api/apiEmpleador";
 
 export class EstablecimientoDeclaradoAction {
 	static #instance = axios.create({
-		baseURL: `${urlAPIEmpleador}SVCC/EstablecimientoDeclarado/`,
+		baseURL: `${urlAPIEmpleador}SVCC/EstablecimientosDeclarados/`,
 	});
 
 	static todos(params = "") {

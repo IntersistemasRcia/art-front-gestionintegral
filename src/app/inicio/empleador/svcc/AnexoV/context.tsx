@@ -39,11 +39,11 @@ export function AnexoVContextProvider({
   const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
 
   const empresasTercerizadas = useSVCCEmpresaTercerizadaList(
-    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 500 } : undefined,
+    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 10 } : undefined,
     {},
   );
   const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList(
-    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 500 } : undefined,
+    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 10 } : undefined,
     {},
   );
 
