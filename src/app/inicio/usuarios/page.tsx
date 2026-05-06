@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
-import { Box, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Typography, TextField, MenuItem } from "@mui/material";
+import { MdExpandMore } from "react-icons/md";
+import { BsSliders } from "react-icons/bs";
 import UsuarioForm, { UsuarioFormFields } from "./UsuarioForm";
 import UsuarioTable from "./UsuarioTable";
 import EmpresaTable from "./EmpresaTable";
@@ -199,6 +201,20 @@ export default function UsuariosPage() {
     setUsuariosPageIndex(1);
   }, [porEmpresaIdsListadoKey]);
 
+  const emptyFilter = { cuit: "", nombre: "", email: "", rol: "", estado: "" };
+  const [filterDraft, setFilterDraft] = useState(emptyFilter);
+  const [filterCommitted, setFilterCommitted] = useState(emptyFilter);
+
+  const handleBuscar = () => {
+    setUsuariosPageIndex(1);
+    setFilterCommitted(filterDraft);
+  };
+  const handleLimpiar = () => {
+    setFilterDraft(emptyFilter);
+    setFilterCommitted(emptyFilter);
+    setUsuariosPageIndex(1);
+  };
+
   const {
     usuarios,
     usuariosListadoMeta,
@@ -219,6 +235,7 @@ export default function UsuariosPage() {
     allowEmptyEmpresasPost: allowEmptyEmpresasPostUsuarios,
     pageIndex: usuariosPageIndex,
     pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+    ...filterCommitted,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -553,6 +570,32 @@ const handleSubmit = async (data: UsuarioFormFields) => {
               />
             </Box>
           </Box>
+
+          <Accordion className={styles.accordion}>
+            <AccordionSummary expandIcon={<MdExpandMore className={styles.accordionIcon} />}>
+              <div className={styles.accordionSummaryContent}>
+                <BsSliders size={20} />
+                <Typography className={styles.accordionTitle}>Configuración de Filtros</Typography>
+              </div>
+            </AccordionSummary>
+            <AccordionDetails>
+              <div className={styles.filterRow}>
+                <TextField label="CUIT" value={filterDraft.cuit.replace(/\D/g, "").length === 11 ? Formato.CUIP(filterDraft.cuit) : filterDraft.cuit} onChange={e => setFilterDraft(p => ({ ...p, cuit: e.target.value.replace(/\D/g, "").slice(0, 11) }))} className={styles.filterFieldCuit} />
+                <TextField label="Nombre" value={filterDraft.nombre} onChange={e => setFilterDraft(p => ({ ...p, nombre: e.target.value }))} className={styles.filterFieldNombre} />
+                <TextField label="Email" value={filterDraft.email} onChange={e => setFilterDraft(p => ({ ...p, email: e.target.value }))} className={styles.filterFieldEmail} />
+                <TextField select label="Rol" value={filterDraft.rol} onChange={e => setFilterDraft(p => ({ ...p, rol: e.target.value }))} className={styles.filterFieldCombo}>
+                  <MenuItem value="">Todos</MenuItem>
+                  {(roles ?? []).map(r => <MenuItem key={r.id} value={r.nombre}>{r.nombre}</MenuItem>)}
+                </TextField>
+                <TextField select label="Estado" value={filterDraft.estado} onChange={e => setFilterDraft(p => ({ ...p, estado: e.target.value }))} className={styles.filterFieldCombo}>
+                  <MenuItem value="">Todos</MenuItem>
+                  {["Activo", "Inactivo", "Pendiente activación"].map(e => <MenuItem key={e} value={e}>{e}</MenuItem>)}
+                </TextField>
+                <CustomButton onClick={handleBuscar}>Buscar</CustomButton>
+                <CustomButton onClick={handleLimpiar}>Limpiar</CustomButton>
+              </div>
+            </AccordionDetails>
+          </Accordion>
 
           <UsuarioTable
             data={usuarios}

@@ -116,6 +116,11 @@ export interface UsuarioGetAllParams {
   sort?: string;
   pageIndex?: number;
   pageSize?: number;
+  cuit?: string;
+  nombre?: string;
+  email?: string;
+  rol?: string;
+  estado?: string;
 }
 export interface UsuarioGetAllResult {
   index: number;

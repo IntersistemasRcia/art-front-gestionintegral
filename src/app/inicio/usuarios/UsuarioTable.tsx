@@ -345,6 +345,7 @@ export default function UsuarioTable({
       columns={columns}
       isLoading={isLoading}
       size="small"
+      enableFiltering={false}
       manualPagination={Boolean(serverPagination)}
       pageIndex={serverPagination?.pageIndex}
       pageSize={serverPagination?.pageSize}

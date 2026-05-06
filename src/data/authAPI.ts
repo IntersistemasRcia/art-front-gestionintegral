@@ -67,6 +67,11 @@ export type UsuariosEmpresasUsuarioLogueadoBody = {
   empresasId: number[];
   pageIndex: number;
   pageSize: number;
+  cuit?: string;
+  nombre?: string;
+  email?: string;
+  rol?: string;
+  estado?: string;
 };
 
 export const USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX = 1;

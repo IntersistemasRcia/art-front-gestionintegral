@@ -219,3 +219,37 @@
 .empresaSelectorBox {
   min-width: 420px;
 }
+
+.accordionTitle {
+  font-weight: bold !important;
+  font-size: 1.5rem !important;
+  display: flex;
+  align-items: center;
+}
+
+.accordionIcon {
+  font-size: 2.5rem !important;
+  color: black;
+}
+
+.accordion {
+  margin-bottom: 16px;
+}
+
+.accordionSummaryContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.filterFieldCuit { min-width: 140px; }
+.filterFieldNombre { min-width: 320px; }
+.filterFieldEmail { min-width: 320px; }
+.filterFieldCombo { min-width: 160px; }
