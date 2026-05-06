@@ -344,12 +344,8 @@ const FormulariosRAR: React.FC = () => {
 
           let mapaAgentes = new Map<number, string>();
           try {
-            const agentes = await ArtAPI.getAgentesCausantes();
-            const arr = Array.isArray(agentes)
-              ? agentes
-              : agentes?.data
-                ? (Array.isArray(agentes.data) ? agentes.data : [agentes.data])
-                : [agentes];
+            const agentesResp = await ArtAPI.getAgentesCausantes();
+            const arr = Array.isArray(agentesResp) ? agentesResp : [];
             arr.forEach((a: any) => {
               const codigo = Number(a?.codigo ?? 0);
               const nombre = String(a?.agenteCausante ?? '').trim();
