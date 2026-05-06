@@ -15,6 +15,7 @@ import CondicionesTabla from './table';
 import type { SiniestroItem, InstanciaSiniestro } from './types/tipos';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
+import { useAuth } from '@/data/AuthContext';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import Formato from '@/utils/Formato';
@@ -79,9 +80,19 @@ const cols: ColumnDef<SiniestroItem>[] = [
 ];
 
 const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+const EMPRESA_TODAS_ID = -1;
+const EMPRESA_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_ID,
+  cuit: 0,
+  razonSocial: "Todas las Empresas",
+  domicilio: "",
+  localidad: "",
+  provincia: "",
+};
 
 
 export default function SiniestrosPage() {
+  const { user } = useAuth();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -89,6 +100,7 @@ export default function SiniestrosPage() {
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
   const [selectedDenuncia, setSelectedDenuncia] = useState<number | null>(null);
+  const [selectedDenunciaCuit, setSelectedDenunciaCuit] = useState<number | undefined>(undefined);
 
   const cuitQuery = searchParams.get('cuit') ?? searchParams.get('cuil') ?? '';
   const cuitDesdeQuery = normalizeDigits(cuitQuery);
@@ -108,8 +120,31 @@ export default function SiniestrosPage() {
   }, [filtersData?.data]);
 
   const cuitEmpresaSeleccionada = normalizeDigits((empresaSeleccionada as any)?.cuit);
-  const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
+  const isAdmin = String(user?.rol ?? "").trim().toLowerCase() === "administrador";
+  const cuitEmpresasUsuario = useMemo(() => {
+    const desdeSesion = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => Number(e.empresaCUIT))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    if (desdeSesion.length > 0) return Array.from(new Set(desdeSesion));
+    const desdeStore = empresas
+      .map((e) => Number((e as any)?.cuit))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    return Array.from(new Set(desdeStore));
+  }, [empresas, user?.empresas]);
+  const mostrarOpcionTodas = !bloquearBusquedaPorCuit && empresas.length > 1;
+  const opcionesEmpresaSelector = useMemo(
+    () => (mostrarOpcionTodas ? [EMPRESA_TODAS, ...empresas] : empresas),
+    [empresas, mostrarOpcionTodas]
+  );
+  const esOpcionTodasSeleccionada = empresaSeleccionada?.empresaId === EMPRESA_TODAS_ID;
+  const cuitFinalStr = cuitDesdeQuery || (esOpcionTodasSeleccionada ? "" : cuitEmpresaSeleccionada);
   const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
+  const cuitsContexto = useMemo<number[] | undefined>(() => {
+    if (cuitFinal) return [cuitFinal];
+    if (isAdmin) return undefined;
+    return cuitEmpresasUsuario.length > 0 ? cuitEmpresasUsuario : undefined;
+  }, [cuitFinal, isAdmin, cuitEmpresasUsuario]);
 
   // Si viene CUIT por query param, forzar selección por CUIT y bloquear el selector
   useEffect(() => {
@@ -130,8 +165,8 @@ export default function SiniestrosPage() {
       if (empresas.length === 1) {
         setEmpresaSeleccionada(empresas[0]);
         seleccionAutomaticaRef.current = true;
-      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-        setEmpresaSeleccionada(null);
+      } else if (empresas.length > 1 && seleccionAutomaticaRef.current) {
+        setEmpresaSeleccionada(EMPRESA_TODAS);
         seleccionAutomaticaRef.current = false;
       }
     }
@@ -140,6 +175,7 @@ export default function SiniestrosPage() {
   // Limpiar la denuncia seleccionada cuando cambia el CUIT (empresa/forzado)
   useEffect(() => {
     setSelectedDenuncia(null);
+    setSelectedDenunciaCuit(undefined);
   }, [cuitFinalStr]);
 
   const handleEmpresaChange = (
@@ -153,6 +189,7 @@ export default function SiniestrosPage() {
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
     if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_ID) return "Todas las Empresas";
     if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
     return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
   };
@@ -165,8 +202,9 @@ export default function SiniestrosPage() {
 
   const tieneFiltroAplicado = Boolean(filtroIdParam && filtroNombreParam);
 
-  const instanciasParams: Parameters = cuitFinal ? { CUIT: cuitFinal } : {};
-  if (selectedDenuncia != null && cuitFinal) {
+  const cuitParaInstancias = cuitFinal ?? selectedDenunciaCuit;
+  const instanciasParams: Parameters = cuitParaInstancias ? { CUIT: cuitParaInstancias } : {};
+  if (selectedDenuncia != null && cuitParaInstancias) {
     (instanciasParams as any).Denuncia = selectedDenuncia;
   }
 
@@ -179,7 +217,18 @@ export default function SiniestrosPage() {
   // Carga instancias de esa denuncia (como antes: denunciaNro o siniestroNro para abrir el panel)
   const handleRowClick = (row: SiniestroItem) => {
     const den = Number(row.denunciaNro ?? 0) || Number(row.siniestroNro ?? 0);
-    if (den) setSelectedDenuncia(den);
+    const cuitFilaRaw =
+      (row as any)?.empCUIT ??
+      (row as any)?.empCuit ??
+      (row as any)?.CUIT ??
+      (row as any)?.Cuit ??
+      (row as any)?.cuit ??
+      0;
+    const cuitFila = Number(normalizeDigits(cuitFilaRaw));
+    if (den) {
+      setSelectedDenuncia(den);
+      setSelectedDenunciaCuit(Number.isFinite(cuitFila) && cuitFila > 0 ? cuitFila : undefined);
+    }
   };
 
   const instanciasRows: InstanciaSiniestro[] = useMemo(() => {
@@ -202,13 +251,13 @@ export default function SiniestrosPage() {
         <Box className={styles.empresaSelectorContainer} sx={{ flexShrink: 0 }}>
           <CustomSelectSearch<Empresa>
             label="Seleccionar Empresa"
-            options={empresas}
+            options={opcionesEmpresaSelector}
             value={empresaSeleccionada}
             onChange={handleEmpresaChange}
             getOptionLabel={getEmpresaLabel}
             isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
             loading={isLoadingEmpresas}
-            disabled={isLoadingEmpresas || empresas.length === 0 || bloquearBusquedaPorCuit}
+            disabled={isLoadingEmpresas || opcionesEmpresaSelector.length === 0 || bloquearBusquedaPorCuit}
           />
         </Box>
         {tieneFiltroAplicado && (
@@ -223,7 +272,7 @@ export default function SiniestrosPage() {
         )}
       </Box>
 
-      <EmpleadorSiniestrosContextProvider cuit={cuitFinal} proposition={proposition}>
+      <EmpleadorSiniestrosContextProvider cuit={cuitFinal} cuits={cuitsContexto} isAdmin={isAdmin} proposition={proposition}>
         <TablaSiniestrosPadre
           cuitDesdeQuery={cuitDesdeQuery}
           empresaSeleccionada={empresaSeleccionada}
