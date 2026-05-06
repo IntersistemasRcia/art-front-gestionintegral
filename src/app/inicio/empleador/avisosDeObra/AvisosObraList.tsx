@@ -88,39 +88,44 @@ const AvisosObraList: React.FC<AvisosObraListProps> = ({
                 <TableHead>
                     <TableRow>
                         <TableCell align="center" width={40}>Número</TableCell>
+                        <TableCell align="left" width={140}>CUIT</TableCell>
+                        <TableCell align="left">Razón Social</TableCell>
                         <TableCell align="left" width={100}>Tipo</TableCell>
                         <TableCell align="left">Dirección</TableCell>
                         <TableCell align="center" width={110}>Recepción</TableCell>
                         <TableCell align="center" width={110}>Confirmación</TableCell>
+                        <TableCell align="center" width={160}>Acciones</TableCell>
                     </TableRow>
                 </TableHead>
 
                 <TableBody>
                     {records.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={6} align="center">
+                            <TableCell colSpan={8} align="center">
                                 No se encontraron Avisos de Obra.
                             </TableCell>
                         </TableRow>
                     ) : (
                         records.map((record) => (
                             <TableRow key={record.interno}>
-                                <TableCell>{record.obraNumero}</TableCell>
+                                <TableCell align="center">{record.obraNumero}</TableCell>
+                                <TableCell>{record.empleadorCUIT ? Formato.CUIP(record.empleadorCUIT) : ""}</TableCell>
+                                <TableCell>{record.empleadorRazonSocial ?? ""}</TableCell>
                                 <TableCell>{tipoDesc(record)}</TableCell>
                                 <TableCell>{direccionDesc(record)}</TableCell>
-                                <TableCell>{Formato.Fecha(record.recepcionFecha)}</TableCell>
-                                <TableCell>{Formato.Fecha(record.confirmacionFecha)}</TableCell>
+                                <TableCell align="center">{Formato.Fecha(record.recepcionFecha)}</TableCell>
+                                <TableCell align="center">{Formato.Fecha(record.confirmacionFecha)}</TableCell>
 
-                                <TableCell align="right">
+                                <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                                     <ButtonGroup>
                                         <Tooltip title="Consulta">
-                                            <IconButton color="primary" onClick={() => onView(record)}>
+                                            <IconButton color="primary" size="small" onClick={() => onView(record)}>
                                                 <InfoOutlined />
                                             </IconButton>
                                         </Tooltip>
 
                                         <Tooltip title="Modifica">
-                                            <IconButton color="primary" onClick={() => onChange(record)}>
+                                            <IconButton color="primary" size="small" onClick={() => onChange(record)}>
                                                 <ChangeCircleOutlined />
                                             </IconButton>
                                         </Tooltip>
@@ -128,6 +133,7 @@ const AvisosObraList: React.FC<AvisosObraListProps> = ({
                                         <Tooltip title="Borra">
                                             <IconButton
                                                 color="primary"
+                                                size="small"
                                                 onClick={() => onDelete(record)}
                                                 disabled={record.confirmacionFecha != null}
                                             >
@@ -135,7 +141,7 @@ const AvisosObraList: React.FC<AvisosObraListProps> = ({
                                             </IconButton>
                                         </Tooltip>
                                         <Tooltip title="PDF">
-                                            <IconButton color="primary" onClick={() => onPdf(record)}>
+                                            <IconButton color="primary" size="small" onClick={() => onPdf(record)}>
                                                 <PictureAsPdfOutlined />
                                             </IconButton>
                                         </Tooltip>
