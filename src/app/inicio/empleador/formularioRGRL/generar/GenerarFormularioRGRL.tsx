@@ -17,7 +17,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
 import DataTableImport from '@/utils/ui/table/DataTable';
 
-import ArtAPI from '@/data/artAPI';
+import ArtAPI, { type ApiFormulariosRGRLParams } from '@/data/artAPI';
 import CabeceraFormulario from './CabeceraFormulario';
 import { useAuth } from '@/data/AuthContext';
 
@@ -60,15 +60,27 @@ const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> =
 // Componente principal: crea, edita o replica formularios RGRL
 const GenerarFormularioRGRL: React.FC<{
   initialCuit?: number;
+  /** Ids de empresa del combo del listado; se envían en GetBySpecs (empresasId). */
+  empresasIdGetBySpecs?: number[];
   replicaDe?: number;
   onDone?: (nuevoId: number) => void;
-}> = ({ initialCuit, replicaDe, onDone }) => {
+  onClose?: () => void;
+}> = ({ initialCuit, empresasIdGetBySpecs, replicaDe, onDone, onClose }) => {
 
   const router = useRouter();
   const { hasTask } = useAuth();
   const search = useSearchParams();
   // En modal (onDone) se ignoran query params.
-  const isModal = Boolean(onDone);
+  const isModal = Boolean(onDone || onClose);
+
+  const buildGetBySpecsParams = useCallback(
+    (extra: Partial<ApiFormulariosRGRLParams> = {}): ApiFormulariosRGRLParams => ({
+      empresasId: empresasIdGetBySpecs ?? [],
+      ...extra,
+    }),
+    [empresasIdGetBySpecs]
+  );
+
   const cuitFromQuery = useMemo(() => {
     if (isModal) return undefined;
     const v = search?.get('cuit');
@@ -88,6 +100,18 @@ const GenerarFormularioRGRL: React.FC<{
     const v = search?.get('replicaDe');
     return v ? Number(v) : undefined;
   }, [search, isModal]);
+
+  const cuitSoloLecturaDesdeEmpresaLista = useMemo(
+    () =>
+      Boolean(
+        onClose &&
+          !replicaDe &&
+          !replicaDeQuery &&
+          typeof initialCuit === 'number' &&
+          initialCuit > 0
+      ),
+    [onClose, replicaDe, replicaDeQuery, initialCuit]
+  );
 
   const [original, setOriginal] = useState<FormularioVm | null>(null);
   // Marca si el flujo actual es de réplica
@@ -142,7 +166,7 @@ const GenerarFormularioRGRL: React.FC<{
     setError('');
     try {
       const [formulariosRes, ests, tfs] = await Promise.all([
-        ArtAPI.getFormulariosRGRL({ CUIT: cuit!, PageIndex: 1, PageSize: 1 }),
+        ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: cuit!, PageIndex: 1, PageSize: 1 })),
         fetchEstablecimientos(cuit!),
         ArtAPI.getTiposFormulariosRGRL(),
       ]);
@@ -174,7 +198,7 @@ const GenerarFormularioRGRL: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [cuit, canBuscar]);
+  }, [cuit, canBuscar, buildGetBySpecsParams]);
 
   useEffect(() => {
     // Ejecutar la carga automáticamente solo cuando el CUIT tiene 11 dígitos
@@ -203,7 +227,7 @@ const GenerarFormularioRGRL: React.FC<{
       if (c) setCuit(c);
 
       const [formulariosRes, ests, tfs] = await Promise.all([
-        c ? ArtAPI.getFormulariosRGRL({ CUIT: c, PageIndex: 1, PageSize: 1 }) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
+        c ? ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: c, PageIndex: 1, PageSize: 1 })) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
         c ? fetchEstablecimientos(c) : Promise.resolve([] as Establecimiento[]),
         ArtAPI.getTiposFormulariosRGRL(),
       ]);
@@ -224,7 +248,7 @@ const GenerarFormularioRGRL: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [replicaDe, replicaDeQuery]);
+  }, [replicaDe, replicaDeQuery, buildGetBySpecsParams]);
 
   useEffect(() => {
     if (!idFromQuery && (replicaDe || replicaDeQuery)) cargarReplicaDe();
@@ -542,7 +566,7 @@ const GenerarFormularioRGRL: React.FC<{
       setTipoSel(frm.internoFormulario);
       if (c) {
         const [formulariosRes, ests] = await Promise.all([
-          ArtAPI.getFormulariosRGRL({ CUIT: c, PageIndex: 1, PageSize: 1 }),
+          ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: c, PageIndex: 1, PageSize: 1 })),
           fetchEstablecimientos(c),
         ]);
         const rs = (formulariosRes.data?.[0]?.razonSocial ?? '') as string;
@@ -630,7 +654,7 @@ const GenerarFormularioRGRL: React.FC<{
     } finally {
       setLoading(false);
     }
-  }, [idFromQuery]);
+  }, [idFromQuery, buildGetBySpecsParams]);
 
   useEffect(() => {
     if (idFromQuery && !isModal) cargarPaso2();
@@ -709,26 +733,98 @@ const GenerarFormularioRGRL: React.FC<{
 
   const guardarPUT = async (completar: boolean, options?: { redirigir?: boolean; fechaSRTOverride?: string | null }) => {
     if (!form) return;
-    if (completar) {
-      for (let i = 0; i < responsablesUI.length; i++) {
+
+    for (let i = 0; i < gremiosUI.length; i++) {
+      const g = gremiosUI[i] ?? {};
+      const tieneLegajo = Number(g.legajo ?? 0) > 0;
+      const tieneNombre = String(g.nombre ?? '').trim() !== '';
+      if (tieneLegajo !== tieneNombre) {
+        setError('');
+        setModalMsg(`En Representación Gremial, la fila ${i + 1} tiene datos incompletos. Complete Legajo y Nombre.`);
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+    }
+
+    for (let i = 0; i < contratistasUI.length; i++) {
+      const c = contratistasUI[i] ?? {};
+      const tieneCuit = Number(c.cuit ?? 0) > 0;
+      const tieneContratista = String(c.contratista ?? '').trim() !== '';
+      if (tieneCuit !== tieneContratista) {
+        setError('');
+        setModalMsg(`En Contratista, la fila ${i + 1} tiene datos incompletos. Complete CUIT y Contratista.`);
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+      if (tieneCuit && String(c.cuit).length !== 11) {
+        setError('');
+        setModalMsg(`En Contratista, la fila ${i + 1}: el CUIT debe tener 11 dígitos.`);
+        setModalMsgType('error');
+        setModalMsgOpen(true);
+        return;
+      }
+    }
+
+    for (let i = 0; i < responsablesUI.length; i++) {
         const r = responsablesUI[i] ?? {};
         const tieneDatos =
-          String(r.cuit ?? '').trim() !== '' ||
+        Number(r.cuit ?? 0) > 0 ||
           String(r.responsable ?? '').trim() !== '' ||
           String(r.cargo ?? '').trim() !== '' ||
           typeof r.esContratado === 'number' ||
+          typeof r.representacion === 'number' ||
           String(r.tituloHabilitante ?? '').trim() !== '' ||
           String(r.matricula ?? '').trim() !== '' ||
           String(r.entidadOtorganteTitulo ?? '').trim() !== '';
-        if (tieneDatos && typeof r.representacion !== 'number') {
+      if (tieneDatos) {
+        if (!Number(r.cuit ?? 0)) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere CUIT (distinto de 0).`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (String(r.cuit).length !== 11) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1}: el CUIT debe tener 11 dígitos.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (!String(r.responsable ?? '').trim()) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere Nombre y apellido.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (!String(r.cargo ?? '').trim()) {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere Cargo.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
+        if (typeof r.representacion !== 'number') {
           setError('');
           setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Representación.`);
           setModalMsgType('error');
           setModalMsgOpen(true);
           return;
         }
+        if (typeof r.esContratado !== 'number') {
+          setError('');
+          setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Propio/Contratado.`);
+          setModalMsgType('error');
+          setModalMsgOpen(true);
+          return;
+        }
       }
+    }
 
+    if (completar) {
       // Requerir al menos un Responsable de Datos del Formulario con datos completos
       const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && typeof r.esContratado === 'number');
       if (!tieneRespDatos) {
@@ -814,7 +910,9 @@ const GenerarFormularioRGRL: React.FC<{
         });
       }
 
-      const gremiosFull = gremiosUI.map((g, i) => ({
+      const gremiosFull = gremiosUI
+        .filter((g) => g && Number(g.legajo ?? 0) > 0)
+        .map((g, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         legajo: Number(g.legajo ?? 0),
         nombre: g.nombre ?? '',
@@ -824,7 +922,9 @@ const GenerarFormularioRGRL: React.FC<{
         bajaMotivo: 0,
         renglon: i,
       }));
-      const contratistasFull = contratistasUI.map((c, i) => ({
+      const contratistasFull = contratistasUI
+        .filter((c) => c && Number(c.cuit ?? 0) > 0)
+        .map((c, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         cuit: Number(c.cuit ?? 0),
         contratista: c.contratista ?? '',
@@ -834,7 +934,9 @@ const GenerarFormularioRGRL: React.FC<{
         bajaMotivo: 0,
         renglon: i,
       }));
-      const responsablesFull = responsablesUI.map((r, i) => ({
+      const responsablesFull = responsablesUI
+        .filter((r) => r && Number(r.cuit ?? 0) > 0)
+        .map((r, i) => ({
         internoRespuestaFormulario: form.interno ?? 0,
         cuit: Number(r.cuit ?? 0),
         responsable: r.responsable ?? '',
@@ -1169,20 +1271,6 @@ const GenerarFormularioRGRL: React.FC<{
             </div>
           </div>
         ) : null}
-        
-        {panel === 'contratistas' && (
-          <div className={styles.contratistasLegendFixed}>
-            <p>En caso de tener contratistas, indicar nro de CUIT y Nombre - Razón Social</p>
-          </div>
-        )}
-
-        {panel === 'gremios' && (
-          <div className={styles.gremiosLegendFixed}>
-            <p>En caso de contar con delegados gremiales indicar número de legajo conforme a la inscripción en el Ministerio de Trabajo, Empleo y Seguridad Social</p>
-            <p><a href="http://www.trabajo.gov.ar" target="_blank" rel="noreferrer">http://www.trabajo.gov.ar</a></p>
-          </div>
-        )}
-
         {panel === 'contratistas' ? (
           <div className={styles.questionsBox}>
             <div className="formGrid">
@@ -1196,7 +1284,7 @@ const GenerarFormularioRGRL: React.FC<{
                         : String(contratistasUI[idx]?.cuit ?? '')
                     }
                     onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, '');
+                      const digits = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
                       const val = digits ? Number(digits) : undefined;
                       setContratistasUI((prev) => {
                         const next = [...prev];
@@ -1237,7 +1325,7 @@ const GenerarFormularioRGRL: React.FC<{
                       return digits.length === 11 ? CUIP(digits) : (digits ? digits : '');
                     })()}
                     onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, '');
+                      const digits = e.target.value.replace(/[^\d]/g, '').slice(0, 11);
                       const val = digits ? Number(digits) : undefined;
                       setResponsablesUI((prev) => {
                         const next = [...prev];
@@ -1513,10 +1601,46 @@ const GenerarFormularioRGRL: React.FC<{
         ) : null}
 
         <div className={styles.row}>
-          <CustomButton onClick={() => router.back()} disabled={loading}>VOLVER</CustomButton>
-          <CustomButton onClick={() => setConfirmOpen(true)} disabled={loading}>GUARDAR Y CONFIRMAR</CustomButton>
-          <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR BORRADOR</CustomButton>
+          <div className={styles.rowGroup}>
+            <CustomButton onClick={() => router.back()} disabled={loading}>VOLVER</CustomButton>
+            <CustomButton onClick={() => setConfirmOpen(true)} disabled={loading}>GUARDAR Y CONFIRMAR</CustomButton>
+            <CustomButton onClick={() => guardarPUT(false)} disabled={loading}>GUARDAR BORRADOR</CustomButton>
+          </div>
+          <div className={styles.rowGroup}>
+            <CustomButton
+              disabled={panel === 'preguntas' && page === 0}
+              onClick={() => {
+                if (panel === 'responsables') setPanel('contratistas');
+                else if (panel === 'contratistas') setPanel('gremios');
+                else if (panel === 'gremios') setPanel('preguntas');
+                else setPage(p => Math.max(0, p - 1));
+              }}
+            >Anterior</CustomButton>
+            <CustomButton
+              disabled={panel === 'responsables'}
+              onClick={() => {
+                const last = (pagesMap.pages?.length ?? Math.ceil(totalSecs / PAGE_SIZE)) - 1;
+                if (panel === 'preguntas') {
+                  if (page >= last) setPanel('gremios');
+                  else setPage(p => Math.min(last, p + 1));
+                } else if (panel === 'gremios') setPanel('contratistas');
+                else if (panel === 'contratistas') setPanel('responsables');
+              }}
+            >Siguiente</CustomButton>
+          </div>
         </div>
+
+        {panel === 'gremios' && (
+          <div className={styles.gremiosLegendFixed}>
+            <p>En caso de contar con delegados gremiales indicar número de legajo conforme a la inscripción en el Ministerio de Trabajo, Empleo y Seguridad Social</p>
+            <p><a href="http://www.trabajo.gov.ar" target="_blank" rel="noreferrer">http://www.trabajo.gov.ar</a></p>
+          </div>
+        )}
+        {panel === 'contratistas' && (
+          <div className={styles.contratistasLegendFixed}>
+            <p>En caso de tener contratistas, indicar nro de CUIT y Nombre - Razón Social</p>
+          </div>
+        )}
 
         {loading && <div className={styles.savingMsg}>Guardando…</div>}
         {!!error && <div className={styles.errorMsg}>{error}</div>}
@@ -1572,7 +1696,12 @@ const GenerarFormularioRGRL: React.FC<{
         tipos={tipos}
         tipoSel={tipoSel}
         onTipoChange={setTipoSel}
+        cuitSoloLectura={cuitSoloLecturaDesdeEmpresaLista}
         onVolver={() => {
+          if (onClose) {
+            onClose();
+            return;
+          }
           router.back();
         }}
         onCrear={crearFormulario}

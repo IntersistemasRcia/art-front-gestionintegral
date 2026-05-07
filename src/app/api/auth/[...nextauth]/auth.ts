@@ -1,8 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from "next-auth/providers/credentials";
-import UsuarioAPI, { TokenDTO, Usuario, UsuarioVm } from '@/data/usuarioAPI';
-
-const { login } = UsuarioAPI;
+import type { TokenDTO, Usuario, UsuarioVm } from '@/data/usuarioAPI';
+import { loginUsuario } from '@/data/usuarioLogin';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,7 +14,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
-          const user = await login({
+          const user = await loginUsuario({
             usuario: credentials?.loginUser,
             password: credentials?.loginPassword,
           });

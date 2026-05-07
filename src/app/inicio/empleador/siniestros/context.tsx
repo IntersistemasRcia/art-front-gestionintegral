@@ -11,6 +11,7 @@ const TABLE_NAME = "vSiniestrosEmpleador" as const;
 /** Columnas de vSiniestrosEmpleador (denunciaNro solo para fetch tabla hija, no se muestra en tabla padre) */
 const SELECT_COLUMNS = [
   "denunciaNro",
+  "empCUIT",
   "trabCUIL",
   "trabNombre",
   "establecimiento",
@@ -27,6 +28,7 @@ const SELECT_COLUMNS = [
 type Row = QueryResultData;
 
 const trim = (v: unknown): string => String(v ?? "").trim();
+const normalizeDigits = (value: unknown): string => String(value ?? "").replace(/\D/g, "");
 const toNumOrStr = (v: unknown): number | string => {
   if (v == null || v === "") return "";
   if (typeof v === "number" && !Number.isNaN(v)) return v;
@@ -38,10 +40,23 @@ const strOrNull = (v: unknown): string | null => (v != null && v !== "" ? trim(v
 function mapRowToSiniestroItem(row: Row): SiniestroItem {
   const siniestroNroRaw = row?.siniestroNro ?? row?.Siniestro ?? row?.siniestro ?? "";
   const denunciaNro = Number(row?.denunciaNro ?? row?.Denuncia ?? siniestroNroRaw ?? 0) || 0;
+  const empCuitRaw =
+    row?.empCUIT ??
+    row?.empCuit ??
+    row?.EmpCUIT ??
+    row?.EmpCuit ??
+    row?.CUIT ??
+    row?.Cuit ??
+    row?.cuit ??
+    "";
+  const empCuitDigits = normalizeDigits(empCuitRaw);
+  const empCuitValue: number | string = empCuitDigits !== ""
+    ? Number(empCuitDigits)
+    : toNumOrStr(empCuitRaw);
   return {
     denunciaNro,
     siniestroNro: toNumOrStr(siniestroNroRaw) || "",
-    empCUIT: row?.empCUIT ?? row?.Cuit ?? row?.cuit,
+    empCUIT: empCuitValue,
     trabCUIL: row?.trabCUIL ?? row?.Cuil ?? row?.cuil ?? "",
     trabNombre: trim(row?.trabNombre ?? row?.ApellidoNombre ?? row?.apellidoNombre),
     establecimiento: trim(row?.establecimiento ?? row?.Establecimiento),
@@ -55,11 +70,24 @@ function mapRowToSiniestroItem(row: Row): SiniestroItem {
   };
 }
 
-function buildQuery(cuit: number, proposition?: string | null): Query {
-  const baseWhere = `eq(empCUIT,${cuit})`;
-  const where = proposition?.trim()
-    ? `and(${baseWhere},${proposition.trim()})`
-    : baseWhere;
+function buildQuery(params: {
+  cuit?: number;
+  cuits?: number[];
+  isAdmin?: boolean;
+  proposition?: string | null;
+}): Query {
+  const { cuit, cuits, isAdmin, proposition } = params;
+  const cuitList = Array.isArray(cuits) ? Array.from(new Set(cuits.filter((v) => Number.isFinite(v) && v > 0))) : [];
+  const baseWhere = (() => {
+    if (cuit != null && cuit > 0) return `eq(empCUIT,${cuit})`;
+    if (cuitList.length === 0) return isAdmin ? "" : "";
+    if (cuitList.length === 1) return `eq(empCUIT,${cuitList[0]})`;
+    return `or(${cuitList.map((value) => `eq(empCUIT,${value})`).join(",")})`;
+  })();
+  const propositionWhere = proposition?.trim() ?? "";
+  const where = baseWhere && propositionWhere
+    ? `and(${baseWhere},${propositionWhere})`
+    : baseWhere || propositionWhere || undefined;
   return {
     select: SELECT_COLUMNS.map((name) => ({ value: name, name })),
     from: [{ table: TABLE_NAME }],
@@ -82,13 +110,20 @@ const EmpleadorSiniestrosContext = createContext<EmpleadorSiniestrosContextType 
 type Props = {
   children: ReactNode;
   cuit: number | undefined;
+  cuits?: number[];
+  isAdmin?: boolean;
   proposition?: string | null;
 };
 
-export function EmpleadorSiniestrosContextProvider({ children, cuit, proposition }: Props) {
+export function EmpleadorSiniestrosContextProvider({ children, cuit, cuits, isAdmin, proposition }: Props) {
   const query = useMemo(
-    () => (cuit != null && cuit > 0 ? buildQuery(cuit, proposition) : null),
-    [cuit, proposition]
+    () => {
+      if (cuit != null && cuit > 0) return buildQuery({ cuit, proposition });
+      if (Array.isArray(cuits) && cuits.length > 0) return buildQuery({ cuits, isAdmin, proposition });
+      if (isAdmin) return buildQuery({ isAdmin, proposition });
+      return null;
+    },
+    [cuit, cuits, isAdmin, proposition]
   );
 
   const executeKey = query != null ? [QueriesAPI.executeURL, token.getToken(), JSON.stringify(query)] as const : null;

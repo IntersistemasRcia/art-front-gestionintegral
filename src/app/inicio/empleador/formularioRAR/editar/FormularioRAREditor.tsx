@@ -22,6 +22,7 @@ dayjs.extend(customParseFormat);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale('es');
+const API_ART_BASE_URL = (process.env.NEXT_PUBLIC_API_ART_URL ?? '').replace(/\/$/, '');
 
 /* ===== Tipos auxiliares ===== */
 type EstablecimientoOpt = { interno: string; displayText: string };
@@ -87,7 +88,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
   React.useEffect(() => {
     (async () => {
       // detalle del formulario
-      const r = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${edita}`);
+      const r = await fetch(`${API_ART_BASE_URL}/api/FormulariosRAR/${edita}`);
       if (r.ok) {
         const data = await r.json();
         setCantExpuestos(String(data.cantTrabajadoresExpuestos || 0));
@@ -97,7 +98,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
         // establecimientos por CUIT del formulario
         const cuitForm: string | number | undefined = data.cuit || data.CUIT;
         if (cuitForm) {
-          const re = await fetch(`http://arttest.intersistemas.ar:8302/api/Establecimientos/Empresa/${cuitForm}`);
+          const re = await fetch(`${API_ART_BASE_URL}/api/Establecimientos/Empresa/${cuitForm}`);
           const raw = re.ok ? await re.json() : [];
           const arr = Array.isArray(raw)
             ? raw
@@ -342,7 +343,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
         formularioRARDetalle: detalle,
       };
 
-      const r = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${edita}`, {
+      const r = await fetch(`${API_ART_BASE_URL}/api/FormulariosRAR/${edita}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -482,7 +483,7 @@ const FormulariosRAREditar: React.FC<EditarProps> = ({ edita, finalizaCarga }) =
           </div>
           <DataTableImport
             columns={[
-              { accessorKey: 'CUIL', header: 'CUIL', cell: ({ getValue }: { getValue: () => string }) => Formato.CUIP(getValue()) },
+              { accessorKey: 'CUIL', header: 'CUIL', cell: ({ getValue }: { getValue: () => string }) => Formato.CUIP(getValue().replace(/\D/g, '')) },
               { accessorKey: 'Nombre', header: 'Nombre' },
               { accessorKey: 'SectorTareas', header: 'Sector/Tareas' },
               { accessorKey: 'Ingreso', header: 'F. Ingreso', cell: ({ getValue }: any) => formatoFechaTabla(getValue()) },

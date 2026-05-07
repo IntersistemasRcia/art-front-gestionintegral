@@ -114,12 +114,6 @@ const mapApiToUi = (r: ApiFormularioRGRL): FormularioRGRL => ({
   FechaSRTRaw: r.fechaSRT ?? null,
 });
 
-const CargarConsultaFormulariosRGRL = async (cuit: number, pageIndex = 1): Promise<{ data: FormularioRGRL[]; pages: number }> => {
-  // GET /FormulariosRGRL/{cuit}: obtiene lista de formularios para la grilla (paginado server-side).
-  const res = await ArtAPI.getFormulariosRGRL({ CUIT: cuit, PageIndex: pageIndex, PageSize: 10 });
-  return { data: (res.data ?? []).map(mapApiToUi), pages: res.pages ?? 1 };
-};
-
 const CargarEstablecimientoPorId = async (id: number): Promise<ApiEstablecimientoEmpresa | null> => {
   if (!id) return null;
   try {
@@ -296,8 +290,32 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   // pestañas secundarias, modales (impresión/generación), y paginación del detalle.
   const router = useRouter();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const { user, hasTask } = useAuth();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
+  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const sessionEmpresaIds = useMemo(() => {
+    const fromSession = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => e.empresaId)
+      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
+    const unique = Array.from(new Set(fromSession));
+    if (unique.length > 0) return unique;
+    return Array.from(new Set(empresas.map((e) => e.empresaId)));
+  }, [user?.empresas, empresas]);
+  const EMPRESA_TODAS_EMPRESAS_ID = -1;
+  const EMPRESA_OPCION_TODAS: Empresa = {
+    empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+    cuit: 0,
+    razonSocial: "Todas las Empresas",
+    domicilio: "",
+    localidad: "",
+    provincia: "",
+  };
+  const opcionesEmpresaSelector = useMemo(
+    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    [empresas]
+  );
   
   const [loading, setLoading] = useState<boolean>(false);
   const [formulariosRGRL, setFormulariosRGRL] = useState<FormularioRGRL[]>([]);
@@ -330,7 +348,6 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const [tablePage, setTablePage] = useState(1);
   const [tablePageCount, setTablePageCount] = useState(1);
 
-  const { user, hasTask } = useAuth();
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT } = user as any;
 
@@ -417,16 +434,23 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
   // Seleccionar automáticamente si solo hay una empresa
   useEffect(() => {
-    if (!isLoadingEmpresas) {
-      if (empresas.length === 1) {
-        setEmpresaSeleccionada(empresas[0]);
-        seleccionAutomaticaRef.current = true;
-      } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-        setEmpresaSeleccionada(null);
-        seleccionAutomaticaRef.current = false;
-      }
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
     }
-  }, [empresas.length, isLoadingEmpresas]);
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresaSeleccionada((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas]);
 
   // Limpiar formularios cuando cambia la empresa seleccionada
   useEffect(() => {
@@ -452,66 +476,96 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
     if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return "Todas las Empresas";
     return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
   };
 
+  const empresaIdsFiltro = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      if (isAdmin) return [];
+      return sessionEmpresaIds;
+    }
+    return [empresaSeleccionada.empresaId];
+  }, [empresaSeleccionada, isAdmin, sessionEmpresaIds]);
+
+  const canFetchFormularios = useMemo(() => {
+    if (!empresaSeleccionada) return false;
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return true;
+    return empresaIdsFiltro.length > 0;
+  }, [empresaSeleccionada, empresaIdsFiltro]);
+
   const fetchFormularios = useCallback(
-    // Busca cabeceras por CUIT; si CUIT inválido, limpia la grilla. Siempre va a página 1.
-    async (cuitParam?: number) => {
+    // Busca cabeceras por empresasId; para Admin + "Todas", envía empresasId: [].
+    async (empresasIdsParam?: number[]) => {
       try {
         setLoading(true);
-        const c = Number(cuitParam ?? empresaSeleccionada?.cuit);
-        if (!c || Number.isNaN(c)) {
+        const empresasIds = Array.isArray(empresasIdsParam) ? empresasIdsParam : empresaIdsFiltro;
+        if (!canFetchFormularios) {
           setFormulariosRGRL([]);
           setLoading(false);
           return;
         }
         setTablePage(1);
-        const response = await CargarConsultaFormulariosRGRL(c, 1);
+        const responseRaw = await ArtAPI.getFormulariosRGRL({
+          empresasId: empresasIds,
+          PageIndex: 1,
+          PageSize: 10,
+        });
+        const response = { data: (responseRaw.data ?? []).map(mapApiToUi), pages: responseRaw.pages ?? 1 };
         setFormulariosRGRL(response.data ?? []);
         setTablePageCount(response.pages ?? 1);
       } finally {
         setLoading(false);
       }
     },
-    [empresaSeleccionada?.cuit]
+    [empresaIdsFiltro, canFetchFormularios]
   );
 
   // Variante rápida que solo actualiza la tabla sin activar el loading global
   const fetchFormulariosTable = useCallback(
-    async (cuitParam?: number, page = 1) => {
-      const c = Number(cuitParam ?? empresaSeleccionada?.cuit);
-      if (!c || Number.isNaN(c)) return;
-      const response = await CargarConsultaFormulariosRGRL(c, page);
+    async (empresasIdsParam?: number[], page = 1) => {
+      const empresasIds = Array.isArray(empresasIdsParam) ? empresasIdsParam : empresaIdsFiltro;
+      if (!canFetchFormularios) return;
+      const responseRaw = await ArtAPI.getFormulariosRGRL({
+        empresasId: empresasIds,
+        PageIndex: page,
+        PageSize: 10,
+      });
+      const response = { data: (responseRaw.data ?? []).map(mapApiToUi), pages: responseRaw.pages ?? 1 };
       setFormulariosRGRL(response.data ?? []);
       setTablePageCount(response.pages ?? 1);
     },
-    [empresaSeleccionada?.cuit]
+    [empresaIdsFiltro, canFetchFormularios]
   );
 
   const handlePageChange = useCallback(
     async (page: number) => {
       setTablePage(page);
-      const c = Number(empresaSeleccionada?.cuit);
-      if (!c || Number.isNaN(c)) return;
-      const response = await CargarConsultaFormulariosRGRL(c, page);
+      if (!canFetchFormularios) return;
+      const responseRaw = await ArtAPI.getFormulariosRGRL({
+        empresasId: empresaIdsFiltro,
+        PageIndex: page,
+        PageSize: 10,
+      });
+      const response = { data: (responseRaw.data ?? []).map(mapApiToUi), pages: responseRaw.pages ?? 1 };
       setFormulariosRGRL(response.data ?? []);
       setTablePageCount(response.pages ?? 1);
     },
-    [empresaSeleccionada?.cuit]
+    [canFetchFormularios, empresaIdsFiltro]
   );
   
   // Carga inicial y recarga cuando cambian la empresa seleccionada o "referenteDatos".
   useEffect(() => {
-    if (empresaSeleccionada?.cuit) {
-      fetchFormularios(empresaSeleccionada.cuit);
+    if (canFetchFormularios) {
+      fetchFormularios(empresaIdsFiltro);
     }
-  }, [fetchFormularios, referenteDatos, empresaSeleccionada?.cuit]);
+  }, [fetchFormularios, referenteDatos, canFetchFormularios, empresaIdsFiltro]);
 
   const handleCloseModalMsg = async () => {
     setModalMsgOpen(false);
-    if (pendingRefresh && empresaSeleccionada?.cuit) {
-      await fetchFormulariosTable(empresaSeleccionada.cuit, tablePage);
+    if (pendingRefresh && canFetchFormularios) {
+      await fetchFormulariosTable(empresaIdsFiltro, tablePage);
       setPendingRefresh(false);
     }
   };
@@ -759,7 +813,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
           {/* Selector de empresa */}
           <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
             <CustomSelectSearch<Empresa>
-              options={empresas}
+              options={opcionesEmpresaSelector}
               getOptionLabel={getEmpresaLabel}
               value={empresaSeleccionada}
               onChange={handleEmpresaChange}
@@ -770,7 +824,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
               noOptionsText={
                 isLoadingEmpresas
                   ? "Cargando..."
-                  : empresas.length === 0
+                  : opcionesEmpresaSelector.length <= 1
                   ? "No hay empresas disponibles"
                   : "No se encontraron empresas"
               }
@@ -780,7 +834,16 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
           {/* Acciones: editar, generar, replicar y exportar */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <CustomButton onClick={handleClickGenerar}>Generar Formulario</CustomButton>
+            <CustomButton
+              onClick={handleClickGenerar}
+              disabled={
+                !empresaSeleccionada ||
+                empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID ||
+                !empresaSeleccionada.cuit
+              }
+            >
+              Generar Formulario
+            </CustomButton>
 
             <CustomButton onClick={handleExportExcel}>Exportar a Excel</CustomButton>
           </div>
@@ -1095,11 +1158,13 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         <GenerarFormularioRGRL
           //Generar
           initialCuit={empresaSeleccionada?.cuit || undefined}
+          empresasIdGetBySpecs={empresaIdsFiltro}
           replicaDe={replicaDe}
+          onClose={() => setOpenGenerar(false)}
           onDone={async () => {
             setOpenGenerar(false);
-            if (empresaSeleccionada?.cuit) {
-              await fetchFormularios(empresaSeleccionada.cuit);
+            if (canFetchFormularios) {
+              await fetchFormularios(empresaIdsFiltro);
             }
           }}
         />

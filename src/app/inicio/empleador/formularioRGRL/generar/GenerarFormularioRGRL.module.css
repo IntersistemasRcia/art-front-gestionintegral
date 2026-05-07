@@ -10,6 +10,11 @@
   gap: 8px;
   align-items: center;
   margin-bottom: 12px;
+  justify-content: space-between;
+}
+.rowGroup {
+  display: flex;
+  gap: 8px;
 }
 .rowTopSpace {
   display: flex;
@@ -393,49 +398,36 @@
   text-decoration: underline;
 }
 
-/* Leyenda estática dentro del área de contenido (se desplaza con la página) */
 .gremiosLegendFixed {
-  position: absolute;
-  bottom: 24px;
-  left: -340px;
-  width: 520px;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  border-radius: 0;
   text-align: left;
   font-size: 13px;
   color: #333;
-  z-index: 2000;
-  pointer-events: auto;
+  margin-top: 8px;
+}
+
+.gremiosLegendFixed p {
+  margin: 4px 0;
 }
 
 .gremiosLegendFixed a {
   color: #1a73e8;
   text-decoration: underline;
-  pointer-events: auto; /* permite hacer click en el enlace aunque el contenedor esté deshabilitado */
 }
 
 .contratistasLegendFixed {
-  position: absolute;
-  bottom: 24px;
-  left: -340px;
-  width: 520px;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  border-radius: 0;
   text-align: left;
   font-size: 13px;
   color: #333;
-  z-index: 2000;
-  pointer-events: auto;
+  margin-top: 8px;
+}
+
+.contratistasLegendFixed p {
+  margin: 4px 0;
 }
 
 .contratistasLegendFixed a {
   color: #1a73e8;
   text-decoration: underline;
-  pointer-events: auto;
 }
 
 /* Layout principal de filtros / cabeceras */
@@ -506,11 +498,3 @@
   min-width: 0;
 }
 
-
-.headerVisible .gremiosLegendFixed {
-  bottom: -30px;
-}
-
-.headerVisible .contratistasLegendFixed {
-  bottom: -28px;
-}

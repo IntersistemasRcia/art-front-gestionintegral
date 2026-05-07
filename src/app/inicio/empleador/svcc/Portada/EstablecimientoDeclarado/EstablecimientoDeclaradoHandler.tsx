@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import { Data } from "@/utils/ui/table/Browse";
-import gestionEmpleadorAPI, {
+import ArtAPI from "@/data/artAPI";
+import type {
   EstablecimientoDeclaradoBaseDTO,
   EstablecimientoDeclaradoCreateDTO,
   EstablecimientoDeclaradoDTO,
@@ -21,7 +22,7 @@ const {
   useSVCCEstablecimientoDeclaradoCreate,
   useSVCCEstablecimientoDeclaradoUpdate,
   useSVCCEstablecimientoDeclaradoDelete,
-} = gestionEmpleadorAPI;
+} = ArtAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<EstablecimientoDeclaradoDTO>, "onChange"> & {
@@ -31,10 +32,10 @@ type EditState = Omit<FormProps<EstablecimientoDeclaradoDTO>, "onChange"> & {
 export default function EstablecimientoDeclaradoHandler() {
   const [edit, setEdit] = useState<EditState>({ data: {} });
   const { presentacion: { selected: presentacion }, establecimientos } = useSVCCPresentacionContext();
-  const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
+  const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<EstablecimientoDeclaradoDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCEstablecimientoDeclaradoList(
-    { presentacionId: presentacion?.interno ?? 0, page: `${index + 1},${size}` },
+    { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },

@@ -64,6 +64,9 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 	const [editRow, setEditRow] = useState<AsociadoRow | null>(null);
 	const [editGrupoId, setEditGrupoId] = useState<number | null>(null);
 	const [editOrganizacionId, setEditOrganizacionId] = useState<number | null>(null);
+	const [showDuplicate, setShowDuplicate] = useState(false);
+	const [showEditError, setShowEditError] = useState(false);
+	const [editErrorMessage, setEditErrorMessage] = useState("");
 
 	const params = { SRTComercializadorInterno: comercializadorInterno } as unknown as ParametersComercializadoresAsociados;
 	const grupoParams: GrupoOrganizadorComercializador = {};
@@ -176,12 +179,18 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 		const asociadoId = editOrganizacionId ?? editGrupoId!;
 		const tipo = editOrganizacionId ? "Organizador" : "Grupo";
 
+		if (tableRows.some((item) => item !== editRow && item.asociadoId === asociadoId && item.tipo === tipo)) {
+			setShowDuplicate(true);
+			return;
+		}
+
 		if (editRow.isNew) {
 			setTableRows(prev => prev.map(r => r === editRow ? { ...r, asociadoId, tipo } : r));
 			setEditRow(null);
 			return;
 		}
 
+		try {
 		await triggerPut({
 			id: editRow!.interno!,
 			data: {
@@ -194,6 +203,11 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 		});
 		setTableRows(prev => prev.map(r => r === editRow ? { ...r, asociadoId, tipo } : r));
 		setEditRow(null);
+		} catch (error) {
+			const apiMessage = (error as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+			setEditErrorMessage(apiMessage || "No se puede modificar la asociación porque fue utilizada en pólizas.");
+			setShowEditError(true);
+		}
 	};
 
 	const columns = useMemo<ColumnDef<AsociadoRow, unknown>[]>(
@@ -232,13 +246,12 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 		const asociadoId = selectedOrganizacionId ?? selectedGrupoId!;
 		const tipo = selectedOrganizacionId ? "Organizador" : "Grupo";
 
-		setTableRows((prev) => {
-			if (prev.some((item) => item.asociadoId === asociadoId && item.tipo === tipo)) {
-				return prev;
-			}
+		if (tableRows.some((item) => item.asociadoId === asociadoId && item.tipo === tipo)) {
+			setShowDuplicate(true);
+			return;
+		}
 
-			return [...prev, { asociadoId, tipo, isNew: true }];
-		});
+		setTableRows((prev) => [...prev, { asociadoId, tipo, isNew: true }]);
 	};
 
 	return (
@@ -307,6 +320,20 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 				type="error"
 				message={bajaErrorMessage}
 				onClose={() => setShowBajaError(false)}
+			/>
+			<CustomModalMessage
+				open={showDuplicate}
+				type="warning"
+				title="Asociación duplicada"
+				message="Esta asociación ya se encuentra registrada en el sistema."
+				onClose={() => setShowDuplicate(false)}
+			/>
+			<CustomModalMessage
+				open={showEditError}
+				type="error"
+				title="Error al editar la asociación"
+				message={editErrorMessage}
+				onClose={() => setShowEditError(false)}
 			/>
 			<CustomModal
 				open={!!editRow}

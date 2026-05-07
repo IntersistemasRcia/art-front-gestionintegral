@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
-import gestionEmpleadorAPI, { SustanciaDTO } from "@/data/gestionEmpleadorAPI";
+import type { SustanciaDTO } from "@/data/gestionEmpleadorAPI";
+import ArtAPI from "@/data/artAPI";
 import { AnexoVContextProvider } from "../AnexoV/context";
 import { useSVCCPresentacionContext } from "../context";
 
@@ -12,9 +13,7 @@ export type NominaContextType = {
   };
 }
 
-const {
-  useSVCCSustanciaList,
-} = gestionEmpleadorAPI;
+const { useSVCCSustanciaList } = ArtAPI;
 
 const NominaContext = createContext<NominaContextType | undefined>(undefined);
 
@@ -31,7 +30,10 @@ export function NominaContextProvider({
 }) {
   const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
 
-  const sustancias = useSVCCSustanciaList(presentacion ? { presentacionId: presentacion.interno } : undefined, {});
+  const sustancias = useSVCCSustanciaList(
+    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 10 } : undefined,
+    {},
+  );
 
   return (
     <NominaContext.Provider

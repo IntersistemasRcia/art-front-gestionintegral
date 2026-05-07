@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
-import gestionEmpleadorAPI, { EmpresaTercerizadaDTO, EstablecimientoDeclaradoDTO } from "@/data/gestionEmpleadorAPI";
+import type { EmpresaTercerizadaDTO, EstablecimientoDeclaradoDTO } from "@/data/gestionEmpleadorAPI";
+import ArtAPI from "@/data/artAPI";
 import { useSVCCPresentacionContext } from "../context";
 
 export type AnexoVContextType = {
@@ -20,7 +21,7 @@ export type AnexoVContextType = {
 const {
   useSVCCEmpresaTercerizadaList,
   useSVCCEstablecimientoDeclaradoList,
-} = gestionEmpleadorAPI;
+} = ArtAPI;
 
 const AnexoVContext = createContext<AnexoVContextType | undefined>(undefined);
 
@@ -37,8 +38,14 @@ export function AnexoVContextProvider({
 }) {
   const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
 
-  const empresasTercerizadas = useSVCCEmpresaTercerizadaList(presentacion ? { presentacionId: presentacion.interno } : undefined, {});
-  const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList(presentacion ? { presentacionId: presentacion.interno } : undefined, {});
+  const empresasTercerizadas = useSVCCEmpresaTercerizadaList(
+    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 10 } : undefined,
+    {},
+  );
+  const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList(
+    presentacion ? { presentacionId: presentacion.interno, PageIndex: 1, PageSize: 10 } : undefined,
+    {},
+  );
 
   return (
     <AnexoVContext.Provider

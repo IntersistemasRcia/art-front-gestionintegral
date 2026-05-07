@@ -58,6 +58,11 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
       ? user?.empresaId === 0
         ? {}
         : { empresaId: user?.empresaId }
+      : !!listFilter?.allowEmptyEmpresasPost
+      ? {
+          pageIndex: listFilter!.pageIndex ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX,
+          pageSize: listFilter!.pageSize ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+        }
       : null;
 
   const {
@@ -69,8 +74,7 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
 
   const quierePostListadoUsuariosEmpresa =
     listFilter !== undefined &&
-    (listFilter.porEmpresaIds.length > 0 ||
-      Boolean(listFilter.allowEmptyEmpresasPost));
+    listFilter.porEmpresaIds.length > 0;
 
   const listadoSinEmpresasSinPost =
     listFilter !== undefined &&
@@ -98,16 +102,24 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
     listFilter !== undefined
       ? listadoSinEmpresasSinPost
         ? { data: [] as UsuarioRow[] }
+        : listFilter.allowEmptyEmpresasPost
+        ? usuariosData
         : usuariosPorEmpresasData
       : usuariosData;
   const usuariosLoadingResolved =
     listFilter !== undefined
       ? listadoSinEmpresasSinPost
         ? false
+        : listFilter.allowEmptyEmpresasPost
+        ? usuariosLoading
         : usuariosPorEmpresasLoading
       : usuariosLoading;
   const usuariosErrorResolved =
-    listFilter !== undefined ? usuariosPorEmpresasError : usuariosError;
+    listFilter !== undefined
+      ? listFilter.allowEmptyEmpresasPost
+        ? usuariosError
+        : usuariosPorEmpresasError
+      : usuariosError;
   const { data: roles, error: rolesError, isLoading: rolesLoading } = useGetRoles();  
   const {
     data: cargos,
@@ -121,7 +133,9 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
   const { data: sectores } = AuthAPI.useGetRefSectores();
 
   const mutateUsuarios = async () => {
-    if (listFilter !== undefined && quierePostListadoUsuariosEmpresa) {
+    if (listFilter?.allowEmptyEmpresasPost) {
+      await mutateUsuariosLegacy();
+    } else if (listFilter !== undefined && quierePostListadoUsuariosEmpresa) {
       await mutateUsuariosPorEmpresas();
     } else if (listFilter === undefined) {
       await mutateUsuariosLegacy();
@@ -130,7 +144,7 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
 
   const rawUsuarios = usuariosDataResolved?.data ?? [];
   const usuariosNormalizados: UsuarioRow[] =
-    listFilter !== undefined
+    listFilter !== undefined && !listFilter.allowEmptyEmpresasPost
       ? (rawUsuarios as UsuarioEmpresasUsuarioLogueadoItem[]).map(
           mapUsuarioEmpresasLogueadoItemToRow
         )
@@ -145,6 +159,13 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
           size: usuariosPorEmpresasData.size,
           pages: usuariosPorEmpresasData.pages,
           count: usuariosPorEmpresasData.count,
+        }
+      : listFilter?.allowEmptyEmpresasPost && usuariosData
+      ? {
+          index: usuariosData.index,
+          size: usuariosData.size,
+          pages: usuariosData.pages,
+          count: usuariosData.count,
         }
       : null;
 

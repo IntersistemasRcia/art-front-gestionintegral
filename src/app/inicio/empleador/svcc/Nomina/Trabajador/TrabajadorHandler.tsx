@@ -1,5 +1,6 @@
 import { useState } from "react";
-import gestionEmpleadorAPI, {
+import ArtAPI from "@/data/artAPI";
+import type {
   TrabajadorBaseDTO,
   TrabajadorCreateDTO,
   TrabajadorDTO,
@@ -21,7 +22,7 @@ const {
   useSVCCTrabajadorCreate,
   useSVCCTrabajadorUpdate,
   useSVCCTrabajadorDelete,
-} = gestionEmpleadorAPI;
+} = ArtAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<TrabajadorDTO>, "onChange"> & {
@@ -30,11 +31,12 @@ type EditState = Omit<FormProps<TrabajadorDTO>, "onChange"> & {
 };
 export default function NominaHandler() {
   const [edit, setEdit] = useState<EditState>({ data: {} });
-  const { ultima, establecimientos } = useSVCCPresentacionContext();
-  const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
+  const { presentacion: { selected: presentacionSeleccionada }, ultima, establecimientos } = useSVCCPresentacionContext();
+  const presentacionActiva = presentacionSeleccionada ?? ultima.data;
+  const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<TrabajadorDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCTrabajadorList(
-    { presentacionId: ultima.data?.interno ?? 0, page: `${index + 1},${size}` },
+    { presentacionId: presentacionActiva?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
@@ -47,7 +49,7 @@ export default function NominaHandler() {
   const { trigger: triggerDelete, isMutating: isDeleting } = useSVCCTrabajadorDelete(deleteParams, { onSuccess() { mutate(); } });
   const isWorking = isCreating || isUpdating || isDeleting || isLoading || isValidating;
 
-  const readonly = ultima.data?.presentacionFecha != null;
+  const readonly = presentacionActiva?.presentacionFecha != null;
 
   return (
     <>
@@ -140,7 +142,7 @@ export default function NominaHandler() {
   function handleEditOnConfirm() {
     switch (edit.action) {
       case "create": {
-        triggerCreate({ presentacionId: ultima.data?.interno ?? 0, ...edit.data } as TrabajadorCreateDTO)
+        triggerCreate({ presentacionId: presentacionActiva?.interno ?? 0, ...edit.data } as TrabajadorCreateDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();

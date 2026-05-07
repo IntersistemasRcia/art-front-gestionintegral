@@ -1,8 +1,9 @@
 
 export type ViewCuentaCorriente = {    
     
-    interno: number;    /** Fecha y hora de creación o registro de la liquidación (formato ISO 8601 string). */
-    periodo: number;    /** Origen o tipo de liquidación (Ej: 'POL', 'SERV', 'AJUSTE'). */
+    interno: number;
+    periodo: number;
+    origen?: string;
     monto: number;    /** Monto de la comisión aplicada. */
     comision: number;    /** Monto por servicios adicionales o gastos. */
     serviciosAdicionales: number;
