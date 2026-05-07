@@ -81,6 +81,16 @@ const {
   useRefCIIUList,
 } = gestionEmpleadorAPI;
 
+/** `Browse`/`DataTable` notifica página en base 1; el estado arranca en `0` ⇒ primera página API = 1. */
+function pageIndexForSvccApi(storedFromTable: number): number {
+  return storedFromTable <= 0 ? 1 : storedFromTable;
+}
+
+/** Índice 1-based que espera `DataTable` desde la prop `pageIndex` (luego internamente hace `prop - 1`). */
+function pageIndexFromApiResponse(apiPageIndex: number | undefined): number {
+  return typeof apiPageIndex === "number" && apiPageIndex >= 1 ? apiPageIndex : 1;
+}
+
 export type SVCCPresentacionFilterBase = Omit<SVCCPresentacionTodasParams, "PageIndex" | "PageSize" | "Order">;
 
 export function SVCCPresentacionContextProvider({
@@ -111,8 +121,8 @@ export function SVCCPresentacionContextProvider({
     if (filtrosPresentacionesBase == null) return undefined;
     return {
       ...filtrosPresentacionesBase,
-      PageIndex: presentacionInfo.index + 1,
-      PageSize: presentacionInfo.size,
+      PageIndex: pageIndexForSvccApi(presentacionInfo.index),
+      PageSize: 10,
       Order: "-interno",
     };
   }, [filtrosPresentacionesBase, presentacionInfo.index, presentacionInfo.size]);
@@ -121,37 +131,42 @@ export function SVCCPresentacionContextProvider({
     revalidateOnFocus: false,
   });
 
-  const ultima = useSVCCPresentacionUltima(filtrosUltimaPresentacion, { revalidateOnFocus: false });
+  const ultimaPaginatedParams = useMemo((): SVCCPresentacionUltimaParams | undefined => {
+    if (filtrosUltimaPresentacion == null) return undefined;
+    return {
+      ...filtrosUltimaPresentacion,
+      PageIndex: pageIndexForSvccApi(presentacionInfo.index),
+      PageSize: 10,
+    };
+  }, [filtrosUltimaPresentacion, presentacionInfo.index]);
+
+  const ultima = useSVCCPresentacionUltima(ultimaPaginatedParams, { revalidateOnFocus: false });
 
   useEffect(() => {
     const pag = presentacionTodas.data;
-    const ultRows = ultima.data ?? [];
+    const ultPag = ultima.data;
     if (pag != null && Array.isArray(pag.data) && pag.data.length > 0) {
-      setPresentacionData({ ...pag, index: Math.max(0, pag.index - 1) });
+      setPresentacionData({ ...pag, index: pageIndexFromApiResponse(pag.index) });
       return;
     }
-    if (ultRows.length > 0) {
-      const n = ultRows.length;
+    if (ultPag != null) {
       setPresentacionData({
-        index: presentacionInfo.index,
-        size: Math.max(presentacionInfo.size, n),
-        pages: 1,
-        count: n,
-        data: ultRows,
+        ...ultPag,
+        index: pageIndexFromApiResponse(ultPag.index),
       });
       return;
     }
     if (pag != null) {
-      setPresentacionData({ ...pag, index: Math.max(0, pag.index - 1) });
+      setPresentacionData({ ...pag, index: pageIndexFromApiResponse(pag.index) });
     }
-  }, [presentacionTodas.data, ultima.data, presentacionInfo.index, presentacionInfo.size]);
+  }, [presentacionTodas.data, ultima.data]);
 
   const ultimaFilaSeleccionada = useMemo(() => {
-    const rows = ultima.data ?? [];
+    const rows = ultima.data?.data ?? [];
     const sel = presentacionInfo.selected;
     if (sel == null) return undefined;
     return rows.find((r) => r.interno === sel.interno);
-  }, [ultima.data, presentacionInfo.selected]);
+  }, [ultima.data?.data, presentacionInfo.selected]);
 
   const constancia = useSVCCPresentacionConstancia(
     presentacionInfo.selected?.interno != null && presentacionInfo.selected.presentacionFecha != null

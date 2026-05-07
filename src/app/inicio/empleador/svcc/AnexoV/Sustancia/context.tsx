@@ -30,7 +30,7 @@ export function SustanciaContextProvider({
   children: ReactNode;
 }) {
   const { presentacion: { selected: presentacion } } = useSVCCPresentacionContext();
-  const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList({ presentacionId: presentacion?.interno ?? 0, PageIndex: 1, PageSize: 1, idEstablecimientoEmpresa }, {});
+  const establecimientosDeclarados = useSVCCEstablecimientoDeclaradoList({ presentacionId: presentacion?.interno ?? 0, PageIndex: 1, PageSize: 10, idEstablecimientoEmpresa }, {});
   const establecimientoDeclarado = establecimientosDeclarados.data?.data.find(e => e.idEstablecimientoEmpresa === idEstablecimientoEmpresa);
 
   return (

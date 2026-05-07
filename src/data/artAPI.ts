@@ -22,6 +22,41 @@ import type { AvisoObraRecord } from "@/app/inicio/empleador/avisosDeObra/types/
 
 const tokenizable = token.configure();
 
+const SVCC_CONSTANCIA_DEFAULT_FILENAME = "constancia.pdf";
+
+/** Extrae el nombre de archivo de `Content-Disposition` sin romper si falta o es inválido (Axios puede exponer headers planos o con `.get`). */
+function filenameFromContentDispositionHeaders(headers: Record<string, unknown>): string {
+  const h = headers as {
+    get?: (name: string) => string | undefined | null;
+  } & Record<string, unknown>;
+  const fromGet =
+    typeof h.get === "function"
+      ? h.get("content-disposition") ?? h.get("Content-Disposition")
+      : undefined;
+  const headerRaw =
+    typeof fromGet === "string" && fromGet.length > 0
+      ? fromGet
+      : h["content-disposition"] ?? h["Content-Disposition"];
+  const header = typeof headerRaw === "string" ? headerRaw.trim() : "";
+  if (!header) return SVCC_CONSTANCIA_DEFAULT_FILENAME;
+
+  const star = /filename\*=(?:UTF-8'')?([^;\n]+)/i.exec(header)?.[1]?.trim();
+  if (star) {
+    try {
+      const decoded = decodeURIComponent(star.replace(/^"+|"+$/g, ""));
+      if (decoded) return decoded;
+    } catch {
+      /* seguir con filename= */
+    }
+  }
+
+  const quoted = /filename\s*=\s*"([^"]+)"/i.exec(header)?.[1]?.trim();
+  if (quoted) return quoted;
+
+  const unquoted = /filename\s*=\s*([^;\n]+)/i.exec(header)?.[1]?.trim()?.replace(/^"+|"+$/g, "") ?? "";
+  return unquoted.length > 0 ? unquoted : SVCC_CONSTANCIA_DEFAULT_FILENAME;
+}
+
 //#region Types SVCC (DTOs y contratos de hooks — mismo módulo que el fetching ART)
 export type Pagination<T> = {
   index: number;
@@ -278,9 +313,11 @@ export type SVCCPresentacionObtenerOptions = SWRConfiguration<PresentacionDTO, A
 //#region Types SVCC/Presentaciones/Ultima
 export type SVCCPresentacionUltimaParams = {
   empleadorCuit: number[];
+  PageIndex?: number;
+  PageSize?: number;
 }
 export type SVCCPresentacionUltimaSWRKey = [url: string, token: string, bodyJson: string];
-export type SVCCPresentacionUltimaOptions = SWRConfiguration<PresentacionDTO[], AxiosError, Fetcher<PresentacionDTO[], SVCCPresentacionUltimaSWRKey>>
+export type SVCCPresentacionUltimaOptions = SWRConfiguration<Pagination<PresentacionDTO>, AxiosError, Fetcher<Pagination<PresentacionDTO>, SVCCPresentacionUltimaSWRKey>>
 //#endregion Types SVCC/Presentaciones/Ultima
 
 //#region Types SVCC/Presentaciones/Nueva
@@ -732,11 +769,46 @@ function mapSvccPresentacionApiRecordToDTO(row: Record<string, unknown>): Presen
   };
 }
 
-function normalizeSvccPresentacionUltimaResponse(raw: unknown): PresentacionDTO[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
+/** Extrae filas de un array raíz o de `data` en respuesta paginada. */
+function mapSvccPresentacionRowsFromRaw(raw: unknown): PresentacionDTO[] {
+  if (raw == null) return [];
+  const rows =
+    Array.isArray(raw)
+      ? raw
+      : typeof raw === "object" && raw !== null && "data" in raw && Array.isArray((raw as { data?: unknown }).data)
+        ? (raw as { data: unknown[] }).data
+        : [];
+  return rows
     .map((item) => mapSvccPresentacionApiRecordToDTO(item as Record<string, unknown>))
     .filter((p) => p.interno > 0);
+}
+
+function normalizeSvccPresentacionUltimaResponse(raw: unknown): Pagination<PresentacionDTO> {
+  const vacío = (): Pagination<PresentacionDTO> => ({
+    index: 1,
+    size: 0,
+    pages: 0,
+    count: 0,
+    data: [],
+  });
+  if (raw == null) return vacío();
+  if (Array.isArray(raw)) {
+    const data = mapSvccPresentacionRowsFromRaw(raw);
+    const n = data.length;
+    return { index: 1, size: n, pages: n > 0 ? 1 : 0, count: n, data };
+  }
+  if (typeof raw === "object" && raw !== null && "data" in raw) {
+    const p = raw as Pagination<Record<string, unknown>>;
+    const data = mapSvccPresentacionRowsFromRaw(raw);
+    return {
+      index: typeof p.index === "number" ? p.index : 1,
+      size: typeof p.size === "number" ? p.size : data.length,
+      pages: typeof p.pages === "number" ? p.pages : data.length > 0 ? 1 : 0,
+      count: typeof p.count === "number" ? p.count : data.length,
+      data,
+    };
+  }
+  return vacío();
 }
 
 function normalizeSvccPresentacionTodasResponse(raw: unknown): Pagination<PresentacionDTO> {
@@ -749,7 +821,7 @@ function normalizeSvccPresentacionTodasResponse(raw: unknown): Pagination<Presen
   });
   if (raw == null) return vacío();
   if (Array.isArray(raw)) {
-    const data = normalizeSvccPresentacionUltimaResponse(raw);
+    const data = mapSvccPresentacionRowsFromRaw(raw);
     const n = data.length;
     return { index: 1, size: n, pages: n > 0 ? 1 : 0, count: n, data };
   }
@@ -2218,19 +2290,25 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/Presentaciones/Ultima
   readonly svccPresentacionUltimaURL = () =>
     this.getURL({ path: "/api/SVCC/Presentaciones/Ultima" }).toString();
-  svccPresentacionUltima = async (params: SVCCPresentacionUltimaParams) =>
-    tokenizable
-      .post<unknown>(this.svccPresentacionUltimaURL(), params)
+  svccPresentacionUltima = async (params: SVCCPresentacionUltimaParams) => {
+    const body: SVCCPresentacionUltimaParams = {
+      ...params,
+      PageIndex: params.PageIndex ?? 1,
+      PageSize: params.PageSize ?? 10,
+    };
+    return tokenizable
+      .post<unknown>(this.svccPresentacionUltimaURL(), body)
       .then(({ data }) => normalizeSvccPresentacionUltimaResponse(data));
+  };
   swrSVCCPresentacionUltima: {
     key: (params: SVCCPresentacionUltimaParams) => SVCCPresentacionUltimaSWRKey,
-    fetcher: (key: SVCCPresentacionUltimaSWRKey) => Promise<PresentacionDTO[]>
+    fetcher: (key: SVCCPresentacionUltimaSWRKey) => Promise<Pagination<PresentacionDTO>>
   } = Object.freeze({
     key: (params) => [this.svccPresentacionUltimaURL(), token.getToken(), JSON.stringify(params)],
     fetcher: ([_url, _token, params]) => this.svccPresentacionUltima(JSON.parse(params)),
   });
   useSVCCPresentacionUltima = (params?: SVCCPresentacionUltimaParams, options?: SVCCPresentacionUltimaOptions) =>
-    useSWR<PresentacionDTO[], AxiosError>(params ? this.swrSVCCPresentacionUltima.key(params) : null, this.swrSVCCPresentacionUltima.fetcher, options);
+    useSWR<Pagination<PresentacionDTO>, AxiosError>(params ? this.swrSVCCPresentacionUltima.key(params) : null, this.swrSVCCPresentacionUltima.fetcher, options);
   //#endregion SVCC/Presentaciones/Ultima
 
   //#region SVCC/Presentaciones/Nueva
@@ -2271,10 +2349,7 @@ export class ArtAPIClass extends ExternalAPI {
     this.svccPresentacionConstanciaURL(params),
     { responseType: "blob" }
   ).then(({ data, headers }) => {
-    const header = headers['content-disposition'];
-    const fname = header.split('filename=')[1].split('.')[0];
-    const ext = header.split('.')[1].split(';')[0];
-    const filename = [fname.replace(`"`, ``), ext.replace(`"`, ``)].filter(e => e).join(".") || "constancia.pdf";
+    const filename = filenameFromContentDispositionHeaders(headers as Record<string, unknown>);
     return new File([data], filename, { type: data.type });
   });
   swrSVCCPresentacionConstancia: {
@@ -2359,7 +2434,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/EstablecimientoDeclarado
   //#region SVCC/EstablecimientoDeclarado - List
   readonly svccEstablecimientoDeclaradoListURL = (params?: SVCCEstablecimientoDeclaradoListParams) =>
-    this.getURL({ path: "/api/SVCC/EstablecimientoDeclarado", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/SVCC/EstablecimientosDeclarados", search: toURLSearch(params) }).toString();
   svccEstablecimientoDeclaradoList = async (params?: SVCCEstablecimientoDeclaradoListParams) => tokenizable.get<Pagination<EstablecimientoDeclaradoDTO>>(
     this.svccEstablecimientoDeclaradoListURL(params)
   ).then(({ data }) => data);
@@ -2375,7 +2450,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/EstablecimientoDeclarado - List
 
   //#region SVCC/EstablecimientoDeclarado - Create
-  readonly svccEstablecimientoDeclaradoCreateURL = this.getURL({ path: "/api/SVCC/EstablecimientoDeclarado" }).toString();
+  readonly svccEstablecimientoDeclaradoCreateURL = this.getURL({ path: "/api/SVCC/EstablecimientosDeclarados" }).toString();
   svccEstablecimientoDeclaradoCreate = async (data?: EstablecimientoDeclaradoCreateDTO) => tokenizable.post<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoCreateURL, data
   ).then(({ data }) => data);
@@ -2391,7 +2466,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/EstablecimientoDeclarado - Create
 
   //#region SVCC/EstablecimientoDeclarado - Update
-  readonly svccEstablecimientoDeclaradoUpdateURL = ({ id }: SVCCEstablecimientoDeclaradoUpdateParams) => this.getURL({ path: `/api/SVCC/EstablecimientoDeclarado/${id}` }).toString();
+  readonly svccEstablecimientoDeclaradoUpdateURL = ({ id }: SVCCEstablecimientoDeclaradoUpdateParams) => this.getURL({ path: `/api/SVCC/EstablecimientosDeclarados/${id}` }).toString();
   svccEstablecimientoDeclaradoUpdate = async (params: SVCCEstablecimientoDeclaradoUpdateParams, data?: EstablecimientoDeclaradoBaseDTO) => tokenizable.put<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoUpdateURL(params), data
   ).then(({ data }) => data);
@@ -2407,7 +2482,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/EstablecimientoDeclarado - Update
 
   //#region SVCC/EstablecimientoDeclarado - Delete
-  readonly svccEstablecimientoDeclaradoDeleteURL = ({ id }: SVCCEstablecimientoDeclaradoDeleteParams) => this.getURL({ path: `/api/SVCC/EstablecimientoDeclarado/${id}` }).toString();
+  readonly svccEstablecimientoDeclaradoDeleteURL = ({ id }: SVCCEstablecimientoDeclaradoDeleteParams) => this.getURL({ path: `/api/SVCC/EstablecimientosDeclarados/${id}` }).toString();
   svccEstablecimientoDeclaradoDelete = async (params: SVCCEstablecimientoDeclaradoDeleteParams) => tokenizable.delete<EstablecimientoDeclaradoDTO>(
     this.svccEstablecimientoDeclaradoDeleteURL(params)
   ).then(({ data }) => data);
@@ -2426,7 +2501,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/Sustancia
   //#region SVCC/Sustancia - List
   readonly svccSustanciaListURL = (params?: SVCCSustanciaListParams) =>
-    this.getURL({ path: "/api/SVCC/Sustancia", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/SVCC/Sustancias", search: toURLSearch(params) }).toString();
   svccSustanciaList = async (params?: SVCCSustanciaListParams) => tokenizable.get<Pagination<SustanciaDTO>>(
     this.svccSustanciaListURL(params)
   ).then(({ data }) => data);
@@ -2442,7 +2517,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - List
 
   //#region SVCC/Sustancia - Create
-  readonly svccSustanciaCreateURL = this.getURL({ path: "/api/SVCC/Sustancia" }).toString();
+  readonly svccSustanciaCreateURL = this.getURL({ path: "/api/SVCC/Sustancias" }).toString();
   svccSustanciaCreate = async (data?: SustanciaCreateDTO) => tokenizable.post<SustanciaDTO>(
     this.svccSustanciaCreateURL, data
   ).then(({ data }) => data);
@@ -2458,7 +2533,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - Create
 
   //#region SVCC/Sustancia - Read
-  readonly svccSustanciaReadURL = ({ id }: SVCCSustanciaReadParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
+  readonly svccSustanciaReadURL = ({ id }: SVCCSustanciaReadParams) => this.getURL({ path: `/api/SVCC/Sustancias/${id}` }).toString();
   svccSustanciaRead = async (params: SVCCSustanciaReadParams) => tokenizable.get<SustanciaDTO>(
     this.svccSustanciaReadURL(params)
   ).then(({ data }) => data);
@@ -2474,7 +2549,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - Read
 
   //#region SVCC/Sustancia - Update
-  readonly svccSustanciaUpdateURL = ({ id }: SVCCSustanciaUpdateParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
+  readonly svccSustanciaUpdateURL = ({ id }: SVCCSustanciaUpdateParams) => this.getURL({ path: `/api/SVCC/Sustancias/${id}` }).toString();
   svccSustanciaUpdate = async (params: SVCCSustanciaUpdateParams, data?: SustanciaBaseDTO) => tokenizable.put<SustanciaDTO>(
     this.svccSustanciaUpdateURL(params), data
   ).then(({ data }) => data);
@@ -2490,7 +2565,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Sustancia - Update
 
   //#region SVCC/Sustancia - Delete
-  readonly svccSustanciaDeleteURL = ({ id }: SVCCSustanciaDeleteParams) => this.getURL({ path: `/api/SVCC/Sustancia/${id}` }).toString();
+  readonly svccSustanciaDeleteURL = ({ id }: SVCCSustanciaDeleteParams) => this.getURL({ path: `/api/SVCC/Sustancias/${id}` }).toString();
   svccSustanciaDelete = async (params: SVCCSustanciaDeleteParams) => tokenizable.delete<SustanciaDTO>(
     this.svccSustanciaDeleteURL(params)
   ).then(({ data }) => data);
@@ -2509,7 +2584,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#region SVCC/Trabajador
   //#region SVCC/Trabajador - List
   readonly svccTrabajadorListURL = (params?: SVCCTrabajadorListParams) =>
-    this.getURL({ path: "/api/SVCC/Trabajador", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/SVCC/Trabajadores", search: toURLSearch(params) }).toString();
   svccTrabajadorList = async (params?: SVCCTrabajadorListParams) => tokenizable.get<Pagination<TrabajadorDTO>>(
     this.svccTrabajadorListURL(params)
   ).then(({ data }) => data);
@@ -2525,7 +2600,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - List
 
   //#region SVCC/Trabajador - Create
-  readonly svccTrabajadorCreateURL = this.getURL({ path: "/api/SVCC/Trabajador" }).toString();
+  readonly svccTrabajadorCreateURL = this.getURL({ path: "/api/SVCC/Trabajadores" }).toString();
   svccTrabajadorCreate = async (data?: TrabajadorCreateDTO) => tokenizable.post<TrabajadorDTO>(
     this.svccTrabajadorCreateURL, data
   ).then(({ data }) => data);
@@ -2541,7 +2616,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Create
 
   //#region SVCC/Trabajador - Read
-  readonly svccTrabajadorReadURL = ({ id }: SVCCTrabajadorReadParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
+  readonly svccTrabajadorReadURL = ({ id }: SVCCTrabajadorReadParams) => this.getURL({ path: `/api/SVCC/Trabajadores/${id}` }).toString();
   svccTrabajadorRead = async (params: SVCCTrabajadorReadParams) => tokenizable.get<TrabajadorDTO>(
     this.svccTrabajadorReadURL(params)
   ).then(({ data }) => data);
@@ -2557,7 +2632,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Read
 
   //#region SVCC/Trabajador - Update
-  readonly svccTrabajadorUpdateURL = ({ id }: SVCCTrabajadorUpdateParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
+  readonly svccTrabajadorUpdateURL = ({ id }: SVCCTrabajadorUpdateParams) => this.getURL({ path: `/api/SVCC/Trabajadores/${id}` }).toString();
   svccTrabajadorUpdate = async (params: SVCCTrabajadorUpdateParams, data?: TrabajadorBaseDTO) => tokenizable.put<TrabajadorDTO>(
     this.svccTrabajadorUpdateURL(params), data
   ).then(({ data }) => data);
@@ -2573,7 +2648,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Update
 
   //#region SVCC/Trabajador - Delete
-  readonly svccTrabajadorDeleteURL = ({ id }: SVCCTrabajadorDeleteParams) => this.getURL({ path: `/api/SVCC/Trabajador/${id}` }).toString();
+  readonly svccTrabajadorDeleteURL = ({ id }: SVCCTrabajadorDeleteParams) => this.getURL({ path: `/api/SVCC/Trabajadores/${id}` }).toString();
   svccTrabajadorDelete = async (params: SVCCTrabajadorDeleteParams) => tokenizable.delete<TrabajadorDTO>(
     this.svccTrabajadorDeleteURL(params)
   ).then(({ data }) => data);

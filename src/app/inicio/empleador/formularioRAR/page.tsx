@@ -24,9 +24,6 @@ import FormularioRARGenerar from './generar/FormularioRARGenerar';
 
 // Ruta del logo para el PDF
 const pdfLogoSrc = '/icons/LogoTexto.png';
-const API_ART_BASE_URL = (process.env.NEXT_PUBLIC_API_ART_URL ?? '').replace(/\/$/, '');
-
-
 /* Helpers */
 const fechaFormatter = (v: any) => Formato.Fecha(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
@@ -347,16 +344,13 @@ const FormulariosRAR: React.FC = () => {
 
           let mapaAgentes = new Map<number, string>();
           try {
-            const rAg = await fetch(`${API_ART_BASE_URL}/api/AgentesCausantes`);
-            if (rAg.ok) {
-              const agentes = await rAg.json();
-              const arr = Array.isArray(agentes) ? agentes : agentes?.data ? (Array.isArray(agentes.data) ? agentes.data : [agentes.data]) : [agentes];
-              arr.forEach((a: any) => {
-                const codigo = Number(a?.codigo ?? 0);
-                const nombre = String(a?.agenteCausante ?? '').trim();
-                if (codigo && nombre) mapaAgentes.set(codigo, nombre);
-              });
-            }
+            const agentesResp = await ArtAPI.getAgentesCausantes();
+            const arr = Array.isArray(agentesResp) ? agentesResp : [];
+            arr.forEach((a: any) => {
+              const codigo = Number(a?.codigo ?? 0);
+              const nombre = String(a?.agenteCausante ?? '').trim();
+              if (codigo && nombre) mapaAgentes.set(codigo, nombre);
+            });
           } catch (e) {
             console.warn('No se pudo cargar el catálogo de agentes para PDF', e);
           }
