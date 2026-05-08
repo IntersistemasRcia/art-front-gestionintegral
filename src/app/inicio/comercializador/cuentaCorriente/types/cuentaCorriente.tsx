@@ -45,4 +45,25 @@ export type ParametersAfipTranferencia = {
     // PageSize?: number;
 }
 
+
+export type ParametersComercializadorPeriodoPago = {
+ComercializadoresInternos?: string;
+OrderBy?: string;
+PageIndex?: number;
+PageSize?: number;
+}
+
+export type ComercializadorPeriodoPago = {
+    srtcomercializadorInterno: number;
+    periodo: number;
+    montoPremio: number;
+    montoPrima: number;
+    comision: number;
+    serviciosAdicionales: number;
+    iva: number;
+    totalSinIva: number;
+    totalConIva: number;
+    interno: number;
+}
+
 export default ViewCuentaCorriente;
