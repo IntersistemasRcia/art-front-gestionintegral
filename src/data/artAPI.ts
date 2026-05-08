@@ -2344,7 +2344,7 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Presentaciones/Finaliza
 
   //#region SVCC/Presentaciones/Constancia
-  readonly svccPresentacionConstanciaURL = ({ id }: SVCCPresentacionConstanciaParams) => this.getURL({ path: `/api/SVCC/Presentaciones/Constancia/${id}` }).toString();
+  readonly svccPresentacionConstanciaURL = ({ id }: SVCCPresentacionConstanciaParams) => this.getURL({ path: `/api/SVCC/Presentaciones/${id}/Constancia` }).toString();
   svccPresentacionConstancia = async (params: SVCCPresentacionConstanciaParams) => tokenizable.get<Blob>(
     this.svccPresentacionConstanciaURL(params),
     { responseType: "blob" }
