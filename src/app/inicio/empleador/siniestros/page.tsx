@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
@@ -98,7 +98,6 @@ export default function SiniestrosPage() {
   const router = useRouter();
   const pathname = usePathname();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
-  const seleccionAutomaticaRef = useRef(false);
   const [selectedDenuncia, setSelectedDenuncia] = useState<number | null>(null);
   const [selectedDenunciaCuit, setSelectedDenunciaCuit] = useState<number | undefined>(undefined);
 
@@ -137,6 +136,12 @@ export default function SiniestrosPage() {
     () => (mostrarOpcionTodas ? [EMPRESA_TODAS, ...empresas] : empresas),
     [empresas, mostrarOpcionTodas]
   );
+  const empresaSeleccionadaEsValida = useMemo(() => {
+    if (empresaSeleccionada == null) return false;
+    return opcionesEmpresaSelector.some(
+      (o) => o.empresaId === empresaSeleccionada.empresaId
+    );
+  }, [empresaSeleccionada, opcionesEmpresaSelector]);
   const esOpcionTodasSeleccionada = empresaSeleccionada?.empresaId === EMPRESA_TODAS_ID;
   const cuitFinalStr = cuitDesdeQuery || (esOpcionTodasSeleccionada ? "" : cuitEmpresaSeleccionada);
   const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
@@ -152,25 +157,25 @@ export default function SiniestrosPage() {
     if (!cuitDesdeQuery) return;
 
     const match = empresas.find((e) => normalizeDigits((e as any)?.cuit) === cuitDesdeQuery);
-    if (match) {
-      setEmpresaSeleccionada(match);
-      seleccionAutomaticaRef.current = true;
-    }
+    if (match) setEmpresaSeleccionada(match);
   }, [cuitDesdeQuery, empresas, isLoadingEmpresas]);
 
-  // Seleccionar automáticamente si solo hay una empresa (salvo que venga CUIT por query)
+  // Por defecto: "Todas las empresas" si existe esa opción; si no, la única empresa del usuario.
   useEffect(() => {
     if (bloquearBusquedaPorCuit) return;
-    if (!isLoadingEmpresas) {
-      if (empresas.length === 1) {
-        setEmpresaSeleccionada(empresas[0]);
-        seleccionAutomaticaRef.current = true;
-      } else if (empresas.length > 1 && seleccionAutomaticaRef.current) {
-        setEmpresaSeleccionada(EMPRESA_TODAS);
-        seleccionAutomaticaRef.current = false;
-      }
-    }
-  }, [empresas.length, isLoadingEmpresas, bloquearBusquedaPorCuit]);
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 0) return;
+    if (empresaSeleccionadaEsValida) return;
+
+    if (mostrarOpcionTodas) setEmpresaSeleccionada(EMPRESA_TODAS);
+    else setEmpresaSeleccionada(empresas[0]);
+  }, [
+    bloquearBusquedaPorCuit,
+    isLoadingEmpresas,
+    empresas,
+    mostrarOpcionTodas,
+    empresaSeleccionadaEsValida,
+  ]);
 
   // Limpiar la denuncia seleccionada cuando cambia el CUIT (empresa/forzado)
   useEffect(() => {
@@ -184,7 +189,6 @@ export default function SiniestrosPage() {
   ) => {
     if (bloquearBusquedaPorCuit) return;
     setEmpresaSeleccionada(newValue);
-    seleccionAutomaticaRef.current = false;
   };
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
