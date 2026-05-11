@@ -1,5 +1,7 @@
 
 export type CuentaCorrienteRegistro = {
+    cuit?: number;
+    empleador_Denominacion?: string;
     periodoCobertura: string;
     periodoDDJJ: string;
     fechaPresentacion: string;
@@ -21,6 +23,8 @@ export type CuentaCorrienteRegistro = {
 }
 
 export type DDJJRegistro = {
+    cuit?: number;
+    empleador_Denominacion?: string;
     periodoDDJJ: string;
     presentacion: string;    
     tipo: string;    
