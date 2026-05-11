@@ -81,6 +81,8 @@ export type PresentacionDTO = PresentacionBaseDTO & {
   interno: number,
   idMotivo?: number,
   presentacionFecha?: string,
+  empleadorCuit?: number,
+  empleadorRazonSocial?: string,
 }
 export type EmpresaTercerizadaBaseDTO = {
   idEstablecimientoEmpresa?: number;
@@ -766,6 +768,8 @@ function mapSvccPresentacionApiRecordToDTO(row: Record<string, unknown>): Presen
     observaciones: obs != null && obs !== '' ? String(obs) : undefined,
     presentacionFecha:
       pf != null && pf !== '' && String(pf) !== 'null' ? String(pf) : undefined,
+    empleadorCuit: row.empleadorCuit != null ? Number(row.empleadorCuit) : undefined,
+    empleadorRazonSocial: row.empleadorRazonSocial != null ? String(row.empleadorRazonSocial) : undefined,
   };
 }
 

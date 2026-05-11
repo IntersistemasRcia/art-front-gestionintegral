@@ -6,6 +6,8 @@ export const PresentacionBrowse = Browse<PresentacionDTO>(
   (props) => {
     return [
       { accessorKey: "interno", header: "Código identificativo" },
+      { accessorKey: "empleadorCuit", header: "CUIT", cell({ getValue }) { return Formato.CUIP(getValue<number>()) } },
+      { accessorKey: "empleadorRazonSocial", header: "Razón Social" },
       {
         accessorKey: "presentacionFecha",
         header: "Fecha de presentación",

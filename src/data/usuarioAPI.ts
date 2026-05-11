@@ -6,6 +6,7 @@ import TokenConfigurator from "@/types/TokenConfigurator";
 import { toURLSearch } from "@/utils/utils";
 import IUsuarioDarDeBaja from "@/app/inicio/usuarios/interfaces/IUsuarioDarDeBajaReactivar";
 import CargoInterface from "@/app/inicio/usuarios/interfaces/CargoInterface";
+import RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface";
 
 //#region Types
 export interface Auditable {
@@ -116,6 +117,11 @@ export interface UsuarioGetAllParams {
   sort?: string;
   pageIndex?: number;
   pageSize?: number;
+  cuit?: string;
+  nombre?: string;
+  email?: string;
+  rol?: string;
+  estado?: string;
 }
 export interface UsuarioGetAllResult {
   index: number;
@@ -138,12 +144,6 @@ export type UsuarioUpdatePayload = {
   email: string;
 };
 //#region /api/Roles types
-export interface RolesInterface {
-  id: string;
-  nombre: string;
-  nombreNormalizado: string;
-  esRolHijo: boolean;
-}
 //#endregion /api/Roles types
 //#region /api/Tablas types
 export interface Campo extends Auditable {

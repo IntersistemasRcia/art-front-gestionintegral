@@ -205,11 +205,12 @@ export default function UsuarioForm({
 
   const { user } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
-  type RoleWithChild = RolesInterface & { esRolHijo?: boolean };
   const availableRoles = useMemo(() => {
-    if (!isAdminEmpleador) return roles;
-    return (roles as RoleWithChild[]).filter(r => !!r.esRolHijo);
-  }, [roles, isAdminEmpleador]);
+    const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
+    if (!userRole || userRole.rolesHijos.length === 0) return roles;
+    const hijoIds = new Set(userRole.rolesHijos.map(h => h.id));
+    return roles.filter(r => hijoIds.has(r.id));
+  }, [roles, user?.rol]);
 
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
