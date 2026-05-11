@@ -6,7 +6,7 @@ import { Box, Typography } from '@mui/material';
 import CustomTab from '@/utils/ui/tab/CustomTab';
 import Formato from '@/utils/Formato';
 import gestionComercializadorAPI from "@/data/gestionComercializadorAPI";
-import type { ViewCuentaCorriente, ViewCuentaCorrienteDetalle } from './types/cuentaCorriente';
+import type { ViewCuentaCorriente, ComercializadorPeriodoPago, ParametersComercializadorPeriodoPago } from './types/cuentaCorriente';
 import { useAuth } from '@/data/AuthContext';
 import ArtAPI from '@/data/artAPI';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
@@ -32,8 +32,6 @@ const formatCurrency = (value: number | string | null | undefined) => {
     }).format(finalNum);
 };
 
-type SelectedCtaCte = ViewCuentaCorriente | null;
-
 function digits(value: unknown) {
     return String(value ?? '').replace(/\D/g, '');
 }
@@ -53,7 +51,7 @@ function CuentaCorrienteComercializador() {
     const [organizador, setOrganizador] = useState<any>(null);
     const [comercializador, setComercializador] = useState<any>(null);
 
-    const [ctacteSelected, setCtacteSelected] = useState<SelectedCtaCte>(null);
+    const [periodoPagoSelected, setPeriodoPagoSelected] = useState<ComercializadorPeriodoPago | null>(null);
     const [empleadorPagoSelected, setEmpleadorPagoSelected] = useState<any>(null);
 
      // PAGINACIÓN controlada por componente
@@ -68,7 +66,6 @@ function CuentaCorrienteComercializador() {
     const [pageCountEmpleador, setPageCountEmpleador] = useState<number>(0);
 
     // Accede a las propiedades de la sesión con seguridad
-    const { empresaCUIT, cuit } = user as any;
 
     const { data: gOrgData } = ArtAPI.useGetGOrganizadorURL(
         isAdmin ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
@@ -168,89 +165,39 @@ function CuentaCorrienteComercializador() {
         : Number(digits((comercializadorValue as any)?.cuil ?? 0));
 
     useEffect(() => {
-        setCtacteSelected(null);
         setPageIndex(0);
         setPageIndexDetalle(0);
     }, [cuilConsulta]);
 
-    // Clave de persistencia para DataTable (por cuit para no mezclar usuarios)
-    const persistKeyForSelection = cuit ? `ctacte_selected_${cuit}` : `ctacte_selected_global`;
+    const comercializadorInterno = comercializadorValue ? String((comercializadorValue as any)?.interno ?? 0) : undefined;
 
-    // NOTA: Usamos ctacteSelected?.periodo, y lo convertimos a string si existe.
-    // Esto hace que la clave SWR solo se active cuando ctacteSelected.periodo tiene un valor.
-    const ctaCteParams = useMemo(() => {
-        const base = { page: `${PageIndex},${PageSize}`, sort: "-periodo" } as any;
-        if (cuilConsulta) return { CUIL: cuilConsulta, ...base } as any;
-        if (hasAnyFiltro) return { CUIL: 0, ...base } as any;
-        return base;
-    }, [PageIndex, PageSize, cuilConsulta, hasAnyFiltro]);
+    const periodoPagoParams = useMemo((): ParametersComercializadorPeriodoPago => ({
+        ComercializadoresInternos: comercializadorInterno,
+        OrderBy: '-Periodo',
+        PageIndex: PageIndex + 1,
+        PageSize,
+    }), [comercializadorInterno, PageIndex, PageSize]);
 
-    const { data: CtaCteRawData, isLoading: isCtaCteLoading, error: viewCtaCteError, isValidating, mutate: mutateCtaCte } =
-    gestionComercializadorAPI.useGetViewCtaCte(ctaCteParams);
+    const { data: periodoPagoRaw, isLoading: isPeriodoPagoLoading } =
+        ArtAPI.useGetComercializadorPeriodoPago(comercializadorInterno ? periodoPagoParams : {});
 
-    const periodoFiltro = ctacteSelected?.periodo || 0;
-    
-    const { data: CtaCteRawDetalleData, isLoading: isCtaCteDetalleLoading, error: viewCtaCteDetalleError, isValidating: isValidatingDetalle, mutate: mutateCtaCteDetalle } =
-    gestionComercializadorAPI.useGetViewCtaCteDetalle(
-        // La consulta de detalles solo se ejecuta si hay un periodo seleccionado (periodoFiltro)
-        periodoFiltro ? { 
-            CUIL: cuilConsulta || (hasAnyFiltro ? 0 : cuil), 
-            page: `${PageIndexDetalle},${PageSizeDetalle}`, // Usar la paginación de detalles
-            periodo: periodoFiltro, // Filtro por periodo
-            sort: "-fecha" // Ordenar por fecha para los detalles es común
-        } : undefined // Si no hay periodo seleccionado, no se consulta
+    const periodoPagoData: ComercializadorPeriodoPago[] = (forceEmpty || !comercializadorInterno) ? [] : (
+        Array.isArray(periodoPagoRaw) ? periodoPagoRaw : (periodoPagoRaw?.data || [])
     );
 
-    // Este handler ahora solo hace UX: setea seleccionado y abre la pestaña 1
-    const onRowClick = (row: ViewCuentaCorriente) => {
-        // Guardar la fila seleccionada en el estado (padre)
-        setCtacteSelected(row);
-        
-        // Cambiar a la pestaña de "Detalles" (valor 1)
-        //setCurrentTab(1); 
-        
-        // Reiniciar la paginación de Detalles
-        setPageIndexDetalle(0);
-        
-        console.log("Fila seleccionada (click), Periodo:", row.periodo);
-    };
+    const periodoFiltro = periodoPagoSelected?.periodo || 0;
+    
 
     //#region CTA CTE COMERCIALIZADOR (cálculo pageCount)
     useEffect(() => {
-        if (forceEmpty) {
-            setPageCount(1);
-            return;
-        }
-        if (viewCtaCteError) {
-            console.error('Error al cargar viewCtaCteError (SWR):', viewCtaCteError);
-            return;
-        }
-
-        // Normalizar respuesta
-        let ctacte: any[] = [];
-        const data = CtaCteRawData;
-        if (data?.data) ctacte = Array.isArray(data.data) ? data.data : [data.data];
-        else if (Array.isArray(data)) ctacte = data;
-        else if (data) ctacte = [data];
-        
-        // Si la API devuelve total/totalRecords/TotalCount calcula pageCount
-        const total =
-            typeof data?.total === 'number' ? data.total :
-            typeof data?.totalCount === 'number' ? data.totalCount :
-            typeof data?.TotalCount === 'number' ? data.TotalCount :
-            typeof data?.TOTAL === 'number' ? data.TOTAL :
-            typeof data?.count === 'number' ? data.count :
-            typeof data?.meta?.total === 'number' ? data.meta.total :
-            undefined;
-
-        if (typeof total === 'number' && PageSize > 0) {
-            setPageCount(Math.ceil(total / PageSize));
-        } else {
-            // fallback
-            setPageCount(ctacte?.length > 0 ? Math.ceil(ctacte.length / PageSize) : 1);
-        }
+        if (forceEmpty) { setPageCount(1); return; }
+        const data = periodoPagoRaw;
+        const arr: ComercializadorPeriodoPago[] = Array.isArray(data) ? data : (data?.data || []);
+        const total = typeof data?.total === 'number' ? data.total : typeof data?.count === 'number' ? data.count : undefined;
+        if (typeof total === 'number' && PageSize > 0) setPageCount(Math.ceil(total / PageSize));
+        else setPageCount(arr.length > 0 ? Math.ceil(arr.length / PageSize) : 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [CtaCteRawData, viewCtaCteError, PageSize, forceEmpty]);
+    }, [periodoPagoRaw, PageSize, forceEmpty]);
 
     const handlePageChange = (newPageIndex: number) => {
         setPageIndex(newPageIndex);
@@ -264,38 +211,6 @@ function CuentaCorrienteComercializador() {
 
 
     //#region CTA CTE COMERCIALIZADOR DETALLE (cálculo pageCount detalles)
-    useEffect(() => {
-        if (forceEmpty) {
-            setPageCountDetalle(1);
-            return;
-        }
-        if (viewCtaCteDetalleError) {
-            console.error('Error al cargar viewCtaCteErrorDetalle (SWR):', viewCtaCteDetalleError);
-            return;
-        }
-
-        let ctacteDetalle: any[] = [];
-        const data = CtaCteRawDetalleData;
-        if (data?.data) ctacteDetalle = Array.isArray(data.data) ? data.data : [data.data];
-        else if (Array.isArray(data)) ctacteDetalle = data;
-        else if (data) ctacteDetalle = [data];
-        
-        const total =
-            typeof data?.total === 'number' ? data.total :
-            typeof data?.totalCount === 'number' ? data.totalCount :
-            typeof data?.TotalCount === 'number' ? data.TotalCount :
-            typeof data?.TOTAL === 'number' ? data.TOTAL :
-            typeof data?.count === 'number' ? data.count :
-            typeof data?.meta?.total === 'number' ? data.meta.total :
-            undefined;
-
-        if (typeof total === 'number' && PageSizeDetalle > 0) {
-            setPageCountDetalle(Math.ceil(total / PageSizeDetalle));
-        } else {
-            setPageCountDetalle(ctacteDetalle?.length > 0 ? Math.ceil(ctacteDetalle.length / PageSizeDetalle) : 1);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [CtaCteRawDetalleData, viewCtaCteDetalleError, PageSizeDetalle, forceEmpty]);
 
     const handlePageDetalleChange = (newPageIndex: number) => {
         setPageIndexDetalle(newPageIndex);
@@ -317,32 +232,25 @@ function CuentaCorrienteComercializador() {
         // no modificar ctacteSelected aquí — la selección se mantiene entre pestañas
     };
 
+    const columnsPeriodoPago: ColumnDef<ComercializadorPeriodoPago>[] = useMemo(() => [
+        { header: 'Período', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(), "YYYY-MM"), meta: { align: 'center' } },
+        { header: 'Monto', accessorKey: 'montoPrima', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
+        { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
+        { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
+        { header: 'Total Sin IVA', accessorKey: 'totalSinIva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
+        { header: 'Total Con IVA', accessorKey: 'totalConIva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
+    ], []);
+
     const columns: ColumnDef<ViewCuentaCorriente>[] = useMemo(() => [
-        { id: 'periodoCtaCte', header: 'Período', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} }, 
+        { id: 'periodoCtaCte', header: 'Período', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} },
         { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         { header: 'Comisión(*)', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
         // { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
-        { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Sin IVA', accessorKey: 'totalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Con IVA', accessorKey: 'totalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
+        { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        { header: 'Total Sin IVA', accessorKey: 'totalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
+        { header: 'Total Con IVA', accessorKey: 'totalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },
     ], []);
 
-    const columnsDetalles: ColumnDef<ViewCuentaCorrienteDetalle>[] = useMemo(() => [
-        { id: 'periodoDetalle', header: 'Período', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue(),"MM-YYYY"), meta: { align: 'center'} },
-        { header: 'Fecha', accessorKey: 'fecha', cell: (info: any) => Formato.Fecha(info.getValue()), meta: { align: 'center'} },
-        { header: 'Origen', accessorKey: 'origen', meta: { align: 'center'} },
-        { header: 'Nro. Póliza', accessorKey: 'polizaNumero', meta: { align: 'center'} },
-        { header: 'CUIT Empleador', accessorKey: 'empleadorCUIT', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center'} },
-        { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'left'} },
-        { header: 'Monto', accessorKey: 'monto', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
-        { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
-        { header: 'Servicios Adicionales', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as string), meta: { align: 'center'} },
-        { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Sin IVA', accessorKey: 'totalSinIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },       
-        { header: 'Total Con IVA', accessorKey: 'totalConIVA', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center'} },   
-        { header: 'Aplica IVA', id: 'aplicaIVA', cell: (info: any) => {const ivaVal = info.row?.original?.iva ?? info.getValue?.(); const num = Number(String(ivaVal ?? 0).replace(',', '.')); return (isNaN(num) || num === 0) ? 'No' : 'Si';}, meta: { align: 'center' } },
-    ], []);
-    
     const columnsEmpleadorPeriodo: ColumnDef<any>[] = useMemo(() => [
         { header: 'CUIT', accessorKey: 'cuit', cell: (info: any) => Formato.CUIP(info.getValue()), meta: { align: 'center' } },
         { header: 'Razón Social', accessorKey: 'razonSocial', meta: { align: 'left' } },
@@ -366,18 +274,13 @@ function CuentaCorrienteComercializador() {
     ], []);
 
 
-    const ctacteData = forceEmpty ? [] : (CtaCteRawData?.data || []);
-    const ctacteDetalleData = forceEmpty ? [] : (
-        Array.isArray(CtaCteRawDetalleData) ? CtaCteRawDetalleData : (CtaCteRawDetalleData?.data || [])
-    );
-
     // Params para consultar EmpleadorPagosComercializador
     const empleadorPagosParams = useMemo(() => ({
         Periodo: periodoFiltro,
-        ComercializadoresInternos: comercializadoresInternos,
-        PageIndex: PageIndexDetalle,
+        ComercializadoresInternos: comercializadorValue ? String((comercializadorValue as any)?.interno ?? 0) : comercializadoresInternos,
+        PageIndex: PageIndexDetalle + 1,
         PageSize: PageSizeDetalle,
-    }), [periodoFiltro, comercializadoresInternos, PageIndexDetalle, PageSizeDetalle]);
+    }), [periodoFiltro, comercializadorValue, comercializadoresInternos, PageIndexDetalle, PageSizeDetalle]);
 
     const { data: empleadorPagosRaw, isLoading: isEmpleadorPagosLoading } = ArtAPI.useGetEmpleadorPagoComercializadorURL(empleadorPagosParams as any);
     const empleadorPagosData = forceEmpty ? [] : (
@@ -528,39 +431,26 @@ function CuentaCorrienteComercializador() {
 
     const tabItems = [
         {
-            label: 'Estado de Cuenta',
+            label: 'Periodo de pago',
             value: 0,
             content: (
-
                 <DataTable
-                    data={ctacteData} 
-                    columns={columns} 
+                    data={periodoPagoData}
+                    columns={columnsPeriodoPago}
                     size="mid"
-                    isLoading={isCtaCteLoading}
-                    onRowClick={onRowClick}
+                    isLoading={isPeriodoPagoLoading}
+                    rowKeyField="interno"
+                    selectedRowKeyProp={periodoPagoSelected ? String(periodoPagoSelected.interno) : null}
+                    onRowClick={(row: ComercializadorPeriodoPago) => {
+                        setPeriodoPagoSelected(row);
+                        setPageIndexDetalle(0);
+                    }}
                     manualPagination={true}
                     pageIndex={PageIndex}
                     pageSize={PageSize}
                     pageCount={pageCount}
                     onPageChange={handlePageChange}
                     onPageSizeChange={handlePageSizeChange}
-
-                    /* NUEVAS PROPS para persistir/recordar la fila seleccionada */
-                    rowKeyField="periodo"                              /* usamos 'periodo' como clave estable */
-                    persistSelectedRowKey={persistKeyForSelection}     /* guarda en localStorage por usuario */
-                    onSelectedRowChange={(selectedKey, row) => {
-                        // selectedKey: string|null ; row?: TData
-                        if (row) {
-                            setCtacteSelected(row as ViewCuentaCorriente);
-                        } else if (selectedKey === null) {
-                            setCtacteSelected(null);
-                        } else {
-                            // si no vino el row (por ejemplo viene desde persist y aun no hay data),
-                            // intentar buscarlo en los datos actuales
-                            const found = (ctacteData || []).find((r: any) => String(r.periodo) === String(selectedKey));
-                            setCtacteSelected(found ?? null);
-                        }
-                    }}
                 />
             ),
         },
@@ -569,52 +459,50 @@ function CuentaCorrienteComercializador() {
             label: 'Empleador por periodo de pago',
             value: 1,
             content: (
-                <DataTable
-                    data={empleadorPagosDataEnriched}
-                    columns={columnsEmpleadorPeriodo}
-                    size="mid"
-                    isLoading={isEmpleadorPagosLoading || isEmpresaByCuitLoading}
-                    onRowClick={(row: any) => setEmpleadorPagoSelected(row)}
-                    manualPagination={true}
-                    pageIndex={PageIndexDetalle}
-                    pageSize={PageSizeDetalle}
-                    pageCount={pageCountDetalle}
-                    onPageChange={handlePageDetalleChange}
-                    onPageSizeChange={handlePageSizeDetalleChange}
-                />
+                <>
+                    {periodoPagoSelected && (
+                        <p className={styles.tabLabel}>
+                            <strong>Periodo:</strong> {Formato.Fecha(periodoPagoSelected.periodo, "YYYY-MM")}
+                        </p>
+                    )}
+                    <DataTable
+                        data={empleadorPagosDataEnriched}
+                        columns={columnsEmpleadorPeriodo}
+                        size="mid"
+                        isLoading={isEmpleadorPagosLoading || isEmpresaByCuitLoading}
+                        rowKeyField="interno"
+                        selectedRowKeyProp={empleadorPagoSelected ? String(empleadorPagoSelected.interno) : null}
+                        onRowClick={(row: any) => setEmpleadorPagoSelected(row)}
+                        manualPagination={true}
+                        pageIndex={PageIndexDetalle}
+                        pageSize={PageSizeDetalle}
+                        pageCount={pageCountDetalle}
+                        onPageChange={handlePageDetalleChange}
+                        onPageSizeChange={handlePageSizeDetalleChange}
+                    />
+                </>
             ),
         },
         {
             label: 'Transferencias del empleador',
             value: 2,
             content: (
-                <DataTable
-                    data={afipTransferData}
-                    columns={columnsAfipTransferencias}
-                    size="mid"
-                    isLoading={isAfipTransferLoading}
-                />
+                <>
+                    {empleadorPagoSelected && (
+                        <p className={styles.tabLabel}>
+                            <strong>Empleador:</strong> {Formato.CUIP(empleadorPagoSelected.cuit)} - {empleadorPagoSelected.razonSocial}
+                        </p>
+                    )}
+                    <DataTable
+                        data={afipTransferData}
+                        columns={columnsAfipTransferencias}
+                        size="mid"
+                        isLoading={isAfipTransferLoading}
+                    />
+                </>
             ),
         },
 
-                {
-            label: 'Detalles',
-            value: 3,
-            content: (
-                 <DataTable
-                    data={ctacteDetalleData} 
-                    columns={columnsDetalles} 
-                    size="mid"
-                    isLoading={isCtaCteDetalleLoading || (currentTab === 1 && !ctacteSelected)}
-                    manualPagination={true}
-                    pageIndex={PageIndexDetalle}
-                    pageSize={PageSizeDetalle}
-                    pageCount={pageCountDetalle}
-                    onPageChange={handlePageDetalleChange}
-                    onPageSizeChange={handlePageSizeDetalleChange}
-                />
-            ),
-        },
     ];
 
     return (
