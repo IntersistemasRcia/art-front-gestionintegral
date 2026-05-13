@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useState, SyntheticEvent, useEffect, useRef } from 'react';
-import DataTable from '@/utils/ui/table/DataTable'; 
+import DataTable from '@/utils/ui/table/DataTable';
 import { ColumnDef } from '@tanstack/react-table';
 import { Box, Typography } from '@mui/material';
 import CustomTab from '@/utils/ui/tab/CustomTab';
@@ -12,6 +12,7 @@ import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from 'next/navigation';
+import ArtAPI from "@/data/artAPI";
 
 
 
@@ -56,6 +57,8 @@ const formatDecimal = (
 
 const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
 
+const PAGE_SIZE = 10;
+
 // ----------------------------------------------------
 // 3. DEFINICIÓN DE COLUMNAS Y COMPONENTE
 // ----------------------------------------------------
@@ -64,11 +67,12 @@ function CuentaCorrientePage() {
     const searchParams = useSearchParams();
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
+    const [pageIndex, setPageIndex] = useState(0);
 
     const cuitQuery = searchParams?.get('cuit') ?? '';
     const cuitDesdeQuery = normalizeDigits(cuitQuery);
     const bloquearBusquedaPorCuit = Boolean(cuitDesdeQuery);
-    
+
     // Seleccionar automáticamente si solo hay una empresa o fijar empresa por CUIT cuando viene desde comercializador
     useEffect(() => {
         if (isLoadingEmpresas) return;
@@ -98,32 +102,25 @@ function CuentaCorrientePage() {
         if (bloquearBusquedaPorCuit) return;
         setEmpresaSeleccionada(newValue);
         seleccionAutomaticaRef.current = false;
+        setPageIndex(0);
     };
 
     const getEmpresaLabel = (empresa: Empresa | null): string => {
         if (!empresa) return "";
         return `${empresa.razonSocial}`;
     };
-    
-    // Consultar datos con ordenamiento por periodo descendente desde el backend
-    const cuitEmpresaSeleccionada = empresaSeleccionada?.cuit? normalizeDigits(empresaSeleccionada.cuit): '';
+    const cuitEmpresaSeleccionada = empresaSeleccionada?.cuit ? normalizeDigits(empresaSeleccionada.cuit) : '';
     const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
     const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
+
     const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
         cuitFinal ? { CUIT: cuitFinal } : {}
     );
-    const { data: CtaCteRawData, isLoading: isCtaCteLoading } = gestionEmpleadorAPI.useGetVEmpleadorDDJJ(
-        cuitFinal
-            ? { 
-                CUIT: cuitFinal,
-                sort: '-Periodo',
-                page: '0,1000'
-              }
-            : {
-                sort: '-Periodo',
-                page: '0,1000'
-              }
-    );
+    const ddJJParams = cuitFinal
+        ? { cuit: [cuitFinal], pageIndex: pageIndex + 1, pageSize: PAGE_SIZE, orderBy: '-periodo' }
+        : null;
+
+    const { data: ddJJRawData, isLoading: isCtaCteLoading } = ArtAPI.useVEmpleadorDDJJ(ddJJParams);
     useEffect(() => {
         if (!bloquearBusquedaPorCuit) return;
         if (empresaSeleccionada) return;
@@ -133,42 +130,33 @@ function CuentaCorrientePage() {
 
         setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as Empresa);
     }, [bloquearBusquedaPorCuit, empresaSeleccionada, polizaRawData]);
-    
-    // Usar los datos directamente sin ordenar en el frontend
-    const sortedData = useMemo(() => {
-        return CtaCteRawData?.data || [];
-    }, [CtaCteRawData]);
 
-    // Calcular saldo mensual y saldo acumulado manualmente:
+    const rawRows = useMemo(() => ddJJRawData?.data ?? [], [ddJJRawData]);
+    const pageCount = ddJJRawData?.pages ?? 0;
 
+    // Normaliza nombres de campo (la API nueva usa camelCase distinto al GET original)
     const computedData = useMemo(() => {
-        const rows = Array.isArray(sortedData) ? [...sortedData] : [];
         const poliza = polizaRawData as { cuit?: number; empleador_Denominacion?: string } | undefined;
 
-        // Ordenamos por periodo ascendente (antiguo -> reciente) para acumular correctamente
-        rows.sort((a: any, b: any) => String(a.periodo).localeCompare(String(b.periodo)));
-
-        let prevSaldoAcumulado = 0;
-
-        return rows.map((r: any) => {
+        return rawRows.map((r: any) => {
             const totalPagado = isNaN(parseToNumber(r.totalPagadoCuota)) ? 0 : parseToNumber(r.totalPagadoCuota);
             const totalCuota = isNaN(parseToNumber(r.totalCuota)) ? 0 : parseToNumber(r.totalCuota);
-
             const saldoMensual = totalPagado - totalCuota;
-            const saldoAcumulado = saldoMensual + prevSaldoAcumulado;
-
-            prevSaldoAcumulado = saldoAcumulado;
 
             return {
                 ...r,
+                // Normalizar nombres que cambiaron entre GET y POST
+                origenDDJJ: r.origenDDJJ ?? r.origenDdjj,
+                totalDevengadoFFEP: r.totalDevengadoFFEP ?? r.totalDevengadoFfep,
+                totalPagadoFFEP: r.totalPagadoFFEP ?? r.totalPagadoFfep,
+                primaAPagar: r.primaAPagar ?? r.primaApagar,
                 cuit: r.cuit ?? poliza?.cuit,
                 empleador_Denominacion: r.empleador_Denominacion ?? poliza?.empleador_Denominacion,
                 saldoMensual,
-                saldoAcumulado,
             };
         });
-    }, [sortedData, polizaRawData]);
-    
+    }, [rawRows, polizaRawData]);
+
     // 1. CONTROL DE LA PESTAÑA: Usamos useState para el valor numérico
     // Iniciamos con 0 si queremos 'Estado de Cuenta', o 1 si queremos 'Últimas DDJJ'
     const initialTabIndex = 0; // Queremos que inicie en la primera pestaña (0)
@@ -176,7 +164,7 @@ function CuentaCorrientePage() {
 
     // 2. HANDLER DE CAMBIO: Convertimos el valor (string) que devuelve MUI a number
     const handleTabChange = (event: SyntheticEvent, newTabValue: string | number) => {
-        setCurrentTab(newTabValue as number); 
+        setCurrentTab(newTabValue as number);
     };
 
     const sumarleUnMesAlPeriodo = (periodo: unknown) => {
@@ -189,7 +177,7 @@ function CuentaCorrientePage() {
 
         const anio = parseInt(periodoStr.substring(0, 4), 10);
         const mes = parseInt(periodoStr.substring(4, 6), 10);
-        
+
         // El resto de la lógica permanece igual
         const fecha = new Date(anio, mes - 1, 1);
         fecha.setMonth(fecha.getMonth() + 1);
@@ -217,7 +205,7 @@ function CuentaCorrientePage() {
         { header: 'FFEP S/Res', accessorKey: 'ffep', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: () => <>Total Cuota<br />a Pagar</>, accessorKey: 'totalCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
         { header: () => <>Total Pagado<br />Cuota</>, accessorKey: 'totalPagadoCuota', cell: info => formatCurrency(info.getValue()), meta: { align: 'center'} },
-        { header: () => <>Saldo<br />Mensual</>, accessorKey: 'saldoMensual', 
+        { header: () => <>Saldo<br />Mensual</>, accessorKey: 'saldoMensual',
             cell: info => {
                 // Usamos el campo calculado `saldoMensual`
                 const mensual = Number(info.row.original?.saldoMensual ?? info.getValue() ?? 0);
@@ -247,13 +235,18 @@ function CuentaCorrientePage() {
             content: (
                 <>
                     <DataTable
-                        data={computedData || []} 
-                        columns={columns} 
-                        pageSizeOptions={[12]}
+                        data={computedData || []}
+                        columns={columns}
+                        pageSizeOptions={[PAGE_SIZE]}
                         size="mid"
-                        isLoading={false}
+                        isLoading={isCtaCteLoading}
+                        manualPagination
+                        pageIndex={pageIndex + 1}
+                        pageSize={PAGE_SIZE}
+                        pageCount={pageCount}
+                        onPageChange={(newPage) => setPageIndex(newPage - 1)}
                     />
-                    <ExportButtons 
+                    <ExportButtons
                         data={computedData || []}
                         type="estadoCuenta"
                         sumarleUnMesAlPeriodo={sumarleUnMesAlPeriodo}
@@ -267,13 +260,18 @@ function CuentaCorrientePage() {
             content: (
                 <>
                     <DataTable
-                        data={computedData || []} 
-                        columns={columnsDDJJ} 
-                        pageSizeOptions={[12]}
+                        data={computedData || []}
+                        columns={columnsDDJJ}
+                        pageSizeOptions={[PAGE_SIZE]}
                         size="mid"
-                        isLoading={false}
+                        isLoading={isCtaCteLoading}
+                        manualPagination
+                        pageIndex={pageIndex + 1}
+                        pageSize={PAGE_SIZE}
+                        pageCount={pageCount}
+                        onPageChange={(newPage) => setPageIndex(newPage - 1)}
                     />
-                    <ExportButtons 
+                    <ExportButtons
                         data={computedData || []}
                         type="ultimasDDJJ"
                     />
@@ -304,10 +302,10 @@ function CuentaCorrientePage() {
                             disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
                 />
             </Box>
-            
+
             <CustomTab 
-                tabs={tabItems} 
-                currentTab={currentTab} 
+                tabs={tabItems}
+                currentTab={currentTab}
                 onTabChange={handleTabChange}
             /> 
 

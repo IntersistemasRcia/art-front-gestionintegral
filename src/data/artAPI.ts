@@ -16,6 +16,7 @@ import { ParametersEmpleadorPagosComercializador, ParametersComercializadorPerio
 import { CoberturaPost, CoberturaPostResponse, ParametersCobertura } from "@/app/inicio/empleador/cobertura/types/cobertura";
 import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
 import { EmpresaParamsID } from "@/app/inicio/usuarios/types/empresa";
+import { VEmpleadorDDJJPostParams, VEmpleadorDDJJItem, VEmpleadorDDJJResponse } from "@/app/inicio/empleador/cuentaCorriente/types/cuentaCorriente";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 import type { AvisoObraRecord } from "@/app/inicio/empleador/avisosDeObra/types/types";
@@ -2693,6 +2694,26 @@ export class ArtAPIClass extends ExternalAPI {
       revalidateOnReconnect: false,
     }
   );
+  //#endregion
+
+
+  //#region VEmpleadorDDJJ POST
+  readonly vEmpleadorDDJJURL = this.getURL({ path: "/api/VEmpleadorDDJJ" }).toString();
+
+  vEmpleadorDDJJPost = async (params: VEmpleadorDDJJPostParams): Promise<VEmpleadorDDJJResponse> =>
+    tokenizable.post<VEmpleadorDDJJResponse>(this.vEmpleadorDDJJURL, params).then(({ data }) => data);
+
+  useVEmpleadorDDJJ = (params: VEmpleadorDDJJPostParams | null) =>
+    useSWR(
+      params
+        ? [this.vEmpleadorDDJJURL, token.getToken(), JSON.stringify(params)]
+        : null,
+      () => this.vEmpleadorDDJJPost(params!),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
   //#endregion
 
 
