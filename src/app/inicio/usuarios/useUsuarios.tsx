@@ -204,8 +204,16 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
       // Usa el fetcher importado para la petición POST, especificando los tipos genéricos
       // await fetcher("UsuarioAPI", "registrar", { data: formData });
       const createdUser = await registrar(formData);
-      // Con SWR, usa mutate para revalidar automáticamente los datos.
       await mutateUsuarios();
+      try {
+        await reenviarCorreo(String(formData.email));
+      } catch {
+        return {
+          success: false,
+          error: "No fue posible enviar el correo de verificación. Verifique el email ingresado.",
+          data: createdUser,
+        };
+      }
       return { success: true, data: createdUser };
     } catch (err) {
       console.log("error",err)
@@ -226,9 +234,13 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
         err instanceof AxiosError
           ? err
           : new AxiosError("Error desconocido al actualizar usuario");
+      const serverValue: string = error.response?.data?.value ?? "";
+      const esErrorCorreo = /correo/i.test(serverValue) || /mail/i.test(serverValue);
       return {
         success: false,
-        error: error.response?.data?.Mensaje ?? "Ocurrió un error al guardar el usuario.",
+        error: esErrorCorreo
+          ? "No fue posible enviar el correo de verificación. Verifique el email ingresado."
+          : error.response?.data?.Mensaje ?? "Ocurrió un error al guardar el usuario.",
       };
     }
 

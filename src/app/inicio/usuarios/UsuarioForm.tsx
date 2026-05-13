@@ -703,7 +703,6 @@ export default function UsuarioForm({
 
       console.log("Submitting form data:", dataToSubmit);
       onSubmit(dataToSubmit);
-      if (isCreating) void UsuarioAPI.reenviarCorreo(dataToSubmit.email);
     }
   };
 
