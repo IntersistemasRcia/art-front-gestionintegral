@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
 import { Box, Typography } from "@mui/material";
 import { ColumnDef } from "@tanstack/react-table";
@@ -17,11 +17,18 @@ import Formato from "@/utils/Formato";
 export type UsuarioEmpresaPorCuitFila = Empresa & { id?: number };
 type EmpresaComboOption = Pick<Empresa, "empresaId" | "cuit" | "razonSocial">;
 
+export type EmpresasRelacionadasMeta = {
+  count: number;
+  isLoading: boolean;
+};
+
 type UsuarioEmpresasUsuarioTabProps = {
   open: boolean;
   usuarioId: string;
   cuitForm: string;
   puedeEditar: boolean;
+  /** Notifica cantidad de empresas vinculadas y estado de carga (p. ej. bloqueo de cierre del modal tras alta). */
+  onEmpresasRelacionadasMetaChange?: (meta: EmpresasRelacionadasMeta) => void;
 };
 
 export function UsuarioEmpresasUsuarioTab({
@@ -29,6 +36,7 @@ export function UsuarioEmpresasUsuarioTab({
   usuarioId,
   cuitForm,
   puedeEditar,
+  onEmpresasRelacionadasMetaChange,
 }: UsuarioEmpresasUsuarioTabProps) {
   const { hasTask } = useAuth();
   const { empresas: empresasStore } = useEmpresasStore();
@@ -59,6 +67,18 @@ export function UsuarioEmpresasUsuarioTab({
     () => (Array.isArray(data) ? (data as UsuarioEmpresaPorCuitFila[]) : []),
     [data]
   );
+
+  useEffect(() => {
+    if (!open || !onEmpresasRelacionadasMetaChange) return;
+    if (!cuitNum || !usuarioId) {
+      onEmpresasRelacionadasMetaChange({ count: 0, isLoading: false });
+      return;
+    }
+    onEmpresasRelacionadasMetaChange({
+      count: rows.length,
+      isLoading,
+    });
+  }, [open, cuitNum, usuarioId, rows.length, isLoading, onEmpresasRelacionadasMetaChange]);
 
   const empresasSesionParaCombo = useMemo<EmpresaComboOption[]>(
     () =>

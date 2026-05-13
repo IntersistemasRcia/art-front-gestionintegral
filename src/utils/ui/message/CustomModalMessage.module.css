@@ -70,3 +70,16 @@
     color: var(--gris) !important;
     font-size: 1.8rem !important; /* Aumentar tamaño del mensaje */
 }
+
+.secondaryMessage {
+    margin-top: 1.25rem !important;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    color: var(--grisOscuro) !important;
+    font-size: 1.35rem !important;
+    font-weight: 600 !important;
+    line-height: 1.45 !important;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.04);
+    border-left: 4px solid var(--naranja);
+}
