@@ -114,6 +114,17 @@ const mapApiToUi = (r: ApiFormularioRGRL): FormularioRGRL => ({
   FechaSRTRaw: r.fechaSRT ?? null,
 });
 
+const soloDigitosCuit = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+
+/** `empresaId` en `useEmpresasStore` que coincide con el CUIT de la fila del listado RGRL. */
+function empresaIdDesdeStorePorCuit(empresasList: Empresa[], cuitFila: unknown): number | undefined {
+  const digitosFila = soloDigitosCuit(cuitFila);
+  if (!digitosFila) return undefined;
+  const found = empresasList.find((e) => soloDigitosCuit(e.cuit) === digitosFila);
+  const id = found?.empresaId;
+  return typeof id === 'number' && Number.isFinite(id) && id > 0 ? id : undefined;
+}
+
 const CargarEstablecimientoPorId = async (id: number): Promise<ApiEstablecimientoEmpresa | null> => {
   if (!id) return null;
   try {
@@ -489,6 +500,15 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     return [empresaSeleccionada.empresaId];
   }, [empresaSeleccionada, isAdmin, sessionEmpresaIds]);
 
+  /** Para GetBySpecs en el modal Generar: `empresaId` por CUIT del combo vs `empresas` del store (misma lógica que edición). */
+  const empresasIdGetBySpecsModalGenerar = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return empresaIdsFiltro;
+    const desdeStore = empresaIdDesdeStorePorCuit(empresas, empresaSeleccionada.cuit);
+    if (desdeStore != null) return [desdeStore];
+    return empresaIdsFiltro;
+  }, [empresaSeleccionada, empresas, empresaIdsFiltro]);
+
   const canFetchFormularios = useMemo(() => {
     if (!empresaSeleccionada) return false;
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return true;
@@ -587,7 +607,6 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         header: 'Acciones',
         //@ts-ignore
         cell: ({ row }) => {
-          console.log("row", row)
  const onClick = async (e: any) => {
   e.stopPropagation?.();
   const interno = Number(row.original.InternoFormularioRGRL || 0);
@@ -659,7 +678,10 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
             e.stopPropagation?.();
             const interno = Number(row.original.InternoFormularioRGRL || 0);
             if (!interno) return;
-            router.push(`/inicio/empleador/formularioRGRL/editar?id=${interno}`);
+            const empresaId = empresaIdDesdeStorePorCuit(empresas, row.original.CUIT);
+            const qEmpresa =
+              empresaId != null ? `&empresaId=${encodeURIComponent(String(empresaId))}` : '';
+            router.push(`/inicio/empleador/formularioRGRL/editar?id=${interno}${qEmpresa}`);
           };
 
           const onCopy = (e: any) => {
@@ -713,7 +735,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         enableSorting: false,
       },
     ],
-    [router]
+    [router, empresas]
   );
   // Re-define DataTable con tipado específico para este componente.
   const DataTable = DataTableImport as unknown as React.FC<{
@@ -1158,7 +1180,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         <GenerarFormularioRGRL
           //Generar
           initialCuit={empresaSeleccionada?.cuit || undefined}
-          empresasIdGetBySpecs={empresaIdsFiltro}
+          empresasIdGetBySpecs={empresasIdGetBySpecsModalGenerar}
           replicaDe={replicaDe}
           onClose={() => setOpenGenerar(false)}
           onDone={async () => {

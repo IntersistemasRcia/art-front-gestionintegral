@@ -74,8 +74,10 @@ export type PresentacionCreateDTO = PresentacionBaseDTO & {
   empleadorCUIT: number;
   idMotivo?: number,
 }
-export type PresentacionFinalizaDTO = PresentacionBaseDTO & {
-  interno: number,
+/** Body PUT `/api/SVCC/Presentaciones/Finaliza` */
+export type PresentacionFinalizaDTO = {
+  id: number;
+  observaciones: string;
 }
 export type PresentacionDTO = PresentacionBaseDTO & {
   interno: number,
