@@ -16,7 +16,6 @@ import { ParametersEmpleadorPagosComercializador, ParametersComercializadorPerio
 import { CoberturaPost, CoberturaPostResponse, ParametersCobertura } from "@/app/inicio/empleador/cobertura/types/cobertura";
 import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
 import { EmpresaParamsID } from "@/app/inicio/usuarios/types/empresa";
-import { VEmpleadorDDJJPostParams, VEmpleadorDDJJItem, VEmpleadorDDJJResponse } from "@/app/inicio/empleador/cuentaCorriente/types/cuentaCorriente";
 import Formato from "@/utils/Formato";
 import { AxiosError } from "axios";
 import type { AvisoObraRecord } from "@/app/inicio/empleador/avisosDeObra/types/types";
@@ -614,6 +613,23 @@ type GetFormulariosRGRLBySpecsBody = {
   orderBy: string;
 };
 
+/** Body POST `/api/VEmpleadorDDJJ` */
+export type VEmpleadorDDJJPostBody = {
+  cuit: number[];
+  pageIndex: number;
+  pageSize: number;
+  orderBy: string;
+};
+
+export type VEmpleadorDDJJApiResponse = {
+  data: unknown[];
+  /** Total de páginas según API (para paginación manual). */
+  pages?: number;
+  index?: number;
+  size?: number;
+  count?: number;
+};
+
 export type FormularioRGRLCreateRequest = {
   internoFormulario: number;
   internoEstablecimiento: number;
@@ -847,6 +863,42 @@ function normalizeSvccPresentacionTodasResponse(raw: unknown): Pagination<Presen
     };
   }
   return vacío();
+}
+
+function normalizeVEmpleadorDDJJResponse(raw: unknown): VEmpleadorDDJJApiResponse {
+  if (raw == null) return { data: [], pages: 0 };
+  if (Array.isArray(raw)) return { data: raw, pages: raw.length > 0 ? 1 : 0 };
+  if (typeof raw === "object" && raw !== null) {
+    const o = raw as Record<string, unknown>;
+    const data = Array.isArray(o.data)
+      ? o.data
+      : Array.isArray(o.Data)
+        ? (o.Data as unknown[])
+        : [];
+    const pagesRaw = o.pages ?? o.Pages;
+    const pagesParsed =
+      typeof pagesRaw === "number" && Number.isFinite(pagesRaw)
+        ? pagesRaw
+        : typeof pagesRaw === "string" && pagesRaw.trim() !== ""
+          ? Number(pagesRaw)
+          : NaN;
+    const pages = Number.isFinite(pagesParsed)
+      ? Math.max(0, Math.floor(pagesParsed))
+      : data.length > 0
+        ? 1
+        : 0;
+    const indexRaw = o.index ?? o.Index;
+    const sizeRaw = o.size ?? o.Size;
+    const countRaw = o.count ?? o.Count;
+    return {
+      data,
+      pages,
+      index: typeof indexRaw === "number" && Number.isFinite(indexRaw) ? indexRaw : undefined,
+      size: typeof sizeRaw === "number" && Number.isFinite(sizeRaw) ? sizeRaw : undefined,
+      count: typeof countRaw === "number" && Number.isFinite(countRaw) ? countRaw : undefined,
+    };
+  }
+  return { data: [], pages: 0 };
 }
 
 export class ArtAPIClass extends ExternalAPI {
@@ -1261,6 +1313,25 @@ export class ArtAPIClass extends ExternalAPI {
       this.swrDeleteFormularioRGRL.fetcher
     );
   //#endregion
+
+  //#region VEmpleadorDDJJ
+  readonly postVEmpleadorDDJJURL = this.getURL({ path: "/api/VEmpleadorDDJJ" }).toString();
+  postVEmpleadorDDJJ = async (body: VEmpleadorDDJJPostBody): Promise<VEmpleadorDDJJApiResponse> =>
+    tokenizable.post<unknown>(this.postVEmpleadorDDJJURL, body).then(({ data }) => normalizeVEmpleadorDDJJResponse(data));
+
+  useVEmpleadorDDJJ = (body: VEmpleadorDDJJPostBody | null, options?: SWRConfiguration<VEmpleadorDDJJApiResponse, AxiosError>) =>
+    useSWR<VEmpleadorDDJJApiResponse, AxiosError>(
+      body ? [this.postVEmpleadorDDJJURL, token.getToken(), JSON.stringify(body)] : null,
+      () => this.postVEmpleadorDDJJ(body as VEmpleadorDDJJPostBody),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        /** Evita `data === undefined` al cambiar página (nueva key), que rompía `pages` y el estado local. */
+        keepPreviousData: true,
+        ...options,
+      }
+    );
+  //#endregion VEmpleadorDDJJ
 
 
   //#region Localidades
@@ -2694,26 +2765,6 @@ export class ArtAPIClass extends ExternalAPI {
       revalidateOnReconnect: false,
     }
   );
-  //#endregion
-
-
-  //#region VEmpleadorDDJJ POST
-  readonly vEmpleadorDDJJURL = this.getURL({ path: "/api/VEmpleadorDDJJ" }).toString();
-
-  vEmpleadorDDJJPost = async (params: VEmpleadorDDJJPostParams): Promise<VEmpleadorDDJJResponse> =>
-    tokenizable.post<VEmpleadorDDJJResponse>(this.vEmpleadorDDJJURL, params).then(({ data }) => data);
-
-  useVEmpleadorDDJJ = (params: VEmpleadorDDJJPostParams | null) =>
-    useSWR(
-      params
-        ? [this.vEmpleadorDDJJURL, token.getToken(), JSON.stringify(params)]
-        : null,
-      () => this.vEmpleadorDDJJPost(params!),
-      {
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-      }
-    );
   //#endregion
 
 
