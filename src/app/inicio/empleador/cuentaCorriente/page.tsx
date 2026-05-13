@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, SyntheticEvent, useEffect, useRef } from 'react';
+import React, { useMemo, useState, SyntheticEvent, useEffect, useRef, useCallback } from 'react';
 import DataTable from '@/utils/ui/table/DataTable'; 
 import { ColumnDef } from '@tanstack/react-table';
 import { Box, Typography } from '@mui/material';
@@ -12,6 +12,8 @@ import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from 'next/navigation';
+import ArtAPI, { type VEmpleadorDDJJPostBody } from '@/data/artAPI';
+import { useAuth } from '@/data/AuthContext';
 
 
 
@@ -56,20 +58,71 @@ const formatDecimal = (
 
 const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
 
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+const DDJJ_PAGE_SIZE = 10;
+const DDJJ_ORDER_BY = '-Periodo';
+
+const EMPRESA_OPCION_TODAS_CTA_CTE: Empresa = {
+    empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+    cuit: 0,
+    razonSocial: 'Todas las Empresas',
+    domicilio: '',
+    localidad: '',
+    provincia: '',
+};
+
 // ----------------------------------------------------
 // 3. DEFINICIÓN DE COLUMNAS Y COMPONENTE
 // ----------------------------------------------------
 function CuentaCorrientePage() {
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+    const { user } = useAuth();
     const searchParams = useSearchParams();
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
+    const isAdmin = String(user?.rol ?? '').trim().toLowerCase() === 'administrador';
+
+    const opcionesEmpresaSelector = useMemo(
+        () => [EMPRESA_OPCION_TODAS_CTA_CTE, ...empresas],
+        [empresas]
+    );
 
     const cuitQuery = searchParams?.get('cuit') ?? '';
     const cuitDesdeQuery = normalizeDigits(cuitQuery);
     const bloquearBusquedaPorCuit = Boolean(cuitDesdeQuery);
-    
-    // Seleccionar automáticamente si solo hay una empresa o fijar empresa por CUIT cuando viene desde comercializador
+
+    const empresasCuitsKey = useMemo(() => {
+        const cuits = empresas
+            .map((e) => normalizeDigits(e.cuit))
+            .filter((c) => c.length > 0);
+        return Array.from(new Set(cuits)).sort().join(',');
+    }, [empresas]);
+
+    const ddjjFilterSignature = useMemo(() => {
+        if (bloquearBusquedaPorCuit) return `q:${cuitDesdeQuery}`;
+        if (!empresaSeleccionada) return 'sin-empresa';
+        if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+            if (isAdmin) return 'admin:todas';
+            return `todas:${empresasCuitsKey}`;
+        }
+        return `una:${empresaSeleccionada.empresaId}:${normalizeDigits(empresaSeleccionada.cuit)}`;
+    }, [
+        bloquearBusquedaPorCuit,
+        cuitDesdeQuery,
+        empresaSeleccionada,
+        empresasCuitsKey,
+        isAdmin,
+    ]);
+
+    const [ddjjPageIndex, setDdjjPageIndex] = useState(1);
+    /** Conserva el último `pages` válido del API cuando la respuesta aún no llegó (clave SWR distinta por página). */
+    const lastDdjjServerPageCountRef = useRef(1);
+
+    useEffect(() => {
+        setDdjjPageIndex(1);
+        lastDdjjServerPageCountRef.current = 1;
+    }, [ddjjFilterSignature]);
+
     useEffect(() => {
         if (isLoadingEmpresas) return;
 
@@ -81,14 +134,22 @@ function CuentaCorrientePage() {
             }
             return;
         }
-            if (empresas.length === 1) {
-                setEmpresaSeleccionada(empresas[0]);
-                seleccionAutomaticaRef.current = true;
-            } else if (empresas.length !== 1 && seleccionAutomaticaRef.current) {
-                setEmpresaSeleccionada(null);
-                seleccionAutomaticaRef.current = false;
-            }
-        
+
+        if (empresas.length === 1) {
+            setEmpresaSeleccionada(empresas[0]);
+            seleccionAutomaticaRef.current = true;
+            return;
+        }
+        if (empresas.length === 0) {
+            setEmpresaSeleccionada(null);
+            seleccionAutomaticaRef.current = false;
+            return;
+        }
+        setEmpresaSeleccionada((prev) => {
+            if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+            return EMPRESA_OPCION_TODAS_CTA_CTE;
+        });
+        seleccionAutomaticaRef.current = true;
     }, [empresas, isLoadingEmpresas, cuitDesdeQuery]);
 
     const handleEmpresaChange = (
@@ -101,29 +162,85 @@ function CuentaCorrientePage() {
     };
 
     const getEmpresaLabel = (empresa: Empresa | null): string => {
-        if (!empresa) return "";
+        if (!empresa) return '';
+        if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return 'Todas las Empresas';
         return `${empresa.razonSocial}`;
     };
-    
-    // Consultar datos con ordenamiento por periodo descendente desde el backend
-    const cuitEmpresaSeleccionada = empresaSeleccionada?.cuit? normalizeDigits(empresaSeleccionada.cuit): '';
+
+    const cuitEmpresaSeleccionada = empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID
+        ? ''
+        : empresaSeleccionada?.cuit
+          ? normalizeDigits(empresaSeleccionada.cuit)
+          : '';
     const cuitFinalStr = cuitDesdeQuery || cuitEmpresaSeleccionada;
     const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
+
+    const ddjjBody = useMemo((): VEmpleadorDDJJPostBody | null => {
+        if (bloquearBusquedaPorCuit) {
+            const n = Number(cuitDesdeQuery);
+            if (!Number.isFinite(n) || n <= 0) return null;
+            return {
+                cuit: [n],
+                pageIndex: ddjjPageIndex,
+                pageSize: DDJJ_PAGE_SIZE,
+                orderBy: DDJJ_ORDER_BY,
+            };
+        }
+        if (!empresaSeleccionada) return null;
+        if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+            if (isAdmin) {
+                return {
+                    cuit: [],
+                    pageIndex: ddjjPageIndex,
+                    pageSize: DDJJ_PAGE_SIZE,
+                    orderBy: DDJJ_ORDER_BY,
+                };
+            }
+            const cuits = empresas
+                .map((e) => Number(e.cuit))
+                .filter((c) => Number.isFinite(c) && c > 0);
+            const unique = Array.from(new Set(cuits));
+            return {
+                cuit: unique,
+                pageIndex: ddjjPageIndex,
+                pageSize: DDJJ_PAGE_SIZE,
+                orderBy: DDJJ_ORDER_BY,
+            };
+        }
+        const c = Number(empresaSeleccionada.cuit);
+        if (!Number.isFinite(c) || c <= 0) return null;
+        return {
+            cuit: [c],
+            pageIndex: ddjjPageIndex,
+            pageSize: DDJJ_PAGE_SIZE,
+            orderBy: DDJJ_ORDER_BY,
+        };
+    }, [bloquearBusquedaPorCuit, cuitDesdeQuery, ddjjPageIndex, empresaSeleccionada, empresas, isAdmin]);
+
     const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
         cuitFinal ? { CUIT: cuitFinal } : {}
     );
-    const { data: CtaCteRawData, isLoading: isCtaCteLoading } = gestionEmpleadorAPI.useGetVEmpleadorDDJJ(
-        cuitFinal
-            ? { 
-                CUIT: cuitFinal,
-                sort: '-Periodo',
-                page: '0,1000'
-              }
-            : {
-                sort: '-Periodo',
-                page: '0,1000'
-              }
-    );
+    const { data: CtaCteRawData, isLoading: isCtaCteLoading } = ArtAPI.useVEmpleadorDDJJ(ddjjBody);
+
+    const ddjjPageCount = useMemo(() => {
+        const p = CtaCteRawData?.pages;
+        if (typeof p === 'number' && Number.isFinite(p) && p >= 1) {
+            const n = Math.floor(p);
+            lastDdjjServerPageCountRef.current = n;
+            return n;
+        }
+        return lastDdjjServerPageCountRef.current;
+    }, [CtaCteRawData, CtaCteRawData?.pages]);
+
+    useEffect(() => {
+        if (isCtaCteLoading) return;
+        if (ddjjPageIndex <= ddjjPageCount) return;
+        setDdjjPageIndex(Math.max(1, ddjjPageCount));
+    }, [ddjjPageCount, ddjjPageIndex, isCtaCteLoading]);
+
+    const handleDdjjPageChange = useCallback((newPageIndex1Based: number) => {
+        setDdjjPageIndex(newPageIndex1Based);
+    }, []);
     useEffect(() => {
         if (!bloquearBusquedaPorCuit) return;
         if (empresaSeleccionada) return;
@@ -242,9 +359,14 @@ function CuentaCorrientePage() {
                     <DataTable
                         data={computedData || []} 
                         columns={columns} 
-                        pageSizeOptions={[12]}
+                        pageSizeOptions={[DDJJ_PAGE_SIZE]}
                         size="mid"
-                        isLoading={false}
+                        isLoading={isCtaCteLoading}
+                        manualPagination
+                        pageIndex={ddjjPageIndex}
+                        pageSize={DDJJ_PAGE_SIZE}
+                        pageCount={ddjjPageCount}
+                        onPageChange={handleDdjjPageChange}
                     />
                     <ExportButtons 
                         data={computedData || []}
@@ -262,9 +384,14 @@ function CuentaCorrientePage() {
                     <DataTable
                         data={computedData || []} 
                         columns={columnsDDJJ} 
-                        pageSizeOptions={[12]}
+                        pageSizeOptions={[DDJJ_PAGE_SIZE]}
                         size="mid"
-                        isLoading={false}
+                        isLoading={isCtaCteLoading}
+                        manualPagination
+                        pageIndex={ddjjPageIndex}
+                        pageSize={DDJJ_PAGE_SIZE}
+                        pageCount={ddjjPageCount}
+                        onPageChange={handleDdjjPageChange}
                     />
                     <ExportButtons 
                         data={computedData || []}
@@ -279,10 +406,11 @@ function CuentaCorrientePage() {
         <div style={{ padding: '20px' }}>
             <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
                 <CustomSelectSearch<Empresa>
-                    options={empresas}
+                    options={opcionesEmpresaSelector}
                     getOptionLabel={getEmpresaLabel}
                     value={empresaSeleccionada}
                     onChange={handleEmpresaChange}
+                    isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
                     label="Seleccionar Empresa"
                     placeholder="Buscar empresa..."
                     loading={isLoadingEmpresas}
@@ -290,7 +418,7 @@ function CuentaCorrientePage() {
                     noOptionsText={
                         isLoadingEmpresas
                             ? "Cargando..."
-                            : empresas.length === 0
+                            : opcionesEmpresaSelector.length <= 1
                             ? "No hay empresas disponibles"
                             : "No se encontraron empresas"
                     }
