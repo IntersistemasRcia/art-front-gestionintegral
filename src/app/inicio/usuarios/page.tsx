@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Box, Typography } from "@mui/material";
-import UsuarioForm, { UsuarioFormFields } from "./UsuarioForm";
+import UsuarioForm, {
+  type UsuarioFormFields,
+  LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR,
+} from "./UsuarioForm";
 import UsuarioTable from "./UsuarioTable";
 import EmpresaTable from "./EmpresaTable";
 import Tareas from "./Tareas";
@@ -222,6 +225,8 @@ export default function UsuariosPage() {
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  /** Tras alta exitosa con id: el modal exige al menos una empresa antes de cerrar. */
+  const [awaitingEmpresaAfterCreate, setAwaitingEmpresaAfterCreate] = useState(false);
   const [requestState, setRequestState] = useState<RequestState>({
     method: null,
     userData: null,
@@ -246,6 +251,7 @@ export default function UsuariosPage() {
     open: boolean;
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
+    secondaryMessage?: string;
   }>({
     open: false,
     message: '',
@@ -255,11 +261,16 @@ export default function UsuariosPage() {
   // Determina si el modal debe estar visible
   const showModal = requestState.method !== null;
 
-  const showModalMessage = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+  const showModalMessage = (
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info',
+    secondaryMessage?: string
+  ) => {
     setModalMessage({
       open: true,
       message,
-      type
+      type,
+      secondaryMessage: secondaryMessage ?? undefined,
     });
   };
 
@@ -267,11 +278,17 @@ export default function UsuariosPage() {
     setModalMessage({
       open: false,
       message: '',
-      type: 'info'
+      type: 'info',
+      secondaryMessage: undefined,
     });
   };
 
+  const handleEmpresaRelationSatisfied = useCallback(() => {
+    setAwaitingEmpresaAfterCreate(false);
+  }, []);
+
   const handleOpenModal = (method: RequestMethod, row?: UsuarioRow) => {
+    setAwaitingEmpresaAfterCreate(false);
     // CORRECCIÓN 2: Mapeamos la fila (UsuarioRow) a datos del formulario (UsuarioFormFields)
     const sectorIdFromRow = row?.sectorId ?? (row as UsuarioRow & { SectorId?: number | string } | undefined)?.SectorId;
     const resolvedSectorId =
@@ -311,6 +328,7 @@ export default function UsuariosPage() {
   };
 
   const handleCloseModal = () => {
+    setAwaitingEmpresaAfterCreate(false);
     setRequestState({ method: null, userData: null });
   };
 
@@ -390,6 +408,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
     // Aquí se crea el objeto completo para la API, añadiendo empresaId
     // La lógica de envío debe considerar el modo (create, edit, delete)
     const method = requestState.method;
+    let successSecondaryMessage: string | undefined;
     let result: { success: boolean; error: string | null } = {
       success: false,
       error: null,
@@ -460,6 +479,8 @@ const handleSubmit = async (data: UsuarioFormFields) => {
     if (createResult.success) {
       const createdUserId = createResult.data?.id;
       if (createdUserId !== undefined && createdUserId !== null) {
+        setAwaitingEmpresaAfterCreate(true);
+        successSecondaryMessage = LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR;
         setRequestState({
           method: "edit",
           userData: {
@@ -467,6 +488,8 @@ const handleSubmit = async (data: UsuarioFormFields) => {
             id: String(createdUserId),
           },
         });
+      } else {
+        setAwaitingEmpresaAfterCreate(false);
       }
     }
   }
@@ -479,7 +502,11 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         activate: "Usuario reactivado exitosamente"
       };
       
-      showModalMessage(successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente", "success");
+      showModalMessage(
+        successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente",
+        "success",
+        successSecondaryMessage
+      );
       if (method !== "create") {
         handleCloseModal();
       }
@@ -611,6 +638,8 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         method={requestState.method || "create"}
         isAdmin={isAdmin}
         isSubmitting={isSubmitting}
+        awaitingEmpresaRelation={awaitingEmpresaAfterCreate}
+        onEmpresaRelationSatisfied={handleEmpresaRelationSatisfied}
       />
 
       <Tareas
@@ -625,7 +654,8 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         message={modalMessage.message}         
         type={modalMessage.type}         
         onClose={handleClose}        
-        title="Operación exitosa"  
+        title={modalMessage.type === "success" ? "Operación exitosa" : undefined}
+        secondaryMessage={modalMessage.secondaryMessage}
       />
     </Box>
   );

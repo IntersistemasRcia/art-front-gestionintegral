@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
   TextField,
@@ -12,6 +12,7 @@ import {
   CircularProgress,
   Checkbox,
   FormControlLabel,
+  Alert,
 } from "@mui/material";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/material.css";
@@ -32,7 +33,10 @@ import useSWR from 'swr';
 import AuthAPI from '@/data/authAPI';
 import dayjs from 'dayjs';
 import CustomTabs from "@/utils/ui/tab/CustomTab";
-import { UsuarioEmpresasUsuarioTab } from "./UsuarioEmpresasUsuarioTab";
+import {
+  UsuarioEmpresasUsuarioTab,
+  type EmpresasRelacionadasMeta,
+} from "./UsuarioEmpresasUsuarioTab";
 
 // Definición del modo de operación (replicada desde UsuariosPage)
 export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
@@ -88,6 +92,9 @@ export interface Props {
   method: RequestMethod; // MODO DE OPERACIÓN
   isSubmitting?: boolean;
   isAdmin?: boolean; // Nuevo parámetro para determinar si el usuario es admin
+  /** Tras registrar usuario: forzar pestaña Empresas y al menos una relación antes de cerrar el modal. */
+  awaitingEmpresaRelation?: boolean;
+  onEmpresaRelationSatisfied?: () => void;
 }
 
 const initialFormState: UsuarioFormFields = {
@@ -178,6 +185,9 @@ export interface TouchedFields {
   sectorId?: boolean;
 }
 
+export const LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR =
+  "Debe asociar al menos una empresa desde la solapa 'Empresas del usuario' antes de guardar los cambios.";
+
 export default function UsuarioForm({
   open,
   onClose,
@@ -191,6 +201,8 @@ export default function UsuarioForm({
   method,
   isSubmitting = false,
   isAdmin = false,
+  awaitingEmpresaRelation = false,
+  onEmpresaRelationSatisfied,
 }: Props) {
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -202,6 +214,7 @@ export default function UsuarioForm({
   const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
   const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
   const [fichaTab, setFichaTab] = useState(0);
+  const [empresasRelMeta, setEmpresasRelMeta] = useState<EmpresasRelacionadasMeta | null>(null);
 
   const { user } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
@@ -279,8 +292,38 @@ export default function UsuarioForm({
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
     setShowPassword(false); // Resetear la visibilidad de contraseña
     setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
-    setFichaTab(0);
-  }, [initialData, open, isEditing, isCreating]);
+    setEmpresasRelMeta(null);
+    setFichaTab(awaitingEmpresaRelation ? 1 : 0);
+  }, [initialData, open, isEditing, isCreating, awaitingEmpresaRelation]);
+
+  useEffect(() => {
+    if (!awaitingEmpresaRelation) return;
+    if (!empresasRelMeta || empresasRelMeta.isLoading) return;
+    if (empresasRelMeta.count >= 1) {
+      onEmpresaRelationSatisfied?.();
+    }
+  }, [awaitingEmpresaRelation, empresasRelMeta, onEmpresaRelationSatisfied]);
+
+  const handleEmpresasRelacionadasMetaChange = useCallback((meta: EmpresasRelacionadasMeta) => {
+    setEmpresasRelMeta(meta);
+  }, []);
+
+  const mustBlockModalClose =
+    awaitingEmpresaRelation &&
+    (empresasRelMeta === null || empresasRelMeta.isLoading || empresasRelMeta.count < 1);
+
+  const handleModalCloseAttempt = useCallback(() => {
+    if (isSubmitting) return;
+    if (mustBlockModalClose) {
+      setModalMsgText(
+        'Debe vincular al menos una empresa al usuario en la pestaña "Empresas del Usuario" antes de cerrar el asistente.'
+      );
+      setModalMsgType("warning");
+      setModalMsgOpen(true);
+      return;
+    }
+    onClose();
+  }, [isSubmitting, mustBlockModalClose, onClose]);
 
   const modalTitle = useMemo(() => {
     switch (method) {
@@ -299,7 +342,7 @@ export default function UsuarioForm({
     }
   }, [method, form.nombre]);
 
-  // --- Funciones de Validación ---
+  // --- Funciones de Validación --- 
 
   const validateCuit = (cuit: string): string | undefined => {
     if (!cuit.trim()) return "CUIT es requerido";
@@ -711,7 +754,7 @@ export default function UsuarioForm({
   return (
     <CustomModal
       open={open}
-      onClose={isSubmitting ? () => { } : onClose}
+      onClose={isSubmitting ? () => {} : handleModalCloseAttempt}
       title={modalTitle}
       size={isCreating || Boolean(form.id) ? "large" : "mid"}
     >
@@ -723,6 +766,17 @@ export default function UsuarioForm({
         {errorMsg && (
           <Typography className={styles.errorMessage}>{errorMsg}</Typography>
         )}
+        {awaitingEmpresaRelation && isEditing && (
+          <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}>
+            <Typography
+              component="div"
+              variant="body1"
+              sx={{ fontSize: "1.2rem", lineHeight: 1.5, fontWeight: 600 }}
+            >
+              {LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR}
+            </Typography>
+          </Alert>
+        )}
         <div className={styles.formLayout}>
           <div className={styles.formContent}>
             <div className={hasEmpresasTab ? styles.tabsStableHeight : undefined}>
@@ -733,6 +787,10 @@ export default function UsuarioForm({
                   {
                     label: "Datos del Usuario",
                     value: 0,
+                    disabled: awaitingEmpresaRelation,
+                    tooltip: awaitingEmpresaRelation
+                      ? "Primero vincule al menos una empresa al usuario"
+                      : undefined,
                     content: (
                       <>
             <div className={styles.formSection}>
@@ -1052,12 +1110,24 @@ export default function UsuarioForm({
                           disabled: empresasTabDisabled,
                           tooltip: "Primero registre el usuario",
                           content: (
-                            <UsuarioEmpresasUsuarioTab
-                              open={open}
-                              usuarioId={String(form.id)}
-                              cuitForm={form.cuit}
-                              puedeEditar={isEditing}
-                            />
+                            <>
+                              {awaitingEmpresaRelation && (
+                                <Typography
+                                  variant="body1"
+                                  color="warning.main"
+                                  sx={{ mb: 2, fontSize: "1.2rem", lineHeight: 1.5, fontWeight: 600 }}
+                                >
+                                  {LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR}
+                                </Typography>
+                              )}
+                              <UsuarioEmpresasUsuarioTab
+                                open={open}
+                                usuarioId={String(form.id ?? "")}
+                                cuitForm={form.cuit}
+                                puedeEditar={isEditing}
+                                onEmpresasRelacionadasMetaChange={handleEmpresasRelacionadasMetaChange}
+                              />
+                            </>
                           ),
                         },
                       ]
@@ -1070,7 +1140,7 @@ export default function UsuarioForm({
               {!isViewing && (
                 <CustomButton
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || (isEditing && mustBlockModalClose)}
                   style={{
                     opacity: isSubmitting ? 0.7 : 1,
                     cursor: isSubmitting ? 'not-allowed' : 'pointer'
@@ -1096,7 +1166,7 @@ export default function UsuarioForm({
               )}
 
               <CustomButton
-                onClick={onClose}
+                onClick={handleModalCloseAttempt}
                 color="secondary"
                 disabled={isSubmitting}
                 style={{
@@ -1119,6 +1189,10 @@ export default function UsuarioForm({
                   <li>La contraseña temporal deberá ser cambiada</li>
                   <li>Posteriormente se podrán configurar los permisos</li>
                   <li>Los campos marcados con * son obligatorios</li>
+                  <li>
+                    Tras registrar, use la solapa &quot;Empresas del Usuario&quot;: debe asociar al menos una
+                    empresa antes de guardar cambios o cerrar el asistente.
+                  </li>
                 </ul>
               </div>
 

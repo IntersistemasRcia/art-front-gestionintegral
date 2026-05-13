@@ -16,6 +16,8 @@ interface CustomModalMessageProps {
   type: MessageType;
   onClose: () => void;
   title?: string;
+  /** Texto adicional debajo del mensaje principal (p. ej. pasos posteriores a un alta). */
+  secondaryMessage?: string;
 }
 
 const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
@@ -24,6 +26,7 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
   type,
   onClose,
   title,
+  secondaryMessage,
 }) => {
 
   // Definir el ícono y la clase CSS basados en el tipo de mensaje
@@ -81,6 +84,15 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
         <Typography variant="body1" className={styles.messageText}>
           {message}
         </Typography>
+        {secondaryMessage ? (
+          <Typography
+            variant="body1"
+            component="p"
+            className={styles.secondaryMessage}
+          >
+            {secondaryMessage}
+          </Typography>
+        ) : null}
       </DialogContent>
       
       <DialogActions>
