@@ -388,13 +388,42 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     });
   }, [cuil, filas]);
 
+  // Verificar si el CUIL ya existe como Expuesto (en alguna fila con exposicion > 0)
+  const cuilExisteComoExpuesto = React.useMemo(() => {
+    const cuilNum = normalizarCuil(cuil);
+    if (!cuilNum) return false;
+    return filas.some((f) => {
+      const cuilFila = normalizarCuil(f.CUIL);
+      const exposicionFila = Number(f.Exposicion || 0);
+      return cuilFila === cuilNum && exposicionFila > 0;
+    });
+  }, [cuil, filas]);
+
+  // Verificar si el CUIL intenta cargarse como Sin Exposición pero ya existe como Expuesto
+  const cuilExpuestoIntentaSinExposicion = React.useMemo(() => {
+    if (!cuilExisteComoExpuesto) return false;
+    return Number(exposicion || 0) === 0;
+  }, [cuilExisteComoExpuesto, exposicion]);
+
+  // Verificar si el CUIL intenta cargarse como Expuesto pero ya existe como Sin Exposición
+  const cuilSinExposicionIntentaExpuesto = React.useMemo(() => {
+    if (!cuilExisteConExposicionCero) return false;
+    return Number(exposicion || 0) > 0;
+  }, [cuilExisteConExposicionCero, exposicion]);
+
   const puedeCargarTrabajador = React.useMemo(() => {
 
     if (!cantidadesCompletas || !trabajadorCompleto) return false;
 
     if (totalTrabajadoresRequeridos <= 0) return false;
 
-    // Si el CUIL ya existe con exposición = 0, no se puede volver a cargar
+    // Si el CUIL ya existe como Sin Exposición y se intenta cargar como Expuesto, bloquear
+    if (cuilSinExposicionIntentaExpuesto) return false;
+
+    // Si el CUIL ya existe como Expuesto y se intenta cargar como Sin Exposición, bloquear
+    if (cuilExpuestoIntentaSinExposicion) return false;
+
+    // Si el CUIL ya existe con exposición = 0, no se puede volver a cargar (duplicado sin exposición)
     if (cuilExisteConExposicionCero) return false;
 
     // Si no se alcanzó el límite, puede cargar cualquier CUIL (nuevo o existente, excepto los que ya tienen exposición 0)
@@ -410,6 +439,8 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     trabajadoresCargados,
     esCuilRepetido,
     cuilExisteConExposicionCero,
+    cuilSinExposicionIntentaExpuesto,
+    cuilExpuestoIntentaSinExposicion,
   ]);
 
 
@@ -799,6 +830,7 @@ React.useEffect(() => {
 
     const cuilNum = normalizarCuil(cuil);
     const yaExisteCuil = filas.some((f) => normalizarCuil(f.CUIL) === cuilNum);
+    const nuevaExposicion = Number(exposicion || 0);
 
     // Verificar si el CUIL ya existe con exposición = 0
     const existeConExposicionCero = filas.some((f) => {
@@ -807,11 +839,41 @@ React.useEffect(() => {
       return cuilFila === cuilNum && exposicionFila === 0;
     });
 
-    // Si el trabajador ya existe con exposición = 0, no se puede volver a cargar
-    if (existeConExposicionCero) {
+    // Verificar si el CUIL ya existe como Expuesto (exposición > 0)
+    const existeComoExpuesto = filas.some((f) => {
+      const cuilFila = normalizarCuil(f.CUIL);
+      const exposicionFila = Number(f.Exposicion || 0);
+      return cuilFila === cuilNum && exposicionFila > 0;
+    });
+
+    // Si el CUIL ya existe como Expuesto y se intenta cargar como Sin Exposición, bloquear
+    if (existeComoExpuesto && nuevaExposicion === 0) {
       setModalMessageType('error');
       setModalMessageTitle('CUIL en uso');
-      setModalMessageText(`El cuil ${normalizarCuil(cuil)} ya fue cargado como trabajador no expuesto`);
+      setModalMessageText('El CUIL ingresado ya fue cargado como trabajador Expuesto y no puede registrarse como Sin Exposición dentro del mismo formulario.');
+      setModalMessageOpen(true);
+      setCuil('');
+      setNombre('');
+      setSector('');
+      setIngreso('');
+      setFechaInicio('');
+      setExposicion('0');
+      setFechaFinExposicion('');
+      setUltimoExamenMedico('');
+      setCodigoAgente('');
+      setErroresCampos({
+        cuil: '', nombre: '', sector: '', ingreso: '', fechaInicio: '', fechaFinExposicion: '', exposicion: '', ultimoExamenMedico: '', codigoAgente: ''
+      });
+      setModoEdicion(false);
+      setEditandoIndex(-1);
+      return;
+    }
+
+    // Si el trabajador ya existe con exposición = 0 y se intenta cargar como expuesto, bloquear
+    if (existeConExposicionCero && nuevaExposicion > 0) {
+      setModalMessageType('error');
+      setModalMessageTitle('CUIL en uso');
+      setModalMessageText('El CUIL ingresado ya fue cargado como trabajador Sin Exposición y no puede registrarse como Expuesto dentro del mismo formulario.');
       setModalMessageOpen(true);
       // Reiniciar todos los campos del formulario según la solicitud
       setCuil('');
@@ -933,6 +995,25 @@ React.useEffect(() => {
     const cuilEditando = trabajadorEditando ? normalizarCuil(trabajadorEditando.CUIL) : null;
     const cuilCambio = cuilNum !== cuilEditando;
     const exposicionActual = Number(exposicion || 0);
+    const exposicionOriginal = Number(trabajadorEditando?.Exposicion || 0);
+
+    // Si se intenta cambiar un trabajador Sin Exposición a Expuesto, bloquear
+    if (!cuilCambio && exposicionOriginal === 0 && exposicionActual > 0) {
+      setModalMessageType('error');
+      setModalMessageTitle('Cambio no permitido');
+      setModalMessageText('El CUIL ingresado ya fue cargado como trabajador Sin Exposición y no puede registrarse como Expuesto dentro del mismo formulario.');
+      setModalMessageOpen(true);
+      return;
+    }
+
+    // Si se intenta cambiar un trabajador Expuesto a Sin Exposición, bloquear
+    if (!cuilCambio && exposicionOriginal > 0 && exposicionActual === 0) {
+      setModalMessageType('error');
+      setModalMessageTitle('Cambio no permitido');
+      setModalMessageText('El CUIL ingresado ya fue cargado como trabajador Expuesto y no puede registrarse como Sin Exposición dentro del mismo formulario.');
+      setModalMessageOpen(true);
+      return;
+    }
 
     // Verificar si el CUIL ya existe con exposición = 0 (excluyendo el trabajador que estamos editando)
     const existeConExposicionCero = filas.some((f, idx) => {
@@ -942,11 +1023,28 @@ React.useEffect(() => {
       return cuilFila === cuilNum && exposicionFila === 0;
     });
 
+    // Verificar si el CUIL ya existe como Expuesto (excluyendo el trabajador que estamos editando)
+    const existeComoExpuesto = filas.some((f, idx) => {
+      if (idx === editandoIndex) return false;
+      const cuilFila = normalizarCuil(f.CUIL);
+      const exposicionFila = Number(f.Exposicion || 0);
+      return cuilFila === cuilNum && exposicionFila > 0;
+    });
+
     // Si estamos intentando cambiar a un CUIL que ya tiene exposición = 0, bloquear
-    if (existeConExposicionCero) {
+    if (existeComoExpuesto && exposicionActual === 0) {
       setModalMessageType('error');
       setModalMessageTitle('CUIL en uso');
-      setModalMessageText(`El cuil ${normalizarCuil(cuil)} ya fue cargado como trabajador no expuesto`);
+      setModalMessageText('El CUIL ingresado ya fue cargado como trabajador Expuesto y no puede registrarse como Sin Exposición dentro del mismo formulario.');
+      setModalMessageOpen(true);
+      return;
+    }
+
+    // Si se intenta editar como Expuesto un CUIL que ya existe como Sin Exposición, bloquear
+    if (existeConExposicionCero && exposicionActual > 0) {
+      setModalMessageType('error');
+      setModalMessageTitle('CUIL en uso');
+      setModalMessageText('El CUIL ingresado ya fue cargado como trabajador Sin Exposición y no puede registrarse como Expuesto dentro del mismo formulario.');
       setModalMessageOpen(true);
       // Reiniciar campos al intentar editar hacia un CUIL no expuesto ya existente
       setCuil('');

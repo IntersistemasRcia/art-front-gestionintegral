@@ -12,7 +12,7 @@ import type { FormularioVm, TipoFormulario } from "@/app/inicio/empleador/formul
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores, ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
 import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador, ParametersComercializadoresAsociados } from "@/app/inicio/comercializador/polizas/types/poliza";
 import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById, SRTComercializadoresAsociadosPostRequest, SRTComercializadoresAsociadosPostResponse, SRTComercializadoresAsociadosPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
-import { ParametersEmpleadorPagosComercializador, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
+import { ParametersEmpleadorPagosComercializador, ParametersComercializadorPeriodoPago, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
 import { CoberturaPost, CoberturaPostResponse, ParametersCobertura } from "@/app/inicio/empleador/cobertura/types/cobertura";
 import { ARCAparams, ARCAApiResponse } from "@/app/inicio/usuarios/interfaces/ARCA";
 import { EmpresaParamsID } from "@/app/inicio/usuarios/types/empresa";
@@ -83,6 +83,8 @@ export type PresentacionDTO = PresentacionBaseDTO & {
   interno: number,
   idMotivo?: number,
   presentacionFecha?: string,
+  empleadorCuit?: number,
+  empleadorRazonSocial?: string,
 }
 export type EmpresaTercerizadaBaseDTO = {
   idEstablecimientoEmpresa?: number;
@@ -785,6 +787,8 @@ function mapSvccPresentacionApiRecordToDTO(row: Record<string, unknown>): Presen
     observaciones: obs != null && obs !== '' ? String(obs) : undefined,
     presentacionFecha:
       pf != null && pf !== '' && String(pf) !== 'null' ? String(pf) : undefined,
+    empleadorCuit: row.empleadorCuit != null ? Number(row.empleadorCuit) : undefined,
+    empleadorRazonSocial: row.empleadorRazonSocial != null ? String(row.empleadorRazonSocial) : undefined,
   };
 }
 
@@ -2738,6 +2742,31 @@ export class ArtAPIClass extends ExternalAPI {
   //#endregion SVCC/Trabajador - Delete
   //#endregion SVCC/Trabajador
   //#endregion SVCC
+
+
+    //#region Comercializador Periodo Pago
+  readonly getComercializadorPeriodoPagoURL = (params: ParametersComercializadorPeriodoPago = {}) => {
+    return this.getURL({
+      path: "/api/ComercializadoresPeriodosPagos",
+      search: toURLSearch(params),
+    }).toString();
+  };
+  
+  getComercializadorPeriodoPago = async (params: ParametersComercializadorPeriodoPago = {}) =>
+    tokenizable.get(
+      this.getComercializadorPeriodoPagoURL(params),
+    ).then(({ data }) => data);
+
+  useGetComercializadorPeriodoPago = (params: ParametersComercializadorPeriodoPago = {}) => useSWR(
+    [this.getComercializadorPeriodoPagoURL(params), token.getToken()],
+    () => this.getComercializadorPeriodoPago(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+  //#endregion
+
 
 }
 

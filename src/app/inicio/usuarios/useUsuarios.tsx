@@ -23,6 +23,11 @@ export type UseUsuariosListFilter = {
   /** Página actual (1-based), igual que en el body del POST. */
   pageIndex?: number;
   pageSize?: number;
+  cuit?: string;
+  nombre?: string;
+  email?: string;
+  rol?: string;
+  estado?: string;
 };
 
 function mapUsuarioEmpresasLogueadoItemToRow(
@@ -62,6 +67,11 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
       ? {
           pageIndex: listFilter!.pageIndex ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX,
           pageSize: listFilter!.pageSize ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+          cuit: listFilter!.cuit || undefined,
+          nombre: listFilter!.nombre || undefined,
+          email: listFilter!.email || undefined,
+          rol: listFilter!.rol || undefined,
+          estado: listFilter!.estado || undefined,
         }
       : null;
 
@@ -84,10 +94,13 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
   const postBody = quierePostListadoUsuariosEmpresa
     ? {
         empresasId: listFilter!.porEmpresaIds,
-        pageIndex:
-          listFilter!.pageIndex ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX,
-        pageSize:
-          listFilter!.pageSize ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+        pageIndex: listFilter!.pageIndex ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_INDEX,
+        pageSize: listFilter!.pageSize ?? USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+        cuit: listFilter!.cuit || undefined,
+        nombre: listFilter!.nombre || undefined,
+        email: listFilter!.email || undefined,
+        rol: listFilter!.rol || undefined,
+        estado: listFilter!.estado || undefined,
       }
     : null;
 

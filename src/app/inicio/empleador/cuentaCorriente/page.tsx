@@ -260,6 +260,7 @@ function CuentaCorrientePage() {
 
     const computedData = useMemo(() => {
         const rows = Array.isArray(sortedData) ? [...sortedData] : [];
+        const poliza = polizaRawData as { cuit?: number; empleador_Denominacion?: string } | undefined;
 
         // Ordenamos por periodo ascendente (antiguo -> reciente) para acumular correctamente
         rows.sort((a: any, b: any) => String(a.periodo).localeCompare(String(b.periodo)));
@@ -277,11 +278,13 @@ function CuentaCorrientePage() {
 
             return {
                 ...r,
+                cuit: r.cuit ?? poliza?.cuit,
+                empleador_Denominacion: r.empleador_Denominacion ?? poliza?.empleador_Denominacion,
                 saldoMensual,
                 saldoAcumulado,
             };
         });
-    }, [sortedData]);
+    }, [sortedData, polizaRawData]);
     
     // 1. CONTROL DE LA PESTAÑA: Usamos useState para el valor numérico
     // Iniciamos con 0 si queremos 'Estado de Cuenta', o 1 si queremos 'Últimas DDJJ'
@@ -314,6 +317,8 @@ function CuentaCorrientePage() {
     }
 
     const columns: ColumnDef<CuentaCorrienteRegistro>[] = useMemo(() => [
+        { header: 'CUIT', accessorKey: 'cuit', cell: info => Formato.CUIP(info.getValue<number>()), meta: { align: 'center'} },
+        { header: 'Razón Social', accessorKey: 'empleador_Denominacion', meta: { align: 'center'} },
         { id: 'periodoCobertura', header: () => <>Período<br />Cobertura</>, accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(sumarleUnMesAlPeriodo(info.getValue() as any) as any,"MM-YYYY"), meta: { align: 'center'} }, //DEBO RESTAR UN MES AL VALOR
         { id: 'periodoDDJJ', header: () => <>Período<br />DDJJ</>, accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue() as any,"MM-YYYY"), meta: { align: 'center'} },
         { header: () => <>Fecha<br />Pres.</>, accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue() as any), meta: { align: 'center'} },
@@ -341,6 +346,8 @@ function CuentaCorrientePage() {
     ], []);
 
     const columnsDDJJ: ColumnDef<DDJJRegistro>[] = useMemo(() => [
+        { header: 'CUIT', accessorKey: 'cuit', cell: info => Formato.CUIP(info.getValue<number>()), meta: { align: 'center'} },
+        { header: 'Razón Social', accessorKey: 'empleador_Denominacion', meta: { align: 'center'} },
         { header: 'Período DDJJ', accessorKey: 'periodo', cell: (info: any) => Formato.Fecha(info.getValue() as any,"MM-YYYY"), meta: { align: 'center'} },
         { header: 'Presentación', accessorKey: 'presentacion', cell: (info: any) => Formato.Fecha(info.getValue() as any), meta: { align: 'center'} },
         { header: 'Tipo', accessorKey: 'origenDDJJ', meta: { align: 'center'} },

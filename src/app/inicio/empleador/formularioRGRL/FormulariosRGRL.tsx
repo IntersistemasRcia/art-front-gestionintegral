@@ -803,19 +803,56 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   };
 
   //#endregion table-and-handlers
+  const [exportingExcel, setExportingExcel] = useState(false);
+
   const handleExportExcel = async () => {
-    const columns: Record<string, TableColumn> = {
-
-
-      CUIT: { header: 'CUIT', key: 'CUIT' },
-      RazonSocial: { header: 'Razón Social', key: 'RazonSocial' },
-      Establecimiento: { header: 'Establecimiento', key: 'Establecimiento' },
-      Formulario: { header: 'Formulario', key: 'Formulario' },
-      Estado: { header: 'Estado', key: 'Estado' },
-      FechaHoraCreacion: { header: 'Fecha Hora Creación', key: 'FechaHoraCreacion' },
-      FechaHoraConfirmado: { header: 'Fecha Hora Confirmado', key: 'FechaHoraConfirmado' },
-    };
-    await saveTable(columns, formulariosRGRL, 'FormulariosRGRL.xlsx', { format: 'xlsx', sheet: { name: 'Formularios RGRL' } });
+    if (!canFetchFormularios) return;
+    try {
+      setExportingExcel(true);
+      // Primera consulta para obtener el total de registros
+      const countResponse = await ArtAPI.getFormulariosRGRL({
+        empresasId: empresaIdsFiltro,
+        PageIndex: 1,
+        PageSize: 1,
+      });
+      const totalCount = countResponse.count ?? 0;
+      if (totalCount === 0) {
+        await saveTable(
+          {
+            CUIT: { header: 'CUIT', key: 'CUIT' },
+            RazonSocial: { header: 'Razón Social', key: 'RazonSocial' },
+            Establecimiento: { header: 'Establecimiento', key: 'Establecimiento' },
+            Formulario: { header: 'Formulario', key: 'Formulario' },
+            Estado: { header: 'Estado', key: 'Estado' },
+            FechaHoraCreacion: { header: 'Fecha Hora Creación', key: 'FechaHoraCreacion' },
+            FechaHoraConfirmado: { header: 'Fecha Hora Confirmado', key: 'FechaHoraConfirmado' },
+          },
+          [],
+          'FormulariosRGRL.xlsx',
+          { format: 'xlsx', sheet: { name: 'Formularios RGRL' } }
+        );
+        return;
+      }
+      // Segunda consulta trayendo todos los registros sin paginación
+      const allResponse = await ArtAPI.getFormulariosRGRL({
+        empresasId: empresaIdsFiltro,
+        PageIndex: 1,
+        PageSize: totalCount,
+      });
+      const allData = (allResponse.data ?? []).map(mapApiToUi);
+      const columns: Record<string, TableColumn> = {
+        CUIT: { header: 'CUIT', key: 'CUIT' },
+        RazonSocial: { header: 'Razón Social', key: 'RazonSocial' },
+        Establecimiento: { header: 'Establecimiento', key: 'Establecimiento' },
+        Formulario: { header: 'Formulario', key: 'Formulario' },
+        Estado: { header: 'Estado', key: 'Estado' },
+        FechaHoraCreacion: { header: 'Fecha Hora Creación', key: 'FechaHoraCreacion' },
+        FechaHoraConfirmado: { header: 'Fecha Hora Confirmado', key: 'FechaHoraConfirmado' },
+      };
+      await saveTable(columns, allData, 'FormulariosRGRL.xlsx', { format: 'xlsx', sheet: { name: 'Formularios RGRL' } });
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   if (loading) {
@@ -867,7 +904,9 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
               Generar Formulario
             </CustomButton>
 
-            <CustomButton onClick={handleExportExcel}>Exportar a Excel</CustomButton>
+            <CustomButton onClick={handleExportExcel} disabled={exportingExcel}>
+              {exportingExcel ? 'Exportando...' : 'Exportar a Excel'}
+            </CustomButton>
           </div>
 
           {/* Tabla principal: resultados de la búsqueda */}
