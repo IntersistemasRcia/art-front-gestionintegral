@@ -215,23 +215,12 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
   };
 
   const usuarioUpdate = async (usuarioId: string, formData: UsuarioUpdatePayload) => {
-    // Obtener email previo para comparar después del update
     const existing = usuarios.find((u) => String(u.id) === String(usuarioId));
     const previousEmail = existing?.email;
 
     try {
-      // Usa el fetcher importado para la petición POST, especificando los tipos genéricos
-      // await fetcher("UsuarioAPI", "registrar", { data: formData });
       await update(usuarioId, formData);
-      // Con SWR, usa mutate para revalidar automáticamente los datos.
       await mutateUsuarios();
-
-      // Si cambió el email, reenviar correo de activación con el nuevo email
-      if (formData?.email && formData.email !== previousEmail) {
-        await reenviarCorreo(String(formData.email));
-      }
-
-      return { success: true };
     } catch (err) {
       const error =
         err instanceof AxiosError
@@ -242,6 +231,20 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
         error: error.response?.data?.Mensaje ?? "Ocurrió un error al guardar el usuario.",
       };
     }
+
+    // Si cambió el email, reenviar correo de activación con el nuevo email
+    if (formData?.email && formData.email !== previousEmail) {
+      try {
+        await reenviarCorreo(String(formData.email));
+      } catch {
+        return {
+          success: false,
+          error: "No fue posible enviar el correo de verificación. Verifique el email ingresado.",
+        };
+      }
+    }
+
+    return { success: true };
   };
 
   const actualizarPermisosUsuario = async (
