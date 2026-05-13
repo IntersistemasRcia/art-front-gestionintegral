@@ -4,11 +4,13 @@ import { Grid, Typography } from "@mui/material";
 import Formato from "@/utils/Formato";
 
 export default function FinalizarHandler() {
-  const { ultima, finaliza } = useSVCCPresentacionContext();
+  const { ultima, finaliza, presentacion } = useSVCCPresentacionContext();
   const isWorking = ultima.isLoading || finaliza.isMutating;
   const presentacionFecha = ultima.data?.presentacionFecha;
+  const presentacionId = presentacion.selected?.interno;
   const disabled = isWorking
-    || (ultima?.data?.interno == null || presentacionFecha != null);
+    || (ultima?.data?.interno == null || presentacionFecha != null)
+    || (presentacionId == null || presentacionId <= 0);
     // ToDo: Revisar si se completaron todos los datos requeridos
 
   return (
@@ -18,7 +20,10 @@ export default function FinalizarHandler() {
           variant="contained"
           color="primary"
           size="large"
-          onClick={() => finaliza.trigger({ interno: ultima.data!.interno, ...ultima.data })}
+          onClick={() => {
+            if (presentacionId == null || presentacionId <= 0) return;
+            void finaliza.trigger({ id: presentacionId, observaciones: '' });
+          }}
           loading={isWorking}
           disabled={disabled}
         >
