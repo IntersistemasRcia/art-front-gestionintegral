@@ -114,6 +114,17 @@ const mapApiToUi = (r: ApiFormularioRGRL): FormularioRGRL => ({
   FechaSRTRaw: r.fechaSRT ?? null,
 });
 
+const soloDigitosCuit = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+
+/** `empresaId` en `useEmpresasStore` que coincide con el CUIT de la fila del listado RGRL. */
+function empresaIdDesdeStorePorCuit(empresasList: Empresa[], cuitFila: unknown): number | undefined {
+  const digitosFila = soloDigitosCuit(cuitFila);
+  if (!digitosFila) return undefined;
+  const found = empresasList.find((e) => soloDigitosCuit(e.cuit) === digitosFila);
+  const id = found?.empresaId;
+  return typeof id === 'number' && Number.isFinite(id) && id > 0 ? id : undefined;
+}
+
 const CargarEstablecimientoPorId = async (id: number): Promise<ApiEstablecimientoEmpresa | null> => {
   if (!id) return null;
   try {
@@ -489,6 +500,15 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     return [empresaSeleccionada.empresaId];
   }, [empresaSeleccionada, isAdmin, sessionEmpresaIds]);
 
+  /** Para GetBySpecs en el modal Generar: `empresaId` por CUIT del combo vs `empresas` del store (misma lógica que edición). */
+  const empresasIdGetBySpecsModalGenerar = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return empresaIdsFiltro;
+    const desdeStore = empresaIdDesdeStorePorCuit(empresas, empresaSeleccionada.cuit);
+    if (desdeStore != null) return [desdeStore];
+    return empresaIdsFiltro;
+  }, [empresaSeleccionada, empresas, empresaIdsFiltro]);
+
   const canFetchFormularios = useMemo(() => {
     if (!empresaSeleccionada) return false;
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return true;
@@ -587,7 +607,6 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         header: 'Acciones',
         //@ts-ignore
         cell: ({ row }) => {
-          console.log("row", row)
  const onClick = async (e: any) => {
   e.stopPropagation?.();
   const interno = Number(row.original.InternoFormularioRGRL || 0);
@@ -659,7 +678,10 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
             e.stopPropagation?.();
             const interno = Number(row.original.InternoFormularioRGRL || 0);
             if (!interno) return;
-            router.push(`/inicio/empleador/formularioRGRL/editar?id=${interno}`);
+            const empresaId = empresaIdDesdeStorePorCuit(empresas, row.original.CUIT);
+            const qEmpresa =
+              empresaId != null ? `&empresaId=${encodeURIComponent(String(empresaId))}` : '';
+            router.push(`/inicio/empleador/formularioRGRL/editar?id=${interno}${qEmpresa}`);
           };
 
           const onCopy = (e: any) => {
@@ -713,7 +735,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         enableSorting: false,
       },
     ],
-    [router]
+    [router, empresas]
   );
   // Re-define DataTable con tipado específico para este componente.
   const DataTable = DataTableImport as unknown as React.FC<{
@@ -781,19 +803,56 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   };
 
   //#endregion table-and-handlers
+  const [exportingExcel, setExportingExcel] = useState(false);
+
   const handleExportExcel = async () => {
-    const columns: Record<string, TableColumn> = {
-
-
-      CUIT: { header: 'CUIT', key: 'CUIT' },
-      RazonSocial: { header: 'Razón Social', key: 'RazonSocial' },
-      Establecimiento: { header: 'Establecimiento', key: 'Establecimiento' },
-      Formulario: { header: 'Formulario', key: 'Formulario' },
-      Estado: { header: 'Estado', key: 'Estado' },
-      FechaHoraCreacion: { header: 'Fecha Hora Creación', key: 'FechaHoraCreacion' },
-      FechaHoraConfirmado: { header: 'Fecha Hora Confirmado', key: 'FechaHoraConfirmado' },
-    };
-    await saveTable(columns, formulariosRGRL, 'FormulariosRGRL.xlsx', { format: 'xlsx', sheet: { name: 'Formularios RGRL' } });
+    if (!canFetchFormularios) return;
+    try {
+      setExportingExcel(true);
+      // Primera consulta para obtener el total de registros
+      const countResponse = await ArtAPI.getFormulariosRGRL({
+        empresasId: empresaIdsFiltro,
+        PageIndex: 1,
+        PageSize: 1,
+      });
+      const totalCount = countResponse.count ?? 0;
+      if (totalCount === 0) {
+        await saveTable(
+          {
+            CUIT: { header: 'CUIT', key: 'CUIT' },
+            RazonSocial: { header: 'Razón Social', key: 'RazonSocial' },
+            Establecimiento: { header: 'Establecimiento', key: 'Establecimiento' },
+            Formulario: { header: 'Formulario', key: 'Formulario' },
+            Estado: { header: 'Estado', key: 'Estado' },
+            FechaHoraCreacion: { header: 'Fecha Hora Creación', key: 'FechaHoraCreacion' },
+            FechaHoraConfirmado: { header: 'Fecha Hora Confirmado', key: 'FechaHoraConfirmado' },
+          },
+          [],
+          'FormulariosRGRL.xlsx',
+          { format: 'xlsx', sheet: { name: 'Formularios RGRL' } }
+        );
+        return;
+      }
+      // Segunda consulta trayendo todos los registros sin paginación
+      const allResponse = await ArtAPI.getFormulariosRGRL({
+        empresasId: empresaIdsFiltro,
+        PageIndex: 1,
+        PageSize: totalCount,
+      });
+      const allData = (allResponse.data ?? []).map(mapApiToUi);
+      const columns: Record<string, TableColumn> = {
+        CUIT: { header: 'CUIT', key: 'CUIT' },
+        RazonSocial: { header: 'Razón Social', key: 'RazonSocial' },
+        Establecimiento: { header: 'Establecimiento', key: 'Establecimiento' },
+        Formulario: { header: 'Formulario', key: 'Formulario' },
+        Estado: { header: 'Estado', key: 'Estado' },
+        FechaHoraCreacion: { header: 'Fecha Hora Creación', key: 'FechaHoraCreacion' },
+        FechaHoraConfirmado: { header: 'Fecha Hora Confirmado', key: 'FechaHoraConfirmado' },
+      };
+      await saveTable(columns, allData, 'FormulariosRGRL.xlsx', { format: 'xlsx', sheet: { name: 'Formularios RGRL' } });
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   if (loading) {
@@ -845,7 +904,9 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
               Generar Formulario
             </CustomButton>
 
-            <CustomButton onClick={handleExportExcel}>Exportar a Excel</CustomButton>
+            <CustomButton onClick={handleExportExcel} disabled={exportingExcel}>
+              {exportingExcel ? 'Exportando...' : 'Exportar a Excel'}
+            </CustomButton>
           </div>
 
           {/* Tabla principal: resultados de la búsqueda */}
@@ -1158,7 +1219,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         <GenerarFormularioRGRL
           //Generar
           initialCuit={empresaSeleccionada?.cuit || undefined}
-          empresasIdGetBySpecs={empresaIdsFiltro}
+          empresasIdGetBySpecs={empresasIdGetBySpecsModalGenerar}
           replicaDe={replicaDe}
           onClose={() => setOpenGenerar(false)}
           onDone={async () => {

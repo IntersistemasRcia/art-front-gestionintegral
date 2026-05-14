@@ -20,6 +20,8 @@ import DataTableImport from '@/utils/ui/table/DataTable';
 import ArtAPI, { type ApiFormulariosRGRLParams } from '@/data/artAPI';
 import CabeceraFormulario from './CabeceraFormulario';
 import { useAuth } from '@/data/AuthContext';
+import { useEmpresasStore } from '@/data/empresasStore';
+import type { Empresa } from '@/data/authAPI';
 
 
 import type {
@@ -57,6 +59,18 @@ const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> =
   }));
 };
 
+function soloDigitosCuit(value: unknown): string {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function empresaIdDesdeStorePorCuit(empresasList: Empresa[], cuitValor: unknown): number | undefined {
+  const digitos = soloDigitosCuit(cuitValor);
+  if (!digitos) return undefined;
+  const found = empresasList.find((e) => soloDigitosCuit(e.cuit) === digitos);
+  const id = found?.empresaId;
+  return typeof id === 'number' && Number.isFinite(id) && id > 0 ? id : undefined;
+}
+
 // Componente principal: crea, edita o replica formularios RGRL
 const GenerarFormularioRGRL: React.FC<{
   initialCuit?: number;
@@ -69,17 +83,18 @@ const GenerarFormularioRGRL: React.FC<{
 
   const router = useRouter();
   const { hasTask } = useAuth();
+  const { empresas } = useEmpresasStore();
   const search = useSearchParams();
   // En modal (onDone) se ignoran query params.
   const isModal = Boolean(onDone || onClose);
 
-  const buildGetBySpecsParams = useCallback(
-    (extra: Partial<ApiFormulariosRGRLParams> = {}): ApiFormulariosRGRLParams => ({
-      empresasId: empresasIdGetBySpecs ?? [],
-      ...extra,
-    }),
-    [empresasIdGetBySpecs]
-  );
+  /** Viene del listado RGRL: `empresaId` resuelto por CUIT contra `useEmpresasStore`. */
+  const empresaIdFromEditUrl = useMemo(() => {
+    if (isModal) return undefined;
+    const v = search?.get('empresaId');
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, [search, isModal]);
 
   const cuitFromQuery = useMemo(() => {
     if (isModal) return undefined;
@@ -121,6 +136,45 @@ const GenerarFormularioRGRL: React.FC<{
   const [error, setError] = useState('');
 
   const [cuit, setCuit] = useState<number | undefined>(initialCuit ?? cuitFromQuery);
+
+  const buildGetBySpecsParams = useCallback(
+    (extra: Partial<ApiFormulariosRGRLParams> = {}): ApiFormulariosRGRLParams => {
+      const fromProps = empresasIdGetBySpecs ?? [];
+      const cuitExtraRaw = extra.CUIT;
+      const cuitExtraNum =
+        cuitExtraRaw != null && String(cuitExtraRaw).trim() !== ''
+          ? Number(cuitExtraRaw)
+          : NaN;
+      const cuitParaLookup =
+        Number.isFinite(cuitExtraNum) && cuitExtraNum > 0
+          ? cuitExtraNum
+          : cuit != null && !Number.isNaN(cuit) && cuit > 0
+            ? cuit
+            : typeof initialCuit === 'number' && initialCuit > 0
+              ? initialCuit
+              : undefined;
+
+      const desdeStore =
+        fromProps.length === 0 && cuitParaLookup != null
+          ? empresaIdDesdeStorePorCuit(empresas, cuitParaLookup)
+          : undefined;
+
+      const empresasIdResuelto =
+        fromProps.length > 0
+          ? fromProps
+          : desdeStore != null
+            ? [desdeStore]
+            : empresaIdFromEditUrl != null
+              ? [empresaIdFromEditUrl]
+              : [];
+
+      return {
+        ...extra,
+        empresasId: empresasIdResuelto,
+      };
+    },
+    [empresasIdGetBySpecs, empresaIdFromEditUrl, empresas, cuit, initialCuit]
+  );
   const [razonSocial, setRazonSocial] = useState('');
   const [establecimientos, setEstablecimientos] = useState<Establecimiento[]>([]);
   const [establecimientoSel, setEstablecimientoSel] = useState<number | undefined>(undefined);

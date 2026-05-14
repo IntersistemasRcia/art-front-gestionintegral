@@ -692,7 +692,7 @@ const FormulariosRAR: React.FC = () => {
 
 
   const disableEdita = cuit !== 99999999999 && internoFormularioRAR !== 0 ? false : true;
-  const disableGenera = cuit === 99999999999 ? true : false;
+  const disableGenera = cuit === 99999999999 || !empresaSeleccionada || empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID || !empresaSeleccionada.cuit;
 
   if (loading) return <Spinner />;
 

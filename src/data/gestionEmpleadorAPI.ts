@@ -244,27 +244,6 @@ export class GestionEmpleadorAPIClass extends ExternalAPI {
   };
   //#endregion
 
-  //#region CtaCTe y DDJJ
-  readonly getVEmpleadorDDJJURL = (params: Parameters = {}) => {
-    params.CUIT ??= useAuth().user?.empresaCUIT ?? 0;
-    return this.getURL({ path: "/api/VEmpleadorDDJJ/?Sort=-Periodo&Page=0,1000", search: toURLSearch(params) }).toString();
-  };
-  getVEmpleadorDDJJ = async (params: Parameters = {}) => tokenizable.get(
-    this.getVEmpleadorDDJJURL(params),
-  ).then(({ data }) => data);
-  useGetVEmpleadorDDJJ = (params: Parameters = {}) => useSWR(
-    [this.getVEmpleadorDDJJURL(params), token.getToken()], () => this.getVEmpleadorDDJJ(params),
-    {
-      // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      //revalidateOnMount: false,
-      //dedupingInterval: 1000 * 60 * 60, // 1 hora (ajusta si hace falta) // Tiempo en ms durante el cual SWR deduplica solicitudes iguales (evita re-fetch frecuente)
-      // Si quieres que la clave no dispare fetch hasta que exista token, puedes usar: (token.getToken() ? key : null)
-    }
-  );
-  //#endregion
-
   //#region SiniestrosEmpleador
   readonly getVEmpleadorSiniestrosInstanciasURL = (params: Parameters = {}) => {
     params.CUIT ??= useAuth().user?.empresaCUIT ?? 0;

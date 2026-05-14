@@ -339,10 +339,18 @@ function CuentaCorrienteComercializador() {
         })
     ), [empleadorPagosData, empresasByCuitMap]);
 
+    const periodoAnterior = useMemo(() => {
+        const p = Number(empleadorPagoSelected?.periodo || 0);
+        if (!p) return undefined;
+        const anio = Math.floor(p / 100);
+        const mes = p % 100;
+        return mes === 1 ? (anio - 1) * 100 + 12 : anio * 100 + (mes - 1);
+    }, [empleadorPagoSelected?.periodo]);
+
     const afipTransferParams = useMemo(() => ({
-        Periodo: empleadorPagoSelected?.periodo,
+        Periodo: periodoAnterior,
         CuitContribuyente: empleadorPagoSelected?.cuit != null ? String(empleadorPagoSelected.cuit) : undefined,
-    }), [empleadorPagoSelected]);
+    }), [periodoAnterior, empleadorPagoSelected?.cuit]);
 
     const { data: afipTransferRaw, isLoading: isAfipTransferLoadingRaw } = ArtAPI.useGetAfipTransferenciaURL(afipTransferParams as any);
     const shouldShowAfip = !!(empleadorPagoSelected?.periodo && empleadorPagoSelected?.cuit);
@@ -363,7 +371,7 @@ function CuentaCorrienteComercializador() {
     const afipTransferData = forceEmpty || !shouldShowAfip ? [] : (
         Array.isArray(afipTransferRaw) ? afipTransferRaw : (afipTransferRaw?.data || afipTransferRaw || [])
     ).filter((x: any) =>
-        Number(digits(x?.cuitContribuyente)) === selectedAfipCuit && Number(x?.periodo || 0) === selectedAfipPeriodo
+        Number(digits(x?.cuitContribuyente)) === selectedAfipCuit && Number(x?.periodo || 0) === periodoAnterior
     ).map((x: any) => ({ ...x, origen: origenEmpleador }));
     const isAfipTransferLoading = shouldShowAfip ? isAfipTransferLoadingRaw : false;
 
