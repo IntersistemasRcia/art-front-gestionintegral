@@ -267,7 +267,7 @@ function CuentaCorrientePage() {
 
         let prevSaldoAcumulado = 0;
 
-        return rows.map((r: any) => {
+        const mapped = rows.map((r: any) => {
             const totalPagado = isNaN(parseToNumber(r.totalPagadoCuota)) ? 0 : parseToNumber(r.totalPagadoCuota);
             const totalCuota = isNaN(parseToNumber(r.totalCuota)) ? 0 : parseToNumber(r.totalCuota);
 
@@ -284,6 +284,9 @@ function CuentaCorrientePage() {
                 saldoAcumulado,
             };
         });
+
+        // Invertimos para mostrar el período más reciente primero
+        return mapped.reverse();
     }, [sortedData, polizaRawData]);
     
     // 1. CONTROL DE LA PESTAÑA: Usamos useState para el valor numérico
