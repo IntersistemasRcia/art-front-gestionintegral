@@ -58,6 +58,15 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
     () => ArtAPI.getEmpresaByCUIT({ CUIT: cuitEmpresa })
   );
 
+  const cp = empresaByCuit?.codLocalidadPostal;
+  const { data: localidadesData } = useSWR(
+    cp ? ['localidadesByCP', cp] : null,
+    () => ArtAPI.getLocalidadesbyCP({ CodPostal: cp })
+  );
+  const litProvincia = Array.isArray(localidadesData) && localidadesData.length > 0
+    ? localidadesData[0].litProvincia
+    : '';
+
   // Acepta poliza como array o como objeto
   const p = Array.isArray(poliza) ? poliza[0] : poliza ?? {};
 
@@ -71,6 +80,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
     }
 
     if (!empresaByCuit) return;
+    if (cp && !localidadesData) return;
 
     if (generatedRef.current) return;
     generatedRef.current = true;
@@ -163,7 +173,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
 
     generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, empresaByCuit]);
+  }, [open, empresaByCuit, localidadesData]);
 
   return (
     // off-screen wrapper: dos bloques separados para forzar que la tabla quede en bloques distintos
@@ -198,10 +208,10 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
               </div>
             </div>
 
-            {clausula && (
-              <>
-                <div className={styles.pdfSection}>El N° del contrato es el <strong>{p.numero ?? ''}</strong>.</div>
+            <div className={styles.pdfSection}>El N° del contrato es el: <strong>{p.numero ?? ''}</strong>.</div>
 
+          {clausula && (
+              <>
                 <div className={styles.pdfSection} style={{ lineHeight: 1.4 }}>
                   Consta por la presente que <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>, renuncia en forma expresa a reclamar o iniciar toda acción de
                   repetición o de regreso contra: {destinatarioEnClausula}, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley
@@ -229,7 +239,6 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
             <div className={styles.pdfSection}>
                 Sin otro particular, saludo a Ud. muy atentamente.
             </div>
-            <br/>
             <div className={styles.signatureSection}>
               <div className={styles.signatureLine}>
                 <Image src="/images/FirmaFernanda.png" alt="Firma de Fernanda Lassalle" width={170} height={200} priority />
@@ -240,6 +249,9 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
                 Gerente de Administración
               </p>
             </div>
+            {nominasSeleccionadas && nominasSeleccionadas.length > 0 && (
+              <div className={styles.pdfSection}>Se adjunta Nómina de Personal.</div>
+            )}
           </div>
         </div>
       </div>
@@ -256,7 +268,12 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
             <div className={styles.pdfLogo}>
               <Image src="/icons/LogoTexto.svg" alt="Logo" width={130} height={130} />
             </div>
-            <div className={styles.pdfLugarFecha}>Ciudad Autónoma de Buenos Aires, {dia ?? ''}</div>
+            <div style={{ textAlign: 'right', fontSize: '0.75rem' }}>
+              <div>Ciudad Autónoma de Buenos Aires,</div>
+              <div>Fecha: {dia ?? ''}</div>
+              <div>Hora: {hora ?? ''}</div>
+              <div>Página: {pageIndex + 2}</div>
+            </div>
           </div>
 
           <div className={styles.pdfSecondPage}>
@@ -265,13 +282,9 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
             <div className={styles.pdfPolicyInfo}>
               <div>Razón Social: {empresaByCuit?.razonSocial ?? ''}</div>
               <div>CUIT: {empresaByCuit?.cuit ?? ''}</div>
-              <div>
-                Calle: {empresaByCuit?.domicilioCalle ?? ''}
-              </div>
-              <div>
-                CP: {empresaByCuit?.codLocalidadPostal ?? ''}
-              </div>
-              <div>Nro.Contrato: {empresaByCuit?.contratoNro ?? ''}</div>
+              <div>Calle: {[empresaByCuit?.domicilioCalle, empresaByCuit?.domicilioNro].filter(Boolean).join(' ')}</div>
+              <div>Localidad: {litProvincia} - CP: {empresaByCuit?.codLocalidadPostal ?? ''}</div>
+              <div>Nro.Contrato: {p.numero ?? ''}</div>
               <div>Ciiu Rev. 4: {empresaByCuit?.ciiu ?? ''}</div>
             </div>
 
