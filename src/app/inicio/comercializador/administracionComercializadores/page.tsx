@@ -18,6 +18,16 @@ function digits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
+function toISOFechaNacimiento(value: string): string {
+  if (!value) return '';
+  // Soporta DD/MM/YYYY (viene de ARCA) y YYYY-MM-DD (input type="date")
+  const ddmmyyyy = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmmyyyy) {
+    return new Date(`${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`).toISOString();
+  }
+  return new Date(value).toISOString();
+}
+
 function estadoFromDeletedAt(v: any) {
   return v == null || String(v).trim() === '' ? 'Activo' : 'Inactivo';
 }
@@ -875,6 +885,8 @@ export default function AdminUserPage() {
               const cuilNumber = Number(cleanCuit || 0);
               const codPostalNumber = Number((data as any)?.codPostal ?? 0);
               const gOrganizadorInternoForPost = selectedGrupoInterno ?? gOrganizadorInterno ?? 0;
+              const fechaNacimientoRaw = String((data as any)?.fechaNacimiento ?? '');
+              const fechaNacimientoIso = toISOFechaNacimiento(fechaNacimientoRaw);
 
               try {
                 await triggerPostOrganizador({
@@ -884,7 +896,7 @@ export default function AdminUserPage() {
                   email: String((data as any)?.email ?? ''),
                   telefono: String((data as any)?.phoneNumber ?? ''),
                   razonSocial: String((data as any)?.nombre ?? ''),
-                  fechaNacimiento: String((data as any)?.fechaNacimiento ?? ''),
+                  fechaNacimiento: fechaNacimientoIso,
                   domocilioCalle: String((data as any)?.domicilioCalle ?? ''),
                   domicilioNumero: String((data as any)?.domicilioNro ?? ''),
                   domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
@@ -907,6 +919,7 @@ export default function AdminUserPage() {
               const cleanCuit = digits((data as any)?.cuit ?? '');
               const cuilNumber = Number(cleanCuit || 0);
               const codPostalNumber = Number((data as any)?.codPostal ?? 0);
+              const fechaNacimientoIsoG = toISOFechaNacimiento(String((data as any)?.fechaNacimiento ?? ''));
 
               const payload: ComercializadorGOrganizadoresPostRequest = {
                 descripcion: String((data as any)?.nombre ?? ''),
@@ -914,7 +927,7 @@ export default function AdminUserPage() {
                 email: String((data as any)?.email ?? ''),
                 telefono: String((data as any)?.phoneNumber ?? ''),
                 razonSocial: String((data as any)?.nombre ?? ''),
-                fechaNacimiento: String((data as any)?.fechaNacimiento ?? ''),
+                fechaNacimiento: fechaNacimientoIsoG,
                 domocilioCalle: String((data as any)?.domicilioCalle ?? ''),
                 domicilioNumero: String((data as any)?.domicilioNro ?? ''),
                 domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
