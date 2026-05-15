@@ -22,6 +22,7 @@
 .wrapper thead th {
   background: #92bd68;
   color: #ffffff;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   text-align: center;
@@ -50,7 +51,7 @@
 }
 
 .wrapper tbody tr:nth-child(even) td {
-  background: #d7e9c6;
+  background: #f7fbf4;
 }
 
 .paginationContainer {
@@ -73,4 +74,29 @@
 
 .paginationContainer button:disabled {
   color: var(--gris) !important;
+}
+
+.tableTitle {
+  text-align: center;
+  font-weight: 700;
+  margin: 6px 0;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.groupHeader {
+  text-align: center !important;
+  font-weight: 700 !important;
+  padding: 8px 0 !important;
+  background: #d7e9c6 !important;
+  color: #000000 !important;
+  letter-spacing: 0.4px;
+}
+
+.wrapper tbody tr.rowOdd td {
+  background: #ffffff;
+}
+
+.wrapper tbody tr.rowEven td {
+  background: #f7fbf4;
 }
