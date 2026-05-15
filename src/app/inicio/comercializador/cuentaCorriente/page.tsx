@@ -172,7 +172,7 @@ function CuentaCorrienteComercializador() {
     const periodoPagoParams = useMemo((): ParametersComercializadorPeriodoPago => ({
         ComercializadoresInternos: comercializadorInterno,
         OrderBy: '-Periodo',
-        PageIndex: PageIndex + 1,
+        PageIndex: PageIndex,
         PageSize,
     }), [comercializadorInterno, PageIndex, PageSize]);
 
@@ -276,7 +276,7 @@ function CuentaCorrienteComercializador() {
     const empleadorPagosParams = useMemo(() => ({
         Periodo: periodoFiltro,
         ComercializadoresInternos: comercializadorValue ? String((comercializadorValue as any)?.interno ?? 0) : comercializadoresInternos,
-        PageIndex: PageIndexDetalle + 1,
+        PageIndex: PageIndexDetalle,
         PageSize: PageSizeDetalle,
     }), [periodoFiltro, comercializadorValue, comercializadoresInternos, PageIndexDetalle, PageSizeDetalle]);
 
