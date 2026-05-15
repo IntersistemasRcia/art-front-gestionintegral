@@ -40,7 +40,7 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
       case 'error':
         return { 
           Icon: ErrorOutlineIcon, 
-          defaultTitle: 'Error' 
+          defaultTitle: 'Ocurrió un inconveniente' 
         };
       case 'warning':
         return { 

@@ -40,7 +40,8 @@ export type ParametersEmpleadorPagosComercializador = {
 export type ParametersAfipTranferencia = {
     Periodo?: number;
     CuitContribuyente?: string;
-    // OrderBy?: string;
+    FechaProceso?: number;
+    OrderBy?: string;
     // PageIndex?: number;
     // PageSize?: number;
 }

@@ -160,6 +160,10 @@ export default function CoberturaPage() {
             return;
         }
 
+        const now = new Date();
+        setDia(now.toLocaleDateString('es-AR'));
+        setHora(now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }));
+
         setIsDownloading(true);
         void (async () => {
             try {
@@ -173,7 +177,7 @@ export default function CoberturaPage() {
                 });
 
                 setAbrirPDF(true);
-            } finally {
+            } catch {
                 setIsDownloading(false);
             }
         })();
@@ -710,7 +714,7 @@ export default function CoberturaPage() {
                 {abrirPDF && presentadoA != "" ? (
                <Cobertura_PDF
                     open={abrirPDF}
-                    handleVentanaImpresion={(open: boolean) => setAbrirPDF(open)}
+                    handleVentanaImpresion={(open: boolean) => { setAbrirPDF(open); setIsDownloading(false); }}
                     presentadoA={presentadoA}
                     poliza={polizaData}                     // pasa tu objeto poliza
                     dia={dia}                           // opcional
