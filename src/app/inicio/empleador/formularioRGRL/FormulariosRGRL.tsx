@@ -2,6 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import DataTableImport from '@/utils/ui/table/DataTable';
+import DataTableDetail from '@/utils/ui/table/DataTableDetail';
+import { type DataTableDetailColumn } from '@/utils/ui/table/types';
 import { saveTable, type TableColumn } from '@/utils/excelUtils';
 import { useRouter } from 'next/navigation';
 
@@ -964,161 +966,94 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
           {/* Paneles de planillas y listas (se muestran cuando activeTab != 'none') */}
           {activeTab !== 'none' && (
-            <div style={{ marginTop: 10 }}>
+            <div className={styles.panelPlanillas}>
               {loadingTab ? (
-                <div style={{ padding: 12, textAlign: 'center' }}>cargando...</div>
+                <div className={styles.panelLoadingTab}>cargando...</div>
               ) : (
                 <>
                   {activeTab === 'planillaA' && (
-                    <>
-                      <div className={styles.tablaTitulo}>PLANILLA A - LISTADO DE SUSTANCIAS Y AGENTES CANCERÍGENOS (Res. SRT 81/2019)</div>
-                      <table className={styles.sheetTable}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 90 }}>Código</th>
-                            <th>Sustancia</th>
-                            <th style={{ width: 80 }}>Sí/No</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {planillaA.map((r, i) => (
-                            <tr key={i}>
-                              <td>{r.Codigo}</td>
-                              <td>{r.Sustancia}</td>
-                              <td>{r.SiNo}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    <DataTableDetail<PlanillaAItem>
+                      title="PLANILLA A - LISTADO DE SUSTANCIAS Y AGENTES CANCERÍGENOS (Res. SRT 81/2019)"
+                      columns={[
+                        { header: 'Código',    width: 90,  render: r => r.Codigo },
+                        { header: 'Sustancia', align: 'left', render: r => r.Sustancia },
+                        { header: 'Sí/No',    width: 80,  render: r => r.SiNo },
+                      ] as DataTableDetailColumn<PlanillaAItem>[]}
+                      rows={planillaA}
+                      rowKey={(_, i) => String(i)}
+                      pageSize={50}
+                    />
                   )}
 
                   {activeTab === 'planillaB' && (
-                    <>
-                      <div className={styles.tablaTitulo}>PLANILLA B - DIFENILOS POLICLORADOS (Res. SRT 497/03)</div>
-                      <table className={styles.sheetTable}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 90 }}>Código</th>
-                            <th>Sustancia</th>
-                            <th style={{ width: 80 }}>Sí/No</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {planillaB.map((r, i) => (
-                            <tr key={i}>
-                              <td>{r.Codigo}</td>
-                              <td>{r.Sustancia}</td>
-                              <td>{r.SiNo}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    <DataTableDetail<PlanillaBItem>
+                      title="PLANILLA B - DIFENILOS POLICLORADOS (Res. SRT 497/03)"
+                      columns={[
+                        { header: 'Código',    width: 90,  render: r => r.Codigo },
+                        { header: 'Sustancia', align: 'left', render: r => r.Sustancia },
+                        { header: 'Sí/No',    width: 80,  render: r => r.SiNo },
+                      ] as DataTableDetailColumn<PlanillaBItem>[]}
+                      rows={planillaB}
+                      rowKey={(_, i) => String(i)}
+                      pageSize={50}
+                    />
                   )}
 
                   {activeTab === 'planillaC' && (
-                    <>
-                      <div className={styles.tablaTitulo}>PLANILLA C - SUSTANCIAS QUÍMICAS A DECLARAR (Res. SRT 743/03)</div>
-                      <table className={styles.sheetTable}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 90 }}>Código</th>
-                            <th>Sustancia</th>
-                            <th style={{ width: 80 }}>Sí/No</th>
-                            <th>Norma Vigente</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {planillaC.map((r, i) => (
-                            <tr key={i}>
-                              <td>{r.Codigo}</td>
-                              <td>{r.Sustancia}</td>
-                              <td>{r.SiNo}</td>
-                              <td>{r.NormaVigente}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    <DataTableDetail<PlanillaCItem>
+                      title="PLANILLA C - SUSTANCIAS QUÍMICAS A DECLARAR (Res. SRT 743/03)"
+                      columns={[
+                        { header: 'Código',        width: 90,  render: r => r.Codigo },
+                        { header: 'Sustancia',     align: 'left', render: r => r.Sustancia },
+                        { header: 'Sí/No',         width: 80,  render: r => r.SiNo },
+                        { header: 'Norma Vigente', align: 'left', render: r => r.NormaVigente },
+                      ] as DataTableDetailColumn<PlanillaCItem>[]}
+                      rows={planillaC}
+                      rowKey={(_, i) => String(i)}
+                      pageSize={50}
+                    />
                   )}
 
                   {activeTab === 'gremios' && (
-                    <>
-                      <h2 style={{ textAlign: 'center' }}>Representación Gremial</h2>
-                      <table className={styles.sheetTable}>
-                        <thead>
-                          <tr>
-                            <th>Nro Legajo del Gremio</th>
-                            <th>Nombre del Gremio</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {gremios.map((g, i) => (
-                            <tr key={i}>
-                              <td>{g.Legajo}</td>
-                              <td>{g.Nombre}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    <DataTableDetail<GremioItem>
+                      title="Representación Gremial"
+                      columns={[
+                        { header: 'Nro Legajo del Gremio', width: 200, render: r => r.Legajo },
+                        { header: 'Nombre del Gremio',     align: 'left', render: r => r.Nombre },
+                      ] as DataTableDetailColumn<GremioItem>[]}
+                      rows={gremios}
+                      rowKey={(_, i) => String(i)}
+                    />
                   )}
 
                   {activeTab === 'contratistas' && (
-                    <>
-                      <h2 style={{ textAlign: 'center' }}>Contratistas</h2>
-                      <table className={styles.sheetTable}>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 160 }}>CUIT</th>
-                            <th>Contratista</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {contratistas.map((c, i) => (
-                            <tr key={i}>
-                              <td>{c.CUIT}</td>
-                              <td>{c.Contratista}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    <DataTableDetail<ContratistaItem>
+                      title="Contratistas"
+                      columns={[
+                        { header: 'CUIT',        width: 160,  render: r => r.CUIT },
+                        { header: 'Contratista', align: 'left', render: r => r.Contratista },
+                      ] as DataTableDetailColumn<ContratistaItem>[]}
+                      rows={contratistas}
+                      rowKey={(_, i) => String(i)}
+                    />
                   )}
 
                   {activeTab === 'responsables' && (
-                    <>
-                      <h2 style={{ textAlign: 'center' }}>Datos Laborales del Profesional o Responsable del Formulario</h2>
-                      <table className={styles.sheetTable}>
-                        <thead>
-                          <tr>
-                            <th>CUIT/CUIL/CUIP</th>
-                            <th>Nombre y apellido</th>
-                            <th>Cargo</th>
-                            <th>Representación</th>
-                            <th>Propio/contratado</th>
-                            <th>Título habilitante</th>
-                            <th>N° matrícula</th>
-                            <th>Entidad que otorgó el título habilitante</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {responsables.map((r, i) => (
-                            <tr key={i}>
-                              <td>{r.CUITCUIL}</td>
-                              <td>{r.NombreApellido}</td>
-                              <td>{r.Cargo}</td>
-                              <td>{r.Representacion}</td>
-                              <td>{r.PropioContratado}</td>
-                              <td>{r.TituloHabilitante}</td>
-                              <td>{r.Matricula}</td>
-                              <td>{r.EntidadOtorgante}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    <DataTableDetail<ResponsableItem>
+                      title="Datos Laborales del Profesional o Responsable del Formulario"
+                      columns={[
+                        { header: 'CUIT/CUIL/CUIP',                  render: r => r.CUITCUIL },
+                        { header: 'Nombre y Apellido',                render: r => r.NombreApellido },
+                        { header: 'Cargo',                            render: r => r.Cargo },
+                        { header: 'Representación',                   render: r => r.Representacion },
+                        { header: 'Propio/Contratado',                render: r => r.PropioContratado },
+                        { header: 'Título Habilitante',               render: r => r.TituloHabilitante },
+                        { header: 'N° Matrícula',                     render: r => r.Matricula },
+                        { header: 'Entidad que otorgó el título',     render: r => r.EntidadOtorgante },
+                      ] as DataTableDetailColumn<ResponsableItem>[]}
+                      rows={responsables}
+                      rowKey={(_, i) => String(i)}
+                    />
                   )}
                 </>
               )}
@@ -1127,61 +1062,29 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
 
           {/* Detalle principal: condiciones a cumplir y paginación del detalle */}
           {!!internoSeleccionado && activeTab === 'none' && (
-            <div style={{ marginTop: 18 }}>
-              <h2 style={{ textAlign: 'center', margin: '12px 0 6px' }}>CONDICIONES A CUMPLIR</h2>
+            <div className={styles.panelCondiciones}>
               {loadingDetalle ? (
-                <div style={{ padding: 16, textAlign: 'center' }}>cargando detalle...</div>
-
+                <div className={styles.panelLoadingDetalle}>cargando detalle...</div>
+              ) : detalleFiltrado.length === 0 ? (
+                <div className={styles.panelVacio}>
+                  No hay condiciones para mostrar.
+                </div>
               ) : (
-                detalleFiltrado.length === 0 ? (
-                  <div style={{ padding: 12, textAlign: 'center', opacity: 0.7 }}>
-                    No hay condiciones para mostrar.
-                  </div>
-                ) : (
-                  <div className={styles.detalleTable}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={{ width: 60 }}>NRO</th>
-                          <th>PREGUNTA</th>
-                          <th style={{ width: 120 }}>RESPUESTA</th>
-                          <th style={{ width: 170 }}>FECHA DE REGULARIZACIÓN</th>
-                          <th style={{ width: 260 }}>NORMA VIGENTE</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          // Agrupar por Categoria y renderizar título centrado y en negrita
-                          const groups: Record<string, FormularioRGRLDetalle[]> = {};
-                          const orderMap: Record<string, number> = {};
-                          for (const it of detallePageData) {
-                            const t = (it.Categoria ?? 'Sin categoría').toString();
-                            if (!groups[t]) groups[t] = [];
-                            groups[t].push(it);
-                            orderMap[t] = it.CategoriaOrden ?? orderMap[t] ?? 0;
-                          }
-                          const titles = Object.keys(groups).sort((a, b) => (orderMap[a] ?? 0) - (orderMap[b] ?? 0));
-                          return titles.map(title => (
-                            <React.Fragment key={title}>
-                              <tr>
-                                <td colSpan={5} style={{ textAlign: 'center', fontWeight: 700, padding: '8px 0' }}>{title}</td>
-                              </tr>
-                              {groups[title].map(r => (
-                                <tr key={r.Nro}>
-                                  <td>{r.Nro}</td>
-                                  <td>{r.Pregunta || '—'}</td>
-                                  <td>{r.Respuesta}</td>
-                                  <td>{r.FechaRegularizacion}</td>
-                                  <td>{r.NormaVigente || '—'}</td>
-                                </tr>
-                              ))}
-                            </React.Fragment>
-                          ));
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                )
+                <DataTableDetail<FormularioRGRLDetalle>
+                  title="CONDICIONES A CUMPLIR"
+                  columns={[
+                    { header: 'Nro',                      width: 60,  render: r => r.Nro },
+                    { header: 'Pregunta',                 align: 'left', render: r => r.Pregunta || '—' },
+                    { header: 'Respuesta',                width: 120, render: r => r.Respuesta },
+                    { header: 'Fecha de Regularización',  width: 170, render: r => r.FechaRegularizacion },
+                    { header: 'Norma Vigente',            width: 260, align: 'left', render: r => r.NormaVigente || '—' },
+                  ] as DataTableDetailColumn<FormularioRGRLDetalle>[]}
+                  rows={detallePageData}
+                  rowKey={r => String(r.Nro)}
+                  pageSize={detallePageData.length || 1}
+                  groupBy={r => (r.Categoria ?? 'Sin categoría').toString()}
+                  groupOrder={r => r.CategoriaOrden ?? 0}
+                />
               )}
             </div>
           )}

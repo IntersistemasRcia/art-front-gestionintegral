@@ -1,3 +1,21 @@
+import React from 'react';
+
+export type DataTableDetailColumn<T> = {
+  header: string;
+  width?: number;
+  align?: 'left' | 'center' | 'right';
+  render: (row: T) => React.ReactNode;
+};
+
+export type DataTableDetailProps<T> = {
+  columns: DataTableDetailColumn<T>[];
+  rows: T[];
+  rowKey: (row: T, index: number) => string;
+  pageSize?: number;
+  title?: string;
+  groupBy?: (row: T) => string;
+  groupOrder?: (row: T) => number;
+};
 import {
   ColumnDef,
   RowSelectionState,
