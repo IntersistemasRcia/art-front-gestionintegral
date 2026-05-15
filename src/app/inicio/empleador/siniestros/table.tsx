@@ -4,7 +4,8 @@ import React from 'react';
 import dayjs from 'dayjs';
 import type { InstanciasTablaProps, InstanciaSiniestro } from './types/tipos';
 import { useAuth } from '@/data/AuthContext';
-import DataTableDetail, { DataTableDetailColumn } from '@/utils/ui/table/DataTableDetail';
+import DataTableDetail from '@/utils/ui/table/DataTableDetail';
+import { type DataTableDetailColumn } from '@/utils/ui/table/types';
 
 const fmtDateTime = (v?: string | null) => {
   if (!v) return '';
