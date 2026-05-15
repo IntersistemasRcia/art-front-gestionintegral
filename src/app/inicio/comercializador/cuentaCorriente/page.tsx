@@ -5,7 +5,6 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Box, Typography } from '@mui/material';
 import CustomTab from '@/utils/ui/tab/CustomTab';
 import Formato from '@/utils/Formato';
-import gestionComercializadorAPI from "@/data/gestionComercializadorAPI";
 import type { ViewCuentaCorriente, ComercializadorPeriodoPago, ParametersComercializadorPeriodoPago } from './types/cuentaCorriente';
 import { useAuth } from '@/data/AuthContext';
 import ArtAPI from '@/data/artAPI';
@@ -63,7 +62,6 @@ function CuentaCorrienteComercializador() {
     const [PageIndexDetalle, setPageIndexDetalle] = useState<number>(0);
     const [PageSizeDetalle, setPageSizeDetalle] = useState<number>(10);
     const [pageCountDetalle, setPageCountDetalle] = useState<number>(0);
-    const [pageCountEmpleador, setPageCountEmpleador] = useState<number>(0);
 
     // Accede a las propiedades de la sesión con seguridad
 
@@ -287,92 +285,35 @@ function CuentaCorrienteComercializador() {
         Array.isArray(empleadorPagosRaw) ? empleadorPagosRaw : (empleadorPagosRaw?.data || empleadorPagosRaw || [])
     );
 
-    const [empresasByCuitMap, setEmpresasByCuitMap] = useState<Record<string, any>>({});
-    const [isEmpresaByCuitLoading, setIsEmpresaByCuitLoading] = useState<boolean>(false);
+    const empleadorPagosDataEnriched = empleadorPagosData;
 
-    useEffect(() => {
-        const cuits: string[] = (empleadorPagosData ?? [])
-            .map((x: any) => digits(x?.cuit))
-            .filter((x: string) => x.length === 11);
+    const periodoPagoFiltro = Number(periodoPagoSelected?.periodo || 0);
 
-        const uniqueCuitsMissing: string[] = Array.from(new Set<string>(cuits))
-            .filter((cuitItem: string) => !(cuitItem in empresasByCuitMap));
-        if (uniqueCuitsMissing.length === 0) return;
-
-        let cancelled = false;
-        setIsEmpresaByCuitLoading(true);
-
-        Promise.all(
-            uniqueCuitsMissing.map((cuitItem: string) =>
-                ArtAPI.getEmpresaByCUIT({ CUIT: Number(cuitItem) })
-                    .then((data) => ({ cuitItem, data }))
-                    .catch(() => ({ cuitItem, data: null }))
-            )
-        )
-            .then((results) => {
-                if (cancelled) return;
-                setEmpresasByCuitMap((prev) => {
-                    const next = { ...prev } as Record<string, any>;
-                    results.forEach(({ cuitItem, data }) => {
-                        next[cuitItem] = data;
-                    });
-                    return next;
-                });
-            })
-            .finally(() => {
-                if (!cancelled) setIsEmpresaByCuitLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [empleadorPagosData, empresasByCuitMap]);
-
-    const empleadorPagosDataEnriched = useMemo(() => (
-        (empleadorPagosData ?? []).map((row: any) => {
-            const cuitKey = digits(row?.cuit);
-            const empresa = empresasByCuitMap[cuitKey];
-            return {
-                ...row,
-                razonSocial: empresa?.razonSocial ?? row?.razonSocial ?? '',
-            };
-        })
-    ), [empleadorPagosData, empresasByCuitMap]);
-
-    const periodoAnterior = useMemo(() => {
-        const p = Number(empleadorPagoSelected?.periodo || 0);
-        if (!p) return undefined;
-        const anio = Math.floor(p / 100);
-        const mes = p % 100;
+    const periodoOriginal = useMemo(() => {
+        if (!periodoPagoFiltro) return undefined;
+        const anio = Math.floor(periodoPagoFiltro / 100);
+        const mes = periodoPagoFiltro % 100;
         return mes === 1 ? (anio - 1) * 100 + 12 : anio * 100 + (mes - 1);
-    }, [empleadorPagoSelected?.periodo]);
+    }, [periodoPagoFiltro]);
 
     const afipTransferParams = useMemo(() => ({
-        Periodo: periodoAnterior,
+        FechaProceso: periodoPagoFiltro || undefined,
         CuitContribuyente: empleadorPagoSelected?.cuit != null ? String(empleadorPagoSelected.cuit) : undefined,
-    }), [periodoAnterior, empleadorPagoSelected?.cuit]);
+        OrderBy: '-Periodo',
+    }), [periodoPagoFiltro, empleadorPagoSelected?.cuit]);
 
     const { data: afipTransferRaw, isLoading: isAfipTransferLoadingRaw } = ArtAPI.useGetAfipTransferenciaURL(afipTransferParams as any);
-    const shouldShowAfip = !!(empleadorPagoSelected?.periodo && empleadorPagoSelected?.cuit);
+    const shouldShowAfip = !!(periodoPagoFiltro && empleadorPagoSelected?.cuit);
     const selectedAfipCuit = Number(digits(empleadorPagoSelected?.cuit));
-    const selectedAfipPeriodo = Number(empleadorPagoSelected?.periodo || 0);
-
-    const { data: origenDetalleRaw } = gestionComercializadorAPI.useGetViewCtaCteDetalle(
-        shouldShowAfip
-            ? { CUIL: cuilConsulta || (hasAnyFiltro ? 0 : cuil), periodo: selectedAfipPeriodo }
-            : undefined
-    );
-    const origenEmpleador = useMemo(() => {
-        if (!selectedAfipCuit) return '';
-        const arr: any[] = Array.isArray(origenDetalleRaw) ? origenDetalleRaw : (origenDetalleRaw?.data || []);
-        return arr.find((d: any) => Number(d.empleadorCUIT) === selectedAfipCuit)?.origen ?? '';
-    }, [origenDetalleRaw, selectedAfipCuit]);
 
     const afipTransferData = forceEmpty || !shouldShowAfip ? [] : (
         Array.isArray(afipTransferRaw) ? afipTransferRaw : (afipTransferRaw?.data || afipTransferRaw || [])
     ).filter((x: any) =>
-        Number(digits(x?.cuitContribuyente)) === selectedAfipCuit && Number(x?.periodo || 0) === periodoAnterior
-    ).map((x: any) => ({ ...x, origen: origenEmpleador }));
+        Number(digits(x?.cuitContribuyente)) === selectedAfipCuit
+    ).map((x: any) => ({
+        ...x,
+        origen: Number(x?.periodo || 0) === periodoOriginal ? 'Original' : 'Rectificativa',
+    }));
     const isAfipTransferLoading = shouldShowAfip ? isAfipTransferLoadingRaw : false;
 
     useEffect(() => {
@@ -388,8 +329,8 @@ function CuentaCorrienteComercializador() {
             typeof data?.pages === 'number' ? data.count :
             undefined;
 
-        if (typeof total === 'number' && PageSizeDetalle > 0) setPageCountEmpleador(Math.ceil(total / PageSizeDetalle));
-        else setPageCountEmpleador(arr.length > 0 ? Math.ceil(arr.length / PageSizeDetalle) : 1);
+        if (typeof total === 'number' && PageSizeDetalle > 0) setPageCountDetalle(Math.ceil(total / PageSizeDetalle));
+        else setPageCountDetalle(arr.length > 0 ? Math.ceil(arr.length / PageSizeDetalle) : 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [empleadorPagosRaw, PageSizeDetalle]);
 
@@ -477,7 +418,7 @@ function CuentaCorrienteComercializador() {
                         data={empleadorPagosDataEnriched}
                         columns={columnsEmpleadorPeriodo}
                         size="mid"
-                        isLoading={isEmpleadorPagosLoading || isEmpresaByCuitLoading}
+                        isLoading={isEmpleadorPagosLoading}
                         rowKeyField="interno"
                         selectedRowKeyProp={empleadorPagoSelected ? String(empleadorPagoSelected.interno) : null}
                         onRowClick={(row: any) => setEmpleadorPagoSelected(row)}
