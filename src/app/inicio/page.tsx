@@ -38,13 +38,18 @@ const InicioPage = () => {
           </Box>
         ) : indicadores && indicadores.length > 0 ? (
           indicadores.map((indicador: IndicadorDTO, index: number) => {
-            const baseLink = indicador.link ?? "";
+            const baseLink = (indicador.link ?? "").trim();
             const params = new URLSearchParams();
             if (indicador.filtroId != null) {
               params.set("filtroId", String(indicador.filtroId));
               params.set("filtroNombre", indicador.descripcion ?? "");
             }
-            const link = params.toString() ? `${baseLink}${baseLink.includes("?") ? "&" : "?"}${params}` : baseLink;
+            const link =
+              baseLink.length === 0
+                ? ""
+                : params.toString()
+                  ? `${baseLink}${baseLink.includes("?") ? "&" : "?"}${params}`
+                  : baseLink;
             return (
               <Card
                 key={indicador.id}
