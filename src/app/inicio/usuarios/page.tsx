@@ -536,7 +536,15 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         handleCloseModal();
       }
     } else {
-      const errorMessage = result.error || `Error al ${method} el usuario.`;
+      const rawError = result.error || `Error al ${method} el usuario.`;
+      const isInvalidEmailError =
+        /Mailbox.*does not exist|does not exist.*Mailbox/i.test(rawError) ||
+        /5\.1\.1/.test(rawError) ||
+        /4\.4\.5/.test(rawError) ||
+        /Directory harvest attack/i.test(rawError);
+      const errorMessage = isInvalidEmailError
+        ? "El email registrado no existe. Por favor inserte un email válido."
+        : rawError;
       showModalMessage(errorMessage, "error");
       setFormError(errorMessage);
     }

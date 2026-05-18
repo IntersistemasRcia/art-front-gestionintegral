@@ -510,7 +510,8 @@ const FormulariosRAR: React.FC = () => {
       cell: ({ row }: { row: any }) => {
         const estadoForm = String(row.original.Estado || row.original.estado || '');
         const mostrarEditar = estadoForm !== 'Confirmado';
-        const mostrarReplicar = true; 
+        const mostrarImprimir = estadoForm === 'Confirmado';
+        const mostrarReplicar = true;
         
         return (
           <Box className={styles.iconActions}>
@@ -552,7 +553,7 @@ const FormulariosRAR: React.FC = () => {
                 </Tooltip>
               )}
               {/* Botón Imprimir */}
-              <Tooltip
+              {mostrarImprimir && <Tooltip
                 title="Generar PDF"
                 arrow
                 slotProps={{
@@ -571,7 +572,7 @@ const FormulariosRAR: React.FC = () => {
                 >
                   <BsFileEarmarkPdfFill fontSize="large" />
                 </IconButton>
-              </Tooltip>
+              </Tooltip>}
               {/* Botón Replicar */}
               {mostrarReplicar && (
                 <Tooltip

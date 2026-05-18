@@ -9,6 +9,9 @@ import DataTable from '@/utils/ui/table/DataTable';
 import Formato from '@/utils/Formato';
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
+import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
+import { useEmpresasStore } from '@/data/empresasStore';
+import { Empresa } from '@/data/authAPI';
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import DenunciaForm from './denunciaForm';
 import dayjs from 'dayjs';
@@ -536,7 +539,10 @@ function DenunciasPage() {
   const { user, hasTask } = useAuth();
   const isAdmin = (user?.rol || '').toLowerCase() === 'administrador';
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
-  const canEditCuit = isAdmin || (hasTask && typeof hasTask === 'function' && hasTask('Denuncia_VerDenuncia'));
+
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
 
   const [estado, setEstado] = useState<string | undefined>(undefined);
   const [pageIndex, setPageIndex] = useState(1);
@@ -545,37 +551,20 @@ function DenunciasPage() {
   const [pageCount, setPageCount] = useState<number>(0);
   const hasLoadedOnce = useRef(false);
 
-  // Buscador por CUIT (arriba de "Registrar Denuncia")
-  const [cuitBusqueda, setCuitBusqueda] = useState<string>("");
-  const [empCuit, setEmpCuit] = useState<number | undefined>(undefined);
+  const empCuit: number | undefined = empresaSeleccionada
+    ? Number(String((empresaSeleccionada as any)?.cuit ?? '').replace(/\D/g, '')) || undefined
+    : undefined;
 
-  // Si el usuario NO es administrador, fijar el filtro por su empresa CUIT y bloquear cambios
+  // Selección automática si hay una sola empresa
   useEffect(() => {
-    const userCuit = user?.empresaCUIT;
-    // Si el usuario NO es administrador y NO tiene la tarea Denuncia_VerDenuncia,
-    // fijar el filtro por su empresa CUIT y bloquear cambios.
-    if (!isAdmin && !(hasTask && typeof hasTask === 'function' && hasTask('Denuncia_VerDenuncia')) && userCuit && String(userCuit).length === 11) {
-      setEmpCuit(userCuit);
-      setCuitBusqueda(String(userCuit));
+    if (!isLoadingEmpresas && empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+    } else if (!isLoadingEmpresas && empresas.length !== 1 && seleccionAutomaticaRef.current) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
     }
-  }, [isAdmin, user?.empresaCUIT, hasTask]);
-
-  // Auto-trigger search when CUIT input reaches 11 digits
-  useEffect(() => {
-    const digits = (cuitBusqueda || '').replace(/\D/g, '');
-    if (digits.length === 11) {
-      const c = Number(digits);
-      if (empCuit !== c) {
-        setEmpCuit(c);
-        setPageIndex(1);
-      }
-    } else {
-      if (empCuit !== undefined) {
-        setEmpCuit(undefined);
-        setPageIndex(1);
-      }
-    }
-  }, [cuitBusqueda, empCuit]);
+  }, [empresas.length, isLoadingEmpresas]);
 
   // Hook para POST de denuncia
   const { trigger: postDenuncia, isMutating: isPostingDenuncia } = ArtAPI.usePostDenuncia();
@@ -682,10 +671,9 @@ function DenunciasPage() {
   };
 
   // Handle estado filter change
-  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
+  const handleEstadoChange = (value: string) => {
     setEstado(value === '' ? undefined : value);
-    setPageIndex(1); // Reset to first page when filtering (1-based)
+    setPageIndex(1);
   };
 
   // Modal handlers
@@ -1091,33 +1079,35 @@ function DenunciasPage() {
         <>
       {/* Filters */}
       <div className={styles.filtersContainer}>
-        <div className={styles.filterGroup}>
-          <label htmlFor="estado" className={styles.filterLabel}>
-            FILTROS
-          </label>
-          <select
-            id="estado"
-            value={estado ?? ''}
-            onChange={handleEstadoChange}
-            className={styles.filterSelect}
-          >
-            {estadoOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className={styles.cuitGroup}>
+          <CustomSelectSearch<Empresa>
+            options={empresas}
+            getOptionLabel={(e) => {
+              const cuitFmt = Formato.CUIP((e as any)?.cuit);
+              return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
+            }}
+            value={empresaSeleccionada}
+            onChange={(_ev, val) => {
+              setEmpresaSeleccionada(val as Empresa);
+              setPageIndex(1);
+            }}
+            label="Empresa"
+            loading={isLoadingEmpresas}
+            loadingText="Cargando empresas..."
+            noOptionsText={isLoadingEmpresas ? 'Cargando...' : 'No se encontraron empresas'}
+            disabled={isLoadingEmpresas}
+            size="medium"
+          />
         </div>
 
-        <div className={styles.cuitGroup}>
-          <input
-            id="cuitBusqueda"
-            type="text"
-            placeholder="Ingresá CUIT (11 dígitos)"
-            value={cuitBusqueda}
-            onChange={(e) => setCuitBusqueda((e.target.value || '').replace(/[^\d]/g, ''))}
-            disabled={!canEditCuit}
-            className={styles.cuitInput}
+        <div className={styles.filterGroup}>
+          <CustomSelectSearch<{ value: string; label: string }>
+            options={estadoOptions}
+            getOptionLabel={(o) => o?.label ?? ''}
+            value={estadoOptions.find(o => o.value === (estado ?? '')) ?? estadoOptions[0]}
+            onChange={(_ev, val) => handleEstadoChange(val?.value ?? '')}
+            label="Estado"
+            sx={{ minWidth: 220 }}
           />
         </div>
       </div>

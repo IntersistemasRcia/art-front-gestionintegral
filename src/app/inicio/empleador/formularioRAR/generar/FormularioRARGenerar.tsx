@@ -618,7 +618,7 @@ React.useEffect(() => {
         try {
           const agArr = await ArtAPI.getAgentesCausantes();
           const opcionesAgentes: OpcionAgente[] = agArr
-            .filter(a => a.codigo || a.agenteCausante)
+            .filter(a => (a.codigo || a.agenteCausante) && String(a.codigo) !== '1')
             .map(a => ({
               interno: a.interno,
               codigo: a.codigo,
