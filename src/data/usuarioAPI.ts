@@ -271,7 +271,10 @@ export class UsuarioAPIClass extends ExternalAPI {
         );
       });
   useGetRoles = (query: any = {}) =>
-    useSWR([this.getRolesURL(), token.getToken()], () => this.getRoles(query));
+    useSWR(
+      query === null ? null : [this.getRolesURL(), token.getToken()],
+      () => this.getRoles(query ?? {})
+    );
   //#endregion getRoles
 
   //#region registrar

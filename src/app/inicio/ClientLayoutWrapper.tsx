@@ -11,6 +11,7 @@ import styles from './ClientLayoutWrapper.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/data/AuthContext'; // Importa el hook de contexto
 import { useEmpresasLoader } from '@/data/useEmpresasLoader';
+import { useRolesLoader } from '@/data/useRolesLoader';
 import { useEmpresasStore } from '@/data/empresasStore';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 
@@ -58,7 +59,8 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   const [isEmptyEmpresasModalOpen, setIsEmptyEmpresasModalOpen] = useState(false);
   const { emptyEmpresasMessage, setEmptyEmpresasMessage } = useEmpresasStore();
   
-  // Cargar empresas automáticamente cuando el usuario esté autenticado
+  // Cargar roles y empresas automáticamente cuando el usuario esté autenticado
+  useRolesLoader();
   useEmpresasLoader();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
