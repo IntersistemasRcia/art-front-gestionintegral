@@ -94,6 +94,7 @@ const menuItems: MenuItem[] = [
     permissionTask: "Configuraciones",
     children: [
       { name: "Indicadores", icon: BsBarChartLineFill, link: "/inicio/configuraciones/indicadores", permissionTask: "Configuraciones_Indicadores" },
+      { name: "Parámetros", icon: BsClipboard2Data, link: "/inicio/configuraciones/parametros", permissionTask: "Configuraciones_Parametros" },
     ],
   },
 ];
@@ -162,11 +163,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
         const filtered: MenuItem[] = [];
 
         items.forEach((item) => {
-            // Verificar permisos primero
-            if (item.permissionTask && !hasTask(item.permissionTask)) {
-                return;
-            }
-
             const itemMatches = matchesSearch(item.name, searchTerm);
             
             if (item.children) {
@@ -181,7 +177,9 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                     });
                 }
             } else {
-                // Si es un item sin hijos y coincide, incluirlo
+                if (item.permissionTask && !hasTask(item.permissionTask)) {
+                    return;
+                }
                 if (itemMatches) {
                     filtered.push(item);
                 }
@@ -220,11 +218,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
 
     const renderMenuItems = (items: MenuItem[], isSubmenu: boolean = false) => {
         return items.map((item) => {
-            // Los permisos ya se verifican en filterMenuItems, pero mantenemos esta verificación por seguridad
-            if (item.permissionTask && !hasTask(item.permissionTask)) {
-                return null;
-            }
-
             if (item.children) {
                 const renderedChildren = renderMenuItems(item.children, true);
                 const filteredChildren = renderedChildren.filter(child => child !== null);
@@ -264,7 +257,11 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                     </React.Fragment>
                 );
             }
-            
+
+            if (item.permissionTask && !hasTask(item.permissionTask)) {
+                return null;
+            }
+
             const isActive = item.link === pathname;
             const listItemButtonClasses = `${styles.menuItemButton} ${isOpen ? styles.menuItemButtonOpen : styles.menuItemButtonClosed} ${isSubmenu ? styles.submenuItem : ''} ${isActive ? styles.activeLink : ''}`;
             const listItemIconClasses = `${styles.icon} ${isOpen ? styles.iconOpen : styles.iconClosed}`;
