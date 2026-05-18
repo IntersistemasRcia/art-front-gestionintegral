@@ -79,6 +79,8 @@ export interface UsuarioFormFields {
   sectorId?: number;
 }
 
+const ROLES_EXCLUIDOS_USUARIOS = ["comercializador", "grupoorganizador", "organizadorcomercializador"];
+
 export interface Props {
   open: boolean;
   onClose: () => void;
@@ -220,9 +222,10 @@ export default function UsuarioForm({
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
   const availableRoles = useMemo(() => {
     const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
-    if (!userRole || userRole.rolesHijos.length === 0) return roles;
-    const hijoIds = new Set(userRole.rolesHijos.map(h => h.id));
-    return roles.filter(r => hijoIds.has(r.id));
+    const baseRoles = (!userRole || userRole.rolesHijos.length === 0)
+      ? roles
+      : (() => { const hijoIds = new Set(userRole.rolesHijos.map(h => h.id)); return roles.filter(r => hijoIds.has(r.id)); })();
+    return baseRoles.filter(r => !ROLES_EXCLUIDOS_USUARIOS.includes(r.nombreNormalizado.toLowerCase()));
   }, [roles, user?.rol]);
 
   // --- Lógica de Modos y Estado ---
