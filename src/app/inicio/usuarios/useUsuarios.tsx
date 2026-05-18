@@ -205,15 +205,6 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
       // await fetcher("UsuarioAPI", "registrar", { data: formData });
       const createdUser = await registrar(formData);
       await mutateUsuarios();
-      try {
-        await reenviarCorreo(String(formData.email));
-      } catch {
-        return {
-          success: false,
-          error: "No fue posible enviar el correo de verificación. Verifique el email ingresado.",
-          data: createdUser,
-        };
-      }
       return { success: true, data: createdUser };
     } catch (err) {
       console.log("error",err)
