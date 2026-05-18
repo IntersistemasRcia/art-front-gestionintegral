@@ -14,6 +14,9 @@ import {
 import Formato from "@/utils/Formato";
 import { useAuth } from '@/data/AuthContext';
 import ArtAPI from "@/data/artAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
 import type { ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 
 const formatEstablecimientoLabel = (est?: Partial<ApiEstablecimientoEmpresa> | null): string => {
@@ -70,6 +73,23 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
   const { user, hasTask } = useAuth();
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
   const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const empresaId = Number((user as any)?.empresaId ?? 0);
+  //const isEmpleador = empresaId > 0;
+
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+
+  const establecimientoEmpresaSeleccionada = empresas.find(e => {
+    const digits = String((e as any)?.cuit ?? '').replace(/\D/g, '');
+    return digits === String(form.establecimientoCuit ?? '').replace(/\D/g, '');
+  }) ?? null;
+
+  const handleEstablecimientoEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
+    const cuit = val ? String((val as any)?.cuit ?? '') : '';
+    const digits = cuit.replace(/\D/g, '');
+    const formatted = digits.length === 11 ? Formato.CUIP(digits) : digits;
+    const synthetic = { target: { name: 'establecimientoCuit', value: formatted } } as any;
+    onTextFieldChange(synthetic);
+  };
 
   // Establecimientos por CUIT
   const [establecimientos, setEstablecimientos] = useState<ApiEstablecimientoEmpresa[]>([]);
@@ -169,18 +189,20 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
         </Typography>
 
           <div className={styles.formRow}>
-            <TextField
-              label="CUIT Establecimiento"
-              name="establecimientoCuit"
-              value={form.establecimientoCuit}
-              onChange={numericChange("establecimientoCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-              onBlur={() => onBlur("establecimientoCuit")}
-              error={touched.establecimientoCuit && !!errors.establecimientoCuit}
-              helperText={touched.establecimientoCuit ? errors.establecimientoCuit : undefined}
-              fullWidth
-              required={!isDisabled && (isUserAdmin || canRealizaDenuncias)}
-              disabled={isDisabled || (!isUserAdmin && !canRealizaDenuncias)}
-              placeholder="CUIT del establecimiento"
+            <CustomSelectSearch<Empresa>
+              options={empresas}
+              getOptionLabel={(e) => {
+                const cuitFmt = Formato.CUIP((e as any)?.cuit);
+                return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
+              }}
+              value={establecimientoEmpresaSeleccionada}
+              onChange={handleEstablecimientoEmpresaChange}
+              label="Empresa Establecimiento (CUIT)"
+              loading={isLoadingEmpresas}
+              loadingText="Cargando empresas..."
+              noOptionsText="No se encontraron empresas"
+              disabled={isDisabled || isLoadingEmpresas}
+              className={styles.formRowWide}
             />
 
             <Autocomplete

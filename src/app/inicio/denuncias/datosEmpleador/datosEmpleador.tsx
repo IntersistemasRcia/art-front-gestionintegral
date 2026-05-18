@@ -1,62 +1,50 @@
 import React, { useEffect, useRef } from "react";
 import { TextField, Typography } from "@mui/material";
-import { SelectChangeEvent } from "@mui/material/Select";
 import styles from "../denuncias.module.css";
-import type { DenunciaFormData, DatosEmpleadorProps } from "../types/tDenuncias";
+import type { DatosEmpleadorProps } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
 import { useAuth } from "@/data/AuthContext";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
 
 const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   form,
   errors,
   touched,
   isDisabled,
-  readonlyEmpCuit = false,
   onTextFieldChange,
-  onSelectChange,
   onBlur,
 }) => {
   const { user, hasTask } = useAuth();
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
 
   const empresaId = Number((user as any)?.empresaId ?? 0);
-  const lockAllFields = isDisabled || (empresaId > 0 && !canRealizaDenuncias);
-  const lockNonCuitFields = empresaId === 0; // admin: solo CUIT editable
-  const nonCuitLocked = lockAllFields || lockNonCuitFields;
+  const isEmpleador = empresaId > 0;
   const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
-  const cuitLocked = (lockAllFields || readonlyEmpCuit) && !isAdmin;
-  const cuitEnabled = !cuitLocked;
+
+  const lockAllFields = isDisabled || (isEmpleador && !canRealizaDenuncias);
+  const lockNonCuitFields = !isEmpleador && !isAdmin;
+  const nonCuitLocked = lockAllFields || lockNonCuitFields;
   const nonCuitEnabled = !nonCuitLocked;
-  // Helper para mantener sólo dígitos
+
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+
+  const empresaSeleccionada = empresas.find(e => {
+    const digits = String((e as any)?.cuit ?? '').replace(/\D/g, '');
+    return digits === (form.empCuit ?? '').replace(/\D/g, '');
+  }) ?? null;
+
+  const handleEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
+    const cuit = val ? String((val as any)?.cuit ?? '') : '';
+    const digits = cuit.replace(/\D/g, '');
+    const formatted = digits.length === 11 ? Formato.CUIP(digits) : digits;
+    const synthetic = { target: { name: 'empCuit', value: formatted } } as any;
+    onTextFieldChange(synthetic);
+  };
+
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
 
-  // Handler numérico con formateo opcional
-  const numericChange = (
-    name: string,
-    options?: { format?: (digits: string) => string; formatWhenLen?: number }
-  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    let digits = onlyDigits(e.target.value || "");
-    const cap = options?.formatWhenLen ?? undefined as number | undefined;
-    if (cap != null) {
-      digits = digits.slice(0, cap);
-    }
-    const synthetic = { target: { name, value: digits } } as any;
-    onTextFieldChange(synthetic);
-    try {
-      if (
-        options?.format &&
-        options.formatWhenLen != null &&
-        digits.length === options.formatWhenLen &&
-        !isDisabled
-      ) {
-        const formatted = options.format(digits);
-        const syntheticEvent = { target: { name, value: formatted } } as any;
-        onTextFieldChange(syntheticEvent);
-      }
-    } catch (err) {
-      // ignore
-    }
-  };
 
   // Formateo inicial de empCuit si viene desde la base
   const empCuitInitRef = useRef(false);
@@ -101,6 +89,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
       // ignore
     }
   }, [user, form.empCuit, onTextFieldChange, canRealizaDenuncias]);
+
   return (
     <div className={styles.formSection}>
       <Typography variant="h5" component="h2" className={styles.sectionTitle}>
@@ -108,18 +97,20 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
       </Typography>
 
       <div className={styles.formRow}>
-        <TextField
-          label="CUIT"
-          name="empCuit"
-          value={form.empCuit}
-          onChange={numericChange("empCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-          onBlur={() => onBlur("empCuit")}
-          error={touched.empCuit && !!errors.empCuit}
-          helperText={touched.empCuit && errors.empCuit}
-          fullWidth
-          disabled={!cuitEnabled}
-          InputProps={{ readOnly: !cuitEnabled }}
-          placeholder="Solo números"
+        <CustomSelectSearch<Empresa>
+          options={empresas}
+          getOptionLabel={(e) => {
+            const cuitFmt = Formato.CUIP((e as any)?.cuit);
+            return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
+          }}
+          value={empresaSeleccionada}
+          onChange={handleEmpresaChange}
+          label="Empresa (CUIT)"
+          loading={isLoadingEmpresas}
+          loadingText="Cargando empresas..."
+          noOptionsText="No se encontraron empresas"
+          disabled={isDisabled || isLoadingEmpresas}
+          className={styles.formRowWide}
         />
 
         <TextField
@@ -130,7 +121,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           InputProps={{ readOnly: true }}
           error={touched.empPoliza && !!errors.empPoliza}
           helperText={touched.empPoliza && errors.empPoliza}
-          fullWidth
+          className={styles.smallField}
           disabled={!nonCuitEnabled}
           placeholder="Número de póliza"
         />
