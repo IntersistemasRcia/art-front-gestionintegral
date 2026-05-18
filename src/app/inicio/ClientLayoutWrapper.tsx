@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/data/AuthContext'; // Importa el hook de contexto
 import { useEmpresasLoader } from '@/data/useEmpresasLoader';
 import { useRolesLoader } from '@/data/useRolesLoader';
+import { useAccesosRapidosLoader } from '@/data/useAccesosRapidosLoader';
 import { useEmpresasStore } from '@/data/empresasStore';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 
@@ -40,6 +41,10 @@ const formatTitleFromPath = (pathname: string): string => {
     return 'Atención al Público';
   }
 
+  if (pathname === '/inicio/configuraciones/parametros') {
+    return 'Parámetros';
+  }
+
   const parts = pathname.split('/').filter(Boolean);
   const lastPart = parts[parts.length - 1];
   if (!lastPart) {
@@ -59,8 +64,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   const [isEmptyEmpresasModalOpen, setIsEmptyEmpresasModalOpen] = useState(false);
   const { emptyEmpresasMessage, setEmptyEmpresasMessage } = useEmpresasStore();
   
-  // Cargar roles y empresas automáticamente cuando el usuario esté autenticado
+  // Cargar roles, empresas y accesos rápidos al autenticarse
   useRolesLoader();
+  useAccesosRapidosLoader();
   useEmpresasLoader();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);

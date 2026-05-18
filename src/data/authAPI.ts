@@ -14,6 +14,15 @@ export interface ParametersParamEntidad {
   parametroId?: number;
 }
 
+export type ParametroEntidad = {
+  id: number;
+  entidadId: number;
+  entidadTipo: string;
+  parametroId: number;
+  parametroNombre: string;
+  valor: string;
+};
+
 export interface Empresa {
   empresaId: number;
   cuit: number;
@@ -270,16 +279,19 @@ export class AuthAPIClass extends ExternalAPI {
   readonly getParametrosEntidadURL = (params: ParametersParamEntidad = {}) => {
     return this.getURL({ path: "/api/ParametrosEntidades", search: toURLSearch(params) }).toString();
   };
-  getParametrosEntidad = async (params: ParametersParamEntidad = {}) => tokenizable.get(
-    this.getParametrosEntidadURL(params),
-  ).then(({ data }) => data);
-  useGetParametrosEntidadURL = (params: ParametersParamEntidad = {}) => useSWR(
-    [this.getParametrosEntidadURL(params), token.getToken()], () => this.getParametrosEntidad(params),
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-    }
-  );
+  getParametrosEntidad = async (params: ParametersParamEntidad = {}) =>
+    tokenizable
+      .get<ParametroEntidad[]>(this.getParametrosEntidadURL(params))
+      .then(({ data }) => data);
+  useGetParametrosEntidadURL = (params: ParametersParamEntidad | null = {}) =>
+    useSWR(
+      params === null ? null : [this.getParametrosEntidadURL(params), token.getToken()],
+      () => this.getParametrosEntidad(params ?? {}),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
   //endregion
 
   //#region UsuariosEmpresas / UsuarioLogueado

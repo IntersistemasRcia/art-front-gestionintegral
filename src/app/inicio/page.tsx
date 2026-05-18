@@ -7,7 +7,9 @@ import Card from '@/components/Card';
 import styles from './page.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import QueriesAPI, { IndicadorDTO } from '@/data/queryAPI';
-import { CircularProgress, Box } from '@mui/material';
+import Link from 'next/link';
+import { CircularProgress, Box, Typography } from '@mui/material';
+import { useAccesosRapidosStore } from '@/data/accesosRapidosStore';
 
 const { useGetIndicadores } = QueriesAPI;
 
@@ -18,6 +20,7 @@ const InicioPage = () => {
   const { data: session, status } = useSession();
   const isAuthenticated = status === 'authenticated';
   const { data: indicadores, isLoading, error } = useGetIndicadores(isAuthenticated);
+  const { accesosRapidos, isLoading: isLoadingAccesosRapidos } = useAccesosRapidosStore();
 
   const { nombre } = session?.user as any || " ";
 
@@ -90,11 +93,26 @@ const InicioPage = () => {
         <div className={styles.quickAccess}>
           <h2 className={styles.accessTitle}>Accesos Rápidos</h2>
           <div className={styles.accessButtons}>
-            {/* Uso del componente CustomButton */}
-            <CustomButton width="60%" >Consultar Siniestro</CustomButton>
-            <CustomButton width="60%">DDJJ</CustomButton>
-            <CustomButton width="60%">Informes</CustomButton>
-            <CustomButton width="60%">Denuncia</CustomButton>
+            {isLoadingAccesosRapidos ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : accesosRapidos.length > 0 ? (
+              accesosRapidos.map((acceso) => (
+                <CustomButton
+                  key={acceso.id}
+                  width="60%"
+                  component={Link}
+                  href={acceso.href}
+                >
+                  {acceso.label}
+                </CustomButton>
+              ))
+            ) : (
+              <Typography sx={{ color: 'var(--gris)', fontSize: '1.4rem' }}>
+                No hay accesos rápidos configurados para tu rol.
+              </Typography>
+            )}
           </div>
         </div>
       </div>
