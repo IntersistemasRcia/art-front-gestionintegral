@@ -1080,16 +1080,15 @@ function DenunciasPage() {
       {/* Filters */}
       <div className={styles.filtersContainer}>
         <div className={styles.cuitGroup}>
-          <CustomSelectSearch<Empresa | { razonSocial: string; cuit: null }>
-            options={[{ razonSocial: 'Todas las empresas', cuit: null }, ...empresas]}
+          <CustomSelectSearch<Empresa>
+            options={empresas}
             getOptionLabel={(e) => {
-              if (!e || (e as any)?.cuit === null) return 'Todas las empresas';
               const cuitFmt = Formato.CUIP((e as any)?.cuit);
               return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
             }}
-            value={empresaSeleccionada ?? { razonSocial: 'Todas las empresas', cuit: null }}
+            value={empresaSeleccionada}
             onChange={(_ev, val) => {
-              setEmpresaSeleccionada((val as any)?.cuit === null ? null : val as Empresa);
+              setEmpresaSeleccionada(val as Empresa);
               setPageIndex(1);
             }}
             label="Empresa"
