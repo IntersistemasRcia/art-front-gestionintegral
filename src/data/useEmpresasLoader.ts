@@ -5,6 +5,22 @@ import { useSession } from "next-auth/react";
 import AuthAPI from "./authAPI";
 import ArtAPI from "./artAPI";
 import { useEmpresasStore } from "./empresasStore";
+import { useRolesStore } from "./rolesStore";
+import { isAdministradorEmpleadorOrChild } from "@/utils/rolesUtils";
+
+const ROLES_WAIT_INTERVAL_MS = 50;
+const ROLES_WAIT_TIMEOUT_MS = 10000;
+
+async function waitForRolesLoaded(): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < ROLES_WAIT_TIMEOUT_MS) {
+    const { isLoaded } = useRolesStore.getState();
+    if (isLoaded) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, ROLES_WAIT_INTERVAL_MS));
+  }
+}
 
 export const useEmpresasLoader = () => {
   const { data: session, status } = useSession();
@@ -36,15 +52,15 @@ export const useEmpresasLoader = () => {
       !hasLoadedRef.current
     ) {
       hasLoadedRef.current = true;
-      
+
       const loadEmpresas = async () => {
         try {
           setLoading(true);
           setError(null);
           setEmptyEmpresasMessage(null);
 
-          const userRole = String((session.user as any)?.rol ?? "").toLowerCase();
-          const isAdministrador = userRole === "administrador";
+          const userRole = String((session.user as { rol?: string })?.rol ?? "");
+          const isAdministrador = userRole.toLowerCase() === "administrador";
 
           if (isAdministrador) {
             // Para Administrador, cargar TODAS las empresas desde /api/Empresas.
@@ -62,18 +78,25 @@ export const useEmpresasLoader = () => {
           }
 
           // Para el resto de roles, mantener filtro por CUIT del usuario.
-          const userCuit = (session.user as any)?.cuit;
+          const userCuit = (session.user as { cuit?: number })?.cuit;
           const empresasData = await AuthAPI.getEmpresas(
             userCuit ? { CUIT: userCuit } : {}
           );
           const resolvedEmpresas = empresasData || [];
           setEmpresas(resolvedEmpresas);
+
           if (resolvedEmpresas.length === 0) {
-            const userName = String((session.user as any)?.userName ?? "").trim();
-            const nombreUsuario = userName || "sin nombre";
-            setEmptyEmpresasMessage(
-              `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
-            );
+            await waitForRolesLoaded();
+            const { roles } = useRolesStore.getState();
+            if (isAdministradorEmpleadorOrChild(userRole, roles)) {
+              const userName = String(
+                (session.user as { userName?: string })?.userName ?? ""
+              ).trim();
+              const nombreUsuario = userName || "sin nombre";
+              setEmptyEmpresasMessage(
+                `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
+              );
+            }
           }
         } catch (error) {
           console.error("Error al cargar empresas:", error);
@@ -102,4 +125,3 @@ export const useEmpresasLoader = () => {
     clearEmpresas,
   ]);
 };
-
