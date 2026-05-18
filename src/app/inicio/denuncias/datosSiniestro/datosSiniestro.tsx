@@ -83,6 +83,11 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     return digits === String(form.establecimientoCuit ?? '').replace(/\D/g, '');
   }) ?? null;
 
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    return `${Formato.CUIP(empresa.cuit)} - ${empresa.razonSocial ?? ''}`;
+  };
+
   const handleEstablecimientoEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
     const cuit = val ? String((val as any)?.cuit ?? '') : '';
     const digits = cuit.replace(/\D/g, '');
@@ -191,16 +196,20 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
           <div className={styles.formRow}>
             <CustomSelectSearch<Empresa>
               options={empresas}
-              getOptionLabel={(e) => {
-                const cuitFmt = Formato.CUIP((e as any)?.cuit);
-                return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
-              }}
+              getOptionLabel={getEmpresaLabel}
               value={establecimientoEmpresaSeleccionada}
               onChange={handleEstablecimientoEmpresaChange}
               label="Empresa Establecimiento (CUIT)"
+              placeholder="Buscar empresa..."
               loading={isLoadingEmpresas}
               loadingText="Cargando empresas..."
-              noOptionsText="No se encontraron empresas"
+              noOptionsText={
+                isLoadingEmpresas
+                  ? "Cargando..."
+                  : empresas.length <= 1
+                  ? "No hay empresas disponibles"
+                  : "No se encontraron empresas"
+              }
               disabled={isDisabled || isLoadingEmpresas}
               className={styles.formRowWide}
             />

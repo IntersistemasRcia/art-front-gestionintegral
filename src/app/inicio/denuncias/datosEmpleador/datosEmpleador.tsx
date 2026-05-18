@@ -35,6 +35,11 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
     return digits === (form.empCuit ?? '').replace(/\D/g, '');
   }) ?? null;
 
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    return `${Formato.CUIP(empresa.cuit)} - ${empresa.razonSocial ?? ''}`;
+  };
+
   const handleEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
     const cuit = val ? String((val as any)?.cuit ?? '') : '';
     const digits = cuit.replace(/\D/g, '');
@@ -99,16 +104,20 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
       <div className={styles.formRow}>
         <CustomSelectSearch<Empresa>
           options={empresas}
-          getOptionLabel={(e) => {
-            const cuitFmt = Formato.CUIP((e as any)?.cuit);
-            return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
-          }}
+          getOptionLabel={getEmpresaLabel}
           value={empresaSeleccionada}
           onChange={handleEmpresaChange}
           label="Empresa (CUIT)"
+          placeholder="Buscar empresa..."
           loading={isLoadingEmpresas}
           loadingText="Cargando empresas..."
-          noOptionsText="No se encontraron empresas"
+          noOptionsText={
+            isLoadingEmpresas
+              ? "Cargando..."
+              : empresas.length <= 1
+              ? "No hay empresas disponibles"
+              : "No se encontraron empresas"
+          }
           disabled={isDisabled || isLoadingEmpresas}
           className={styles.formRowWide}
         />
