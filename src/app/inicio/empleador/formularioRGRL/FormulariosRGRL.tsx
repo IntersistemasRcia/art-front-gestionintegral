@@ -55,33 +55,6 @@ const cargarTipos = async (): Promise<ApiTiposFormularios> => {
   return _tiposCache!;
 };
 
-const buildTiposIndex = async (internoFormulario: number): Promise<Map<number, TiposIndexItem>> => {
-  // Índice por código de cuestionario metadatos (pregunta, norma, sección, planilla, orden).
-  const all = await cargarTipos();
-  const form = all.find(f => f.secciones?.some(s => s.internoFormulario === internoFormulario));
-  const idx = new Map<number, TiposIndexItem>();
-  form?.secciones?.forEach(s => {
-    s.cuestionarios?.forEach(q => {
-      idx.set(q.codigo, {
-        pregunta: q.pregunta ?? '',
-        norma: q.comentario ?? '',
-        seccion: s.descripcion ?? '',
-        pagina: s.pagina ?? 1,
-        planilla: (s.planilla ?? '').trim().toUpperCase(),
-        seccionOrden: s.orden ?? 0,
-      });
-    });
-  });
-  return idx;
-};
-
-const getPlanillaCuestionarios = async (internoFormulario: number, letra: 'A' | 'B' | 'C') => {
-  // Devuelve cuestionarios pertenecientes a la planilla indicada (A/B/C) para el tipo de formulario.
-  const all = await cargarTipos();
-  const form = all.find(f => f.secciones?.some(s => s.internoFormulario === internoFormulario));
-  const secs = form?.secciones?.filter(s => (s.planilla ?? '').trim().toUpperCase() === letra) ?? [];
-  return secs.flatMap(s => s.cuestionarios ?? []);
-};
 //#endregion tipos-catalogos
 
 
@@ -200,68 +173,94 @@ const formatFechaAAAAMMDD = (v?: number | string | null): string => {
 const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
   // GET /FormulariosRGRL/{id}: arma el payload completo para impresión y vista de detalle.
   const data = await ArtAPI.getFormularioRGRLById(id) as unknown as ApiFormularioDetalle;
+  // Construir catálogo
 
-  const idx = await buildTiposIndex(Number(data.internoFormulario ?? 1));
+  type Seccion = ApiTiposFormularios[0]['secciones'][0];
+  type Cuestionario = Seccion['cuestionarios'][0];
+  type CatItem = { codigo: number; seccion: string; seccionOrden: number; pregunta: string; norma: string; planilla: string };
 
-  const rMap = new Map<number, string>();
-  for (const r of (data.respuestasCuestionario ?? [])) {
-    if (r?.internoCuestionario != null) rMap.set(Number(r.internoCuestionario), r.respuesta ?? '');
+  const tiposAll2 = await cargarTipos();
+  const tipoForm2 = tiposAll2.find(f => f.secciones?.some(s => s.internoFormulario === Number(data.internoFormulario ?? 1)));
+  const secsOrdenadas = (tipoForm2?.secciones ?? []).slice().sort((a: Seccion, b: Seccion) => (a.orden ?? 0) - (b.orden ?? 0));
+
+  const catalogoNormal: CatItem[] = [];
+  const catalogoPlanillaA: CatItem[] = [];
+  const catalogoPlanillaB: CatItem[] = [];
+  const catalogoPlanillaC: CatItem[] = [];
+
+  for (const s of secsOrdenadas) {
+    const planilla = (s.planilla ?? '').trim().toUpperCase();
+    const cuests = (s.cuestionarios ?? []).slice().sort((a: Cuestionario, b: Cuestionario) => (a.codigo ?? 0) - (b.codigo ?? 0));
+    for (const q of cuests) {
+      const item: CatItem = { codigo: Number(q.codigo ?? 0), seccion: s.descripcion ?? '', seccionOrden: s.orden ?? 0, pregunta: q.pregunta ?? '', norma: q.comentario ?? '', planilla };
+      if (planilla === 'A') catalogoPlanillaA.push(item);
+      else if (planilla === 'B') catalogoPlanillaB.push(item);
+      else if (planilla === 'C') catalogoPlanillaC.push(item);
+      else catalogoNormal.push(item);
+    }
   }
 
-  const items: FormularioRGRLDetalle[] = [];
-  for (const r of (data.respuestasCuestionario ?? [])) {
+  type RespCuest = ApiFormularioDetalle['respuestasCuestionario'][0];
 
+  const respOrdenadas = (data.respuestasCuestionario ?? []).slice()
+    .sort((a: RespCuest, b: RespCuest) => (a.internoCuestionario ?? 0) - (b.internoCuestionario ?? 0));
 
-    const key = Number(r.internoCuestionario);
-    const meta = idx.get(key);
-    const p = (meta?.planilla ?? '').toUpperCase();
-    // Omite cuestionarios de planillas A/B/C: se muestran en sus tabs específicos.
-    if (p === 'A' || p === 'B' || p === 'C') continue;
-    if (!meta || !(meta.pregunta ?? '').trim()) continue;
-    items.push({
-      Nro: r.internoCuestionario ?? 0,
-      Categoria: meta?.seccion ?? '',
-      CategoriaOrden: meta?.seccionOrden ?? 0,
-      Pregunta: meta?.pregunta ?? '',
-      Respuesta: mapRespuesta(r.respuesta),
-      FechaRegularizacion: (r.fechaRegularizacionNormal ?? '').toString().trim() || formatFechaAAAAMMDD(r.fechaRegularizacion),
-      NormaVigente: meta?.norma ?? '',
-    });
-  }
+  const nNormal = catalogoNormal.length;
+  const respNormal = respOrdenadas.slice(0, nNormal);
+  const respPlanillas = respOrdenadas.slice(nNormal);
 
-  const cleaned = items.filter(it =>
-    // Filtra filas vacías y mantiene únicamente las que tengan algún dato relevante.
-    (it.Pregunta && it.Pregunta.trim()) ||
-    (it.Respuesta && it.Respuesta.trim()) ||
-    (it.FechaRegularizacion && it.FechaRegularizacion.trim()) ||
-    (it.NormaVigente && it.NormaVigente.trim())
-  );
+  const items: FormularioRGRLDetalle[] = catalogoNormal.map((cat, i) => ({
+    Nro: cat.codigo,
+    Categoria: cat.seccion,
+    CategoriaOrden: cat.seccionOrden,
+    Pregunta: cat.pregunta,
+    Respuesta: respNormal[i] ? mapRespuesta(respNormal[i].respuesta) : '',
+    FechaRegularizacion: respNormal[i]
+      ? ((respNormal[i].fechaRegularizacionNormal ?? '').toString().trim() || formatFechaAAAAMMDD(respNormal[i].fechaRegularizacion))
+      : '',
+    NormaVigente: cat.norma,
+  }));
+
+  const cleaned = items.filter(it => (it.Pregunta && it.Pregunta.trim()));
   cleaned.sort((a, b) => {
     const so = (a.CategoriaOrden ?? 0) - (b.CategoriaOrden ?? 0);
     if (so !== 0) return so;
     return (a.Nro ?? 0) - (b.Nro ?? 0);
   });
 
-  const qsA = await getPlanillaCuestionarios(Number(data.internoFormulario ?? 1), 'A');
-  const planillaA: PlanillaAItem[] = qsA.map(q => ({
-    Codigo: String(q.codigo ?? ''),
-    Sustancia: q.pregunta ?? '',
-    SiNo: mapRespuesta(rMap.get(Number(q.codigo))) as PlanillaAItem['SiNo'],
+  // Planillas
+  const bloques: RespCuest[][] = [];
+  {
+    let actual: RespCuest[] = [];
+    for (let i = 0; i < respPlanillas.length; i++) {
+      if (i === 0) { actual.push(respPlanillas[i]); continue; }
+      const gap = (respPlanillas[i].internoCuestionario ?? 0) - (respPlanillas[i - 1].internoCuestionario ?? 0);
+      if (gap > 10) { bloques.push(actual); actual = [respPlanillas[i]]; }
+      else actual.push(respPlanillas[i]);
+    }
+    if (actual.length > 0) bloques.push(actual);
+  }
+  const bloquePA = bloques.find(b => b.length === catalogoPlanillaA.length) ?? respPlanillas.slice(0, catalogoPlanillaA.length);
+  const bloquePB = bloques.find(b => b.length === catalogoPlanillaB.length && b !== bloquePA) ?? [];
+  const bloquePC = bloques.find(b => b.length === catalogoPlanillaC.length && b !== bloquePA && b !== bloquePB) ?? [];
+
+  const planillaA: PlanillaAItem[] = catalogoPlanillaA.map((cat, i) => ({
+    Codigo: String(cat.codigo),
+    Sustancia: cat.pregunta,
+    SiNo: mapRespuesta(bloquePA[i]?.respuesta) as PlanillaAItem['SiNo'],
   }));
 
-  const qsB = await getPlanillaCuestionarios(Number(data.internoFormulario ?? 1), 'B');
-  const planillaB: PlanillaBItem[] = qsB.map(q => ({
-    Codigo: String(q.codigo ?? ''),
-    Sustancia: q.pregunta ?? '',
-    SiNo: mapRespuesta(rMap.get(Number(q.codigo))) as PlanillaBItem['SiNo'],
+  const planillaB: PlanillaBItem[] = catalogoPlanillaB.map((cat, i) => ({
+    Codigo: String(cat.codigo),
+    Sustancia: cat.pregunta,
+    SiNo: mapRespuesta(bloquePB[i]?.respuesta) as PlanillaBItem['SiNo'],
   }));
 
-  const qsC = await getPlanillaCuestionarios(Number(data.internoFormulario ?? 1), 'C');
-  const planillaC: PlanillaCItem[] = qsC.map(q => ({
-    Codigo: String(q.codigo ?? ''),
-    Sustancia: q.pregunta ?? '',
-    SiNo: mapRespuesta(rMap.get(Number(q.codigo))) as PlanillaCItem['SiNo'],
-    NormaVigente: q.comentario ?? '',
+  const planillaC: PlanillaCItem[] = catalogoPlanillaC.map((cat, i) => ({
+    Codigo: String(cat.codigo),
+    Sustancia: cat.pregunta,
+    SiNo: mapRespuesta(bloquePC[i]?.respuesta) as PlanillaCItem['SiNo'],
+    NormaVigente: cat.norma,
   }));
 
   const gremios = (data.respuestasGremio ?? []).map(g => ({
