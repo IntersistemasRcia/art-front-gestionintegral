@@ -59,7 +59,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   // establecimientos y agentes
   const [opcionesEstablecimientos, setOpcionesEstablecimientos] = React.useState<OpcionEstablecimiento[]>([]);
   const [agentesCausantes, setAgentesCausantes] = React.useState<OpcionAgente[]>([]);
-  const [cargandoSelects, setCargandoSelects] = React.useState<boolean>(false);
+  const [cargandoSelects, setCargandoSelects] = React.useState<boolean>(editarId > 0);
 
   // selección establecimiento (usamos el **id** como value del Select)
   const [establecimientoSeleccionado, setEstablecimientoSeleccionado] = React.useState<string>('');
@@ -501,6 +501,11 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
           setEstablecimientoSeleccionado(String(data.internoEstablecimiento));
         }
 
+        const cuitFormulario = data.cuit || data.CUIT;
+        if (cuitFormulario && (!cuit || cuit === 0)) {
+          setCuitActual(String(cuitFormulario));
+        }
+
         // Detalle trabajadores
         if (Array.isArray(data.formularioRARDetalle)) {
           const filasMap = data.formularioRARDetalle.map((d: any) => ({
@@ -578,7 +583,8 @@ React.useEffect(() => {
         if (!cuitParaUsar || cuitParaUsar === 0 || String(cuitParaUsar).trim() === '' || String(cuitParaUsar).trim() === '0') {
           if (!cancel) {
             setOpcionesEstablecimientos([]);
-            setCargandoSelects(false);
+            // En modo edición el CUIT real llega después;
+            if (!esModoEdicionFormulario) setCargandoSelects(false);
           }
           return;
         }
@@ -1416,6 +1422,12 @@ React.useEffect(() => {
               <span className={styles.requiredAsterisk}>*</span>
             </h4>
             <div className={styles.modalRow}>
+              {cargandoSelects ? (
+                <div className={styles.cargandoEstablecimiento}>
+                  <span className={styles.cargandoSpinner} />
+                  Cargando datos del formulario...
+                </div>
+              ) : (
               <FormControl fullWidth required className={styles.flex1}>
                 <InputLabel>Establecimiento</InputLabel>
                 <Select
@@ -1423,22 +1435,10 @@ React.useEffect(() => {
                   onChange={(e) => setEstablecimientoSeleccionado(e.target.value)}
                   label="Establecimiento"
                   disabled={cargandoSelects}
-                  MenuProps={{
-                    PaperProps: {
-                      style: {
-                        maxHeight: 300,
-                      },
-                    },
-                  }}
-                >
-                  {cargandoSelects ? (
-                    <MenuItem disabled value="">
-                      Cargando establecimientos...
-                    </MenuItem>
-                  ) : opcionesEstablecimientos.length === 0 ? (
-                    <MenuItem disabled value="">
-                      No hay establecimientos disponibles
-                    </MenuItem>
+                    MenuProps={{ PaperProps: { style: { maxHeight: 300 } } }}
+                  >
+                    {opcionesEstablecimientos.length === 0 ? (
+                    <MenuItem disabled value="">No hay establecimientos disponibles</MenuItem>
                   ) : (
                     opcionesEstablecimientos.map((est) => (
                       <MenuItem key={est.interno} value={est.interno}>
@@ -1448,6 +1448,7 @@ React.useEffect(() => {
                   )}
                 </Select>
               </FormControl>
+              )}
             </div>
             </div>
 

@@ -62,6 +62,29 @@
   font-size: 14px;
 }
 
+.cargandoEstablecimiento {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--grisOscuro);
+  font-size: 14px;
+}
+
+.cargandoSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--grisClaroClaro);
+  border-top-color: var(--naranja);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Sección de selección de establecimiento */
 .establecimientoSection {
   background: var(--grisClaroClaro);
