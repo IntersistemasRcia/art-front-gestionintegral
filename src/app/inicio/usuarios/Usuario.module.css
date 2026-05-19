@@ -209,6 +209,10 @@
   margin-top: 8px;
 }
 
+.roleDisabled {
+  color: #9aa0a6;
+}
+
 .empresaSelectorWrapper {
   display: flex;
   align-items: center;

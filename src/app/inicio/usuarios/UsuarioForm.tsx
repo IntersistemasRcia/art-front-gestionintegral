@@ -220,14 +220,6 @@ export default function UsuarioForm({
 
   const { user } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
-  const availableRoles = useMemo(() => {
-    const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
-    const baseRoles = (!userRole || userRole.rolesHijos.length === 0)
-      ? roles
-      : (() => { const hijoIds = new Set(userRole.rolesHijos.map(h => h.id)); return roles.filter(r => hijoIds.has(r.id)); })();
-    return baseRoles.filter(r => !ROLES_EXCLUIDOS_USUARIOS.includes(r.nombreNormalizado.toLowerCase()));
-  }, [roles, user?.rol]);
-
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
   const isEditing = method === "edit";
@@ -238,6 +230,29 @@ export default function UsuarioForm({
   const hasEmpresasTab = true;
   const empresasTabDisabled = isCreating && !Boolean(form.id);
   const requiresTituloMatricula = form.rol === "MedicinaLaboral" || form.rol === "SeguridadEHigiene";
+
+  const roleOptions = useMemo(() => {
+    const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
+    const baseRoles = (!userRole || userRole.rolesHijos.length === 0)
+      ? roles
+      : (() => { const hijoIds = new Set(userRole.rolesHijos.map(h => h.id)); return roles.filter(r => hijoIds.has(r.id)); })();
+    const isExcludedRole = (rol: RolesInterface) =>
+      ROLES_EXCLUIDOS_USUARIOS.includes(rol.nombreNormalizado.toLowerCase());
+    const currentRole = roles.find(r => r.nombre === form.rol);
+    const currentExcluded = currentRole ? isExcludedRole(currentRole) : false;
+
+    const allowed = baseRoles
+      .filter(r => !isExcludedRole(r))
+      .map((rol) => ({ rol, disabled: false }));
+
+    if (currentExcluded && currentRole) {
+      return [{ rol: currentRole, disabled: true }];
+    }
+
+    return allowed;
+  }, [roles, user?.rol, isEditing, isViewing, form.rol]);
+
+  const isRolSelectDisabled = isDisabled || isAdminUser || (isEditing && roleOptions.length === 1 && roleOptions[0].disabled);
 
   // Función helper para formatear CUIT
   const formatCuit = (cuit: string): string => {
@@ -915,7 +930,7 @@ export default function UsuarioForm({
                   fullWidth
                   required={!isDisabled && !isAdminUser}
                   error={touched.rol && !!errors.rol && !isAdminUser}
-                  disabled={isDisabled || isAdminUser}
+                  disabled={isRolSelectDisabled}
                 >
                   <InputLabel>Rol</InputLabel>
                   <Select
@@ -925,8 +940,13 @@ export default function UsuarioForm({
                     onChange={handleSelectChange}
                     onBlur={() => handleBlur("rol")}
                   >
-                    {availableRoles.map((rol) => (
-                      <MenuItem key={rol.id} value={rol.nombre}>
+                    {roleOptions.map(({ rol, disabled }) => (
+                      <MenuItem
+                        key={rol.id}
+                        value={rol.nombre}
+                        disabled={disabled}
+                        className={disabled ? styles.roleDisabled : undefined}
+                      >
                         {rol.nombre}
                       </MenuItem>
                     ))}
