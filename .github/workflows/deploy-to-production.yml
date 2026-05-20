@@ -1,0 +1,246 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Deploy manual'
+        required: true
+        default: 'Deploy manual'
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy on self-hosted Windows runner
+    runs-on: [self-hosted, windows, x64, art-front-production]
+    env:
+      SITE_PATH: ${{ secrets.SITE_PATH }}
+      SITE_NAME: ${{ secrets.SITE_NAME }}
+      BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
+      MAX_BACKUPS: ${{ secrets.MAX_BACKUPS }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      COMMIT: ${{ github.sha }}
+      ACTOR: ${{ github.actor }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Notify Teams - Start
+        if: ${{ env.TEAMS_WEBHOOK_URL != '' }}
+        shell: powershell
+        run: |
+          $webhook = $env:TEAMS_WEBHOOK_URL
+          if ([string]::IsNullOrEmpty($webhook)) { Write-Host "No Teams webhook configured - skipping"; exit 0 }
+          $msg = "**Deployment started**`nRepository: $env:REPO`nBranch: $env:BRANCH`nCommit: $env:COMMIT`nActor: $env:ACTOR`nRun: $env:RUN_URL"
+          $body = @{ text = $msg } | ConvertTo-Json
+          Invoke-RestMethod -Uri $webhook -Method Post -Body $body -ContentType 'application/json'
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Show node/npm versions and timestamp
+        shell: powershell
+        run: |
+          Write-Host "Node version:"; node -v
+          Write-Host "NPM version:"; npm -v
+          Write-Host "Timestamp:"; Get-Date
+
+      - name: Cache npm registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies (verbose, save log)
+        shell: powershell
+        timeout-minutes: 45
+        run: |
+          # Run npm ci using cmd.exe to ensure stdout/stderr redirection works reliably on Windows
+          # This writes all output to npmci_verbose.log in the working directory.
+          cmd /c "npm ci --verbose > npmci_verbose.log 2>&1"
+
+      - name: Upload npm ci verbose log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npmci-verbose-log
+          path: npmci_verbose.log
+
+      - name: Build
+        run: |
+          npm run build
+
+      - name: Backup current deployment (keep configured count)
+        shell: powershell
+        run: |
+          # Determine deploy dir from secret or fallback
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          if (-not (Test-Path $DEPLOY_DIR)) { Write-Host "No existing deploy dir: $DEPLOY_DIR - skipping backup"; exit 0 }
+
+          # Determine backup dir: use BACKUP_PATH secret if provided, otherwise use DEPLOY_DIR\backups
+          if ([string]::IsNullOrEmpty($env:BACKUP_PATH)) { $BACKUP_DIR = Join-Path $DEPLOY_DIR 'backups' } else { $BACKUP_DIR = $env:BACKUP_PATH }
+          New-Item -ItemType Directory -Force -Path $BACKUP_DIR | Out-Null
+
+          $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+          # prepare local logs folder
+          New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
+          $temp = Join-Path $env:TEMP ("deploy_backup_$timestamp")
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+
+          # Mirror current deployment to temp excluding backups and large folders
+          $robolog = Join-Path (Get-Location) ("robocopy_backup_$timestamp.log")
+          robocopy $DEPLOY_DIR $temp /MIR /XD .git .github\workflows node_modules backups /LOG:$robolog /TEE
+          $rc = $LASTEXITCODE
+          # robocopy exit codes: 0=no files copied, 1=some files copied, 2=some files mismatched, 3=some files copied and mismatched
+          if ($rc -gt 3) { throw "robocopy failed with code $rc" }
+          Write-Host "robocopy finished with exit code $rc (treated as success)"
+          exit 0
+
+          $backupFile = Join-Path $BACKUP_DIR ("backup_$timestamp.zip")
+          Compress-Archive -Path (Join-Path $temp '*') -DestinationPath $backupFile -Force
+
+          # Remove temp
+          Remove-Item -Recurse -Force $temp
+
+          # Keep only MAX_BACKUPS latest backups (default 5)
+          if ([string]::IsNullOrEmpty($env:MAX_BACKUPS)) { $max = 5 } else { $max = [int]$env:MAX_BACKUPS }
+          $backups = Get-ChildItem -Path $BACKUP_DIR -Filter '*.zip' | Sort-Object LastWriteTime -Descending
+          if ($backups.Count -gt $max) {
+            $backups | Select-Object -Skip $max | ForEach-Object { Remove-Item $_.FullName -Force }
+          }
+
+      - name: Copy build to deployment directory (Windows)
+        shell: powershell
+        run: |
+          # SITE_PATH is provided via repository secret (secrets.SITE_PATH). If not set, fallback to C:\inetpub\sitios\ArtFrontGestionIntegral
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          New-Item -ItemType Directory -Force -Path $DEPLOY_DIR | Out-Null
+          # ensure deploy logs folder exists
+          New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
+          # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
+          # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
+          $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'          
+          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
+          $rc = $LASTEXITCODE
+          if ($rc -gt 3) { throw "robocopy failed with code $rc" }
+          Write-Host "robocopy finished with exit code $rc (treated as success)"
+          exit 0
+
+      - name: Stop PM2 application before deployment (Windows)
+        shell: powershell
+        run: |
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          Set-Location -Path $DEPLOY_DIR
+          $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
+          
+          # Check if PM2 is available
+          if (Get-Command pm2 -ErrorAction SilentlyContinue) {
+            Write-Host "Stopping PM2 application: $appName"
+            pm2 stop $appName -s | Out-Null
+            Write-Host "Application stopped successfully"
+          } else {
+            Write-Host "PM2 not found, skipping stop"
+          }
+
+      - name: Install production dependencies on deploy dir (Windows)
+        shell: powershell
+        run: |
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          Set-Location -Path $DEPLOY_DIR
+          npm ci --omit=dev
+
+      - name: Upload robocopy logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robocopy-logs
+          path: _deploy_logs/*.log
+
+      - name: Ensure PM2 is installed (Windows)
+        shell: powershell
+        run: |
+          if (-not (Get-Command pm2 -ErrorAction SilentlyContinue)) {
+            npm install -g pm2
+          }
+
+      - name: Start/Reload application with PM2 (Windows)
+        shell: powershell
+        run: |
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          Set-Location -Path $DEPLOY_DIR
+
+          # Use PM2 to start or reload the app from ecosystem.config.js (idempotent)
+          # This will start the process if not running, or reload it with zero-downtime when possible.
+          $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
+          pm2 delete $appName -s | Out-Null  # silently delete existing process if any
+          pm2 start ecosystem.config.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "pm2 startOrReload failed with code $LASTEXITCODE, attempting start then restart fallback"
+            pm2 start ecosystem.config.js --env production
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "pm2 start also failed with code $LASTEXITCODE, attempting pm2 restart by name: $appName"
+              pm2 restart $appName
+            }
+          }
+
+      - name: Fallback - Restart application if previous steps failed (Windows)
+        if: failure()
+        shell: powershell
+        run: |
+          Write-Host "Previous steps failed, attempting to restart the application as fallback"
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          Set-Location -Path $DEPLOY_DIR
+          $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
+          
+          if (Get-Command pm2 -ErrorAction SilentlyContinue) {
+            Write-Host "Attempting to restart application: $appName"
+            pm2 restart $appName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Restart failed, attempting to start from scratch"
+              pm2 start ecosystem.config.js
+            }
+            pm2 save
+            Write-Host "Fallback restart completed"
+          } else {
+            Write-Host "PM2 not available for fallback restart"
+            exit 1
+          }
+
+      - name: Save PM2 process list (Windows)
+        shell: powershell
+        run: |
+          pm2 save
+
+      - name: Upload PM2 logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pm2-logs
+          path: ${{ github.workspace }}/_deploy_logs
+
+      - name: Show PM2 status (Windows)
+        shell: powershell
+        run: |
+          pm2 status
+
+      - name: Notify Teams - Finish
+        if: always() && env.TEAMS_WEBHOOK_URL != ''
+        shell: powershell
+        run: |
+          $webhook = $env:TEAMS_WEBHOOK_URL
+          $conclusion = '${{ job.status }}'  # SUCCESS, FAILURE, CANCELLED
+          $msg = "**Deployment finished**`nRepository: $env:REPO`nBranch: $env:BRANCH`nCommit: $env:COMMIT`nActor: $env:ACTOR`nResult: $conclusion`nRun: $env:RUN_URL"
+          $body = @{ text = $msg } | ConvertTo-Json
+          Invoke-RestMethod -Uri $webhook -Method Post -Body $body -ContentType 'application/json'
