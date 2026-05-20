@@ -85,6 +85,7 @@ function buildUsuarioUpdatePayload(data: UsuarioFormFields): UsuarioUpdatePayloa
     ...(data.password ? { password: String(data.password) } : {}),
     ...(data.confirmPassword ? { confirmPassword: String(data.confirmPassword) } : {}),
     email: String(data.email ?? "").trim(),
+    rol: String(data.rol ?? ""),
   };
 }
 
