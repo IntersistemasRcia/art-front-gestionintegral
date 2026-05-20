@@ -310,6 +310,9 @@ export default function AdminUserPage() {
   };
 
   const canCreateForTab = (tabIndex: number) => {
+    if (tabIndex === 0 && hasTask('Comercializador_Administracion_CrearGrupoOrganizador')) return true;
+    if (tabIndex === 1 && hasTask('Comercializador_Administracion_CrearOrganizadorComercializador')) return true;
+    if (tabIndex === 2 && hasTask('Comercializador_Administracion_CrearComercializador')) return true;
     if (isComercializador) return false;
     if (isOrganizadorComercializador) return tabIndex === 2; // solo Comercializador
     if (isGrupoOrganizador) return tabIndex === 1 || tabIndex === 2; // Organizador o Comercializador
