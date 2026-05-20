@@ -1,7 +1,7 @@
 //src/utils/ui/tab/CustomTab.tsx
 
 import React, { useState, ReactNode, SyntheticEvent } from 'react';
-import { Tabs, Tab, Box, Typography } from '@mui/material';
+import { Tabs, Tab, Box, Typography, Tooltip } from '@mui/material';
 import styles from './CustomTab.module.css';
 
 // Define la estructura de cada "tab"
@@ -10,6 +10,7 @@ interface TabItem {
     value: number;         
     content: ReactNode;    // El contenido que se mostrará en el panel
     disabled?: boolean;    // para deshabilitar la pestaña
+    tooltip?: string;
   
 }
 
@@ -71,16 +72,42 @@ return (
                     aria-label="custom tabs"
                     className={styles.customTabsBar} 
                 >
-                    {tabs.map((tab) => (
-                        <Tab
-                            key={tab.value}
-                            label={tab.label}
-                            value={tab.value} 
-                            disabled={tab.disabled || false} // <-- Aplica la propiedad disabled
-                            {...a11yProps(tab.value)}
-                            className={styles.customTab} 
-                        />
-                    ))}
+                    {tabs.map((tab) =>
+                        tab.tooltip && tab.disabled ? (
+                            <Tooltip
+                                key={tab.value}
+                                title={tab.tooltip}
+                                arrow
+                                slotProps={{
+                                    tooltip: {
+                                        sx: {
+                                            fontSize: "1.2rem",
+                                            fontWeight: 500,
+                                        },
+                                    },
+                                }}
+                            >
+                                <span style={{ display: "inline-flex" }}>
+                                    <Tab
+                                        label={tab.label}
+                                        value={tab.value}
+                                        disabled
+                                        {...a11yProps(tab.value)}
+                                        className={styles.customTab}
+                                    />
+                                </span>
+                            </Tooltip>
+                        ) : (
+                            <Tab
+                                key={tab.value}
+                                label={tab.label}
+                                value={tab.value}
+                                disabled={tab.disabled || false}
+                                {...a11yProps(tab.value)}
+                                className={styles.customTab}
+                            />
+                        )
+                    )}
                 </Tabs>
             </Box>
             {/* Renderizado de los Paneles de Contenido */}

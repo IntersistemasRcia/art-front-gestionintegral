@@ -19,16 +19,25 @@
   margin: 0;
 }
 
+.accordionTitle {
+  font-weight: bold !important;
+  font-size: 1.5rem !important;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.accordionIcon {
+  font-size: 2.5rem !important;
+  color: black;
+}
+
 /* Filters */
 .filtersContainer {
   display: flex;
   gap: 20px;
   align-items: flex-end;
-  margin-bottom: 25px;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
+  padding: 8px 0;
 }
 
 .actionsBar {
@@ -51,12 +60,14 @@
 }
 
 .filterSelect {
-  padding: 8px 12px;
-  border: 1px solid #ced4da;
+  padding: 16.5px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.23);
   border-radius: 4px;
   background-color: white;
-  font-size: 14px;
+  font-size: 1rem;
   min-width: 150px;
+  height: 56px;
+  box-sizing: border-box;
 }
 
 .filterSelect:focus {
@@ -213,11 +224,18 @@
   margin-top: 4px;
 }
 
-/* Grupo para el campo de CUIT (sin estilos en línea) */
+/* Grupo para el selector de empresa */
 .cuitGroup {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
+  flex: 1;
+  min-width: 320px;
+  max-width: 500px;
+}
+
+.cuitGroup > * {
+  width: 100%;
 }
 
 /* Estilos del input de CUIT (remueve inline styles del JSX) */
@@ -285,6 +303,10 @@
   flex: 1;
 }
 
+.formRowWide {
+  flex: 4.1 !important;
+}
+
 .fullRowField {
   flex: 1 !important;
 }
@@ -300,9 +322,8 @@
 
 /* Campos con ancho reducido (por ejemplo: Cod Postal) */
 .smallField {
-  /* Allow small fields to shrink to prevent wrapping on narrow containers */
-  flex: 0 2 220px;
-  max-width: 220px;
+  flex: 0 0 130px;
+  max-width: 130px;
 }
 
 /* Campos compactos para CUIL / Tipo doc / Nº doc */
@@ -340,6 +361,12 @@
 .captionNote {
   margin-left: 16px;
   margin-top: 4px;
+}
+
+/* Utilidad: layout en columna */
+.flexColumn {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Contenedor de la tabla de trabajadores relacionados */
@@ -468,7 +495,7 @@
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 
@@ -535,4 +562,18 @@
   font-weight: 700;
   margin-bottom: 8px;
   color: #1565c0;
+}
+
+/* Utilidad: atenuar elementos deshabilitados */
+.disabledOpacity {
+  opacity: 0.6;
+}
+
+/* Enlaces sin subrayado (confirmación de archivos adjuntos) */
+.noUnderlineLink {
+  text-decoration: none;
+}
+
+.formContainer :global(.MuiFormLabel-asterisk) {
+  color: #d32f2f;
 }

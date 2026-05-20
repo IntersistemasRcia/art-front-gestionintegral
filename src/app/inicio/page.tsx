@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// src/app/inicio/page.tsx
 "use client";
 
 import { useSession} from "next-auth/react";
@@ -6,15 +6,21 @@ import React from 'react';
 import Card from '@/components/Card';
 import styles from './page.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
-import { 
-  BsBellFill,
-  BsFileEarmarkLock,
-  BsTruck
-} from 'react-icons/bs';
+import QueriesAPI, { IndicadorDTO } from '@/data/queryAPI';
+import Link from 'next/link';
+import { CircularProgress, Box, Typography } from '@mui/material';
+import { useAccesosRapidosStore } from '@/data/accesosRapidosStore';
 
+const { useGetIndicadores } = QueriesAPI;
+
+// Array de colores para las tarjetas (se rotan según el índice)
+const borderColors = ['border-blue', 'border-pink', 'border-purple', 'border-yellow', 'border-red', 'border-green'];
 
 const InicioPage = () => {
   const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated';
+  const { data: indicadores, isLoading, error } = useGetIndicadores(isAuthenticated);
+  const { accesosRapidos, isLoading: isLoadingAccesosRapidos } = useAccesosRapidosStore();
 
   const { nombre } = session?.user as any || " ";
 
@@ -25,64 +31,44 @@ const InicioPage = () => {
       </div>
 
       <div className={styles.cardsGrid}>
-        {/* Tarjeta de Siniestros Pendientes */}
-        <Card
-          title="Siniestros Pendientes"
-          quantity={34}
-          description="Siniestros"
-          lastUpdated="15/01/2025"
-          link="/siniestros"
-          borderColorClass="border-blue"
-        />
-
-        {/* Tarjeta de Pólizas Activas */}
-        <Card
-          title="Pólizas Activas"
-          quantity={34}
-          description="Pólizas"
-          lastUpdated="15/01/2025"
-          link="/polizas"
-          borderColorClass="border-pink"
-        />
-        
-        {/* Tarjeta de Alertas CCM */}
-        <Card
-          title="Alertas CCM"
-          quantity={34}
-          description="Alertas"
-          lastUpdated="15/01/2025"
-          link="/alertas-ccm"
-          borderColorClass="border-purple"
-        />
-        {/* Tarjeta de Siniestros Pendientes */}
-        <Card
-          title="Siniestros Pendientes"
-          quantity={34}
-          description="Siniestros"
-          lastUpdated="15/01/2025"
-          link="/siniestros"
-          borderColorClass="border-blue"
-        />
-
-        {/* Tarjeta de Pólizas Activas */}
-        <Card
-          title="Pólizas Activas"
-          quantity={34}
-          description="Pólizas"
-          lastUpdated="15/01/2025"
-          link="/polizas"
-          borderColorClass="border-pink"
-        />
-        
-        {/* Tarjeta de Alertas CCM */}
-        <Card
-          title="Alertas CCM"
-          quantity={34}
-          description="Alertas"
-          lastUpdated="15/01/2025"
-          link="/alertas-ccm"
-          borderColorClass="border-purple"
-        />
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gridColumn: '1 / -1', padding: '40px' }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Box sx={{ gridColumn: '1 / -1', padding: '20px', textAlign: 'center', color: 'var(--rojo)' }}>
+            Error al cargar los indicadores
+          </Box>
+        ) : indicadores && indicadores.length > 0 ? (
+          indicadores.map((indicador: IndicadorDTO, index: number) => {
+            const baseLink = (indicador.link ?? "").trim();
+            const params = new URLSearchParams();
+            if (indicador.filtroId != null) {
+              params.set("filtroId", String(indicador.filtroId));
+              params.set("filtroNombre", indicador.descripcion ?? "");
+            }
+            const link =
+              baseLink.length === 0
+                ? ""
+                : params.toString()
+                  ? `${baseLink}${baseLink.includes("?") ? "&" : "?"}${params}`
+                  : baseLink;
+            return (
+              <Card
+                key={indicador.id}
+                title={indicador.descripcion}
+                quantity={indicador.valor}
+                description={indicador.nombre}
+                link={link}
+                borderColorClass={borderColors[index % borderColors.length]}
+              />
+            );
+          })
+        ) : (
+          <Box sx={{ gridColumn: '1 / -1', padding: '20px', textAlign: 'center', color: 'var(--gris)' }}>
+            No hay indicadores disponibles
+          </Box>
+        )}
       </div>
 
     <div className={styles.infoSection}>
@@ -107,11 +93,26 @@ const InicioPage = () => {
         <div className={styles.quickAccess}>
           <h2 className={styles.accessTitle}>Accesos Rápidos</h2>
           <div className={styles.accessButtons}>
-            {/* Uso del componente CustomButton */}
-            <CustomButton width="60%" >Consultar Siniestro</CustomButton>
-            <CustomButton width="60%">DDJJ</CustomButton>
-            <CustomButton width="60%">Informes</CustomButton>
-            <CustomButton width="60%">Denuncia</CustomButton>
+            {isLoadingAccesosRapidos ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : accesosRapidos.length > 0 ? (
+              accesosRapidos.map((acceso) => (
+                <CustomButton
+                  key={acceso.id}
+                  width="60%"
+                  component={Link}
+                  href={acceso.href}
+                >
+                  {acceso.label}
+                </CustomButton>
+              ))
+            ) : (
+              <Typography sx={{ color: 'var(--gris)', fontSize: '1.4rem' }}>
+                No hay accesos rápidos configurados para tu rol.
+              </Typography>
+            )}
           </div>
         </div>
       </div>

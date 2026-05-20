@@ -1,0 +1,315 @@
+.usuariosPageContainer {
+  padding: var(--content-padding);
+}
+
+.errorMessage {
+  color: var(--naranja);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+/* Layout principal del formulario */
+.formLayout {
+  display: flex;
+  gap: 24px;
+  min-height: 500px;
+}
+
+.formContent {
+  flex: 2;
+  padding-right: 24px;
+}
+
+.infoPanel {
+  flex: 1;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 20px;
+  height: fit-content;
+}
+
+.infoColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+.infoPanelTitle {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  margin-bottom: 16px !important;
+  color: #333;
+}
+
+.infoList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.infoList li {
+  padding: 8px 0;
+  font-size: 14px;
+  color: #666;
+  position: relative;
+  padding-left: 20px;
+}
+
+.infoList li:before {
+  content: "•";
+  color: var(--verde);
+  font-weight: bold;
+  position: absolute;
+  left: 0;
+}
+
+/* Secciones del formulario */
+.formSection {
+  margin-bottom: 32px;
+}
+
+.sectionTitle {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  margin-bottom: 20px !important;
+  color: #333;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 8px;
+}
+
+/* Filas del formulario */
+.formRow {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.formRow > * {
+  flex: 1;
+}
+
+/* Botón de búsqueda: evitar que tome el mismo flex que los campos */
+.searchButton {
+  flex: 0 0 auto;
+  align-self: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 10px !important;
+  height: 34px;
+  min-height: unset !important;
+}
+
+/* Input de búsqueda: hacerlo un poco más angosto que el resto */
+.searchInput {
+  flex: 0 0 200px; /* no crecer, base 260px */
+  max-width: 200px;
+  align-self: center;
+}
+
+/* Asegurar que el input real dentro de MUI respete la altura compacta */
+.searchInput .MuiInputBase-root {
+  min-height: 34px;
+}
+
+.fullRowField {
+  flex: 1 !important;
+}
+
+/* Campos con ancho reducido */
+.postalField {
+  flex: 0 0 auto;
+  max-width: 160px;
+  width: 100%;
+  align-self: center;
+}
+
+.nroField {
+  flex: 0 0 auto;
+  max-width: 120px;
+  width: 100%;
+  align-self: center;
+}
+
+.pisoField {
+  flex: 0 0 auto;
+  max-width: 100px;
+  width: 100%;
+  align-self: center;
+}
+
+/* Checkbox grande usado en etiquetas */
+.checkboxLarge {
+  transform: scale(1.25);
+}
+
+/* FormControlLabel personalizado */
+.formControlLabel {
+  align-items: center;
+}
+
+.formControlLabel .MuiFormControlLabel-label {
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+/* Ayuda para contraseñas */
+.passwordHelp {
+  font-size: 12px !important;
+  color: #666 !important;
+  margin-top: 8px !important;
+  font-style: italic;
+}
+
+/* Acciones del formulario */
+.formActions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+}
+
+.asociadosContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.asociadosActions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.asociadosTableWrapper {
+  margin-top: 6px;
+}
+
+.actionButtonDisabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  margin-right: 8px;
+}
+
+.cancelButton {
+  background-color: #6c757d !important;
+  color: white !important;
+  border: none !important;
+}
+
+.cancelButton:hover {
+  background-color: #5a6268 !important;
+}
+
+.saveButton {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.saveButton:hover {
+  background-color: #5a6268 !important;
+}
+
+.saveAndContinueButton {
+  background-color: #ff9800 !important;
+  color: white !important;
+}
+
+.saveAndContinueButton:hover {
+  background-color: #f57c00 !important;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .formLayout {
+    flex-direction: column;
+  }
+  
+  .formContent {
+    padding-right: 0;
+  }
+  
+  .infoPanel {
+    order: -1;
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .formRow {
+    flex-direction: column;
+  }
+  
+  .formActions {
+    flex-direction: column;
+  }
+  
+  .formActions button {
+    width: 100%;
+  }
+}
+
+/* Campo más ancho para comision/serviciosAdicionales */
+.wideField {
+  flex: 1.5;
+}
+
+.checkboxLabel {
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.phoneField {
+  width: 100%;
+}
+
+.phoneContainer {
+  width: 100% !important;
+}
+
+.phoneInput {
+  width: 100% !important;
+  height: 43px;
+  border: 1px solid #45661f !important;
+  border-radius: 4px !important;
+  color: #474747 !important;
+  font-family: Outfit, sans-serif !important;
+  font-size: 1.5rem !important;
+}
+
+.phoneButton {
+  border-color: #45661f !important;
+}
+
+.phoneContainer :global(.special-label) {
+  color: #45661f;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.actionButtons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.deleteIcon {
+  cursor: pointer;
+  color: var(--naranja);
+  font-size: 1.7rem;
+}
+
+.editIcon {
+  cursor: pointer;
+  color: var(--naranja);
+  font-size: 1.7rem;
+}

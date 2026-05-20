@@ -28,9 +28,14 @@
     width: 700px;
 }
 
-.large {
+/* .large {
     width: 1100px;
+} */
+
+.large {
+    width: 1340px;
 }
+
 
 /* === NUEVA SECCIÓN: Encabezado del Modal === */
 .modalHeader {

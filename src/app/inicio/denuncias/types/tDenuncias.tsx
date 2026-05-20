@@ -1,4 +1,3 @@
-import { s } from "react-querybuilder/dist/index-Dxdojb6L";
 import type { SelectChangeEvent } from "@mui/material/Select";
 
 // Interface for detailed incident/accident report
@@ -84,10 +83,9 @@ export type DenunciaCreate = {
   // Additional Information
   comentario: string;
   origenIngreso: string;
-  trasladoTipo: string;
   avisoTrabajadorFueraNomina: boolean | null;
   avisoEmpleadorSinContratoVigente: boolean | null;
-  estado: number;
+  estado: number | string;
   denunciaCanalIngresoInterno: number;
 }
 
@@ -103,6 +101,8 @@ export interface DenunciaFormData {
   tipoDenuncia: 'AccidenteTrabajo' | 'Enfermedad' | '';
   tipoSiniestro: string;
   enViaPublica: 'Si' | 'No' | '';
+  // Fecha en la que se informa a la ART
+  fechaInformacionArt: string;
 
   // Accidente de Trabajo
   fechaOcurrencia: string;
@@ -142,6 +142,9 @@ export interface DenunciaFormData {
   domicilioNro: string;
   domicilioPiso: string;
   domicilioDpto: string;
+    trasladoTipo: string;
+  domicilioEntreCalle1: string;
+  domicilioEntreCalle2: string;
   telefono: string;
   email: string;
   localidad: string;
@@ -149,27 +152,6 @@ export interface DenunciaFormData {
 
   // Trabajadores relacionados (tabla)
   trabajadoresRelacionados: TrabajadorRelacionado[];
-
-  // Paso 3: Datos del Siniestro (Estado del Trabajador)
-  estaConsciente: 'Ignora' | 'Si' | 'No' | '';
-  color: string;
-  habla: 'Ignora' | 'Si' | 'No' | '';
-  gravedad: 'Ignora' | 'Leve' | 'Grave' | 'Critico' | '';
-  respira: 'Ignora' | 'Si' | 'No' | '';
-  observaciones: string;
-  tieneHemorragia: 'Ignora' | 'Si' | 'No' | '';
-  contextoDenuncia: 'Ignora' | 'Urgente' | 'Normal' | '';
-
-  // ROAM
-  roam: 'No' | 'Si' | '';
-  roamNro: string;
-  roamAno: string;
-  roamCodigo: string;
-  roamDescripcion: string;
-
-  // Tipo de Traslado
-  tipoTraslado: string;
-  prestadorTraslado: string;
 
   // Prestador Inicial
   prestadorInicialCuit: string;
@@ -190,12 +172,31 @@ export interface DenunciaFormData {
   // Verificación de Contacto Inicial
   verificaContactoInicial: string;
 
+  // Estado del Trabajador
+  estTrabEstaConsciente: string;
+  estTrabColor: string;
+  estTrabHabla: string;
+  estTrabGravedad: string;
+  estTrabRespira: string;
+  estTrabObservaciones: string;
+  estTrabTieneHemorragia: string;
+  estTrabContextoDenuncia: string;
+  estTrabPrestadorTraslado: string;
+
+  estTrabPrestadorTrasladoRazonSocial?: string;
+
   // Paso 4: Confirmación
   // Archivos adjuntos
   archivosAdjuntos: File[];
 
   // Aceptación de términos
   aceptoTerminos: boolean;
+
+  // ROAM
+  roam: string;
+  roamNumero: string;
+  roamInterno: string;
+  roamAnio: string;
 
   // Datos del Empleador (solapa adicional)
   empCuit: string;
@@ -254,11 +255,10 @@ export const COLORES = [
 ];
 
 export const TIPOS_TRASLADO = [
-  { value: 'AMBULANCIA', label: 'Ambulancia' },
-  { value: 'VEHICULO_PARTICULAR', label: 'Vehículo Particular' },
-  { value: 'TRANSPORTE_PUBLICO', label: 'Transporte Público' },
-  { value: 'A_PIE', label: 'A Pie' },
-  { value: 'NO_REQUIERE', label: 'No Requiere Traslado' }
+  { value: 'AMBULANCIA_UTIM', label: 'Ambulancia UTIM' },
+  { value: 'AMBULANCIA_CSM', label: 'Ambulancia CSM' },
+  { value: 'REMIS', label: 'Remis' },
+  { value: 'PROPIO', label: 'Propio' }
 ];
 
 // Estado inicial del formulario
@@ -279,6 +279,7 @@ export const initialDenunciaFormData: DenunciaFormData = {
   entreCalle: '',
   entreCalleY: '',
   descripcion: '',
+  fechaInformacionArt: '',
   codLocalidad: '',
   codPostal: '',
   localidadAccidente: '',
@@ -317,6 +318,8 @@ export const initialDenunciaFormData: DenunciaFormData = {
   domicilioNro: '',
   domicilioPiso: '',
   domicilioDpto: '',
+  domicilioEntreCalle1: '',
+  domicilioEntreCalle2: '',
   telefono: '',
   email: '',
   localidad: '',
@@ -324,21 +327,6 @@ export const initialDenunciaFormData: DenunciaFormData = {
   trabajadoresRelacionados: [],
 
   // Paso 3
-  estaConsciente: '',
-  color: '',
-  habla: '',
-  gravedad: '',
-  respira: '',
-  observaciones: '',
-  tieneHemorragia: '',
-  contextoDenuncia: '',
-  roam: '',
-  roamNro: '',
-  roamAno: '',
-  roamCodigo: '',
-  roamDescripcion: '',
-  tipoTraslado: '',
-  prestadorTraslado: '',
   prestadorInicialCuit: '',
   prestadorInicialRazonSocial: '',
   establecimientoCuit: '',
@@ -353,6 +341,21 @@ export const initialDenunciaFormData: DenunciaFormData = {
   establecimientoTelefono: '',
   establecimientoEmail: '',
   verificaContactoInicial: '',
+  estTrabEstaConsciente: 'Ignora',
+  estTrabColor: 'Ind.',
+  estTrabHabla: 'Ignora',
+  estTrabGravedad: 'Ignora',
+  estTrabRespira: 'Ignora',
+  estTrabObservaciones: '',
+  estTrabTieneHemorragia: 'Ignora',
+  estTrabContextoDenuncia: 'Ignora',
+  estTrabPrestadorTraslado: '',
+  trasladoTipo: '',
+  // ROAM defaults
+  roam: '',
+  roamNumero: '',
+  roamInterno: '',
+  roamAnio: '',
 
   // Paso 4
   archivosAdjuntos: [],
@@ -368,10 +371,16 @@ export type DenunciaGetAll = {
   empCuit: number;
   empPoliza: number;
   empRazonSocial: string;
+  conIniDomicilioCalle?: string;
+  conIniDomicilioNumero?: string;
+  conIniDomicilioPiso?: string;
+  conIniDomicilioDepartamento?: string;
+  conIniDomicilioEntreCalle?: string;
+  conIniDomicilioYCalle?: string;
 };
-
 export type DenunciaQueryParams = {
-  Estado?: number;
+  Estado?: number | string;
+  Tipo?: number
   PageIndex?: number;
   PageSize?: number;
   EmpCuit?: number;
@@ -425,12 +434,12 @@ export type PrestadorQueryParams = {
 
 export type PrestadorResponse = {
   cuit: number;
-  nombreFantasia: string;
+  razonSocial: string;
 };
 
 // Tipo para crear una nueva denuncia (POST /api/Denuncias)
 export type DenunciaPostRequest = {
-  // siniestroNro: number;
+  siniestroNro: number;
   siniestroTipo: string;
   empCuit: number;
   empPoliza: number;
@@ -476,6 +485,7 @@ export type DenunciaPostRequest = {
   empEstTelefonos: string;
   empEsteMail: string;
   prestadorCuit: number;
+  estTrabPrestadorTraslado?: number | null;
   afiCuil: number;
   afiDocTipo: string;
   afiDocNumero: number;
@@ -497,19 +507,14 @@ export type DenunciaPostRequest = {
   afiObraSocial: string;
   comentario: string;
   origenIngreso: string;
-  trasladoTipo: string;
-
   avisoTrabajadorFueraNomina: number;
-  avisoTrabajadorSinContratoVigente: boolean;
-  estado: number;
-  //denunciaCanalIngresoInterno: number;
+  avisoEmpleadorSinContratoVigente: boolean;
+  estado: string;
+  denunciaCanalIngresoInterno: number;
   descripcion: string;
-  fechaHoraSiniestro: string;
+  fechaHoraSiniestro: string | null;
+  fechaHoraTomaConocimientoSiniestro: string | null;
   enViaPublica: string;
-  roam: string;
-  roamNumero: number;
-  roamInterno: number;
-  roamAnio: number;
 
   tipoAccidente: string;
   conIniTelefono: string;
@@ -521,19 +526,19 @@ export type DenunciaPostRequest = {
   conIniCodLocalidad: number;
   conIniCodPostal: string;
   conIniLocalidad: string;
-
-
-
-  estTrabEstaConsciente: string;
-  estTrabColor: string;
-  estTrabHabla: string;
-  estTrabGravedad: string;
-  estTrabRespira: string;
-  estTrabObservaciones: string;
-  estTrabTieneHemorragia: string;
-  estTrabVerificaContactoInicial: string;
-  estTrabPrestadorTraslado: string;
-  contextoDenuncia: string;
+  conIniDomicilioCalle: string;
+  conIniDomicilioNumero: string;
+  conIniDomicilioPiso: string;
+  conIniDomicilioDepartamento: string;
+  conIniDomicilioEntreCalle: string;
+  conIniDomicilioYCalle: string;
+  denunciaInstanciaImagenes: Array<{
+    internoRefDenImgTipo: number;
+    tipoDocumentacion: string;
+    archivoNombre: string;
+    imagen: string;
+  }>;
+  trasladoTipo: string;
 };
 
 // Tipo para actualizar una denuncia existente (PUT /api/Denuncias/{id})
@@ -585,7 +590,6 @@ export type DenunciaPutRequest = {
   empEstTelefonos: string;
   empEsteMail: string;
   prestadorCuit: number;
-  estado: number;
   afiCuil: number;
   afiDocTipo: string;
   afiDocNumero: number;
@@ -607,19 +611,15 @@ export type DenunciaPutRequest = {
   afiObraSocial: string;
   comentario: string;
   origenIngreso: string;
-  trasladoTipo: string;
   avisoTrabajadorFueraNomina: number;
   avisoEmpleadorSinContratoVigente: boolean;
   denunciaCanalIngresoInterno: number;
   descripcion: string;
-  fechaHoraSiniestro: string;
+  fechaHoraSiniestro: string | null;
   enViaPublica: string;
-  roam: string;
-  roamNumero: number;
-  roamInterno: number;
-  roamAnio: number;
   tipoAccidente: string;
   estadoDenunciaSiniestro: string;
+  siniestroTomaConocimientoFechaHora?: string | null;
   conIniTelefono: string;
   conIniApellidoNombres: string;
   conIniRelacionConFamiliar: string;
@@ -628,16 +628,19 @@ export type DenunciaPutRequest = {
   conIniCodLocalidad: number;
   conIniCodPostal: string;
   conIniLocalidad: string;
-  estTrabEstaConsciente: string;
-  estTrabColor: string;
-  estTrabHabla: string;
-  estTrabGravedad: string;
-  estTrabRespira: string;
-  estTrabObservaciones: string;
-  estTrabTieneHemorragia: string;
-  estTrabContextoDenuncia: string;
-  estTrabVerificaContactoInicial: string;
-  estTrabPrestadorTraslado: string;
+  conIniDomicilioCalle: string;
+  conIniDomicilioNumero: string;
+  conIniDomicilioPiso: string;
+  conIniDomicilioDepartamento: string;
+  conIniDomicilioEntreCalle: string;
+  conIniDomicilioYCalle: string;
+  denunciaInstanciaImagenes: Array<{
+    interno: number;
+    internoRefDenImgTipo: number;
+    tipoDocumentacion: string;
+    archivoNombre: string;
+    imagen: string;
+  }>;
 };
 
 // Tipo para actualizar parcialmente una denuncia (PATCH /api/Denuncias)
@@ -655,6 +658,14 @@ export type ParametersLocalidad = {
 
 export type ParametersLocalidadCodigo = {
   Codigo?: number;
+};
+
+export type ParametersLocalidadSRT = {
+  provinciaId?: number;
+}
+
+export type ParametersLocalidadbyCodigo = {
+  codigo?: string;
 };
 
 export type ParametersLocalidadNombre = {
@@ -681,6 +692,11 @@ export interface RefObraSocial {
   eMail: string;
   web: string;
   organismo: string;
+}
+
+export interface RefPrestadores {
+  cuit: number;
+  razonSocial: string;
 }
 
 export interface Roam {
@@ -734,6 +750,7 @@ export interface Props {
   onClose: () => void;
   onSubmit: (formData: DenunciaFormData, options?: { final?: boolean }) => void;
   initialData?: DenunciaFormData;
+  initialFiles?: File[];
   errorMsg?: string | null;
   method: RequestMethod;
   isSubmitting?: boolean;
@@ -764,16 +781,8 @@ export interface ValidationErrors {
   telefono?: string;
   email?: string;
   // Accident data fields
-  estaConsciente?: string;
-  color?: string;
-  habla?: string;
-  gravedad?: string;
-  respira?: string;
-  tieneHemorragia?: string;
-  contextoDenuncia?: string;
   prestadorInicialCuit?: string;
   prestadorInicialRazonSocial?: string;
-  roamDescripcion?: string;
   // Employer fields
   empCuit?: string;
   empPoliza?: string;
@@ -816,16 +825,8 @@ export interface TouchedFields {
   telefono?: boolean;
   email?: boolean;
   // Accident data fields
-  estaConsciente?: boolean;
-  color?: boolean;
-  habla?: boolean;
-  gravedad?: boolean;
-  respira?: boolean;
-  tieneHemorragia?: boolean;
-  contextoDenuncia?: boolean;
   prestadorInicialCuit?: boolean;
   prestadorInicialRazonSocial?: boolean;
-  roamDescripcion?: boolean;
   // Confirmation fields
   aceptoTerminos?: boolean;
   // Employer fields
@@ -843,3 +844,10 @@ export interface TouchedFields {
   empTelefonos?: boolean;
   empEmail?: boolean;
 }
+
+export type ParametersEmpleadorT = {
+  CUIL?: number;
+  PageIndex?: number;
+  PageSize?: number;
+  Perido?: number;
+};

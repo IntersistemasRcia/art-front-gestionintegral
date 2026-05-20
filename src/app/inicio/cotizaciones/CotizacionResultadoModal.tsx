@@ -106,19 +106,9 @@ export const CotizacionResultadoModal = ({
                     Alícuota Final:
                   </Typography>
                   <Typography variant="body2" fontWeight="bold" sx={{ fontSize: '1.6rem' }}>
-                    {Formato.Moneda(resultado.alicuotaFinal)}
+                    % {typeof resultado.alicuotaFinal === 'number' ? resultado.alicuotaFinal.toFixed(2) : resultado.alicuotaFinal}
                   </Typography>
                 </Box>
-                {resultado.alicuotaFinalEstadisticas && (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '1.6rem' }}>
-                      Alícuota Final Estadísticas:
-                    </Typography>
-                    <Typography variant="body2" fontWeight="bold" sx={{ fontSize: '1.6rem' }}>
-                      {Formato.Moneda(resultado.alicuotaFinalEstadisticas)}
-                    </Typography>
-                  </Box>
-                )}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '1.6rem' }}>
                     Estado:

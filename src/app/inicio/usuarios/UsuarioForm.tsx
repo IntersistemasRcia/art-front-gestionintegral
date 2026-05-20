@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
   TextField,
@@ -10,53 +10,99 @@ import {
   InputLabel,
   FormControl,
   CircularProgress,
-  Autocomplete,
   Checkbox,
   FormControlLabel,
+  Alert,
 } from "@mui/material";
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
+import { useAuth } from '@/data/AuthContext';
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import RefEmpleador from "./interfaces/RefEmpleador";
+import UsuarioRow from "./interfaces/UsuarioRow";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 import CargoInterface from "./interfaces/CargoInterface";
 import Formato from "@/utils/Formato";
+import ArtAPI from '@/data/artAPI';
+import UsuarioAPI from '@/data/usuarioAPI';
+import useSWR from 'swr';
+import AuthAPI from '@/data/authAPI';
+import dayjs from 'dayjs';
+import CustomTabs from "@/utils/ui/tab/CustomTab";
+import {
+  UsuarioEmpresasUsuarioTab,
+  type EmpresasRelacionadasMeta,
+} from "./UsuarioEmpresasUsuarioTab";
 
 // Definición del modo de operación (replicada desde UsuariosPage)
-type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
+export type RequestMethod = "create" | "edit" | "view" | "delete" | "activate" | "remove";
 
 export interface UsuarioFormFields {
   nombre: string;
+  apellido?: string;
+  titulo?: string;
   email: string;
   cuit: string; // Keep as string for form input, will convert to number on submit
   phoneNumber: string;
+  matricula?: string;
+  fechaNacimiento?: string;
+  canalInterviniente?: string;
+  inicioFecha?: string;
+  bajaFecha?: string | null;
+  domicilioCalle?: string;
+  domicilioNro?: string;
+  domicilioPiso?: string;
+  domicilioEntreCalle1?: string;
+  domicilioEntreCalle2?: string;
+  domicilioCodPostal?: string;
+  domicilioCodLocalidad?: string;
+  domicilioLocalidad?: string;
+  domicilioProvincia?: string;
   cargoId?: number;
   password?: string;
   confirmPassword?: string;
   rol: string;
+  maxUsuarios?: number;
+  cantidadUsuarios?: number;
   // tipo: string;
   userName: string;
   empresaId: number;
   id?: string;
+  comision?: number;
+  serviciosAdicionales?: number;
+  aplicaIva?: number;
+  srtComercializadorOrganizadorInterno?: number;
+  sectorId?: number;
 }
 
-interface Props {
+const ROLES_EXCLUIDOS_USUARIOS = ["comercializador", "grupoorganizador", "organizadorcomercializador"];
+
+export interface Props {
   open: boolean;
   onClose: () => void;
   onSubmit: (formData: UsuarioFormFields) => void;
   roles: RolesInterface[];
   cargos: CargoInterface[];
   refEmpleadores: RefEmpleador[];
+  usuarios?: UsuarioRow[];
   initialData?: UsuarioFormFields;
   errorMsg?: string | null;
   method: RequestMethod; // MODO DE OPERACIÓN
   isSubmitting?: boolean;
   isAdmin?: boolean; // Nuevo parámetro para determinar si el usuario es admin
+  /** Tras registrar usuario: forzar pestaña Empresas y al menos una relación antes de cerrar el modal. */
+  awaitingEmpresaRelation?: boolean;
+  onEmpresaRelationSatisfied?: () => void;
 }
 
 const initialFormState: UsuarioFormFields = {
   nombre: "",
+  apellido: "",
+  titulo: "",
   email: "",
   cuit: "",
   phoneNumber: "",
@@ -64,17 +110,33 @@ const initialFormState: UsuarioFormFields = {
   password: "",
   confirmPassword: "",
   rol: "",
+  maxUsuarios: 0,
+  cantidadUsuarios: 0,
   // tipo: "",
   userName: "",
   empresaId: 0,
+  sectorId: undefined,
 };
 
 // Interfaces completas para errores y campos tocados
-interface ValidationErrors {
+export interface ValidationErrors {
   nombre?: string;
+  apellido?: string;
+  titulo?: string;
   email?: string;
   cuit?: string;
   phoneNumber?: string;
+  matricula?: string;
+  fechaNacimiento?: string;
+  domicilioCalle?: string;
+  domicilioNro?: string;
+  domicilioPiso?: string;
+  domicilioEntreCalle1?: string;
+  domicilioEntreCalle2?: string;
+  domicilioCodPostal?: string;
+  domicilioCodLocalidad?: string;
+  domicilioLocalidad?: string;
+  domicilioProvincia?: string;
   cargoId?: string;
   password?: string;
   confirmPassword?: string;
@@ -83,13 +145,32 @@ interface ValidationErrors {
   // userName?: string;
   empresaId?: string;
   id?: string;
+  maxUsuarios?: string;
+  cantidadUsuarios?: string;
+  sectorId?: string;
 }
 
-interface TouchedFields {
+export interface TouchedFields {
   nombre?: boolean;
+  apellido?: boolean;
+  titulo?: boolean;
   email?: boolean;
   cuit?: boolean;
   phoneNumber?: boolean;
+  matricula?: boolean;
+  fechaNacimiento?: boolean;
+  canalInterviniente?: boolean;
+  inicioFecha?: boolean;
+  bajaFecha?: boolean;
+  domicilioCalle?: boolean;
+  domicilioNro?: boolean;
+  domicilioPiso?: boolean;
+  domicilioEntreCalle1?: boolean;
+  domicilioEntreCalle2?: boolean;
+  domicilioCodPostal?: boolean;
+  domicilioCodLocalidad?: boolean;
+  domicilioLocalidad?: boolean;
+  domicilioProvincia?: boolean;
   cargoId?: boolean;
   password?: boolean;
   confirmPassword?: boolean;
@@ -98,7 +179,16 @@ interface TouchedFields {
   // userName?: boolean;
   empresaId?: boolean;
   id?: boolean;
+  comision?: boolean;
+  serviciosAdicionales?: boolean;
+  aplicaIva?: boolean;
+  maxUsuarios?: boolean;
+  cantidadUsuarios?: boolean;
+  sectorId?: boolean;
 }
+
+export const LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR =
+  "Debe asociar al menos una empresa desde la solapa 'Empresas del usuario' antes de guardar los cambios.";
 
 export default function UsuarioForm({
   open,
@@ -107,17 +197,29 @@ export default function UsuarioForm({
   roles,
   cargos,
   refEmpleadores,
+  usuarios = [],
   initialData,
   errorMsg,
   method,
   isSubmitting = false,
   isAdmin = false,
+  awaitingEmpresaRelation = false,
+  onEmpresaRelationSatisfied,
 }: Props) {
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<TouchedFields>({});
   const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [modalMsgOpen, setModalMsgOpen] = useState<boolean>(false);
+  const [modalMsgText, setModalMsgText] = useState<string>("");
+  const [modalMsgType, setModalMsgType] = useState<MessageType>('error');
+  const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
+  const [fichaTab, setFichaTab] = useState(0);
+  const [empresasRelMeta, setEmpresasRelMeta] = useState<EmpresasRelacionadasMeta | null>(null);
 
+  const { user } = useAuth();
+  const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
   const isEditing = method === "edit";
@@ -125,6 +227,32 @@ export default function UsuarioForm({
   const isDeleting = method === "delete";
   const isActivating = method === "activate";
   const isDisabled = isViewing || isDeleting || isActivating;
+  const hasEmpresasTab = true;
+  const empresasTabDisabled = isCreating && !Boolean(form.id);
+  const requiresTituloMatricula = form.rol === "MedicinaLaboral" || form.rol === "SeguridadEHigiene";
+
+  const roleOptions = useMemo(() => {
+    const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
+    const baseRoles = (!userRole || userRole.rolesHijos.length === 0)
+      ? roles
+      : (() => { const hijoIds = new Set(userRole.rolesHijos.map(h => h.id)); return roles.filter(r => hijoIds.has(r.id)); })();
+    const isExcludedRole = (rol: RolesInterface) =>
+      ROLES_EXCLUIDOS_USUARIOS.includes(rol.nombreNormalizado.toLowerCase());
+    const currentRole = roles.find(r => r.nombre === form.rol);
+    const currentExcluded = currentRole ? isExcludedRole(currentRole) : false;
+
+    const allowed = baseRoles
+      .filter(r => !isExcludedRole(r))
+      .map((rol) => ({ rol, disabled: false }));
+
+    if (currentExcluded && currentRole) {
+      return [{ rol: currentRole, disabled: true }];
+    }
+
+    return allowed;
+  }, [roles, user?.rol, isEditing, isViewing, form.rol]);
+
+  const isRolSelectDisabled = isDisabled || isAdminUser || (isEditing && roleOptions.length === 1 && roleOptions[0].disabled);
 
   // Función helper para formatear CUIT
   const formatCuit = (cuit: string): string => {
@@ -138,10 +266,12 @@ export default function UsuarioForm({
   };
 
   useEffect(() => {
+    if (!open) return;
+
     // Restablecer el formulario y los estados de error/tocado al abrir o cambiar los datos
     if (initialData) {
       const processedData = { ...initialData };
-      
+
       // Aplicar formato al CUIT
       console.log("Initial:", processedData);
       if (processedData.userName) {
@@ -159,16 +289,60 @@ export default function UsuarioForm({
         processedData.password = "";
         processedData.confirmPassword = "";
       }
-      
+
+      if (processedData.empresaId) {
+        const empresa = refEmpleadores.find(
+          (item) => item.interno === processedData.empresaId
+        );
+        if (empresa?.cantidadUsuariosMaxima !== undefined) {
+          processedData.maxUsuarios = empresa.cantidadUsuariosMaxima;
+        }
+        const currentCountFromList = usuarios.filter((u) => u.empresaId === processedData.empresaId).length;
+        processedData.cantidadUsuarios = empresa?.cantidadUsuarios ?? currentCountFromList;
+      }
+
       setForm(processedData);
     } else {
       setForm(initialFormState);
     }
-    
+
     setErrors({});
     setTouched({});
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
-  }, [initialData, open, isEditing, isCreating, cargos]);
+    setShowPassword(false); // Resetear la visibilidad de contraseña
+    setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
+    setEmpresasRelMeta(null);
+    setFichaTab(awaitingEmpresaRelation ? 1 : 0);
+  }, [initialData, open, isEditing, isCreating, awaitingEmpresaRelation]);
+
+  useEffect(() => {
+    if (!awaitingEmpresaRelation) return;
+    if (!empresasRelMeta || empresasRelMeta.isLoading) return;
+    if (empresasRelMeta.count >= 1) {
+      onEmpresaRelationSatisfied?.();
+    }
+  }, [awaitingEmpresaRelation, empresasRelMeta, onEmpresaRelationSatisfied]);
+
+  const handleEmpresasRelacionadasMetaChange = useCallback((meta: EmpresasRelacionadasMeta) => {
+    setEmpresasRelMeta(meta);
+  }, []);
+
+  const mustBlockModalClose =
+    awaitingEmpresaRelation &&
+    (empresasRelMeta === null || empresasRelMeta.isLoading || empresasRelMeta.count < 1);
+
+  const handleModalCloseAttempt = useCallback(() => {
+    if (isSubmitting) return;
+    if (mustBlockModalClose) {
+      setModalMsgText(
+        'Debe vincular al menos una empresa al usuario en la pestaña "Empresas del Usuario" antes de cerrar el asistente.'
+      );
+      setModalMsgType("warning");
+      setModalMsgOpen(true);
+      return;
+    }
+    onClose();
+  }, [isSubmitting, mustBlockModalClose, onClose]);
 
   const modalTitle = useMemo(() => {
     switch (method) {
@@ -187,7 +361,7 @@ export default function UsuarioForm({
     }
   }, [method, form.nombre]);
 
-  // --- Funciones de Validación ---
+  // --- Funciones de Validación --- 
 
   const validateCuit = (cuit: string): string | undefined => {
     if (!cuit.trim()) return "CUIT es requerido";
@@ -283,7 +457,7 @@ export default function UsuarioForm({
           // En edición, solo validar si alguno de los campos de password tiene contenido
           const hasPassword = form.password && form.password.trim() !== "";
           const hasConfirmPassword = value.trim() !== "";
-          
+
           if (hasPassword || hasConfirmPassword) {
             // Si cualquiera tiene contenido, validar ambos
             return validateConfirmPassword(value, form.password || "");
@@ -296,6 +470,16 @@ export default function UsuarioForm({
       //   return validatePhoneNumber(value);
       case "nombre":
         return validateRequired(value, "Nombre");
+      case "titulo":
+        if (!requiresTituloMatricula) {
+          return undefined;
+        }
+        return validateRequired(value, "Título Habilitante");
+      case "matricula":
+        if (!requiresTituloMatricula) {
+          return undefined;
+        }
+        return validateRequired(value, "Matrícula");
       // case "userName":
       //   return validateRequired(value, "Usuario");
       // case "tipo":
@@ -307,13 +491,14 @@ export default function UsuarioForm({
         }
         return validateRequired(value, "Rol");
       case "cargoId":
+        if (isAdminEmpleador) return undefined;
         return validateRequired(String(value), "Cargo");
       case "empresaId":
-        // No validar empresa si está marcado como administrador en modo creación
-        if (isCreating && isAdminUser) {
-          return undefined;
-        }
-        return validateRequired(String(value), "Empresa");
+        // El campo "Empresa" no se gestiona en esta ficha.
+        return undefined;
+      case "sectorId":
+        if (isAdminEmpleador) return undefined;
+        return validateRequired(String(value), "Sector");
       default:
         return undefined;
     }
@@ -336,6 +521,19 @@ export default function UsuarioForm({
       }
     });
 
+    // Si estamos creando un usuario para una empresa, validar el límite de usuarios
+    const max = Number(form.maxUsuarios ?? 0);
+    const current = Number(form.cantidadUsuarios ?? 0);
+    if (max > 0 && current >= max) {
+      const msg = "Se alcanzó el límite de usuarios para esta empresa. Por favor comunicarse con un operador de la ART";
+      newErrors.maxUsuarios = msg;
+      // mostrar modal de error
+      setModalMsgText(msg);
+      setModalMsgType('error');
+      setModalMsgOpen(true);
+      hasErrors = true;
+    }
+
     setErrors(newErrors);
     return !hasErrors;
   };
@@ -354,14 +552,26 @@ export default function UsuarioForm({
           ...prev,
           [name]: formattedCuit,
         }));
+        // Si completó 11 dígitos, disparar consulta ARCA
+        if (cleanValue.length === 11) {
+          setArcaCUIL(Number(cleanValue));
+        } else {
+          setArcaCUIL(undefined);
+        }
       }
+    } else if (name === "matricula") {
+      const numericValue = value.replace(/\D/g, '');
+      setForm((prev: UsuarioFormFields) => ({
+        ...prev,
+        [name]: numericValue,
+      }));
     } else {
       setForm((prev: UsuarioFormFields) => ({
         ...prev,
         [name]: value,
       }));
     }
-        
+
     if (touched[fieldName]) {
       const error = validateField(fieldName, name === "cuit" ? formatCuit(value.replace(/[^0-9]/g, '')) : value);
       setErrors((prev) => ({
@@ -409,23 +619,45 @@ export default function UsuarioForm({
     }
   };
 
+  const handleSectorChange = (e: SelectChangeEvent<string>) => {
+    const { value } = e.target;
+    const sectorId = value === "" ? undefined : Number(value);
+
+    setForm((prev: UsuarioFormFields) => ({
+      ...prev,
+      sectorId: sectorId,
+    }));
+
+    if (touched.sectorId) {
+      const error = validateField("sectorId", String(sectorId || ""));
+      setErrors((prev) => ({
+        ...prev,
+        sectorId: error,
+      }));
+    }
+  };
+
   const handleIsAdminUserChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     setIsAdminUser(checked);
-    
+
     if (checked) {
       // Si se marca como administrador, limpiar la empresa y establecer rol
       setForm((prev: UsuarioFormFields) => ({
         ...prev,
         empresaId: 0,
         rol: "Administrador",
+        maxUsuarios: 0,
+        cantidadUsuarios: 0,
       }));
-      
+
       // Limpiar errores de empresa y rol si existen
       setErrors((prev) => ({
         ...prev,
         empresaId: undefined,
         rol: undefined,
+        maxUsuarios: undefined,
+        cantidadUsuarios: undefined,
       }));
     } else {
       // Si se desmarca, limpiar el rol y validar empresa y rol si ya fueron tocados
@@ -433,7 +665,7 @@ export default function UsuarioForm({
         ...prev,
         rol: "",
       }));
-      
+
       if (touched.empresaId) {
         const empresaError = validateField("empresaId", String(form.empresaId || ""));
         setErrors((prev) => ({
@@ -451,6 +683,10 @@ export default function UsuarioForm({
     }
   };
 
+  const handleShowPasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowPassword(event.target.checked);
+  };
+
   const handleBlur = (fieldName: keyof UsuarioFormFields) => {
     setTouched((prev) => ({ ...prev, [fieldName]: true }));
     const error = validateField(fieldName, String(form[fieldName] ?? ""));
@@ -459,6 +695,25 @@ export default function UsuarioForm({
       [fieldName]: error,
     }));
   };
+
+  // Llamada ARCA: usar useSWR con key null hasta completar 11 dígitos
+  const { data: arcaData, isValidating: isLoadingArca, error: arcaError } = useSWR(
+    arcaCUIL ? ArtAPI.getARCAURL({ CUIL: arcaCUIL }) : null,
+    () => ArtAPI.getARCA({ CUIL: arcaCUIL }),
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+
+  const { data: sectores, isValidating: isLoadingSectores, error: sectoresError } = AuthAPI.useGetRefSectores();
+
+  useEffect(() => {
+    if (!arcaData) return;
+    setForm(prev => ({
+      ...prev,
+      nombre: ([arcaData.nombre, arcaData.apellido].filter(Boolean).join(' ')) || prev.nombre,
+      apellido: arcaData.apellido ?? prev.apellido,
+      fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
+    }));
+  }, [arcaData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -480,7 +735,7 @@ export default function UsuarioForm({
     if (isCreating && isAdminUser) {
       finalEmpresaId = 0; // Si es administrador, empresaId debe ser 0
     }
-    
+
     const formDataWithDefaults = {
       ...form,
       cuit: form.cuit.replace(/[^\d]/g, ""), // Parse CUIT as integer, removing all non-digits
@@ -488,7 +743,8 @@ export default function UsuarioForm({
       tipo: "", // Default type
       rol: form.rol || (roles.length > 0 ? roles[0].nombre : ""), // Default to first role
       empresaId: finalEmpresaId,
-    };    
+      cargoId: isCreating && isAdminEmpleador ? 1 : form.cargoId,
+    };
 
     // Mark all fields as touched
     const allTouched: TouchedFields = Object.keys(form).reduce((acc, key) => {
@@ -516,9 +772,9 @@ export default function UsuarioForm({
   return (
     <CustomModal
       open={open}
-      onClose={isSubmitting ? () => {} : onClose}
+      onClose={isSubmitting ? () => {} : handleModalCloseAttempt}
       title={modalTitle}
-      size={isCreating ? "large" : "mid"}
+      size={isCreating || Boolean(form.id) ? "large" : "mid"}
     >
       <Box
         component="form"
@@ -528,9 +784,33 @@ export default function UsuarioForm({
         {errorMsg && (
           <Typography className={styles.errorMessage}>{errorMsg}</Typography>
         )}
+        {awaitingEmpresaRelation && isEditing && (
+          <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}>
+            <Typography
+              component="div"
+              variant="body1"
+              sx={{ fontSize: "1.2rem", lineHeight: 1.5, fontWeight: 600 }}
+            >
+              {LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR}
+            </Typography>
+          </Alert>
+        )}
         <div className={styles.formLayout}>
           <div className={styles.formContent}>
-            {/* Datos del Usuario */}
+            <div className={hasEmpresasTab ? styles.tabsStableHeight : undefined}>
+              <CustomTabs
+                currentTab={fichaTab}
+                onTabChange={(_e, v) => setFichaTab(v)}
+                tabs={[
+                  {
+                    label: "Datos del Usuario",
+                    value: 0,
+                    disabled: awaitingEmpresaRelation,
+                    tooltip: awaitingEmpresaRelation
+                      ? "Primero vincule al menos una empresa al usuario"
+                      : undefined,
+                    content: (
+                      <>
             <div className={styles.formSection}>
               <Typography variant="h6" className={styles.sectionTitle}>
                 Datos del Usuario
@@ -538,7 +818,7 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
-                  label="Nombre"
+                  label="Nombre/Apellido"
                   name="nombre"
                   value={form.nombre}
                   onChange={handleTextFieldChange}
@@ -552,7 +832,7 @@ export default function UsuarioForm({
                 />
               </div>
 
-              {isCreating && (
+              {(isCreating || isEditing) && (
                 <div className={styles.formRow}>
                   <TextField
                     label="Email"
@@ -574,7 +854,7 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
-                  label="CUIT"
+                  label="CUIT/CUIL"
                   name="cuit"
                   value={form.cuit}
                   onChange={handleTextFieldChange}
@@ -586,26 +866,39 @@ export default function UsuarioForm({
                   disabled={isDisabled}
                   placeholder="Ingrese CUIT (11 dígitos)"
                 />
-                <TextField
-                  label="Teléfono"
-                  name="phoneNumber"
-                  value={form.phoneNumber}
-                  onChange={handleTextFieldChange}
-                  onBlur={() => handleBlur("phoneNumber")}
-                  error={touched.phoneNumber && !!errors.phoneNumber}
-                  helperText={touched.phoneNumber && errors.phoneNumber}
-                  fullWidth
-                  disabled={isDisabled}
-                  placeholder="Ingrese teléfono"
-                />
+                <div className={styles.phoneField}>
+                  <PhoneInput
+                    country="ar"
+                    value={form.phoneNumber}
+                    onChange={(value) =>
+                      setForm((prev: UsuarioFormFields) => ({
+                        ...prev,
+                        phoneNumber: value,
+                      }))
+                    }
+                    onBlur={() => handleBlur("phoneNumber")}
+                    disabled={isDisabled}
+                    specialLabel="Teléfono"
+                    containerClass={styles.phoneContainer}
+                    inputClass={styles.phoneInput}
+                    buttonClass={styles.phoneButton}
+                    inputProps={{ name: "phoneNumber" }}
+                  />
+                  {touched.phoneNumber && errors.phoneNumber && (
+                    <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
+                      {errors.phoneNumber}
+                    </Typography>
+                  )}
+                </div>
               </div>
 
               <div className={styles.formRow}>
                 <FormControl
                   fullWidth
-                  required={!isDisabled}
+                  required={!isDisabled && !isAdminEmpleador}
                   error={touched.cargoId && !!errors.cargoId}
                   disabled={isDisabled}
+                  sx={{ display: isAdminEmpleador ? 'none' : undefined }}
                 >
                   <InputLabel>Cargo/Función</InputLabel>
                   <Select
@@ -616,7 +909,6 @@ export default function UsuarioForm({
                     onBlur={() => handleBlur("cargoId")}
                     displayEmpty
                   >
-                    
                     {cargos.map((cargo) => (
                       <MenuItem key={cargo.id} value={cargo.id}>
                         {cargo.descripcion}
@@ -633,169 +925,246 @@ export default function UsuarioForm({
                     </Typography>
                   )}
                 </FormControl>
+
+                <FormControl
+                  fullWidth
+                  required={!isDisabled && !isAdminUser}
+                  error={touched.rol && !!errors.rol && !isAdminUser}
+                  disabled={isRolSelectDisabled}
+                >
+                  <InputLabel>Rol</InputLabel>
+                  <Select
+                    name="rol"
+                    value={form.rol}
+                    label="Rol"
+                    onChange={handleSelectChange}
+                    onBlur={() => handleBlur("rol")}
+                  >
+                    {roleOptions.map(({ rol, disabled }) => (
+                      <MenuItem
+                        key={rol.id}
+                        value={rol.nombre}
+                        disabled={disabled}
+                        className={disabled ? styles.roleDisabled : undefined}
+                      >
+                        {rol.nombre}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {touched.rol && errors.rol && !isAdminUser && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ ml: 2, mt: 0.5 }}
+                    >
+                      {errors.rol}
+                    </Typography>
+                  )}
+                </FormControl>
+                <FormControl
+                  fullWidth
+                  required={!isDisabled && !isAdminEmpleador}
+                  error={touched.sectorId && !!errors.sectorId}
+                  disabled={isDisabled}
+                  sx={{ display: isAdminEmpleador ? 'none' : undefined }}
+                >
+                  <InputLabel>Sector</InputLabel>
+                  <Select
+                      name="sectorId"
+                      value={form.sectorId ? String(form.sectorId) : ""}
+                      label="Sector"
+                      onChange={handleSectorChange}
+                      onBlur={() => handleBlur("sectorId")}
+                    >
+                      {isLoadingSectores ? (
+                        <MenuItem value="">
+                          <em>Cargando...</em>
+                        </MenuItem>
+                      ) : sectores && sectores.length > 0 ? (
+                        sectores.map((s) => (
+                          <MenuItem key={s.id} value={String(s.id)}>
+                            {s.descripcion}
+                          </MenuItem>
+                        ))
+                      ) : (
+                        <MenuItem value="">No hay sectores</MenuItem>
+                      )}
+                  </Select>
+                  {touched.sectorId && errors.sectorId && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ ml: 2, mt: 0.5 }}
+                    >
+                      {errors.sectorId}
+                    </Typography>
+                  )}
+                </FormControl>
               </div>
 
-              {isCreating && (
-                <div className={styles.formRow}>
-                  {/* Rol (Select) */}
-                  <FormControl
-                    fullWidth
-                    required={!isDisabled && !isAdminUser}
-                    error={touched.rol && !!errors.rol && !isAdminUser}
-                    disabled={isDisabled || isAdminUser}
-                  >
-                    <InputLabel>Rol</InputLabel>
-                    <Select
-                      name="rol"
-                      value={form.rol}
-                      label="Rol"
-                      onChange={handleSelectChange}
-                      onBlur={() => handleBlur("rol")}
-                    >
-                      {roles.map((rol) => (
-                        <MenuItem key={rol.id} value={rol.nombre}>
-                          {rol.nombre}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {touched.rol && errors.rol && !isAdminUser && (
-                      <Typography
-                        variant="caption"
-                        color="error"
-                        sx={{ ml: 2, mt: 0.5 }}
-                      >
-                        {errors.rol}
-                      </Typography>
-                    )}
-                  </FormControl>
+              <div className={styles.formRow} style={{ display: requiresTituloMatricula ? undefined : 'none' }}>
+                <TextField
+                  label="Título Habilitante"
+                  name="titulo"
+                  value={form.titulo || ""}
+                  onChange={handleTextFieldChange}
+                  onBlur={() => handleBlur("titulo")}
+                  error={touched.titulo && !!errors.titulo}
+                  helperText={touched.titulo && errors.titulo}
+                  fullWidth
+                  required={!isDisabled && requiresTituloMatricula}
+                  disabled={isDisabled}
+                />
+                <TextField
+                  label="Matrícula"
+                  name="matricula"
+                  value={form.matricula || ""}
+                  onChange={handleTextFieldChange}
+                  onBlur={() => handleBlur("matricula")}
+                  error={touched.matricula && !!errors.matricula}
+                  helperText={touched.matricula && errors.matricula}
+                  fullWidth
+                  required={!isDisabled && requiresTituloMatricula}
+                  disabled={isDisabled}
+                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                />
+              </div>
 
-                  {/* Empresa (Autocomplete con búsqueda) */}
-                  <Autocomplete
+            </div>
+            {isAdmin && (
+              <div className={styles.formRow}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={isAdminUser}
+                      onChange={handleIsAdminUserChange}
+                      disabled={isDisabled}
+                      color="primary"
+                    />
+                  }
+                  label="Es Administrador"
+                />
+              </div>
+            )}
+
+            {/* Credenciales de Acceso (Ocultas en View y Deleted)*/}
+            {(isCreating || isEditing) && (
+              <div className={styles.formSection}>
+                <Typography variant="h6" className={styles.sectionTitle}>
+                  Credenciales de Acceso
+                </Typography>
+
+                <div className={styles.formRow}>
+                  <TextField
+                    label={
+                      isCreating
+                        ? "Contraseña temporal"
+                        : "Nueva contraseña (opcional)"
+                    }
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={handleTextFieldChange}
+                    onBlur={() => handleBlur("password")}
+                    error={touched.password && !!errors.password}
+                    helperText={touched.password && errors.password}
                     fullWidth
-                    options={refEmpleadores}
-                    getOptionLabel={(option) => option.razonSocial || ""}
-                    value={isAdminUser ? null : (refEmpleadores.find(emp => emp.interno === form.empresaId) || null)}
-                    onChange={(event, newValue) => {
-                      const empresaId = newValue ? newValue.interno : 0;
-                      setForm((prev: UsuarioFormFields) => ({
-                        ...prev,
-                        empresaId: empresaId,
-                      }));
-                      
-                      if (touched.empresaId) {
-                        const error = validateField("empresaId", String(empresaId));
-                        setErrors((prev) => ({
-                          ...prev,
-                          empresaId: error,
-                        }));
-                      }
-                    }}
-                    onBlur={() => handleBlur("empresaId")}
-                    disabled={isDisabled || (form.empresaId !== 0 && !isAdmin) || isAdminUser}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label={isAdminUser ? "Empresa" : "Empresa *"}
-                        error={touched.empresaId && !!errors.empresaId && !isAdminUser}
-                        helperText={touched.empresaId && errors.empresaId && !isAdminUser ? errors.empresaId : ""}
-                        placeholder={isAdminUser ? "No aplica para administradores" : "Buscar empresa..."}
-                      />
-                    )}
-                    filterOptions={(options, { inputValue }) => {
-                      return options.filter(option =>
-                        option.razonSocial.toLowerCase().includes(inputValue.toLowerCase())
-                      );
-                    }}
-                    noOptionsText="No se encontraron empresas"
+                    required={isCreating && !isDisabled}
+                    disabled={isDisabled}
+                    placeholder={
+                      isCreating ? "••••••••" : "Dejar vacío para no cambiar"
+                    }
                   />
-                  
-                  {/* Checkbox Es Administrador - solo en modo crear */}
-                  {isAdmin && (
+                  <TextField
+                    label={
+                      isCreating
+                        ? "Confirmar contraseña"
+                        : "Confirmar nueva contraseña"
+                    }
+                    name="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    value={form.confirmPassword}
+                    onChange={handleTextFieldChange}
+                    onBlur={() => handleBlur("confirmPassword")}
+                    error={
+                      touched.confirmPassword && !!errors.confirmPassword
+                    }
+                    helperText={
+                      touched.confirmPassword && errors.confirmPassword
+                    }
+                    fullWidth
+                    required={isCreating && !isDisabled}
+                    disabled={isDisabled}
+                    placeholder={
+                      isCreating ? "••••••••" : "Dejar vacío para no cambiar"
+                    }
+                  />
+
+                  <div className={styles.showPasswordRow}>
                     <FormControlLabel
                       control={
                         <Checkbox
-                          checked={isAdminUser}
-                          onChange={handleIsAdminUserChange}
+                          checked={showPassword}
+                          onChange={handleShowPasswordChange}
                           disabled={isDisabled}
                           color="primary"
                         />
                       }
-                      label="Es Administrador"
-                      sx={{ mt: 2 }}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Credenciales de Acceso (Ocultas en View y Deleted)*/}
-            {(isCreating || isEditing) && (
-                <div className={styles.formSection}>
-                  <Typography variant="h6" className={styles.sectionTitle}>
-                    Credenciales de Acceso
-                  </Typography>
-
-                  <div className={styles.formRow}>
-                    <TextField
-                      label={
-                        isCreating
-                          ? "Contraseña temporal"
-                          : "Nueva contraseña (opcional)"
-                      }
-                      name="password"
-                      type="password"
-                      value={form.password}
-                      onChange={handleTextFieldChange}
-                      onBlur={() => handleBlur("password")}
-                      error={touched.password && !!errors.password}
-                      helperText={touched.password && errors.password}
-                      fullWidth
-                      required={isCreating && !isDisabled}
-                      disabled={isDisabled}
-                      placeholder={
-                        isCreating ? "••••••••" : "Dejar vacío para no cambiar"
-                      }
-                    />
-                    <TextField
-                      label={
-                        isCreating
-                          ? "Confirmar contraseña"
-                          : "Confirmar nueva contraseña"
-                      }
-                      name="confirmPassword"
-                      type="password"
-                      value={form.confirmPassword}
-                      onChange={handleTextFieldChange}
-                      onBlur={() => handleBlur("confirmPassword")}
-                      error={
-                        touched.confirmPassword && !!errors.confirmPassword
-                      }
-                      helperText={
-                        touched.confirmPassword && errors.confirmPassword
-                      }
-                      fullWidth
-                      required={isCreating && !isDisabled}
-                      disabled={isDisabled}
-                      placeholder={
-                        isCreating ? "••••••••" : "Dejar vacío para no cambiar"
-                      }
+                      label="Mostrar contraseña"
                     />
                   </div>
-
-                  <Typography variant="body2" className={styles.passwordHelp}>
-                    {isCreating
-                      ? "La contraseña debe tener al menos 8 caracteres, incluir mayúsculas, minúsculas y números."
-                      : "Deje ambos campos vacíos para mantener la contraseña actual. Si desea cambiarla, complete ambos campos con la nueva contraseña."}
-                  </Typography>
                 </div>
-              )}
+
+                <Typography variant="body2" className={styles.passwordHelp}>
+                  {isCreating
+                    ? "La contraseña debe tener al menos 8 caracteres, incluir mayúsculas, minúsculas y números."
+                    : "Deje ambos campos vacíos para mantener la contraseña actual. Si desea cambiarla, complete ambos campos con la nueva contraseña."}
+                </Typography>
+              </div>
+            )}
+                      </>
+                    ),
+                  },
+                  ...(hasEmpresasTab
+                    ? [
+                        {
+                          label: "Empresas del Usuario",
+                          value: 1,
+                          disabled: empresasTabDisabled,
+                          tooltip: "Primero registre el usuario",
+                          content: (
+                            <>
+                              {awaitingEmpresaRelation && (
+                                <Typography
+                                  variant="body1"
+                                  color="warning.main"
+                                  sx={{ mb: 2, fontSize: "1.2rem", lineHeight: 1.5, fontWeight: 600 }}
+                                >
+                                  {LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR}
+                                </Typography>
+                              )}
+                              <UsuarioEmpresasUsuarioTab
+                                open={open}
+                                usuarioId={String(form.id ?? "")}
+                                cuitForm={form.cuit}
+                                puedeEditar={isEditing}
+                                onEmpresasRelacionadasMetaChange={handleEmpresasRelacionadasMetaChange}
+                              />
+                            </>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
             <div className={styles.formActions}>
               {/* Botón de acción principal (Oculto en 'view') */}
               {!isViewing && (
-                <CustomButton 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  style={{ 
+                <CustomButton
+                  type="submit"
+                  disabled={isSubmitting || (isEditing && mustBlockModalClose)}
+                  style={{
                     opacity: isSubmitting ? 0.7 : 1,
                     cursor: isSubmitting ? 'not-allowed' : 'pointer'
                   }}
@@ -803,27 +1172,27 @@ export default function UsuarioForm({
                   {isSubmitting ? (
                     <>
                       <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                      {isEditing ? "Guardando..." 
-                       : isDeleting ? "Procesando..." 
-                       : isActivating ? "Activando..." 
-                       : "Registrando..."}
+                      {isEditing ? "Guardando..."
+                        : isDeleting ? "Procesando..."
+                          : isActivating ? "Activando..."
+                            : "Registrando..."}
                     </>
                   ) : (
                     <>
                       {isEditing ? "Guardar Cambios"
-                       : isDeleting ? "Dar de baja Usuario"
-                       : isActivating ? "Activar Usuario"
-                       : "Registrar Usuario"}
+                        : isDeleting ? "Dar de baja Usuario"
+                          : isActivating ? "Activar Usuario"
+                            : "Registrar Usuario"}
                     </>
                   )}
                 </CustomButton>
               )}
 
               <CustomButton
-                onClick={onClose}
+                onClick={handleModalCloseAttempt}
                 color="secondary"
                 disabled={isSubmitting}
-                style={{ 
+                style={{
                   opacity: isSubmitting ? 0.7 : 1,
                   cursor: isSubmitting ? 'not-allowed' : 'pointer'
                 }}
@@ -833,20 +1202,62 @@ export default function UsuarioForm({
             </div>
           </div>
           {isCreating && (
-            <div className={styles.infoPanel}>
-              <Typography variant="h6" className={styles.infoPanelTitle}>
-                Información Importante
-              </Typography>
-              <ul className={styles.infoList}>
-                <li>El usuario recibirá un email para activar su cuenta</li>
-                <li>La contraseña temporal deberá ser cambiada</li>
-                <li>Posteriormente se podrán configurar los permisos</li>
-                <li>Los campos marcados con * son obligatorios</li>
-              </ul>
+            <div className={styles.infoColumn}>
+              <div className={styles.infoPanel}>
+                <Typography variant="h6" className={styles.infoPanelTitle}>
+                  Información Importante
+                </Typography>
+                <ul className={styles.infoList}>
+                  <li>El usuario recibirá un email para activar su cuenta</li>
+                  <li>La contraseña temporal deberá ser cambiada</li>
+                  <li>Posteriormente se podrán configurar los permisos</li>
+                  <li>Los campos marcados con * son obligatorios</li>
+                  <li>
+                    Tras registrar, use la solapa &quot;Empresas del Usuario&quot;: debe asociar al menos una
+                    empresa antes de guardar cambios o cerrar el asistente.
+                  </li>
+                </ul>
+              </div>
+
+              <div className={styles.infoPanel}>
+                <Typography variant="h6" className={styles.infoPanelTitle}>
+                  Información de ARCA
+                </Typography>
+                <div style={{ marginTop: 8 }}>
+                  {isLoadingArca ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CircularProgress size={18} />
+                      <Typography variant="body2">Consultando ARCA...</Typography>
+                    </div>
+                  ) : arcaError ? (
+                    <Typography variant="body2" color="error">No se pudo consultar ARCA</Typography>
+                  ) : arcaData ? (
+                    <ul className={styles.infoList}>
+                      <li><strong>Nombre:</strong> {arcaData.nombre || ''}</li>
+                      <li><strong>Apellido:</strong> {arcaData.apellido || ''}</li>
+                      <li><strong>Fecha de Nac.:</strong> {arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : ''}</li>
+                    </ul>
+                  ) : (
+                    <ul className={styles.infoList}>
+                      <li><strong>Nombre:</strong> </li>
+                      <li><strong>Apellido:</strong> </li>
+                      <li><strong>Fecha de Nac.:</strong> </li>
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
           )}
+
         </div>
       </Box>
+      <CustomModalMessage
+        open={modalMsgOpen}
+        onClose={() => setModalMsgOpen(false)}
+        message={modalMsgText}
+        type={modalMsgType}
+        title="Atención"
+      />
     </CustomModal>
   );
 }

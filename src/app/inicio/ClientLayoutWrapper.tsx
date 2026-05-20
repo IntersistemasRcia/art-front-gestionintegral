@@ -3,12 +3,18 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import styles from './ClientLayoutWrapper.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/data/AuthContext'; // Importa el hook de contexto
+import { useEmpresasLoader } from '@/data/useEmpresasLoader';
+import { useRolesLoader } from '@/data/useRolesLoader';
+import { useAccesosRapidosLoader } from '@/data/useAccesosRapidosLoader';
+import { useEmpresasStore } from '@/data/empresasStore';
+import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 
 const formatTitleFromPath = (pathname: string): string => {
   if (pathname === '/inicio') {
@@ -19,12 +25,24 @@ const formatTitleFromPath = (pathname: string): string => {
     return 'Póliza';
   }
 
+  if (pathname === '/inicio/comercializador/polizas') {
+    return 'Pólizas';
+  }
+
+  if (pathname === '/inicio/comercializador/administracionComercializadores') {
+    return 'Administración Comercializadores';
+  }
+
   if (pathname === '/inicio/informes/comisionesMedicas') {
     return 'Comisiones Médicas';
   }
 
   if (pathname === '/inicio/informes/atencionAlPublico') {
     return 'Atención al Público';
+  }
+
+  if (pathname === '/inicio/configuraciones/parametros') {
+    return 'Parámetros';
   }
 
   const parts = pathname.split('/').filter(Boolean);
@@ -42,16 +60,73 @@ const formatTitleFromPath = (pathname: string): string => {
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { status, session } = useAuth(); // Obtén el estado y la sesión del contexto
+  const [isExpiredSessionModalOpen, setIsExpiredSessionModalOpen] = useState(false);
+  const [isEmptyEmpresasModalOpen, setIsEmptyEmpresasModalOpen] = useState(false);
+  const { emptyEmpresasMessage, setEmptyEmpresasMessage } = useEmpresasStore();
+  
+  // Cargar roles, empresas y accesos rápidos al autenticarse
+  useRolesLoader();
+  useAccesosRapidosLoader();
+  useEmpresasLoader();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const pathname = usePathname();
   const pageTitle = formatTitleFromPath(pathname);
+
+  const sessionExpires =
+    typeof session === 'object' &&
+    session !== null &&
+    'expires' in session &&
+    typeof session.expires === 'string'
+      ? session.expires
+      : null;
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/');
     }
   }, [status, router]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !sessionExpires) {
+      setIsExpiredSessionModalOpen(false);
+      return;
+    }
+
+    const expiresAt = new Date(sessionExpires).getTime();
+    if (Number.isNaN(expiresAt)) {
+      return;
+    }
+
+    const timeoutMs = expiresAt - Date.now();
+    if (timeoutMs <= 0) {
+      setIsExpiredSessionModalOpen(true);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsExpiredSessionModalOpen(true);
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [status, sessionExpires]);
+
+  useEffect(() => {
+    if (emptyEmpresasMessage) {
+      setIsEmptyEmpresasModalOpen(true);
+    }
+  }, [emptyEmpresasMessage]);
+
+  const handleExpiredSessionModalClose = async () => {
+    setIsExpiredSessionModalOpen(false);
+    await signOut({ callbackUrl: '/login' });
+  };
+
+  const handleEmptyEmpresasModalClose = async () => {
+    setIsEmptyEmpresasModalOpen(false);
+    setEmptyEmpresasMessage(null);
+    await signOut({ callbackUrl: '/login' });
+  };
 
   if (status === "loading") {
     return (
@@ -67,6 +142,20 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     
   return (
     <>
+      <CustomModalMessage
+        open={isExpiredSessionModalOpen}
+        onClose={handleExpiredSessionModalClose}
+        message="La sesion expiró. Por favor vuelva a Iniciar Sesión."
+        type="warning"
+        title="Sesión expirada"
+      />
+      <CustomModalMessage
+        open={isEmptyEmpresasModalOpen}
+        onClose={handleEmptyEmpresasModalClose}
+        message={emptyEmpresasMessage ?? ""}
+        type="warning"
+        title="Atención"
+      />
       <Navbar />
       <div className={styles.mainLayout}>
         <div className={styles.breadcrumbsContainer}>

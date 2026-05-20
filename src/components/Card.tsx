@@ -21,6 +21,8 @@ const Card: React.FC<CardProps> = ({
   link,
   borderColorClass = 'border-purple', // Valor por defecto si no se pasa
 }) => {
+  const trimmedLink = (link ?? "").trim();
+
   return (
     <div className={`${styles.card} ${styles[borderColorClass]}`}>
       <div className={styles.cardContent}>
@@ -37,8 +39,8 @@ const Card: React.FC<CardProps> = ({
           </div>
         )}
         {lastUpdated && <p className={styles.lastUpdated}>Última actualización : {lastUpdated}</p>}
-        {link && (
-          <Link href={link} className={styles.link}>
+        {trimmedLink && (
+          <Link href={trimmedLink} className={styles.link}>
             Ver Detalles →
           </Link>
         )}

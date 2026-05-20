@@ -142,7 +142,9 @@ export const CotizadorForm = ({ onClose }: CotizadorFormProps) => {
   const handleTextFieldChange = (field: keyof CotizadorFormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    const raw = e.target.value;
+    const value = field === 'numeroTelefono' ? raw.replace(/\D/g, '') : raw;
+    setFormData(prev => ({ ...prev, [field]: value }));
     clearFieldError(field);
   };
 

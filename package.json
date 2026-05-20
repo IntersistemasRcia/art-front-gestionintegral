@@ -1,6 +1,6 @@
 {
   "name": "art_gestionintegral",
-  "version": "0.1.0",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "set NODE_OPTIONS=--max-old-space-size=6144 && next dev --webpack",
@@ -41,10 +41,12 @@
     "react-dom": "^19.2.1",
     "react-icons": "^5.5.0",
     "react-modal": "^3.16.3",
+    "react-phone-input-2": "^2.15.1",
     "react-querybuilder": "^8.8.4",
     "swr": "^2.3.6",
     "tailwindcss": "3.3.2",
-    "typescript": "5.1.3"
+    "typescript": "5.1.3",
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.2",

@@ -1,8 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from "next-auth/providers/credentials";
-import UsuarioAPI, { TokenDTO, Usuario, UsuarioVm } from '@/data/usuarioAPI';
-
-const { login } = UsuarioAPI;
+import type { TokenDTO, Usuario, UsuarioVm } from '@/data/usuarioAPI';
+import { loginUsuario } from '@/data/usuarioLogin';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -14,10 +13,19 @@ export const authOptions: NextAuthOptions = {
         loginPassword: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        return await login({
-          usuario: credentials?.loginUser,
-          password: credentials?.loginPassword
-        }).then();
+        try {
+          const user = await loginUsuario({
+            usuario: credentials?.loginUser,
+            password: credentials?.loginPassword,
+          });
+
+          if (!user) return null;
+          return user as any;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Error de autenticación";
+          throw new Error(message);
+        }
       },
     }),
   ],
@@ -34,8 +42,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         const { token: tkn, ...usr } = user as UsuarioVm;
-        token.user = usr;
+        // Evita inflar la cookie JWT con estructuras grandes (ej: empresas).
+        // NextAuth guarda el JWT en cookie y puede provocar HTTP 431.
+        const { empresas: _empresas, ...usrSinEmpresas } = usr;
+        token.user = usrSinEmpresas;
         token.data = tkn;
+      }
+      if (token.user && typeof token.user === "object" && "empresas" in (token.user as Record<string, unknown>)) {
+        delete (token.user as Record<string, unknown>).empresas;
       }
       return token;
     },

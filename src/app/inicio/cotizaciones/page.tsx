@@ -7,7 +7,9 @@ import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import { CotizadorForm } from './CotizadorForm';
 
-const EXTERNAL_QUOTE_URL = "http://arttest.intersistemas.ar:8687/Cotizador";
+const  basePath = process.env.NEXT_PUBLIC_FRONT_COTIZADOR_URL || 'http://fallback-prod.url'; 
+
+const EXTERNAL_QUOTE_URL = `${basePath}/Cotizador`;
 
 function CotizacionesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);

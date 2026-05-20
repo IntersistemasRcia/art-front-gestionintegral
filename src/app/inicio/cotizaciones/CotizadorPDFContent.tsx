@@ -23,12 +23,27 @@ const SERVICIOS_ONLINE = [
 ] as const;
 
 // Función helper para formatear importe sin símbolo de moneda (solo números con formato argentino)
+// Formato: separador de miles con punto, separador decimal con coma (ej: 1.234.567,89)
 const formatearImporteArgentino = (valor: number): string => {
   if (isNaN(valor)) return String(valor);
-  return valor
-    .toFixed(2)
-    .replace('.', ',')
-    .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  
+  // Convertir a string con 2 decimales
+  const valorStr = valor.toFixed(2);
+  
+  // Separar parte entera y decimal
+  const [parteEntera, parteDecimal] = valorStr.split('.');
+  
+  // Agregar puntos como separadores de miles a la parte entera
+  const parteEnteraFormateada = parteEntera.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  
+  // Unir parte entera y decimal con coma
+  return `${parteEnteraFormateada},${parteDecimal}`;
+};
+
+// Función helper para formatear alícuota con 2 decimales
+const formatearAlicuota = (valor: number): string => {
+  if (isNaN(valor)) return String(valor);
+  return valor.toFixed(2);
 };
 
 // Calcula los costos y ahorros de una cotización
@@ -126,8 +141,8 @@ export const CotizadorPDFContent = ({
         <tbody>
           <tr>
             <td className={styles.columnaLabel}>Alicuota Variable</td>
-            <td className={styles.columnaValor}>{alicuotaIngresadaNum} %</td>
-            <td className={`${styles.columnaValor} ${styles.columnaValorBold}`}>{alicuotaFinalNum} %</td>
+            <td className={styles.columnaValor}>{formatearAlicuota(alicuotaIngresadaNum)} %</td>
+            <td className={`${styles.columnaValor} ${styles.columnaValorBold}`}>{formatearAlicuota(alicuotaFinalNum)} %</td>
           </tr>
           <tr>
             <td className={styles.columnaLabel}>Costo Mensual</td>

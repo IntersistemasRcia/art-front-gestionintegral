@@ -131,12 +131,28 @@ jobs:
           New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
           # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
           # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
-          $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'
-          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env web.config server.js /LOG:$robolog2 /TEE
+          $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'          
+          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
           exit 0
+
+      - name: Stop PM2 application before deployment (Windows)
+        shell: powershell
+        run: |
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          Set-Location -Path $DEPLOY_DIR
+          $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
+          
+          # Check if PM2 is available
+          if (Get-Command pm2 -ErrorAction SilentlyContinue) {
+            Write-Host "Stopping PM2 application: $appName"
+            pm2 stop $appName -s | Out-Null
+            Write-Host "Application stopped successfully"
+          } else {
+            Write-Host "PM2 not found, skipping stop"
+          }
 
       - name: Install production dependencies on deploy dir (Windows)
         shell: powershell
@@ -168,7 +184,8 @@ jobs:
           # Use PM2 to start or reload the app from ecosystem.config.js (idempotent)
           # This will start the process if not running, or reload it with zero-downtime when possible.
           $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
-          pm2 startOrReload ecosystem.config.js --env production
+          pm2 delete $appName -s | Out-Null  # silently delete existing process if any
+          pm2 start ecosystem.config.js
           if ($LASTEXITCODE -ne 0) {
             Write-Host "pm2 startOrReload failed with code $LASTEXITCODE, attempting start then restart fallback"
             pm2 start ecosystem.config.js --env production
@@ -176,6 +193,29 @@ jobs:
               Write-Host "pm2 start also failed with code $LASTEXITCODE, attempting pm2 restart by name: $appName"
               pm2 restart $appName
             }
+          }
+
+      - name: Fallback - Restart application if previous steps failed (Windows)
+        if: failure()
+        shell: powershell
+        run: |
+          Write-Host "Previous steps failed, attempting to restart the application as fallback"
+          if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
+          Set-Location -Path $DEPLOY_DIR
+          $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
+          
+          if (Get-Command pm2 -ErrorAction SilentlyContinue) {
+            Write-Host "Attempting to restart application: $appName"
+            pm2 restart $appName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Restart failed, attempting to start from scratch"
+              pm2 start ecosystem.config.js
+            }
+            pm2 save
+            Write-Host "Fallback restart completed"
+          } else {
+            Write-Host "PM2 not available for fallback restart"
+            exit 1
           }
 
       - name: Save PM2 process list (Windows)

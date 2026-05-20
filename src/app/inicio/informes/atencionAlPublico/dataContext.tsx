@@ -22,13 +22,17 @@ import {
   DialogContentText,
   DialogTitle,
 } from "@mui/material";
-import QueriesAPI, { type Query } from "@/data/queryAPI";
+import QueriesAPI, { type FiltroVm, type Query } from "@/data/queryAPI";
 import Formato from "@/utils/Formato";
 import propositionFormat from "@/utils/PropositionFormatQuery";
 import { operators } from "@/utils/ui/queryBuilder/QueryBuilderDefaults";
 import { ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { saveTable, type TableColumn, type AddTableOptions } from "@/utils/excelUtils";
+import { FiltrosTable, FiltrosTableContextProvider } from "@/components/filtros/FiltrosTable";
+import CustomModal from "@/utils/ui/form/CustomModal";
+import parsePropositionGroup from "@/utils/PropositionParseQuery";
+import FiltroForm from "@/components/filtros/FiltroForm";
 
 // ===== Tipos =====
 type Row = Record<string, any>;
@@ -51,13 +55,20 @@ interface DataContextType {
   rows: Row[];
   query: { state: RuleGroupType; setState: React.Dispatch<React.SetStateAction<RuleGroupType>> };
   dialog?: React.ReactNode;
-  onAplica: () => void;
-  onLimpia: () => void;
+
+  proposition?: string;
+  filtro?: FiltroVm;
+  onLookupFiltro: () => void;
+  onGuardaFiltro: () => void;
+  onEliminaFiltro: () => void;
+
+  onAplicaFiltro: () => void;
+  onLimpiaFiltro: () => void;
+  onLimpiaTabla: () => void;
   onExport: () => void;
 }
 
 // ===== Helpers / formatters =====
-const fechaHoraFormatter = (v: any) => Formato.FechaHora(v);
 const fechaFormatter = (v: any) => Formato.Fecha(v);
 const numeroFormatter = (v: any) => Formato.Numero(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
@@ -80,38 +91,42 @@ const display = (v: any) => (typeof v === "string" ? v.trim() : v);
 const { execute, analyze } = QueriesAPI;
 const defaultQuery: RuleGroupType = { combinator: "and", rules: [] };
 const DataContext = createContext<DataContextType | undefined>(undefined);
+const MODULO_FILTROS = "Informes_AtencionAlPublico";
 
 // ===== Provider =====
 export function DataContextProvider({ children }: { children: ReactNode }) {
   const [tables] = useState<Tables>({
     vw_AtencionAlPublico: [
-      // NOTA: Había dos "Interno" duplicados; dejo uno solo
+
       { name: "Interno", label: "Número", type: "number", formatter: numeroFormatter },
 
-      { name: "OrigenDescripcion", label: "Origen", type: "text"},
-      
-      { name: "ContactoTrabajadorEmpleador", label: "Contacto Tipo", type: "text"},
+      { name: "OrigenDescripcion", label: "Origen", type: "text" },
+
+      { name: "ContactoTrabajadorEmpleador", label: "Trab./Emp.", type: "text" },
       { name: "ContactoDocNro", label: "CUIT/DNI", type: "text", formatter: cuipFormatter },
       { name: "ContactoNombre", label: "Contacto Nombre", type: "text" },
 
       { name: "TemaDescripcion", label: "Tema", type: "text" },
       { name: "CategoriaDescripcion", label: "Categoría", type: "text" },
       { name: "TipoTramiteDescripcion", label: "Trámite", type: "text" },
-      
+      { name: "Estado", label: "Estado", type: "text" },
+      { name: "DiasTrans", label: "T. Trans.", type: "number", formatter: numeroFormatter },
+      { name: "SectorDescripcion", label: "Sector", type: "text" },
+
+
       { name: "MedioDireccion", label: "Email", type: "text" },
 
-      { name: "Apertura", label: "Fecha Contacto", type: "date", formatter: fechaFormatter },
-      { name: "Cierre", label: "Fecha Último Estado", type: "date", formatter: fechaFormatter },
+      { name: "Apertura", label: "Fecha Contacto", type: "dateTime", formatter: fechaFormatter },
+      { name: "Cierre", label: "Fecha Último Estado", type: "dateTime", formatter: fechaFormatter },
       //{ name: "AfiliadoComentario", label: "Departamento", type: "text" },
+
     ],
   });
 
-
-
-  // Columnas + campos para QB (excluyo Interno del QB, como en tu implementación previa)
+  // Columnas + campos para QB
   const { columns, fields, headers } = useMemo(() => {
     const all = tables.vw_AtencionAlPublico;
-    const fieldsForQB = all.filter(c => c.name !== "Interno");
+    const fieldsForQB = all; // incluir todos los campos para que el QueryBuilder permita filtrarlos
 
     const columns: ColumnDef<Row>[] = [];
     const headers: Headers = { columns: {}, options: { formatters: { row: {} } } };
@@ -127,7 +142,9 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
         },
       });
       headers.columns[name] = { key: name, header: label ?? name };
-      if (formatter) headers.options.formatters!.row![name] = formatter;
+      if (formatter) {
+        headers.options.formatters!.row![name] = formatter;
+      }
     });
 
     const fields: Field[] = fieldsForQB.map(({ name, label, operators: colOps, valueEditorType, values, type }) => ({
@@ -146,6 +163,17 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [query, setQuery] = useState(defaultQuery);
   const [dialog, setDialog] = useState<React.ReactNode>();
+  const [filtro, setFiltro] = useState<FiltroVm | undefined>();
+  const [moduloFiltros, setModuloFiltros] = useState<string>(MODULO_FILTROS);
+
+  const proposition = useMemo<string | undefined>(() => {
+    const result = formatQuery(
+      query,
+      propositionFormat({ fields }) as any
+    );
+
+    return typeof result === "string" ? result : undefined;
+  }, [query, fields]);
 
   const onCloseDialog = () => setDialog(null);
   const errorDialog = (prop: { title?: string; message: any }) =>
@@ -163,9 +191,58 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
       </Dialog>
     );
 
-  const onAplica = useCallback(() => {
-    const proposition = formatQuery(query, propositionFormat({ fields }));
+  const onLookupFiltro = useCallback(() => {
+    setDialog(
+      <FiltrosLookup
+        modulo={moduloFiltros}
+        onClose={onCloseDialog}
+        onSelect={(f) => {
+          setFiltro(f);
+          if (f?.modulo) setModuloFiltros(f.modulo);
+          setQuery(parsePropositionGroup(f.proposition));
+          onCloseDialog();
+        }}
+      />
+    );
+  }, [moduloFiltros]);
 
+  const onGuardaFiltro = useCallback(() => {
+    setDialog(
+      <FiltroForm
+        action={filtro == null ? "Create" : "Update"}
+        title="Guardando filtro"
+        init={{
+          ...filtro,
+          modulo: filtro?.modulo ?? moduloFiltros,
+          proposition,
+        }}
+        onClose={(completed, filtroGuardado) => {
+          if (completed && filtroGuardado) {
+            setFiltro(filtroGuardado);
+            if (filtroGuardado.modulo) setModuloFiltros(filtroGuardado.modulo);
+          }
+          onCloseDialog();
+        }}
+      />
+    );
+  }, [filtro, proposition, moduloFiltros]);
+
+  const onEliminaFiltro = useCallback(() => {
+    setDialog(
+      <FiltroForm
+        action="Delete"
+        title="Borrando filtro"
+        init={filtro}
+        disabled={{ nombre: true, ambito: true }}
+        onClose={(completed) => {
+          if (completed) setFiltro(undefined);
+          onCloseDialog();
+        }}
+      />
+    );
+  }, [filtro]);
+
+  const onAplicaFiltro = useCallback(() => {
     return (async function procesar() {
       const table = "vw_AtencionAlPublico" as const;
 
@@ -194,7 +271,6 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
                   (n) => !got.some((k) => normalizeKey(k) === normalizeKey(n))
                 );
                 if (missing.length) {
-                  console.warn("[atencion-publico] columnas no presentes en la respuesta:", missing);
                   errorDialog({
                     title: "Aviso de columnas faltantes",
                     message:
@@ -207,33 +283,33 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
 
             onCloseDialog();
           })
-          .catch((error) =>
+          .catch((error) => {
             errorDialog({
               message:
                 typeof error === "string"
                   ? error
                   : error?.detail ?? error?.message ?? JSON.stringify(error),
-            })
-          );
+            });
+          });
       }
 
       await analyze(q)
         .then(async (ok) =>
           ok.count > 90
             ? setDialog(
-                <Dialog open scroll="paper" onClose={onCloseDialog}>
-                  <DialogTitle>Consulta con muchos registros</DialogTitle>
-                  <DialogContent dividers>
-                    <DialogContentText tabIndex={-1}>
-                      La consulta generará {ok.count} registros.
-                    </DialogContentText>
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={onCloseDialog}>Cancela</Button>
-                    <Button onClick={onConfirm}>Continúa</Button>
-                  </DialogActions>
-                </Dialog>
-              )
+              <Dialog open scroll="paper" onClose={onCloseDialog}>
+                <DialogTitle>Consulta con muchos registros</DialogTitle>
+                <DialogContent dividers>
+                  <DialogContentText tabIndex={-1}>
+                    La consulta generará {ok.count} registros.
+                  </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={onCloseDialog}>Cancela</Button>
+                  <Button onClick={onConfirm}>Continúa</Button>
+                </DialogActions>
+              </Dialog>
+            )
             : onConfirm()
         )
         .catch((error) =>
@@ -245,12 +321,14 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
           })
         );
     })();
-  }, [query, fields, tables]);
+  }, [proposition, tables]);
 
-  const onLimpia = useCallback(() => {
+  const onLimpiaFiltro = useCallback(() => {
+    setFiltro(undefined);
     setQuery(defaultQuery);
-    setRows([]);
   }, []);
+
+  const onLimpiaTabla = useCallback(() => setRows([]), []);
 
   const onExport = useCallback(async () => {
     const now = dayjs();
@@ -284,9 +362,15 @@ export function DataContextProvider({ children }: { children: ReactNode }) {
     columns,
     rows,
     dialog,
+    proposition,
+    filtro,
     query: { state: query, setState: setQuery },
-    onAplica,
-    onLimpia,
+    onLookupFiltro,
+    onGuardaFiltro,
+    onEliminaFiltro,
+    onAplicaFiltro,
+    onLimpiaFiltro,
+    onLimpiaTabla,
     onExport,
   };
 
@@ -300,4 +384,22 @@ export function useDataContext() {
     throw new Error("useDataContext must be used within a DataContextProvider");
   }
   return context;
+}
+
+function FiltrosLookup({
+  modulo,
+  onSelect,
+  onClose,
+}: {
+  modulo: string;
+  onSelect: (filtro: FiltroVm) => void;
+  onClose: () => void;
+}) {
+  return (
+    <CustomModal open={true} onClose={onClose} title="Elige filtro">
+      <FiltrosTableContextProvider deleted={false} modulo={modulo}>
+        <FiltrosTable onSelect={onSelect} />
+      </FiltrosTableContextProvider>
+    </CustomModal>
+  );
 }

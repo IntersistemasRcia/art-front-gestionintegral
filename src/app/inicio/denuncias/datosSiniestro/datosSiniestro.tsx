@@ -4,23 +4,31 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   TextField,
   Typography,
-  MenuItem,
-  Select,
-  InputLabel,
-  FormControl,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { SelectChangeEvent } from "@mui/material/Select";
 import styles from "../denuncias.module.css";
 import {
   DenunciaFormData,
-  COLORES,
-  TIPOS_TRASLADO,
-  PrestadorResponse,
 } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
-import ArtAPI, { formatEstablecimientoLabel } from "@/data/artAPI";
+import { useAuth } from '@/data/AuthContext';
+import ArtAPI from "@/data/artAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
 import type { ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
+
+const formatEstablecimientoLabel = (est?: Partial<ApiEstablecimientoEmpresa> | null): string => {
+  if (!est) return "";
+  const nroSucursal = est.nroSucursal;
+  const domicilio = `${est.domicilioCalle || ""} ${est.domicilioNro || ""}`.trim();
+  const parts: string[] = [];
+  if (nroSucursal !== undefined && nroSucursal !== null) parts.push(String(nroSucursal));
+  if (domicilio) parts.push(domicilio);
+  if (parts.length === 0) return "";
+  return `Sucursal: ${parts.join(" - ")}`;
+};
 
 type DatosSiniestroProps = {
   form: DenunciaFormData;
@@ -38,37 +46,11 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
   errors,
   touched,
   isDisabled,
-  isEditing,
   onTextFieldChange,
-  onSelectChange,
   onBlur,
 }) => {
 
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
-
-
-  // Estado de carga para búsqueda de Prestador Inicial por CUIT
-  const [prestadorLoading, setPrestadorLoading] = useState(false);
-  const lastPrestadorCuitRef = useRef<string>("");
-
-  // Formateo inicial de CUITs si vienen desde la base (modo edición)
-  const prestadorCuitInitialFormattedRef = useRef(false);
-  useEffect(() => {
-    if (prestadorCuitInitialFormattedRef.current) return;
-    const digits = onlyDigits(String(form.prestadorInicialCuit || ""));
-    if (digits.length === 11) {
-      try {
-        const formatted = Formato.CUIP(digits);
-        if (formatted && formatted !== String(form.prestadorInicialCuit || "")) {
-          const synthetic = { target: { name: 'prestadorInicialCuit', value: formatted } } as any;
-          onTextFieldChange(synthetic);
-        }
-      } catch (err) {
-        // ignore
-      }
-    }
-    prestadorCuitInitialFormattedRef.current = true;
-  }, [form.prestadorInicialCuit]);
 
   const establecimientoCuitInitialFormattedRef = useRef(false);
   useEffect(() => {
@@ -88,20 +70,45 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     establecimientoCuitInitialFormattedRef.current = true;
   }, [form.establecimientoCuit]);
 
+  const { user, hasTask } = useAuth();
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
+  const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const empresaId = Number((user as any)?.empresaId ?? 0);
+  //const isEmpleador = empresaId > 0;
+
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+
+  const establecimientoEmpresaSeleccionada = empresas.find(e => {
+    const digits = String((e as any)?.cuit ?? '').replace(/\D/g, '');
+    return digits === String(form.establecimientoCuit ?? '').replace(/\D/g, '');
+  }) ?? null;
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    return `${Formato.CUIP(empresa.cuit)} - ${empresa.razonSocial ?? ''}`;
+  };
+
+  const handleEstablecimientoEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
+    const cuit = val ? String((val as any)?.cuit ?? '') : '';
+    const digits = cuit.replace(/\D/g, '');
+    const formatted = digits.length === 11 ? Formato.CUIP(digits) : digits;
+    const synthetic = { target: { name: 'establecimientoCuit', value: formatted } } as any;
+    onTextFieldChange(synthetic);
+  };
+
   // Establecimientos por CUIT
   const [establecimientos, setEstablecimientos] = useState<ApiEstablecimientoEmpresa[]>([]);
   const [establecimientosLoading, setEstablecimientosLoading] = useState(false);
   const [selectedEstablecimiento, setSelectedEstablecimiento] = useState<ApiEstablecimientoEmpresa | null>(null);
-
-  // Datos ROAM
-  const { data: roamList } = ArtAPI.useGetRefRoam();
-
   // Generador de handlers para campos numéricos.
   const numericChange = (
     name: string,
-    options?: { format?: (digits: string) => string; formatWhenLen?: number }
+    options?: { format?: (digits: string) => string; formatWhenLen?: number; maxDigits?: number }
   ) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = onlyDigits(e.target.value || "");
+    let digits = onlyDigits(e.target.value || "");
+    if (options?.maxDigits != null) {
+      digits = digits.slice(0, options.maxDigits);
+    }
     const synthetic = { target: { name, value: digits } } as any;
     onTextFieldChange(synthetic);
     try {
@@ -119,32 +126,6 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
       // Ignorar errores de formateo
     }
   };
-  
-  // Autocompletar Razón Social Prestador al ingresar 11 dígitos de CUIT
-  useEffect(() => {
-    const digits = onlyDigits(String(form.prestadorInicialCuit || ""));
-    if (isDisabled) return;
-    if (digits.length !== 11) return;
-    if (lastPrestadorCuitRef.current === digits) return;
-
-    const fetchPrestador = async () => {
-      try {
-        setPrestadorLoading(true);
-        const data: PrestadorResponse = await ArtAPI.getPrestador({ CUIT: Number(digits) });
-        if (!data) return;
-        const fantasia = data.nombreFantasia ?? "";
-        const synthetic = { target: { name: "prestadorInicialRazonSocial", value: fantasia } } as any;
-        onTextFieldChange(synthetic);
-        lastPrestadorCuitRef.current = digits;
-      } catch (_err) {
-        // Silenciar errores (no encontrado u otros)
-      } finally {
-        setPrestadorLoading(false);
-      }
-    };
-
-    fetchPrestador();
-  }, [form.prestadorInicialCuit, isDisabled, isEditing]);
 
   // Buscar establecimientos al ingresar 11 dígitos de CUIT de establecimiento
   useEffect(() => {
@@ -185,287 +166,57 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     };
   }, [form.establecimientoCuit, isDisabled]);
 
-  // Autoselección de ROAM Descripción según ROAM Nro (match por 'interno')
+  // Si el usuario no es administrador, fijar CUIT de establecimiento al CUIT de la empresa del usuario (no editable)
   useEffect(() => {
-    if (isDisabled) return;
-    const nro = onlyDigits(String(form.roamNro || ""));
-    const list: any[] = (roamList || []) as any[];
-
-    if (!nro) {
-      if (form.roamDescripcion) {
-        const synthetic = { target: { name: "roamDescripcion", value: "" } } as any;
+    if (canRealizaDenuncias) return;
+    if (isUserAdmin) return;
+    if (!user) return;
+    const empresaCuitRaw = String(user.empresaCUIT ?? "");
+    const digits = empresaCuitRaw.replace(/\D/g, '');
+    if (!digits) return;
+    try {
+      const formatted = Formato.CUIP(digits);
+      if (formatted && formatted !== String(form.establecimientoCuit || "")) {
+        const synthetic = { target: { name: 'establecimientoCuit', value: formatted } } as any;
         onTextFieldChange(synthetic);
       }
-      return;
+    } catch (err) {
+      // ignore
     }
+  }, [user?.empresaCUIT, isUserAdmin, canRealizaDenuncias]);
 
-    const match = list.find((r: any) => String(r?.interno || "") === nro);
-    const desc = match?.roamDetalle ? String(match.roamDetalle) : "";
-    if (desc && form.roamDescripcion !== desc) {
-      const synthetic = { target: { name: "roamDescripcion", value: desc } } as any;
-      onTextFieldChange(synthetic);
-    }
-  }, [form.roamNro, roamList, isDisabled]);
-
-  // Bloquear edición de ROAM Nro (solo lectura) cuando hay un ROAM seleccionado, sin opacidad
-  const lockRoamNro = Boolean(form.roamDescripcion);
   return (
     <>
-      {/* Estado del Trabajador */}
+      {/* Establecimiento */}
       <div className={styles.formSection}>
         <Typography variant="h6" className={styles.sectionTitle}>
-          Estado del Trabajador
+          Establecimiento
         </Typography>
 
-        <div className={styles.formRow}>
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.estaConsciente && !!errors.estaConsciente}
-            disabled={isDisabled}
-          >
-            <InputLabel>¿Está Consciente?</InputLabel>
-            <Select
-              name="estaConsciente"
-              value={form.estaConsciente}
-              label="¿Está Consciente?"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("estaConsciente")}
-            >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Si">Sí</MenuItem>
-              <MenuItem value="No">No</MenuItem>
-            </Select>
-            {touched.estaConsciente && errors.estaConsciente && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.estaConsciente}
-              </Typography>
-            )}
-          </FormControl>
-
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.color && !!errors.color}
-            disabled={isDisabled}
-          >
-            <InputLabel>Color</InputLabel>
-            <Select
-              name="color"
-              value={form.color}
-              label="Color"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("color")}
-            >
-              {COLORES.map((color) => (
-                <MenuItem key={color.value} value={color.value}>
-                  {color.label}
-                </MenuItem>
-              ))}
-            </Select>
-            {touched.color && errors.color && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.color}
-              </Typography>
-            )}
-          </FormControl>
-
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.habla && !!errors.habla}
-            disabled={isDisabled}
-          >
-            <InputLabel>¿Habla?</InputLabel>
-            <Select
-              name="habla"
-              value={form.habla}
-              label="¿Habla?"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("habla")}
-            >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Si">Sí</MenuItem>
-              <MenuItem value="No">No</MenuItem>
-            </Select>
-            {touched.habla && errors.habla && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.habla}
-              </Typography>
-            )}
-          </FormControl>
-
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.gravedad && !!errors.gravedad}
-            disabled={isDisabled}
-          >
-            <InputLabel>Gravedad</InputLabel>
-            <Select
-              name="gravedad"
-              value={form.gravedad}
-              label="Gravedad"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("gravedad")}
-            >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Leve">Leve</MenuItem>
-              <MenuItem value="Grave">Grave</MenuItem>
-              <MenuItem value="Critico">Crítico</MenuItem>
-            </Select>
-            {touched.gravedad && errors.gravedad && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.gravedad}
-              </Typography>
-            )}
-          </FormControl>
-
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.respira && !!errors.respira}
-            disabled={isDisabled}
-          >
-            <InputLabel>¿Respira?</InputLabel>
-            <Select
-              name="respira"
-              value={form.respira}
-              label="¿Respira?"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("respira")}
-            >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Si">Sí</MenuItem>
-              <MenuItem value="No">No</MenuItem>
-            </Select>
-            {touched.respira && errors.respira && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.respira}
-              </Typography>
-            )}
-          </FormControl>
-        </div>
-
-        <div className={styles.formRow}>
-          <TextField
-            label="Observaciones"
-            name="observaciones"
-            value={form.observaciones}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            multiline
-            rows={3}
-            placeholder="Observaciones del estado del trabajador"
-          />
-        </div>
-
-        <div className={styles.formRow}>
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.tieneHemorragia && !!errors.tieneHemorragia}
-            disabled={isDisabled}
-          >
-            <InputLabel>¿Tiene Hemorragia?</InputLabel>
-            <Select
-              name="tieneHemorragia"
-              value={form.tieneHemorragia}
-              label="¿Tiene Hemorragia?"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("tieneHemorragia")}
-            >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Si">Sí</MenuItem>
-              <MenuItem value="No">No</MenuItem>
-            </Select>
-            {touched.tieneHemorragia && errors.tieneHemorragia && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.tieneHemorragia}
-              </Typography>
-            )}
-          </FormControl>
-
-          <FormControl
-            fullWidth
-            required={!isDisabled}
-            error={touched.contextoDenuncia && !!errors.contextoDenuncia}
-            disabled={isDisabled}
-          >
-            <InputLabel>Contexto Denuncia</InputLabel>
-            <Select
-              name="contextoDenuncia"
-              value={form.contextoDenuncia}
-              label="Contexto Denuncia"
-              onChange={onSelectChange}
-              onBlur={() => onBlur("contextoDenuncia")}
-            >
-              <MenuItem value="Ignora">Ignora</MenuItem>
-              <MenuItem value="Urgente">Urgente</MenuItem>
-              <MenuItem value="Normal">Normal</MenuItem>
-            </Select>
-            {touched.contextoDenuncia && errors.contextoDenuncia && (
-              <Typography
-                variant="caption"
-                color="error"
-                className={styles.captionNote}
-              >
-                {errors.contextoDenuncia}
-              </Typography>
-            )}
-          </FormControl>
-        </div>
-      </div>
-
-        {/* Establecimiento */}
-        <div className={styles.formSection}>
-          <Typography variant="h6" className={styles.sectionTitle}>
-            Establecimiento
-          </Typography>
-
           <div className={styles.formRow}>
-            <TextField
-              label="CUIT Establecimiento"
-              name="establecimientoCuit"
-              value={form.establecimientoCuit}
-              onChange={numericChange("establecimientoCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-              onBlur={() => onBlur("establecimientoCuit")}
-              error={touched.establecimientoCuit && !!errors.establecimientoCuit}
-              helperText={touched.establecimientoCuit ? errors.establecimientoCuit : undefined}
-              fullWidth
-              required={!isDisabled}
-              disabled={isDisabled}
-              placeholder="CUIT del establecimiento"
+            <CustomSelectSearch<Empresa>
+              options={empresas}
+              getOptionLabel={getEmpresaLabel}
+              value={establecimientoEmpresaSeleccionada}
+              onChange={handleEstablecimientoEmpresaChange}
+              label="Empresa Establecimiento (CUIT)"
+              placeholder="Buscar empresa..."
+              loading={isLoadingEmpresas}
+              loadingText="Cargando empresas..."
+              noOptionsText={
+                isLoadingEmpresas
+                  ? "Cargando..."
+                  : empresas.length <= 1
+                  ? "No hay empresas disponibles"
+                  : "No se encontraron empresas"
+              }
+              disabled={isDisabled || isLoadingEmpresas}
+              className={styles.formRowWide}
             />
 
             <Autocomplete
               className={styles.wideField}
-              disabled={isDisabled || establecimientos.length === 0}
+              disabled={isDisabled}
               options={establecimientos}
               loading={establecimientosLoading}
               getOptionLabel={(option: ApiEstablecimientoEmpresa) =>
@@ -532,6 +283,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCiiu ? errors.establecimientoCiiu : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="CIIU"
             />
           </div>
@@ -547,6 +299,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCalle ? errors.establecimientoCalle : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Calle"
             />
 
@@ -560,6 +313,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoNumero ? errors.establecimientoNumero : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Número"
             />
 
@@ -573,6 +327,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoPiso ? errors.establecimientoPiso : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Piso"
             />
 
@@ -586,6 +341,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoDpto ? errors.establecimientoDpto : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Dpto"
             />
           </div>
@@ -601,6 +357,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCodLocalidad ? errors.establecimientoCodLocalidad : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Código localidad"
             />
 
@@ -614,6 +371,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoCodPostal ? errors.establecimientoCodPostal : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Código postal"
             />
 
@@ -627,6 +385,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoTelefono ? errors.establecimientoTelefono : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Teléfono"
             />
 
@@ -640,223 +399,12 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               helperText={touched.establecimientoEmail ? errors.establecimientoEmail : undefined}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: true }}
               placeholder="Email"
             />
           </div>
         </div>
 
-      {/* ROAM */}
-      <div className={styles.formSection}>
-        <Typography variant="h6" className={styles.sectionTitle}>
-          ROAM
-        </Typography>
-
-        <div className={styles.formRow}>
-          <FormControl fullWidth disabled={isDisabled}>
-            <InputLabel>ROAM</InputLabel>
-            <Select
-              name="roam"
-              value={form.roam}
-              label="ROAM"
-              onChange={onSelectChange}
-            >
-              <MenuItem value="No">No</MenuItem>
-              <MenuItem value="Si">Sí</MenuItem>
-            </Select>
-          </FormControl>
-
-          <Autocomplete
-            className={styles.wideField}
-            disabled={isDisabled}
-            options={(roamList || []) as any[]}
-            getOptionLabel={(option: any) => String(option?.roamDetalle || "")}
-            isOptionEqualToValue={(opt: any, val: any) => String(opt?.interno) === String(val?.interno)}
-            value={(roamList || []).find((r: any) => String(r?.roamDetalle || "") === String(form.roamDescripcion || "")) || null}
-            onChange={(_e, newValue: any) => {
-              const desc = String(newValue?.roamDetalle || "");
-              const interno = newValue?.interno != null ? String(newValue.interno) : "";
-              const e1 = { target: { name: "roamDescripcion", value: desc } } as any;
-              onTextFieldChange(e1);
-              // Setear ROAM Nro al interno (y que no se pueda editar luego)
-              const e2 = { target: { name: "roamNro", value: interno } } as any;
-              onTextFieldChange(e2);
-            }}
-            fullWidth
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="ROAM Descripción"
-                placeholder="Buscar ROAM"
-                onBlur={() => onBlur("roamDescripcion")}
-                fullWidth
-              />
-            )}
-          />
-
-          <TextField
-            label="ROAM Nro."
-            name="roamNro"
-            value={form.roamNro}
-            onChange={numericChange("roamNro")}
-            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-            fullWidth
-            disabled={isDisabled}
-            InputProps={{ readOnly: !isDisabled && lockRoamNro }}
-            placeholder="Número ROAM"
-          />
-
-          <TextField
-            label="ROAM Año"
-            name="roamAno"
-            value={form.roamAno}
-            onChange={numericChange("roamAno")}
-            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-            fullWidth
-            disabled={isDisabled}
-            placeholder="Año ROAM"
-          />
-
-          <TextField
-            label="ROAM Código"
-            name="roamCodigo"
-            value={form.roamCodigo}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            placeholder="Código ROAM"
-          />
-
-          {/* <TextField
-            label="ROAM Código"
-            name="roamCodigo"
-            value={form.roamCodigo}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            placeholder="Código ROAM"
-          /> */}
-
-
-
-        </div>
-      </div>
-
-      {/* Tipo de Traslado */}
-      <div className={styles.formSection}>
-        <Typography variant="h6" className={styles.sectionTitle}>
-          Tipo de Traslado
-        </Typography>
-
-        <div className={styles.formRow}>
-          <FormControl fullWidth disabled={isDisabled}>
-            <InputLabel>Tipo Traslado</InputLabel>
-            <Select
-              name="tipoTraslado"
-              value={form.tipoTraslado}
-              label="Tipo Traslado"
-              onChange={onSelectChange}
-            >
-              {TIPOS_TRASLADO.map((tipo) => (
-                <MenuItem key={tipo.value} value={tipo.value}>
-                  {tipo.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <TextField
-            label="Prestador Traslado"
-            name="prestadorTraslado"
-            value={form.prestadorTraslado}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            placeholder="Prestador de traslado"
-          />
-        </div>
-      </div>
-
-      {/* Prestador Inicial */}
-      <div className={styles.formSection}>
-        <Typography variant="h6" className={styles.sectionTitle}>
-          Prestador Inicial
-        </Typography>
-
-        <div className={styles.formRow}>
-          <TextField
-            label="CUIT Prestador Inicial"
-            name="prestadorInicialCuit"
-            value={form.prestadorInicialCuit}
-            onChange={numericChange("prestadorInicialCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-            onBlur={() => onBlur("prestadorInicialCuit")}
-            error={
-              touched.prestadorInicialCuit && !!errors.prestadorInicialCuit
-            }
-            helperText={
-              prestadorLoading
-                ? "Buscando prestador inicial..."
-                : touched.prestadorInicialCuit
-                ? errors.prestadorInicialCuit
-                : undefined
-            }
-            fullWidth
-            required={!isDisabled}
-            disabled={isDisabled}
-            placeholder="CUIT del prestador inicial"
-          />
-          {/* <CustomButton
-            color="primary"
-            size="mid"
-            className={styles.smallButton}
-            icon={<span>🔍</span>}
-            aria-label="buscar prestador"
-          >
-            {""}
-          </CustomButton> */}
-
-          <TextField
-            label="Razón Social Prestador"
-            name="prestadorInicialRazonSocial"
-            value={form.prestadorInicialRazonSocial}
-            onChange={onTextFieldChange}
-            onBlur={() => onBlur("prestadorInicialRazonSocial")}
-            InputProps={{ readOnly: true }}
-            error={
-              touched.prestadorInicialRazonSocial &&
-              !!errors.prestadorInicialRazonSocial
-            }
-            helperText={
-              touched.prestadorInicialRazonSocial &&
-              errors.prestadorInicialRazonSocial
-            }
-            fullWidth
-            required={!isDisabled}
-            disabled={isDisabled}
-            placeholder="Razón social del prestador"
-          />
-        </div>
-      </div>
-
-      {/* Verificación de Contacto Inicial */}
-      {/* <div className={styles.formSection}>
-        <Typography variant="h6" className={styles.sectionTitle}>
-          Verificación de Contacto Inicial
-        </Typography>
-
-        <div className={styles.formRow}>
-          <TextField
-            label="Verifica Contacto Inicial"
-            name="verificaContactoInicial"
-            value={form.verificaContactoInicial}
-            onChange={onTextFieldChange}
-            fullWidth
-            disabled={isDisabled}
-            multiline
-            rows={2}
-            placeholder="Información de verificación del contacto inicial"
-          />
-        </div>
-      </div> */}
     </>
   );
 };

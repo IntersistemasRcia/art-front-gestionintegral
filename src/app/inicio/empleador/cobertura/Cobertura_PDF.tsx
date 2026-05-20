@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import styles from './cobertura.module.css';
 import Image from 'next/image';
 import Formato from '@/utils/Formato';
+import ArtAPI from '@/data/artAPI';
+import useSWR from 'swr';
 
 type CoberturaPDFProps = {
   poliza?: any;
@@ -16,6 +18,7 @@ type CoberturaPDFProps = {
   fechaHasta?: string;
   clausula?: boolean;
   nominasSeleccionadas?: Array<{ cuil?: string | number; nombreEmpleador?: string }>;
+  cuitEmpresa?: number;
 };
 
 export default function Cobertura_PDF(props: CoberturaPDFProps) {
@@ -30,17 +33,57 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
     fechaHasta,
     clausula,
     nominasSeleccionadas,
+    cuitEmpresa,
   } = props;
 
   // refs separados: primero el certificado (pagina 1), luego el resto (pagina 2+)
   const firstRef = useRef<HTMLDivElement | null>(null);
-  const restRef = useRef<HTMLDivElement | null>(null);
+  const restRef = useRef<(HTMLDivElement | null)[]>([]);
+  const generatedRef = useRef(false);
+
+  const nominaChunks = useMemo(() => {
+    const rowsPerPage = 32;
+    const source = nominasSeleccionadas ?? [];
+    if (source.length === 0) return [source];
+
+    const chunks: Array<Array<{ cuil?: string | number; nombreEmpleador?: string }>> = [];
+    for (let i = 0; i < source.length; i += rowsPerPage) {
+      chunks.push(source.slice(i, i + rowsPerPage));
+    }
+    return chunks;
+  }, [nominasSeleccionadas]);
+
+  const { data: empresaByCuit } = useSWR(
+    cuitEmpresa ? ['empresaByCuit', cuitEmpresa] : null,
+    () => ArtAPI.getEmpresaByCUIT({ CUIT: cuitEmpresa })
+  );
+
+  const cp = empresaByCuit?.codLocalidadPostal;
+  const { data: localidadesData } = useSWR(
+    cp ? ['localidadesByCP', cp] : null,
+    () => ArtAPI.getLocalidadesbyCP({ CodPostal: cp })
+  );
+  const litProvincia = Array.isArray(localidadesData) && localidadesData.length > 0
+    ? localidadesData[0].litProvincia
+    : '';
 
   // Acepta poliza como array o como objeto
   const p = Array.isArray(poliza) ? poliza[0] : poliza ?? {};
 
+  // Destinatario para la cláusula: usar el valor ingresado en el formulario si existe
+  const destinatarioEnClausula = presentadoA?.trim() ? presentadoA : 'A quien corresponda';
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      generatedRef.current = false;
+      return;
+    }
+
+    if (!empresaByCuit) return;
+    if (cp && !localidadesData) return;
+
+    if (generatedRef.current) return;
+    generatedRef.current = true;
 
     const generate = async () => {
       try {
@@ -48,7 +91,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
         const { jsPDF } = await import('jspdf');
 
         // validar refs
-        if (!firstRef.current && !restRef.current) throw new Error('No content to render');
+        if (!firstRef.current) throw new Error('No content to render');
 
         const pdf = new jsPDF({
           orientation: 'portrait',
@@ -59,62 +102,64 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
         // escala para mejorar calidad (ajusta si el PDF pesa mucho)
         const scale = 3;
         const jpegQuality = 0.85;
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const footerReservedHeight = 56;
+        const printableHeight = pageHeight - footerReservedHeight;
+
+        const renderBlockWithPagination = async (element: HTMLDivElement, startOnNewPage: boolean) => {
+          const canvas = await html2canvas(element, {
+            scale,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+          });
+
+          const imgWidth = pageWidth;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
+
+          let renderedHeight = 0;
+          let firstSlice = true;
+
+          while (renderedHeight < imgHeight - 0.1) {
+            if (startOnNewPage || !firstSlice) {
+              pdf.addPage();
+            }
+
+            pdf.addImage(imgData, 'JPEG', 0, -renderedHeight, imgWidth, imgHeight);
+            renderedHeight += printableHeight;
+            firstSlice = false;
+            startOnNewPage = false;
+          }
+        };
 
         // Render primer bloque (certificado)
         if (firstRef.current) {
-          const canvas1 = await html2canvas(firstRef.current, {
-            scale,
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-          });
-          // Añadir canvas1 como primera página (no crear página extra)
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgWidth = pageWidth;
-          const imgHeight = (canvas1.height * imgWidth) / canvas1.width;
-          // usar JPEG en lugar de PNG para contenido (mejor compresión)
-          const imgData1 = canvas1.toDataURL('image/jpeg', jpegQuality);
-          pdf.addImage(imgData1, 'JPEG', 0, 0, imgWidth, imgHeight);
-
-          // Si canvas1 ocupa más de una página, agregar las siguientes porciones
-          let heightLeft1 = imgHeight - pdf.internal.pageSize.getHeight();
-          while (heightLeft1 > -0.1) {
-            pdf.addPage();
-            pdf.addImage(imgData1, 'PNG', 0, -(imgHeight - pdf.internal.pageSize.getHeight() - heightLeft1), imgWidth, imgHeight);
-            heightLeft1 -= pdf.internal.pageSize.getHeight();
-          }
+          await renderBlockWithPagination(firstRef.current, false);
         }
 
-        // Render resto (páginas siguientes: póliza + tabla)
-        if (restRef.current) {
-          const canvas2 = await html2canvas(restRef.current, {
-            scale,
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-          });
+        // Render páginas de nómina (cada bloque empieza en página nueva)
+        const nominaRefs = restRef.current.filter((element): element is HTMLDivElement => element !== null);
+        for (const pageElement of nominaRefs) {
+          await renderBlockWithPagination(pageElement, true);
+        }
 
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgWidth = pageWidth;
-          const imgHeight = (canvas2.height * imgWidth) / canvas2.width;
-          const imgData2 = canvas2.toDataURL('image/jpeg', jpegQuality);
-
-          // Si el primer contenido ya ocupó todo, la siguiente adición debe ser nueva página
-          // Añadimos canvas2 y lo fragmentamos en páginas según altura
-          let heightLeft = imgHeight;
-          let position = 0;
-
-          // Añadimos primer trozo de canvas2 en nueva(s) página(s)
-          pdf.addPage();
-          pdf.addImage(imgData2, 'JPEG', 0, 0, imgWidth, imgHeight);
-          heightLeft -= pdf.internal.pageSize.getHeight();
-
-          while (heightLeft > -0.1) {
-            pdf.addPage();
-            // posicion negativa para desplazar la imagen y mostrar la siguiente porción
-            pdf.addImage(imgData2, 'JPEG', 0, -(imgHeight - pdf.internal.pageSize.getHeight() - heightLeft), imgWidth, imgHeight);
-            heightLeft -= pdf.internal.pageSize.getHeight();
-          }
+        // Pie de página en todas las páginas
+        const footerLines = [
+          'San Martin 588 - Piso 5to. - (1004) Capital Federal - Bs As. - Argentina - Tel: 0800-333-2786',
+          'Mail: atencion.clientes@artmutualrural.org.ar',
+        ];
+        const pageCount = pdf.getNumberOfPages();
+        pdf.setFontSize(8);
+        pdf.setTextColor(120);
+        for (let i = 1; i <= pageCount; i++) {
+          pdf.setPage(i);
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, printableHeight, pageWidth, footerReservedHeight, 'F');
+          pdf.setDrawColor(200);
+          pdf.line(30, pageHeight - 42, pageWidth - 30, pageHeight - 42);
+          pdf.text(footerLines, pageWidth / 2, pageHeight - 28, { align: 'center' });
         }
 
         pdf.save('CertificadoDeCobertura.pdf');
@@ -128,7 +173,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
 
     generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, empresaByCuit, localidadesData]);
 
   return (
     // off-screen wrapper: dos bloques separados para forzar que la tabla quede en bloques distintos
@@ -163,13 +208,13 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
               </div>
             </div>
 
-            {clausula && (
-              <>
-                <div className={styles.pdfSection}>El N° del contrato es el <strong>{p.numero ?? ''}</strong>.</div>
+            <div className={styles.pdfSection}>El N° del contrato es el: <strong>{p.numero ?? ''}</strong>.</div>
 
+          {clausula && (
+              <>
                 <div className={styles.pdfSection} style={{ lineHeight: 1.4 }}>
                   Consta por la presente que <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>, renuncia en forma expresa a reclamar o iniciar toda acción de
-                  repetición o de regreso contra: A quien corresponda, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley
+                  repetición o de regreso contra: {destinatarioEnClausula}, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley
                   N° 24.557, sea en cualquier otra norma jurídica, con motivo de las prestaciones en especie o dinerarias que se vea obligada a abonar, contratar
                   u otorgar al personal dependiente o ex dependiente de <strong>{p.empleador_Denominacion ?? ''}</strong>, amparados por la cobertura del Contrato de
                   Afiliación N° <strong>{p.numero ?? ''}</strong>, por accidentes del trabajo o enfermedades profesionales, ocurridos o contraídos por el hecho
@@ -194,7 +239,6 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
             <div className={styles.pdfSection}>
                 Sin otro particular, saludo a Ud. muy atentamente.
             </div>
-            <br/>
             <div className={styles.signatureSection}>
               <div className={styles.signatureLine}>
                 <Image src="/images/FirmaFernanda.png" alt="Firma de Fernanda Lassalle" width={170} height={200} priority />
@@ -205,47 +249,64 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
                 Gerente de Administración
               </p>
             </div>
+            {nominasSeleccionadas && nominasSeleccionadas.length > 0 && (
+              <div className={styles.pdfSection}>Se adjunta Nómina de Personal.</div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bloque separado que se renderiza en páginas posteriores */}
-      <div ref={restRef} className={styles.pdfContainer}>
-        <div className={styles.pdfSecondPage}>
-          <h3>Nómina de Personal a la Fecha</h3>
-
-          <div className={styles.pdfPolicyInfo}>
-            <div>Razón Social: {p.empleador_Denominacion ?? ''}</div>
-            <div>CUIT: {p.cuit ?? ''}</div>
-            <div>
-              Calle: {p.empleador_Domicilio_Calle ?? ''} {p.empleador_Domicilio_Altura ?? ''} {p.empleador_Domicilio_Piso ?? ''}{' '}
-              {p.empleador_Domicilio_Depto ?? ''}
+      {nominaChunks.map((chunk, pageIndex) => (
+        <div
+          key={`nomina-page-${pageIndex}`}
+          ref={(element) => {
+            restRef.current[pageIndex] = element;
+          }}
+          className={styles.pdfContainer}
+        >
+          <div className={styles.pdfHeader}>
+            <div className={styles.pdfLogo}>
+              <Image src="/icons/LogoTexto.svg" alt="Logo" width={130} height={130} />
             </div>
-            <div>
-              Localidad: {p.empleador_Domicilio_Localidad_Descripcion ?? ''} - CP: {p.empleador_Domicilio_CP ?? ''}
+            <div style={{ textAlign: 'right', fontSize: '0.75rem' }}>
+              <div>Ciudad Autónoma de Buenos Aires,</div>
+              <div>Fecha: {dia ?? ''}</div>
+              <div>Hora: {hora ?? ''}</div>
+              <div>Página: {pageIndex + 2}</div>
             </div>
-            <div>Nro.Contrato: {p.numero ?? p.nroContrato ?? ''}</div>
-            <div>Ciiu Rev. 4: {p.ciiu ?? ''}</div>
           </div>
 
-          <table className={styles.pdfTable}>
-            <thead>
-              <tr>
-                <th>CUIL</th>
-                <th>Apellido y Nombre</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(nominasSeleccionadas ?? []).map((n, i) => (
-                <tr key={i}>
-                  <td>{n.cuil ?? ''}</td>
-                  <td>{n.nombreEmpleador ?? ''}</td>
+          <div className={styles.pdfSecondPage}>
+            <h3>Nómina de Personal a la Fecha</h3>
+
+            <div className={styles.pdfPolicyInfo}>
+              <div>Razón Social: {empresaByCuit?.razonSocial ?? ''}</div>
+              <div>CUIT: {empresaByCuit?.cuit ?? ''}</div>
+              <div>Calle: {[empresaByCuit?.domicilioCalle, empresaByCuit?.domicilioNro].filter(Boolean).join(' ')}</div>
+              <div>Localidad: {litProvincia} - CP: {empresaByCuit?.codLocalidadPostal ?? ''}</div>
+              <div>Nro.Contrato: {p.numero ?? ''}</div>
+              <div>Ciiu Rev. 4: {empresaByCuit?.ciiu ?? ''}</div>
+            </div>
+
+            <table className={styles.pdfTable}>
+              <thead>
+                <tr>
+                  <th>CUIL</th>
+                  <th>Apellido y Nombre</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {chunk.map((n, i) => (
+                  <tr key={`${pageIndex}-${i}`}>
+                    <td>{n.cuil ?? ''}</td>
+                    <td>{n.nombreEmpleador ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }

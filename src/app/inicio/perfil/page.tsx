@@ -1,7 +1,8 @@
 // src/app/inicio/profile/page.tsx
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useAuth } from '@/data/AuthContext';
 import { useState } from "react";
 import {
   Typography,
@@ -31,7 +32,6 @@ import Formato from "@/utils/Formato";
 
 function ProfilePage() {
   const { data: session, status } = useSession();
-  const [mostrarDetalles, setMostrarDetalles] = useState(false);
 
   if (status === "loading") {
     return (
@@ -49,7 +49,15 @@ function ProfilePage() {
     );
   }
 
-  const { rol, nombre, cuit, empresaCUIT, empresaRazonSocial } = session.user as any;
+  const user = session.user as {
+    rol?: string;
+    nombre?: string;
+    cuit?: string;
+    empresaCUIT?: string;
+    empresaRazonSocial?: string;
+  };
+
+  const { rol, nombre, cuit, empresaCUIT, empresaRazonSocial } = user;
 
   return (
     <Box className={styles.pagePadding}>
@@ -60,7 +68,7 @@ function ProfilePage() {
       <Paper elevation={3} className={styles.profileContainer}>
         <Box className={styles.header}>
           <Avatar 
-            alt={nombre || session.user?.name} 
+            alt={nombre ?? session.user?.name ?? undefined}
             src={session.user?.image || undefined} 
             className={styles.avatar}
           />
@@ -107,30 +115,7 @@ function ProfilePage() {
                   </Typography>
                 </Box>
 
-                {(empresaCUIT || empresaRazonSocial) && (
-                  <>
-                    <Divider className={styles.dividerMargin} sx={{ marginTop: 3 }} />
-                    
-                    <Typography variant="h6" gutterBottom className={styles.sectionTitle} sx={{ marginTop: 2 }}>
-                      <BusinessIcon className={styles.iconSectionTitle} />
-                      Empresa Relacionada
-                    </Typography>
-                    
-                    <Box className={styles.dataItem}>
-                      <BusinessIcon className={styles.icon} />
-                      <Typography variant="body1" component="span">
-                        <span className={styles.label}>Razón Social: {empresaRazonSocial ?? "N/A"}</span>  
-                      </Typography>
-                    </Box>
-                    
-                    <Box className={styles.dataItem}>
-                      <BadgeIcon className={styles.icon} />
-                      <Typography variant="body1" component="span">
-                        <span className={styles.label}>CUIT Empresa: {Formato.CUIP(empresaCUIT) ?? "N/A"}</span> 
-                      </Typography>
-                    </Box>
-                  </>
-                )}
+                
               </CardContent>
             </Card>
           </Grid>
@@ -139,37 +124,24 @@ function ProfilePage() {
             <Card raised className={styles.card}>
               <CardContent>
                 <Typography variant="h6" gutterBottom className={styles.sectionTitle}>
-                  <InfoIcon className={styles.iconSectionTitle} />
-                  Detalles de la Sesión
+                  <BusinessIcon className={styles.iconSectionTitle} />
+                  Empresa Relacionada
                 </Typography>
                 <Divider className={styles.dividerMargin} />
-                
-                <Box className={styles.dataItem} style={{ justifyContent: 'center' }}>
-                  <CustomButton 
-                    onClick={() => setMostrarDetalles(!mostrarDetalles)}
-                    size="mid"
-                  >
-                    {mostrarDetalles ? (
-                      <>
-                        <VisibilityOffIcon sx={{ marginRight: 1 }} />
-                        Ocultar detalles de sesión
-                      </>
-                    ) : (
-                      <>
-                        <VisibilityIcon sx={{ marginRight: 1 }} />
-                        Ver detalles de sesión
-                      </>
-                    )}
-                  </CustomButton>
+
+                <Box className={styles.dataItem}>
+                  <BusinessIcon className={styles.icon} />
+                  <Typography variant="body1" component="span">
+                    <span className={styles.label}>Razón Social: {empresaRazonSocial ?? "N/A"}</span>
+                  </Typography>
                 </Box>
-                
-                {mostrarDetalles && (
-                  <Box sx={{ marginTop: 2 }}>
-                    <pre className={styles.pre}>
-                      {JSON.stringify(session, null, 2)}
-                    </pre>
-                  </Box>
-                )}
+
+                <Box className={styles.dataItem}>
+                  <BadgeIcon className={styles.icon} />
+                  <Typography variant="body1" component="span">
+                    <span className={styles.label}>CUIT Empresa: {Formato.CUIP(empresaCUIT) ?? "N/A"}</span>
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>

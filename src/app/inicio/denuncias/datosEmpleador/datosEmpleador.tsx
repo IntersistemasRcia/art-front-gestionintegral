@@ -1,53 +1,55 @@
 import React, { useEffect, useRef } from "react";
 import { TextField, Typography } from "@mui/material";
-import { SelectChangeEvent } from "@mui/material/Select";
 import styles from "../denuncias.module.css";
-import type { DenunciaFormData, DatosEmpleadorProps } from "../types/tDenuncias";
+import type { DatosEmpleadorProps } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
-
-
- 
+import { useAuth } from "@/data/AuthContext";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
 
 const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
   form,
   errors,
   touched,
   isDisabled,
-  readonlyEmpCuit = false,
   onTextFieldChange,
-  onSelectChange,
   onBlur,
 }) => {
-  // Helper para mantener sólo dígitos
+  const { user, hasTask } = useAuth();
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
+
+  const empresaId = Number((user as any)?.empresaId ?? 0);
+  const isEmpleador = empresaId > 0;
+  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+
+  const lockAllFields = isDisabled || (isEmpleador && !canRealizaDenuncias);
+  const lockNonCuitFields = !isEmpleador && !isAdmin;
+  const nonCuitLocked = lockAllFields || lockNonCuitFields;
+  const nonCuitEnabled = !nonCuitLocked;
+
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+
+  const empresaSeleccionada = empresas.find(e => {
+    const digits = String((e as any)?.cuit ?? '').replace(/\D/g, '');
+    return digits === (form.empCuit ?? '').replace(/\D/g, '');
+  }) ?? null;
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    return `${Formato.CUIP(empresa.cuit)} - ${empresa.razonSocial ?? ''}`;
+  };
+
+  const handleEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
+    const cuit = val ? String((val as any)?.cuit ?? '') : '';
+    const digits = cuit.replace(/\D/g, '');
+    const formatted = digits.length === 11 ? Formato.CUIP(digits) : digits;
+    const synthetic = { target: { name: 'empCuit', value: formatted } } as any;
+    onTextFieldChange(synthetic);
+  };
+
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
 
-  // Handler numérico con formateo opcional
-  const numericChange = (
-    name: string,
-    options?: { format?: (digits: string) => string; formatWhenLen?: number }
-  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    let digits = onlyDigits(e.target.value || "");
-    const cap = options?.formatWhenLen ?? undefined as number | undefined;
-    if (cap != null) {
-      digits = digits.slice(0, cap);
-    }
-    const synthetic = { target: { name, value: digits } } as any;
-    onTextFieldChange(synthetic);
-    try {
-      if (
-        options?.format &&
-        options.formatWhenLen != null &&
-        digits.length === options.formatWhenLen &&
-        !isDisabled
-      ) {
-        const formatted = options.format(digits);
-        const syntheticEvent = { target: { name, value: formatted } } as any;
-        onTextFieldChange(syntheticEvent);
-      }
-    } catch (err) {
-      // ignore
-    }
-  };
 
   // Formateo inicial de empCuit si viene desde la base
   const empCuitInitRef = useRef(false);
@@ -67,6 +69,32 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
     }
     empCuitInitRef.current = true;
   }, [form.empCuit]);
+
+  // Prefill automático desde empresaCUIT del usuario si está disponible
+  const userCuitPrefilledRef = useRef(false);
+  useEffect(() => {
+    if (canRealizaDenuncias) return;
+    if (userCuitPrefilledRef.current) return;
+    const userCuit = Number((user as any)?.empresaCUIT ?? 0);
+    if (!userCuit || String(userCuit).length !== 11) return;
+
+    const currentDigits = onlyDigits(form.empCuit);
+    const desiredDigits = String(userCuit);
+    if (currentDigits === desiredDigits) {
+      userCuitPrefilledRef.current = true;
+      return;
+    }
+
+    try {
+      const formatted = Formato.CUIP(desiredDigits);
+      const synthetic = { target: { name: "empCuit", value: formatted } } as any;
+      onTextFieldChange(synthetic);
+      userCuitPrefilledRef.current = true;
+    } catch {
+      // ignore
+    }
+  }, [user, form.empCuit, onTextFieldChange, canRealizaDenuncias]);
+
   return (
     <div className={styles.formSection}>
       <Typography variant="h5" component="h2" className={styles.sectionTitle}>
@@ -74,18 +102,24 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
       </Typography>
 
       <div className={styles.formRow}>
-        <TextField
-          label="CUIT"
-          name="empCuit"
-          value={form.empCuit}
-          onChange={numericChange("empCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-          onBlur={() => onBlur("empCuit")}
-          error={touched.empCuit && !!errors.empCuit}
-          helperText={touched.empCuit && errors.empCuit}
-          fullWidth
-          disabled={isDisabled || readonlyEmpCuit}
-          InputProps={{ readOnly: readonlyEmpCuit }}
-          placeholder="Solo números"
+        <CustomSelectSearch<Empresa>
+          options={empresas}
+          getOptionLabel={getEmpresaLabel}
+          value={empresaSeleccionada}
+          onChange={handleEmpresaChange}
+          label="Empresa (CUIT)"
+          placeholder="Buscar empresa..."
+          loading={isLoadingEmpresas}
+          loadingText="Cargando empresas..."
+          noOptionsText={
+            isLoadingEmpresas
+              ? "Cargando..."
+              : empresas.length <= 1
+              ? "No hay empresas disponibles"
+              : "No se encontraron empresas"
+          }
+          disabled={isDisabled || isLoadingEmpresas}
+          className={styles.formRowWide}
         />
 
         <TextField
@@ -96,8 +130,8 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           InputProps={{ readOnly: true }}
           error={touched.empPoliza && !!errors.empPoliza}
           helperText={touched.empPoliza && errors.empPoliza}
-          fullWidth
-          disabled={isDisabled}
+          className={styles.smallField}
+          disabled={!nonCuitEnabled}
           placeholder="Número de póliza"
         />
       </div>
@@ -112,7 +146,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empRazonSocial && !!errors.empRazonSocial}
           helperText={touched.empRazonSocial && errors.empRazonSocial}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -126,7 +160,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empDomicilioCalle && !!errors.empDomicilioCalle}
           helperText={touched.empDomicilioCalle && errors.empDomicilioCalle}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -138,7 +172,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empDomicilioNro && !!errors.empDomicilioNro}
           helperText={touched.empDomicilioNro && errors.empDomicilioNro}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -151,7 +185,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioPiso")}
           error={touched.empDomicilioPiso && !!errors.empDomicilioPiso}
           helperText={touched.empDomicilioPiso && errors.empDomicilioPiso}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -162,7 +196,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioDpto")}
           error={touched.empDomicilioDpto && !!errors.empDomicilioDpto}
           helperText={touched.empDomicilioDpto && errors.empDomicilioDpto}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -175,7 +209,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioEntreCalle1")}
           error={touched.empDomicilioEntreCalle1 && !!errors.empDomicilioEntreCalle1}
           helperText={touched.empDomicilioEntreCalle1 && errors.empDomicilioEntreCalle1}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -186,7 +220,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empDomicilioEntreCalle2")}
           error={touched.empDomicilioEntreCalle2 && !!errors.empDomicilioEntreCalle2}
           helperText={touched.empDomicilioEntreCalle2 && errors.empDomicilioEntreCalle2}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -199,7 +233,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empCodLocalidad")}
           error={touched.empCodLocalidad && !!errors.empCodLocalidad}
           helperText={touched.empCodLocalidad && errors.empCodLocalidad}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -210,7 +244,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           onBlur={() => onBlur("empCodPostal")}
           error={touched.empCodPostal && !!errors.empCodPostal}
           helperText={touched.empCodPostal && errors.empCodPostal}
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
 
@@ -224,7 +258,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empTelefonos && !!errors.empTelefonos}
           helperText={touched.empTelefonos && errors.empTelefonos}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
 
         <TextField
@@ -236,7 +270,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
           error={touched.empEmail && !!errors.empEmail}
           helperText={touched.empEmail && errors.empEmail}
           fullWidth
-          disabled={isDisabled}
+          disabled={!nonCuitEnabled}
         />
       </div>
     </div>

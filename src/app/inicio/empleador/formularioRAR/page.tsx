@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState, SyntheticEvent } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, SyntheticEvent, useRef } from 'react';
 import { IconButton, Box, Tooltip } from "@mui/material";
 import { useAuth } from '@/data/AuthContext';
 import Formato from '@/utils/Formato';
@@ -14,7 +14,9 @@ import styles from './FormulariosRAR.module.css';
 import { BsFileEarmarkPdfFill, BsPencilFill, BsFront } from "react-icons/bs";
 import FormularioRAR from './types/TformularioRar';
 import ArtAPI from "@/data/artAPI";
-
+import { useEmpresasStore } from "@/data/empresasStore";
+import { Empresa } from "@/data/authAPI";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 
 // Hijos
 import FormularioRARGenerar from './generar/FormularioRARGenerar';
@@ -22,8 +24,6 @@ import FormularioRARGenerar from './generar/FormularioRARGenerar';
 
 // Ruta del logo para el PDF
 const pdfLogoSrc = '/icons/LogoTexto.png';
-
-
 /* Helpers */
 const fechaFormatter = (v: any) => Formato.Fecha(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
@@ -37,13 +37,40 @@ const Spinner: React.FC = () => (
 );
 
 type ViewMode = 'list' | 'crear' | 'editar';
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+const EMPRESA_OPCION_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+  cuit: 0,
+  razonSocial: "Todas las Empresas",
+  domicilio: "",
+  localidad: "",
+  provincia: "",
+};
 
 const FormulariosRAR: React.FC = () => {
   const { user } = useAuth();
+  const isAdmin = user?.rol?.toLowerCase() === "administrador";
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT, cuit } = user as any;
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
+  const sessionEmpresaIds = useMemo(() => {
+    const fromSession = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => e.empresaId)
+      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
+    const unique = Array.from(new Set(fromSession));
+    if (unique.length > 0) return unique;
+    return Array.from(new Set(empresas.map((e) => e.empresaId)));
+  }, [user?.empresas, empresas]);
+  const opcionesEmpresaSelector = useMemo(
+    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    [empresas]
+  );
+
+  const [loading, setLoading] = useState<boolean>(false);
   const [internoFormularioRAR, setInternoFormularioRAR] = useState<number>(0);
   const [internoEstablecimiento, setInternoEstablecimiento] = useState<number>(0);
   const [estado, setEstado] = useState<string>('');
@@ -78,24 +105,114 @@ const FormulariosRAR: React.FC = () => {
     setActiveTabIndex(newTabValue);
   };
 
-  // Usamos el hook SWR del API (solo hace fetch si existe token y respeta las opciones de revalidate)
-  // Pasamos PageIndex y PageSize al hook (cambia la clave de SWR y dispara fetch)
-  const apiPageIndex = PageIndex;
-  const { data: formulariosData, error: formulariosError, isValidating, mutate: mutateFormularios } =
-    ArtAPI.useGetFormulariosRARURL(empresaCUIT ? { CUIT: empresaCUIT, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' } : { PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' });
-
-  // Una sola vez: cuando llegan datos, los mapeamos al estado local
+  // Seleccionar automáticamente si solo hay una empresa
   useEffect(() => {
-    // mantener spinner mientras llega la primera respuesta
-    if (!formulariosData && !formulariosError) {
-      setLoading(true);
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
+    }
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresaSeleccionada((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas]);
+
+  // Limpiar formularios cuando cambia la empresa seleccionada
+  useEffect(() => {
+    setFormulariosRAR([]);
+    setIdFormularioSeleccionado(0);
+    setRegistroSeleccionado(null);
+    setDetallesInterno([]);
+    setErrorDetalles('');
+    setPageIndex(0);
+  }, [empresaSeleccionada?.empresaId]);
+
+  const handleEmpresaChange = (
+    _event: React.SyntheticEvent,
+    newValue: Empresa | null
+  ) => {
+    setEmpresaSeleccionada(newValue);
+    seleccionAutomaticaRef.current = false;
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return "Todas las Empresas";
+    return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
+  };
+
+  const empresaIdsFiltro = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      if (isAdmin) return [];
+      return sessionEmpresaIds;
+    }
+    return [empresaSeleccionada.empresaId];
+  }, [empresaSeleccionada, isAdmin, sessionEmpresaIds]);
+
+  const canFetchFormularios = useMemo(() => {
+    if (!empresaSeleccionada) return false;
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return true;
+    return empresaIdsFiltro.length > 0;
+  }, [empresaSeleccionada, empresaIdsFiltro]);
+
+  // Usamos el hook SWR del API (solo hace fetch si existe token y respeta las opciones de revalidate)
+  // Solo hace fetch si hay una empresa seleccionada
+  // SWR detectará automáticamente cuando cambia el CUIT porque está en la clave
+  const apiPageIndex = PageIndex;
+  const paramsFormularios = canFetchFormularios
+    ? { empresasId: empresaIdsFiltro, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' }
+    : undefined;
+  
+  const { data: formulariosData, error: formulariosError, isLoading: isLoadingSWR, isValidating, mutate: mutateFormularios } =
+    ArtAPI.useGetFormulariosRARURL(paramsFormularios);
+
+  // Sincronizar el estado de loading con SWR
+  useEffect(() => {
+    // Si no hay empresa seleccionada, mantener tabla vacía y no mostrar loading
+    if (!canFetchFormularios) {
+      setFormulariosRAR([]);
+      setLoading(false);
+      setPageCount(1);
       return;
     }
 
+    // Usar el estado de loading de SWR directamente
+    setLoading(isLoadingSWR || isValidating);
+  }, [canFetchFormularios, isLoadingSWR, isValidating]);
+
+  // Una sola vez: cuando llegan datos, los mapeamos al estado local
+  useEffect(() => {
+    // Si no hay empresa seleccionada, no procesar datos
+    if (!canFetchFormularios) {
+      return;
+    }
+
+    // Si está cargando, no procesar aún
+    if (isLoadingSWR || isValidating) {
+      return;
+    }
+
+    // Si hay error, mostrar error
     if (formulariosError) {
       console.error('Error al cargar formularios (SWR):', formulariosError);
       setFormulariosRAR([]);
       setLoading(false);
+      return;
+    }
+
+    // Si no hay datos, mantener vacío
+    if (!formulariosData) {
+      setFormulariosRAR([]);
+      setPageCount(1);
       return;
     }
 
@@ -126,7 +243,7 @@ const FormulariosRAR: React.FC = () => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formulariosData, formulariosError]);
+  }, [formulariosData, formulariosError, canFetchFormularios, isLoadingSWR, isValidating]);
 
   // Handler que se pasa al DataTable para solicitar otra página
   const handlePageChange = (newPageIndex: number) => {
@@ -148,9 +265,7 @@ const FormulariosRAR: React.FC = () => {
     setLoadingDetalles(true);
     setErrorDetalles('');
     try {
-      const response = await fetch(`http://arttest.intersistemas.ar:8302/api/FormulariosRAR/${internoId}`);
-      if (!response.ok) throw new Error(`Error al consultar detalles: ${response.status} - ${response.statusText}`);
-      const data = await response.json();
+      const data = await ArtAPI.getFormularioRARById(internoId);
 
       if (data?.formularioRARDetalle && Array.isArray(data.formularioRARDetalle)) {
         const detallesFormateados = data.formularioRARDetalle.map((detalle: any, index: number) => ({
@@ -229,16 +344,13 @@ const FormulariosRAR: React.FC = () => {
 
           let mapaAgentes = new Map<number, string>();
           try {
-            const rAg = await fetch('http://arttest.intersistemas.ar:8302/api/AgentesCausantes');
-            if (rAg.ok) {
-              const agentes = await rAg.json();
-              const arr = Array.isArray(agentes) ? agentes : agentes?.data ? (Array.isArray(agentes.data) ? agentes.data : [agentes.data]) : [agentes];
-              arr.forEach((a: any) => {
-                const codigo = Number(a?.codigo ?? 0);
-                const nombre = String(a?.agenteCausante ?? '').trim();
-                if (codigo && nombre) mapaAgentes.set(codigo, nombre);
-              });
-            }
+            const agentesResp = await ArtAPI.getAgentesCausantes();
+            const arr = Array.isArray(agentesResp) ? agentesResp : [];
+            arr.forEach((a: any) => {
+              const codigo = Number(a?.codigo ?? 0);
+              const nombre = String(a?.agenteCausante ?? '').trim();
+              if (codigo && nombre) mapaAgentes.set(codigo, nombre);
+            });
           } catch (e) {
             console.warn('No se pudo cargar el catálogo de agentes para PDF', e);
           }
@@ -381,10 +493,10 @@ const FormulariosRAR: React.FC = () => {
 
   /* Columnas para tabla principal de formularios */
   const tableColumns = [
-    { accessorKey: 'interno', header: 'Interno'},
+    // { accessorKey: 'interno', header: 'Interno'},
     { accessorKey: 'cuit', header: 'CUIT', cell: (info: any) => Formato.CUIP(info.getValue()) },
     { accessorKey: 'empresaRazonSocial', header: 'Razón Social' },
-    { accessorKey: 'empresaDireccion', header: 'Dirección' },
+    { accessorKey: 'empresaDireccion', header: 'Nro. Establecimiento' },
     { accessorKey: 'estado', header: 'Estado' },
     { accessorKey: 'fechaCreacion', header: 'Fecha Creación', cell: (info: any) => fechaFormatter(info.getValue()), meta: { align: "center" } },
     { accessorKey: 'fechaPresentacion', header: 'Fecha Presentación', cell: (info: any) => fechaFormatter(info.getValue()), meta: { align: "center" } },
@@ -398,7 +510,8 @@ const FormulariosRAR: React.FC = () => {
       cell: ({ row }: { row: any }) => {
         const estadoForm = String(row.original.Estado || row.original.estado || '');
         const mostrarEditar = estadoForm !== 'Confirmado';
-        const mostrarReplicar = true; 
+        const mostrarImprimir = estadoForm === 'Confirmado';
+        const mostrarReplicar = true;
         
         return (
           <Box className={styles.iconActions}>
@@ -440,7 +553,7 @@ const FormulariosRAR: React.FC = () => {
                 </Tooltip>
               )}
               {/* Botón Imprimir */}
-              <Tooltip
+              {mostrarImprimir && <Tooltip
                 title="Generar PDF"
                 arrow
                 slotProps={{
@@ -459,7 +572,7 @@ const FormulariosRAR: React.FC = () => {
                 >
                   <BsFileEarmarkPdfFill fontSize="large" />
                 </IconButton>
-              </Tooltip>
+              </Tooltip>}
               {/* Botón Replicar */}
               {mostrarReplicar && (
                 <Tooltip
@@ -580,7 +693,7 @@ const FormulariosRAR: React.FC = () => {
 
 
   const disableEdita = cuit !== 99999999999 && internoFormularioRAR !== 0 ? false : true;
-  const disableGenera = cuit === 99999999999 ? true : false;
+  const disableGenera = cuit === 99999999999 || !empresaSeleccionada || empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID || !empresaSeleccionada.cuit;
 
   if (loading) return <Spinner />;
 
@@ -764,8 +877,7 @@ const FormulariosRAR: React.FC = () => {
               <Text style={pdfStyles.estabNumeroTitle}>
                 Nro. Establecimiento:{' '}
                 {String(
-                  datos.internoEstablecimiento ||
-                  datos.InternoEstablecimiento ||
+                  datos.establecimientoNumero ||
                   '—'
                 )}
               </Text>
@@ -820,11 +932,11 @@ const FormulariosRAR: React.FC = () => {
             </View>
 
             {/* Título antes de la tabla de trabajadores */}
-            {trabajadoresFormateados.length > 0 && (
-              <Text style={pdfStyles.trabajadoresTitle}>
-                Trabajadores Registrados ({trabajadoresFormateados.length})
-              </Text>
-            )}
+            {/* {trabajadoresFormateados.length > 0 && (
+              // <Text style={pdfStyles.trabajadoresTitle}>
+              //   Trabajadoress Registrados ({trabajadoresFormateados.length})
+              // </Text>
+            )} */}
           </>
         )}
       />
@@ -889,10 +1001,10 @@ const FormulariosRAR: React.FC = () => {
 
                 </div>
                 <div className={styles.formularioGrid}>
-                  <p><strong>Razón Social:</strong> {registroSeleccionado.razonSocial || '—'}</p>
+                  <p><strong>Razón Social:</strong> {registroSeleccionado.empresaRazonSocial || registroSeleccionado.razonSocial || registroSeleccionado.RazonSocial || '—'}</p>
                   <p><strong>CUIT:</strong> {cuipFormatter(registroSeleccionado.cuit) || '—'}</p>
                   <p><strong>Estado:</strong> {registroSeleccionado.estado || '—'}</p>
-                  <p><strong>Dirección:</strong> {registroSeleccionado.direccion || '—'}</p>
+                  <p><strong>Dirección:</strong> {registroSeleccionado.empresaDireccion || registroSeleccionado.direccion || registroSeleccionado.Direccion || '—'}</p>
                 </div>
               </div>
 
@@ -920,7 +1032,7 @@ const FormulariosRAR: React.FC = () => {
                 <div>
                   <div className={styles.trabajadoresHeader}>
                     <p className={`${styles.detallesInfo} ${styles.trabajadoresCount}`}>
-                      <strong>👥 Trabajadores registrados: {detallesInterno.length}</strong>
+                      <strong>👥 Trabajadores registrados: {new Set(detallesInterno.map((detalle) => detalle.cuil)).size}</strong>
                     </p>
                   </div>
 
@@ -946,6 +1058,28 @@ const FormulariosRAR: React.FC = () => {
     <div>
       {viewMode === 'list' ? (
         <div>
+          {/* Selector de empresa */}
+          <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
+            <CustomSelectSearch<Empresa>
+              options={opcionesEmpresaSelector}
+              getOptionLabel={getEmpresaLabel}
+              value={empresaSeleccionada}
+              onChange={handleEmpresaChange}
+              label="Seleccionar Empresa"
+              placeholder="Buscar empresa..."
+              loading={isLoadingEmpresas}
+              loadingText="Cargando empresas..."
+              noOptionsText={
+                isLoadingEmpresas
+                  ? "Cargando..."
+                  : opcionesEmpresaSelector.length <= 1
+                  ? "No hay empresas disponibles"
+                  : "No se encontraron empresas"
+              }
+              disabled={isLoadingEmpresas}
+            />
+          </Box>
+
           <CustomTab
             tabs={tabItems}
             currentTab={activeTabIndex} // Usamos el estado
@@ -954,19 +1088,21 @@ const FormulariosRAR: React.FC = () => {
         </div>
       ) : viewMode === 'crear' ? (
         <FormularioRARGenerar
-          cuit={cuit}
+          cuit={empresaSeleccionada?.cuit ?? cuit}
           internoEstablecimiento={internoEstablecimiento}
           finalizaCarga={handleFinalizaCarga}
           formulariosRAR={formulariosRAR}
           replicaDe={replicaDe}
+          razonSocial={empresaSeleccionada?.razonSocial}
         />
       ) : (
         <FormularioRARGenerar
-          cuit={cuit}
+          cuit={empresaSeleccionada?.cuit ?? cuit}
           internoEstablecimiento={internoEstablecimiento}
           finalizaCarga={handleFinalizaCarga}
           formulariosRAR={formulariosRAR}
           editarId={editaId}
+          razonSocial={empresaSeleccionada?.razonSocial}
         />
       )}
 

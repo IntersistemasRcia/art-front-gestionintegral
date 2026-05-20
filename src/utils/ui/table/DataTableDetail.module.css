@@ -1,0 +1,102 @@
+.wrapper {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #999;
+}
+
+.wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.wrapper th,
+.wrapper td {
+  border: 1px solid #999;
+  padding: 6px 8px;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.wrapper thead th {
+  background: #92bd68;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  text-align: center;
+  vertical-align: middle;
+  text-shadow: 2px 2px 4px #3a6e1a;
+}
+
+.wrapper thead tr th:first-child {
+  border-top-left-radius: 10px;
+}
+
+.wrapper thead tr th:last-child {
+  border-top-right-radius: 10px;
+}
+
+.wrapper tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 10px;
+}
+
+.wrapper tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 10px;
+}
+
+.wrapper tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+
+.wrapper tbody tr:nth-child(even) td {
+  background: #f7fbf4;
+}
+
+.paginationContainer {
+  font-size: 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  color: var(--grisOscuro);
+  font-family: var(--font);
+}
+
+.paginationIcons {
+  display: flex;
+}
+
+.paginationContainer button {
+  color: var(--naranja) !important;
+}
+
+.paginationContainer button:disabled {
+  color: var(--gris) !important;
+}
+
+.tableTitle {
+  text-align: center;
+  font-weight: 700;
+  margin: 6px 0;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.groupHeader {
+  text-align: center !important;
+  font-weight: 700 !important;
+  padding: 8px 0 !important;
+  background: #d7e9c6 !important;
+  color: #000000 !important;
+  letter-spacing: 0.4px;
+}
+
+.wrapper tbody tr.rowOdd td {
+  background: #ffffff;
+}
+
+.wrapper tbody tr.rowEven td {
+  background: #f7fbf4;
+}

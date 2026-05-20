@@ -6,6 +6,9 @@ import "@/styles/globals.css";
 export const metadata = {
   title: "ART Gestión Integral",
   description: "ART - App Web",
+  other: {
+    google: "notranslate",
+  },
 };
 
 export default function RootLayout({
@@ -14,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" translate="no" className="notranslate">
+      <body translate="no" className="notranslate">
         <Providers>
           {children}
         </Providers>

@@ -1,26 +1,28 @@
 "use client";
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, SyntheticEvent } from 'react';
 import { Box, IconButton, Tooltip } from "@mui/material";
 import styles from './denuncias.module.css';
 import ArtAPI from '@/data/artAPI';
-import { DenunciaGetAll, DenunciaQueryParams, DenunciaFormData, initialDenunciaFormData, DenunciaPostRequest, DenunciaQueryParamsID, COLORES, DenunciaPutRequest, DenunciaPatchRequest } from './types/tDenuncias';
+import { DenunciaGetAll, DenunciaQueryParams, DenunciaFormData, initialDenunciaFormData, DenunciaPostRequest, DenunciaQueryParamsID, DenunciaPutRequest, DenunciaPatchRequest } from './types/tDenuncias';
 import { useAuth } from '@/data/AuthContext';
 import DataTable from '@/utils/ui/table/DataTable';
 import Formato from '@/utils/Formato';
 import CustomButton from "@/utils/ui/button/CustomButton";
+import CustomTabs from '@/utils/ui/tab/CustomTab';
+import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
+import { useEmpresasStore } from '@/data/empresasStore';
+import { Empresa } from '@/data/authAPI';
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import DenunciaForm from './denunciaForm';
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
-
-// Estado options for the dropdown
 const estadoOptions = [
   { value: '', label: 'Todos los estados' },
-  { value: 0, label: 'Borrador' },
-  { value: 1, label: 'Pendiente' },
-  { value: 2, label: 'En proceso' },
-  { value: 3, label: 'Completado' },
-  { value: 4, label: 'Cancelado' },
+  { value: 'Borrador', label: 'Borrador' },
+  { value: 'Pendiente', label: 'Pendiente' },
+  { value: 'En proceso', label: 'En proceso' },
+  { value: 'Completado', label: 'Completado' },
+  { value: 'Cancelado', label: 'Cancelado' },
 ];
 
 // Definición del modo de operación
@@ -46,35 +48,20 @@ const cuilToNumber = (cuil: string | undefined): number => {
   return digits.length === 11 ? Number(digits) : 0;
 };
 
-const buildFechaHoraSiniestroIso = (fechaOcurrencia?: string, hora?: string): string => {
+const buildFechaHoraSiniestroIso = (fechaOcurrencia?: string, hora?: string): string | null => {
   return fechaOcurrencia && hora
     ? dayjs(`${fechaOcurrencia}T${hora}`).toISOString()
-    : dayjs().toISOString();
+    : null;
+};
+
+const buildFechaHoraTomaConocimientoIso = (fechaInformacionArt?: string): string | null => {
+  return fechaInformacionArt
+    ? dayjs(fechaInformacionArt).toISOString()
+    : null;
 };
 
 const buildAfiNacimientoYear = (fechaNac?: string): number => {
   return fechaNac ? dayjs(fechaNac).year() : 0;
-};
-
-const mapGravedadToApi = (v: string | undefined): string => {
-  if (!v) return '';
-  const s = v.trim().toLowerCase();
-  if (s === 'ignora') return 'I';
-  if (s === 'leve') return 'l';
-  if (s === 'grave') return 'g';
-  if (s === 'critico' || s === 'crítico') return 'c';
-  if (s.length === 1) return s;
-  return '';
-};
-
-const mapContextoDenunciaToApi = (v: string | undefined): string => {
-  if (!v) return '';
-  const s = v.trim().toLowerCase();
-  if (s === 'ignora') return 'I';
-  if (s === 'urgente') return 'u';
-  if (s === 'normal') return 'n';
-  if (s.length === 1) return s;
-  return '';
 };
 
 const mapSiNoToApi = (v: string | undefined): string => {
@@ -85,6 +72,29 @@ const mapSiNoToApi = (v: string | undefined): string => {
   if (s === 'no' || s === 'n') return 'N';
   return '';
 };
+
+const mapRoamToApi = (v: string | undefined): string => {
+  if (!v) return '';
+  const s = v.trim().toLowerCase();
+  if (s === 'si' || s === 's') return 'Si';
+  if (s === 'no' || s === 'n') return 'No';
+  if (s === 'posible' || s === 'posi' || s === 'p' || s === 'puede ser' || s === 'puede') return 'Posi';
+  // Enviar literal si es otra etiqueta
+  return String(v).trim();
+};
+
+const normalizeApiRoamToSelect = (apiValue: any): string => {
+  if (apiValue == null || apiValue === '') return '';
+  const s = String(apiValue).trim().toLowerCase();
+  if (s === 'si' || s === 's') return 'Si';
+  if (s === 'no' || s === 'n') return 'No';
+  if (s === 'posi' || s === 'posible' || s === 'p') return 'Posible';
+  // Si la API devuelve la etiqueta literal ya en español, intentar usarla tal cual
+  const cap = String(apiValue).trim();
+  return cap;
+};
+
+// estTrabColor: enviamos/recibimos el literal seleccionado directamente
 
 const mapEstadoCivilToApi = (v: string | undefined): string => {
   if (!v) return '';
@@ -98,84 +108,28 @@ const mapEstadoCivilToApi = (v: string | undefined): string => {
   return '';
 };
 
-
 /* Helpers */
-const fechaFormatter = (v: any) => Formato.Fecha(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
 
-// Mapeos para color: select <-> API
-const COLOR_LETTER_MAP: Record<string, string> = {
-  n: 'NORMAL',
-  p: 'PALIDO',
-  c: 'CIANÓTICO',
-  r: 'RUBICUNDO',
-};
 
-const normalizeApiColorToSelect = (apiColor: any): string => {
-  if (apiColor == null || apiColor === '') return initialDenunciaFormData.color;
-  if (typeof apiColor === 'string') {
-    const s = apiColor.trim();
-    if (s.length === 1) return COLOR_LETTER_MAP[s.toLowerCase()] ?? initialDenunciaFormData.color;
-    return s;
-  }
-  if (typeof apiColor === 'number') {
-    return COLORES[apiColor]?.value ?? initialDenunciaFormData.color;
-  }
-  if (apiColor && typeof apiColor.value === 'string') return String(apiColor.value);
-  return initialDenunciaFormData.color;
-};
 
-const mapColorToApiLetter = (formColor: string): string => {
-  if (!formColor) return '';
-  const v = formColor.trim().toUpperCase();
-  if (v.length === 1) return v.toLowerCase();
-  if (v.includes('NORMAL')) return 'n';
-  if (v.includes('PALID')) return 'p';
-  if (v.includes('CIAN')) return 'c';
-  if (v.includes('RUBIC')) return 'r';
-  return '';
-};
-
-// Normaliza valores de la API a selects del formulario (Si/No/Ignora)
-const normalizeApiSiNoToSelect = (apiValue: any): 'Si' | 'No' | 'Ignora' | '' => {
-  if (apiValue == null || apiValue === '') return '';
-  if (typeof apiValue === 'boolean') return apiValue ? 'Si' : 'No';
-  const s = String(apiValue).trim().toLowerCase();
-  if (s === 's' || s === 'si' || s === 'true' || s === '1') return 'Si';
-  if (s === 'n' || s === 'no' || s === 'false' || s === '0') return 'No';
-  if (s === 'i' || s === 'ignora') return 'Ignora';
-  return '';
-};
-
-// Variante binaria (sin "Ignora") para campos como enViaPublica/roam
+// Variante binaria
 const normalizeApiSiNoBinary = (apiValue: any): 'Si' | 'No' | '' => {
   if (apiValue == null || apiValue === '') return '';
   if (typeof apiValue === 'boolean') return apiValue ? 'Si' : 'No';
   const s = String(apiValue).trim().toLowerCase();
   if (s === 's' || s === 'si' || s === 'true' || s === '1') return 'Si';
   if (s === 'n' || s === 'no' || s === 'false' || s === '0') return 'No';
-  // Para 'i' u otros, dejar vacío
   return '';
 };
 
-// Normaliza gravedad de la API (l/g/c/I) a texto del select
-const normalizeApiGravedadToSelect = (apiValue: any): 'Ignora' | 'Leve' | 'Grave' | 'Critico' | '' => {
+const normalizeApiSiNoIgnora = (apiValue: any): 'Si' | 'No' | 'Ignora' | '' => {
   if (apiValue == null || apiValue === '') return '';
+  if (typeof apiValue === 'boolean') return apiValue ? 'Si' : 'No';
   const s = String(apiValue).trim().toLowerCase();
+  if (s === 's' || s === 'si' || s === 'true' || s === '1') return 'Si';
+  if (s === 'n' || s === 'no' || s === 'false' || s === '0') return 'No';
   if (s === 'i' || s === 'ignora') return 'Ignora';
-  if (s === 'l' || s === 'leve') return 'Leve';
-  if (s === 'g' || s === 'grave') return 'Grave';
-  if (s === 'c' || s === 'critico' || s === 'crítico') return 'Critico';
-  return '';
-};
-
-// Normaliza contexto de denuncia (u/n/I) a texto del select
-const normalizeApiContextoToSelect = (apiValue: any): 'Ignora' | 'Urgente' | 'Normal' | '' => {
-  if (apiValue == null || apiValue === '') return '';
-  const s = String(apiValue).trim().toLowerCase();
-  if (s === 'i' || s === 'ignora') return 'Ignora';
-  if (s === 'u' || s === 'urgente') return 'Urgente';
-  if (s === 'n' || s === 'normal') return 'Normal';
   return '';
 };
 
@@ -192,7 +146,7 @@ const normalizeApiEstadoCivilToSelect = (apiValue: any): string => {
   }
   // Si ya viene el texto completo
   const up = String(apiValue).trim().toUpperCase();
-  if (['SOLTERO','CASADO','DIVORCIADO','VIUDO','CONCUBINATO'].includes(up)) return up;
+  if (['SOLTERO', 'CASADO', 'DIVORCIADO', 'VIUDO', 'CONCUBINATO'].includes(up)) return up;
   return initialDenunciaFormData.estadoCivil;
 };
 
@@ -242,170 +196,337 @@ const parseApiTimeToHM = (v: any): string => {
   return '';
 };
 
- const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, empleadorCuit?: number) => {
-   const fechaHoraSiniestro = buildFechaHoraSiniestroIso(formData.fechaOcurrencia, formData.hora);
-   const afiFechaNacimiento = buildAfiNacimientoYear(formData.fechaNac);
-   const emp = empresa || {};
-   const empCuitNum = typeof empleadorCuit === 'number' && String(empleadorCuit).length === 11 ? empleadorCuit : 0;
+const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, empleadorCuit?: number) => {
+  const fechaHoraSiniestro = buildFechaHoraSiniestroIso(formData.fechaOcurrencia, formData.hora);
+  const fechaHoraTomaConocimientoSiniestro = buildFechaHoraTomaConocimientoIso(formData.fechaInformacionArt);
+  const afiFechaNacimiento = buildAfiNacimientoYear(formData.fechaNac);
+  const emp = empresa || {};
+  const empCuitNum = typeof empleadorCuit === 'number' ? empleadorCuit : onlyDigits(formData.empCuit);
+  const prestadorTrasladoDigits = onlyDigits((formData as any).estTrabPrestadorTraslado || '');
 
-   return {
-     siniestroTipo: formData.tipoDenuncia,
-
-     empCuit: empCuitNum,
-     empPoliza: Number(emp?.polizaNro ?? 0),
-     empRazonSocial: String(emp?.razonSocial ?? ''),
-     empCiiu: Number(emp?.ciiu ?? 0),
-     empDomicilioCalle: String(emp?.domicilioCalle ?? formData.calle ?? ''),
-     empDomicilioNro: String(emp?.domicilioNro ?? formData.nro ?? ''),
-     empDomicilioPiso: String(emp?.domicilioPiso ?? formData.piso ?? ''),
-     empDomicilioDpto: String(emp?.domicilioDpto ?? formData.dpto ?? ''),
-     empDomicilioEntreCalle1: String(emp?.domicilioEntreCalle1 ?? formData.entreCalle ?? ''),
-     empDomicilioEntreCalle2: String(emp?.domicilioEntreCalle2 ?? formData.entreCalleY ?? ''),
-     empCodLocalidad: String(emp?.codLocalidadSrt ?? formData.codLocalidad ?? ''),
-     empCodPostal: Number(emp?.codLocalidadPostal ?? onlyDigits(formData.codPostal)),
-     empTelefonos: String(emp?.telefonos ?? formData.telefonos ?? ''),
-     empeMail: "",
-
-    empOcCuit: onlyDigits(formData.empCuit),
-    empOcRazonSocial: String(formData.empRazonSocial ?? ''),
-    empOcEstablecimiento: String(formData.empRazonSocial ?? ''),
-    empOcCiiu: 0,
-    empOcDomicilioCalle: String(formData.empDomicilioCalle ?? ''),
-    empOcDomicilioNro: String(formData.empDomicilioNro ?? ''),
-    empOcDomicilioPiso: String(formData.empDomicilioPiso ?? ''),
-    empOcDomicilioDpto: String(formData.empDomicilioDpto ?? ''),
-    empOcDomicilioEntreCalle1: String(formData.empDomicilioEntreCalle1 ?? ''),
-    empOcDomicilioEntreCalle2: String(formData.empDomicilioEntreCalle2 ?? ''),
-    empOcCodLocalidad: String(formData.empCodLocalidad ?? ''),
-    empOcCodPostal: Number(onlyDigits(formData.empCodPostal)),
+  return {
+    siniestroTipo: formData.tipoDenuncia,
+    empCuit: empCuitNum,
+    empPoliza: Number(formData.empPoliza ?? 0),
+    empRazonSocial: String(formData.empRazonSocial ?? ''),
+    empCiiu: Number(onlyDigits((formData as any).empCiiu as any)) || 0,
+    empDomicilioCalle: String(formData.empDomicilioCalle ?? ''),
+    empDomicilioNro: String(formData.empDomicilioNro ?? ''),
+    empDomicilioPiso: String(formData.empDomicilioPiso ?? ''),
+    empDomicilioDpto: String(formData.empDomicilioDpto ?? ''),
+    empDomicilioEntreCalle1: String(formData.empDomicilioEntreCalle1 ?? ''),
+    empDomicilioEntreCalle2: String(formData.empDomicilioEntreCalle2 ?? ''),
+    empCodLocalidad: String(formData.empCodLocalidad ?? ''),
+    empCodPostal: Number(onlyDigits(formData.empCodPostal)),
+    empTelefonos: String(formData.empTelefonos ?? ''),
+    empeMail: String(formData.empEmail ?? ''),
+    empOcCuit: Number(onlyDigits((formData as any).establecimientoCuit ?? '')),
+    empOcRazonSocial: String((formData as any).establecimientoNombre ?? ''),
+    empOcEstablecimiento: String((formData as any).establecimientoNombre ?? ''),
+    empOcCiiu: Number(onlyDigits((formData as any).establecimientoCiiu ?? '')),
+    empOcDomicilioCalle: String((formData as any).establecimientoCalle ?? ''),
+    empOcDomicilioNro: String((formData as any).establecimientoNumero ?? ''),
+    empOcDomicilioPiso: String((formData as any).establecimientoPiso ?? ''),
+    empOcDomicilioDpto: String((formData as any).establecimientoDpto ?? ''),
+    empOcDomicilioEntreCalle1: String((formData as any).establecimientoEntreCalle1 ?? ''),
+    empOcDomicilioEntreCalle2: String((formData as any).establecimientoEntreCalle2 ?? ''),
+    empOcCodLocalidad: String((formData as any).establecimientoCodLocalidad ?? ''),
+    empOcCodPostal: Number(onlyDigits((formData as any).establecimientoCodPostal ?? '')),
     empOcSubContrato: "",
-    empOcTelefonos: String(formData.empTelefonos ?? ''),
-    empOceMail: String(formData.empEmail ?? ''),
+    empOcTelefonos: String((formData as any).establecimientoTelefonos ?? (formData as any).establecimientoTelefono ?? ''),
+    empOceMail: String((formData as any).establecimientoEmail ?? ''),
+   // Datos del Establecimiento (empEst*)
+    empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
+    // Usamos la razón social de la empresa como razón social del establecimiento
+    empEstRazonSocial: String(emp?.razonSocial ?? formData.empRazonSocial ?? ''),
+    empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
+    empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
+    empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
+    empEstDomicilioNro: String(formData.establecimientoNumero ?? ''),
+    empEstDomicilioPiso: String(formData.establecimientoPiso ?? ''),
+    empEstDomicilioDpto: String(formData.establecimientoDpto ?? ''),
+    // No hay campos específicos de "entre calles" para establecimiento en el formulario
+    empEstDomicilioEntreCalle1: "",
+    empEstDomicilioEntreCalle2: "",
+    empEstCodLocalidad: String(formData.establecimientoCodLocalidad ?? ''),
+    empEstCodPostal: Number(onlyDigits(formData.establecimientoCodPostal)),
+    empEstTelefonos: String(formData.establecimientoTelefono ?? (formData as any).establecimientoTelefonos ?? ''),
+    empEsteMail: String(formData.establecimientoEmail ?? ''),
+    prestadorCuit: onlyDigits(formData.prestadorInicialCuit),
+    afiCuil: cuilToNumber(formData.cuil),
+    afiDocTipo: formData.docTipo,
+    afiDocNumero: onlyDigits(formData.docNumero),
+    afiNombre: formData.nombre,
+    afiFechaNacimiento,
+    afiSexo: formData.sexo,
+    afiEstadoCivil: mapEstadoCivilToApi(formData.estadoCivil),
+    afiNacionalidad: onlyDigits(formData.nacionalidad),
+    afiDomicilioCalle: formData.domicilioCalle,
+    afiDomicilioNro: formData.domicilioNro,
+    afiDomicilioPiso: formData.domicilioPiso,
+    afiDomicilioDpto: formData.domicilioDpto,
+    afiDomicilioEntreCalle1: formData.domicilioEntreCalle1 ?? '',
+    afiDomicilioEntreCalle2: formData.domicilioEntreCalle2 ?? '',
+    afiCodLocalidad: formData.codLocalidadTrabajador,
+    afiCodPostal: onlyDigits(formData.codPostalTrabajador),
+    afieMail: formData.email,
+    afiTelefono: formData.telefono,
+    afiObraSocial: formData.obraSocial,
 
-     // Datos del Establecimiento (empEst*) desde la sección "Establecimiento" del formulario
-     empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
-     // Usamos la razón social de la empresa como razón social del establecimiento
-     empEstRazonSocial: String(emp?.razonSocial ?? formData.empRazonSocial ?? ''),
-     empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
-     empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
-     empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
-     empEstDomicilioNro: String(formData.establecimientoNumero ?? ''),
-     empEstDomicilioPiso: String(formData.establecimientoPiso ?? ''),
-     empEstDomicilioDpto: String(formData.establecimientoDpto ?? ''),
-     // No hay campos específicos de "entre calles" para establecimiento en el formulario
-     empEstDomicilioEntreCalle1: "",
-     empEstDomicilioEntreCalle2: "",
-     empEstCodLocalidad: String(formData.establecimientoCodLocalidad ?? ''),
-     empEstCodPostal: Number(onlyDigits(formData.establecimientoCodPostal)),
-     empEstTelefonos: String(formData.establecimientoTelefono ?? ''),
-     empEsteMail: String(formData.establecimientoEmail ?? ''),
+    comentario: '',
+    origenIngreso: 'web',
+    descripcion: formData.descripcion,
+    fechaHoraSiniestro,
+    fechaHoraTomaConocimientoSiniestro,
 
-     prestadorCuit: onlyDigits(formData.prestadorInicialCuit),
+    enViaPublica: mapSiNoToApi(formData.enViaPublica || ''),
 
-     afiCuil: cuilToNumber(formData.cuil),
-     afiDocTipo: formData.docTipo,
-     afiDocNumero: onlyDigits(formData.docNumero),
-     afiNombre: formData.nombre,
-     afiFechaNacimiento,
-     afiSexo: formData.sexo,
-     afiEstadoCivil: mapEstadoCivilToApi(formData.estadoCivil),
-     afiNacionalidad: onlyDigits(formData.nacionalidad),
-     afiDomicilioCalle: formData.domicilioCalle,
-     afiDomicilioNro: formData.domicilioNro,
-     afiDomicilioPiso: formData.domicilioPiso,
-     afiDomicilioDpto: formData.domicilioDpto,
-     afiDomicilioEntreCalle1: 'x',
-     afiDomicilioEntreCalle2: 'x',
-     afiCodLocalidad: formData.codLocalidadTrabajador,
-     afiCodPostal: onlyDigits(formData.codPostalTrabajador),
-     afieMail: formData.email,
-     afiTelefono: formData.telefono,
-     afiObraSocial: formData.obraSocial,
+    tipoAccidente: formData.tipoSiniestro || '',
+    conIniTelefono: formData.telefonos || '',
+    conIniApellidoNombres: formData.apellidoNombres || '',
+    conIniRelacionConFamiliar: formData.relacionAccidentado || '',
+    conIniTipoDenuncia: formData.tipoDenuncia || '',
+    conIniTipoSiniestro: formData.tipoSiniestro || '',
+    conIniCodLocalidad: onlyDigits(formData.codLocalidad),
+    conIniCodPostal: String(formData.codPostal ?? ''),
+    conIniLocalidad: String(formData.localidadAccidente ?? ''),
+    conIniDomicilioCalle: String(formData.calle ?? ''),
+    conIniDomicilioNumero: String(formData.nro ?? ''),
+    conIniDomicilioPiso: String(formData.piso ?? ''),
+    conIniDomicilioDepartamento: String(formData.dpto ?? ''),
+    conIniDomicilioEntreCalle: String(formData.entreCalle ?? ''),
+    conIniDomicilioYCalle: String(formData.entreCalleY ?? ''),
+    estTrabEstaConsciente: mapSiNoToApi(formData.estTrabEstaConsciente || ''),
+    estTrabColor: String(formData.estTrabColor || ''),
+    estTrabHabla: mapSiNoToApi(formData.estTrabHabla || ''),
+    estTrabGravedad: String(formData.estTrabGravedad || ''),
+    estTrabRespira: mapSiNoToApi(formData.estTrabRespira || ''),
+    estTrabObservaciones: String(formData.estTrabObservaciones ?? ''),
+    estTrabTieneHemorragia: mapSiNoToApi(formData.estTrabTieneHemorragia || ''),
+    estTrabContextoDenuncia: mapSiNoToApi(formData.estTrabContextoDenuncia || ''),
+    trasladoTipo: String(formData.trasladoTipo ?? ''),
+    estTrabPrestadorTraslado: prestadorTrasladoDigits ? Number(prestadorTrasladoDigits) : null,
+    // ROAM
+    roam: mapRoamToApi((formData as any).roam || ''),
+    roamInterno: Number((formData as any).roamInterno ?? 0),
+    roamNumero: Number((formData as any).roamNumero ?? 0),
+    roamAnio: Number((formData as any).roamAnio ?? 0),
 
-     comentario: formData.observaciones,
-     origenIngreso: 'web',
-     trasladoTipo: formData.tipoTraslado,
-     descripcion: formData.descripcion,
-     fechaHoraSiniestro,
-
-     enViaPublica: mapSiNoToApi(formData.enViaPublica || ''),
-     roam: mapSiNoToApi(formData.roam || ''),
-     roamNumero: onlyDigits(formData.roamNro),
-     roamInterno: onlyDigits(formData.roamCodigo),
-     roamAnio: onlyDigits(formData.roamAno),
-
-     tipoAccidente: formData.tipoSiniestro || '',
-     conIniTelefono: formData.telefonos || '',
-     conIniApellidoNombres: formData.apellidoNombres || '',
-     conIniRelacionConFamiliar: formData.relacionAccidentado || '',
-     conIniTipoDenuncia: formData.tipoDenuncia || '',
-     conIniTipoSiniestro: formData.tipoSiniestro || '',
-     conIniCodLocalidad: onlyDigits(formData.codLocalidad),
-     conIniCodPostal: String(formData.codPostal ?? ''),
-     conIniLocalidad: String(formData.localidadAccidente ?? ''),
-
-     estTrabEstaConsciente: mapSiNoToApi(formData.estaConsciente || ''),
-     estTrabColor: mapColorToApiLetter(formData.color),
-     estTrabHabla: mapSiNoToApi(formData.habla || ''),
-     estTrabGravedad: mapGravedadToApi(formData.gravedad || ''),
-     estTrabRespira: mapSiNoToApi(formData.respira || ''),
-     estTrabObservaciones: formData.observaciones || '',
-     estTrabTieneHemorragia: mapSiNoToApi(formData.tieneHemorragia || ''),
-     estTrabVerificaContactoInicial: 'NCAMBIAR',
-     estTrabPrestadorTraslado: formData.prestadorTraslado || '',
-     contextoDenuncia: mapContextoDenunciaToApi(formData.contextoDenuncia || ''),
-   };
- };
-
- const transformFormDataToPostRequest = (formData: DenunciaFormData, empresa?: any, empleadorCuit?: number, isFinal: boolean = false): DenunciaPostRequest => {
-   const base = buildBaseDenunciaPayload(formData, empresa, empleadorCuit);
-   return {
-     ...base,
-     estado: isFinal ? 1 : 0,
-     avisoTrabajadorFueraNomina: 0,
-     avisoTrabajadorSinContratoVigente: false,
-     // campos específicos de tu POST (los que hoy ya tenés y no están en base)
-     conIniCodLocalidad: onlyDigits(formData.codLocalidad),
-     conIniCodPostal: String(formData.codPostal ?? ''),
-     conIniLocalidad: String(formData.localidadAccidente ?? ''),
-   } as DenunciaPostRequest;
- };
-
-   // Helper para transformar DenunciaFormData a DenunciaPutRequest (edición)
-  const transformFormDataToPutRequest = (formData: DenunciaFormData, existing?: any, empresa?: any, empleadorCuit?: number, isFinal: boolean = false): DenunciaPutRequest => {
-    const base = buildBaseDenunciaPayload(formData, empresa, empleadorCuit);
-    return {
-      ...base,
-      // Asegurar que la descripción del siniestro se envíe explícitamente
-      descripcion: String(formData.descripcion || ''),
-      // Forzar que los datos del establecimiento reflejen siempre lo editado en el formulario
-      empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
-      empEstRazonSocial: String((empresa as any)?.razonSocial ?? formData.empRazonSocial ?? ''),
-      empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
-      empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
-      empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
-      empEstDomicilioNro: String(formData.establecimientoNumero ?? ''),
-      empEstDomicilioPiso: String(formData.establecimientoPiso ?? ''),
-      empEstDomicilioDpto: String(formData.establecimientoDpto ?? ''),
-      empEstCodLocalidad: String(formData.establecimientoCodLocalidad ?? ''),
-      empEstCodPostal: Number(onlyDigits(formData.establecimientoCodPostal)),
-      empEstTelefonos: String(formData.establecimientoTelefono ?? ''),
-      empEsteMail: String(formData.establecimientoEmail ?? ''),
-      // PUT necesita además estos campos (vienen de existing / API)
-      denunciaNro: Number(existing?.denunciaNro ?? 0),
-      siniestroNro: Number(existing?.siniestroNro ?? 0),
-      denunciaCanalIngresoInterno: Number(existing?.denunciaCanalIngresoInterno ?? 0),
-      estadoDenunciaSiniestro: String(existing?.estadoDenunciaSiniestro ?? ''),
-
-      // En tu PUT el backend espera este nombre (en POST es "contextoDenuncia")
-      estTrabContextoDenuncia: mapContextoDenunciaToApi(formData.contextoDenuncia || ''),
-
-      // Si tu PUT realmente lo requiere:
-      avisoEmpleadorSinContratoVigente: false,
-      avisoTrabajadorFueraNomina: 0,
-      estado: isFinal ? 1 : 0,
-    } as DenunciaPutRequest;
   };
+};
+
+const fileToBase64Raw = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const full = String(reader.result || '');
+        const commaIdx = full.indexOf(',');
+        resolve(commaIdx >= 0 ? full.substring(commaIdx + 1) : full);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
+const transformFormDataToPostRequest = async (
+  formData: DenunciaFormData,
+  empresa?: any,
+  empleadorCuit?: number,
+  isFinal: boolean = false,
+  includeNroPreDenuncia: boolean = false
+): Promise<DenunciaPostRequest> => {
+  const base = buildBaseDenunciaPayload(formData, empresa, empleadorCuit);
+
+  const denunciaInstanciaImagenes = await Promise.all(
+    (formData.archivosAdjuntos || []).map(async (file) => ({
+      internoRefDenImgTipo: 0,
+      tipoDocumentacion: file.type || 'Adjunto',
+      archivoNombre: file.name,
+      imagen: await fileToBase64Raw(file),
+    }))
+  );
+
+  return {
+    ...base,
+    ...(includeNroPreDenuncia ? { nroPreDenuncia: 0 } : {}),
+    siniestroNro: 0,
+    denunciaCanalIngresoInterno: 0,
+    estado: isFinal ? 'Pendiente' : 'Borrador',
+    avisoTrabajadorFueraNomina: 0,
+    avisoEmpleadorSinContratoVigente: false,
+    // campos específicos de tu POST (los que hoy ya tenés y no están en base)
+    conIniCodLocalidad: onlyDigits(formData.codLocalidad),
+    conIniCodPostal: String(formData.codPostal ?? ''),
+    conIniLocalidad: String(formData.localidadAccidente ?? ''),
+    denunciaInstanciaImagenes,
+  } as DenunciaPostRequest;
+};
+
+// Helper para transformar DenunciaFormData a DenunciaPutRequest (edición)
+const transformFormDataToPutRequest = async (
+  formData: DenunciaFormData,
+  existing?: any,
+  empresa?: any,
+  empleadorCuit?: number,
+  isFinal: boolean = false
+): Promise<DenunciaPutRequest> => {
+  const base = buildBaseDenunciaPayload(formData, empresa, empleadorCuit);
+
+  const denunciaInstanciaImagenes = await Promise.all(
+    (formData.archivosAdjuntos || []).map(async (file) => ({
+      internoRefDenImgTipo: 0,
+      tipoDocumentacion: file.type || 'Adjunto',
+      archivoNombre: file.name,
+      imagen: await fileToBase64Raw(file),
+      interno: 0, // Nuevos documentos deben llevar interno = 0
+    }))
+  );
+
+  return {
+    ...base,
+    descripcion: String(formData.descripcion || ''),
+    empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
+    empEstRazonSocial: String((empresa as any)?.razonSocial ?? formData.empRazonSocial ?? ''),
+    empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
+    empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
+    empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
+    empEstDomicilioNro: String(formData.establecimientoNumero ?? ''),
+    empEstDomicilioPiso: String(formData.establecimientoPiso ?? ''),
+    empEstDomicilioDpto: String(formData.establecimientoDpto ?? ''),
+    empEstCodLocalidad: String(formData.establecimientoCodLocalidad ?? ''),
+    empEstCodPostal: Number(onlyDigits(formData.establecimientoCodPostal)),
+    empEstTelefonos: String(formData.establecimientoTelefono ?? ''),
+    empEsteMail: String(formData.establecimientoEmail ?? ''),
+
+    denunciaNro: Number(existing?.denunciaNro ?? 0),
+    siniestroNro: Number(existing?.siniestroNro ?? 0),
+    denunciaCanalIngresoInterno: Number(existing?.denunciaCanalIngresoInterno ?? 0),
+    estado: isFinal ? 'Pendiente' : 'Borrador',
+    estadoDenunciaSiniestro: String(existing?.estadoDenunciaSiniestro ?? ''),
+
+    avisoEmpleadorSinContratoVigente: false,
+    avisoTrabajadorFueraNomina: 0,
+
+    // Fecha en que se tomó conocimiento (API espera 'siniestroTomaConocimientoFechaHora' en PUT)
+    siniestroTomaConocimientoFechaHora: (base as any).fechaHoraTomaConocimientoSiniestro ?? null,
+
+    denunciaInstanciaImagenes,
+  } as DenunciaPutRequest;
+};
+
+  const buildOrderedPutPayload = (p: any) => ({
+    denunciaNro: Number(p.denunciaNro ?? 0),
+    siniestroNro: Number(p.siniestroNro ?? 0),
+    siniestroTipo: String(p.siniestroTipo ?? ''),
+    empCuit: Number(p.empCuit ?? 0),
+    empPoliza: Number(p.empPoliza ?? 0),
+    empRazonSocial: String(p.empRazonSocial ?? ''),
+    empCiiu: Number(p.empCiiu ?? 0),
+    empDomicilioCalle: String(p.empDomicilioCalle ?? ''),
+    empDomicilioNro: String(p.empDomicilioNro ?? ''),
+    empDomicilioPiso: String(p.empDomicilioPiso ?? ''),
+    empDomicilioDpto: String(p.empDomicilioDpto ?? ''),
+    empDomicilioEntreCalle1: String(p.empDomicilioEntreCalle1 ?? ''),
+    empDomicilioEntreCalle2: String(p.empDomicilioEntreCalle2 ?? ''),
+    empCodLocalidad: String(p.empCodLocalidad ?? ''),
+    empCodPostal: Number(p.empCodPostal ?? 0),
+    empTelefonos: String(p.empTelefonos ?? ''),
+    empeMail: String(p.empeMail ?? ''),
+    empOcCuit: Number(p.empOcCuit ?? 0),
+    empOcRazonSocial: String(p.empOcRazonSocial ?? ''),
+    empOcEstablecimiento: String(p.empOcEstablecimiento ?? ''),
+    empOcCiiu: Number(p.empOcCiiu ?? 0),
+    empOcDomicilioCalle: String(p.empOcDomicilioCalle ?? ''),
+    empOcDomicilioNro: String(p.empOcDomicilioNro ?? ''),
+    empOcDomicilioPiso: String(p.empOcDomicilioPiso ?? ''),
+    empOcDomicilioDpto: String(p.empOcDomicilioDpto ?? ''),
+    empOcDomicilioEntreCalle1: String(p.empOcDomicilioEntreCalle1 ?? ''),
+    empOcDomicilioEntreCalle2: String(p.empOcDomicilioEntreCalle2 ?? ''),
+    empOcCodLocalidad: String(p.empOcCodLocalidad ?? ''),
+    empOcCodPostal: Number(p.empOcCodPostal ?? 0),
+    empOcSubContrato: String(p.empOcSubContrato ?? ''),
+    empOcTelefonos: String(p.empOcTelefonos ?? ''),
+    empOceMail: String(p.empOceMail ?? ''),
+    empEstCuit: Number(p.empEstCuit ?? 0),
+    empEstRazonSocial: String(p.empEstRazonSocial ?? ''),
+    empEstEstablecimiento: String(p.empEstEstablecimiento ?? ''),
+    empEstCiiu: Number(p.empEstCiiu ?? 0),
+    empEstDomicilioCalle: String(p.empEstDomicilioCalle ?? ''),
+    empEstDomicilioNro: String(p.empEstDomicilioNro ?? ''),
+    empEstDomicilioPiso: String(p.empEstDomicilioPiso ?? ''),
+    empEstDomicilioDpto: String(p.empEstDomicilioDpto ?? ''),
+    empEstDomicilioEntreCalle1: String(p.empEstDomicilioEntreCalle1 ?? ''),
+    empEstDomicilioEntreCalle2: String(p.empEstDomicilioEntreCalle2 ?? ''),
+    empEstCodLocalidad: String(p.empEstCodLocalidad ?? ''),
+    empEstCodPostal: Number(p.empEstCodPostal ?? 0),
+    empEstTelefonos: String(p.empEstTelefonos ?? ''),
+    empEsteMail: String(p.empEsteMail ?? ''),
+    prestadorCuit: Number(p.prestadorCuit ?? 0),
+    afiCuil: Number(p.afiCuil ?? 0),
+    afiDocTipo: String(p.afiDocTipo ?? ''),
+    afiDocNumero: Number(p.afiDocNumero ?? 0),
+    afiNombre: String(p.afiNombre ?? ''),
+    afiFechaNacimiento: Number(p.afiFechaNacimiento ?? 0),
+    afiSexo: String(p.afiSexo ?? ''),
+    afiEstadoCivil: String(p.afiEstadoCivil ?? ''),
+    afiNacionalidad: Number(p.afiNacionalidad ?? 0),
+    afiDomicilioCalle: String(p.afiDomicilioCalle ?? ''),
+    afiDomicilioNro: String(p.afiDomicilioNro ?? ''),
+    afiDomicilioPiso: String(p.afiDomicilioPiso ?? ''),
+    afiDomicilioDpto: String(p.afiDomicilioDpto ?? ''),
+    afiDomicilioEntreCalle1: String(p.afiDomicilioEntreCalle1 ?? ''),
+    afiDomicilioEntreCalle2: String(p.afiDomicilioEntreCalle2 ?? ''),
+    afiCodLocalidad: String(p.afiCodLocalidad ?? ''),
+    afiCodPostal: Number(p.afiCodPostal ?? 0),
+    afieMail: String(p.afieMail ?? ''),
+    afiTelefono: String(p.afiTelefono ?? ''),
+    afiObraSocial: String(p.afiObraSocial ?? ''),
+    comentario: String(p.comentario ?? ''),
+    origenIngreso: String(p.origenIngreso ?? ''),
+    trasladoTipo: p.trasladoTipo ?? null,
+    avisoTrabajadorFueraNomina: Number(p.avisoTrabajadorFueraNomina ?? 0),
+    avisoEmpleadorSinContratoVigente: Boolean(p.avisoEmpleadorSinContratoVigente ?? false),
+    denunciaCanalIngresoInterno: Number(p.denunciaCanalIngresoInterno ?? 0),
+    descripcion: String(p.descripcion ?? ''),
+    fechaHoraSiniestro: p.fechaHoraSiniestro ?? null,
+    fechaHoraTomaConocimientoSiniestro: p.fechaHoraTomaConocimientoSiniestro ?? null,
+    enViaPublica: String(p.enViaPublica ?? ''),
+    roam: p.roam ?? null,
+    roamNumero: Number(p.roamNumero ?? 0),
+    roamInterno: Number(p.roamInterno ?? 0),
+    roamAnio: Number(p.roamAnio ?? 0),
+    tipoAccidente: String(p.tipoAccidente ?? ''),
+    estadoDenunciaSiniestro: String(p.estadoDenunciaSiniestro ?? ''),
+    conIniTelefono: String(p.conIniTelefono ?? ''),
+    conIniApellidoNombres: String(p.conIniApellidoNombres ?? ''),
+    conIniRelacionConFamiliar: String(p.conIniRelacionConFamiliar ?? ''),
+    conIniTipoDenuncia: String(p.conIniTipoDenuncia ?? ''),
+    conIniTipoSiniestro: String(p.conIniTipoSiniestro ?? ''),
+    conIniCodLocalidad: Number(p.conIniCodLocalidad ?? 0),
+    conIniCodPostal: String(p.conIniCodPostal ?? ''),
+    conIniLocalidad: String(p.conIniLocalidad ?? ''),
+    conIniDomicilioCalle: String(p.conIniDomicilioCalle ?? ''),
+    conIniDomicilioNumero: String(p.conIniDomicilioNumero ?? ''),
+    conIniDomicilioPiso: String(p.conIniDomicilioPiso ?? ''),
+    conIniDomicilioDepartamento: String(p.conIniDomicilioDepartamento ?? ''),
+    conIniDomicilioEntreCalle: String(p.conIniDomicilioEntreCalle ?? ''),
+    conIniDomicilioYCalle: String(p.conIniDomicilioYCalle ?? ''),
+    estTrabEstaConsciente: p.estTrabEstaConsciente ?? null,
+    estTrabColor: p.estTrabColor ?? null,
+    estTrabHabla: p.estTrabHabla ?? null,
+    estTrabGravedad: p.estTrabGravedad ?? null,
+    estTrabRespira: p.estTrabRespira ?? null,
+    estTrabObservaciones: p.estTrabObservaciones ?? null,
+    estTrabTieneHemorragia: p.estTrabTieneHemorragia ?? null,
+    estTrabContextoDenuncia: p.estTrabContextoDenuncia ?? null,
+    estTrabVerificaContactoInicial: p.estTrabVerificaContactoInicial ?? null,
+    estTrabPrestadorTraslado: p.estTrabPrestadorTraslado ?? null,
+    denunciaInstanciaImagenes: Array.isArray(p.denunciaInstanciaImagenes) ? p.denunciaInstanciaImagenes : [],
+    estado: String(p.estado ?? ''),
+  });
 
 /* Spinner simple */
 const Spinner: React.FC = () => (
@@ -415,45 +536,35 @@ const Spinner: React.FC = () => (
 );
 
 function DenunciasPage() {
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   const isAdmin = (user?.rol || '').toLowerCase() === 'administrador';
-  
-  // State for filters and pagination
-  const [estado, setEstado] = useState<number | undefined>(undefined);
-  const [pageIndex, setPageIndex] = useState(0);
+  const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
+
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
+
+  const [estado, setEstado] = useState<string | undefined>(undefined);
+  const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [pageCount, setPageCount] = useState<number>(0);
+  const hasLoadedOnce = useRef(false);
 
-  // Buscador por CUIT (arriba de "Registrar Denuncia")
-  const [cuitBusqueda, setCuitBusqueda] = useState<string>("");
-  const [empCuit, setEmpCuit] = useState<number | undefined>(undefined);
+  const empCuit: number | undefined = empresaSeleccionada
+    ? Number(String((empresaSeleccionada as any)?.cuit ?? '').replace(/\D/g, '')) || undefined
+    : undefined;
 
-  // Si el usuario NO es administrador, fijar el filtro por su empresa CUIT y bloquear cambios
+  // Selección automática si hay una sola empresa
   useEffect(() => {
-    const userCuit = user?.empresaCUIT;
-    if (!isAdmin && userCuit && String(userCuit).length === 11) {
-      setEmpCuit(userCuit);
-      setCuitBusqueda(String(userCuit));
+    if (!isLoadingEmpresas && empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+    } else if (!isLoadingEmpresas && empresas.length !== 1 && seleccionAutomaticaRef.current) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
     }
-  }, [isAdmin, user?.empresaCUIT]);
-
-  // Auto-trigger search when CUIT input reaches 11 digits
-  useEffect(() => {
-    const digits = (cuitBusqueda || '').replace(/\D/g, '');
-    if (digits.length === 11) {
-      const c = Number(digits);
-      if (empCuit !== c) {
-        setEmpCuit(c);
-        setPageIndex(0);
-      }
-    } else {
-      if (empCuit !== undefined) {
-        setEmpCuit(undefined);
-        setPageIndex(0);
-      }
-    }
-  }, [cuitBusqueda, empCuit]);
+  }, [empresas.length, isLoadingEmpresas]);
 
   // Hook para POST de denuncia
   const { trigger: postDenuncia, isMutating: isPostingDenuncia } = ArtAPI.usePostDenuncia();
@@ -469,6 +580,8 @@ function DenunciasPage() {
     denunciaData: null,
   });
   const [selectedDenunciaId, setSelectedDenunciaId] = useState<number | null>(null);
+  const [initialFiles, setInitialFiles] = useState<File[]>([]);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
 
   // Fetch denuncia by ID when editing
   const denunciaIdParams: DenunciaQueryParamsID | undefined = selectedDenunciaId ? { id: selectedDenunciaId } : undefined;
@@ -481,23 +594,38 @@ function DenunciasPage() {
   }>({
     open: false,
     message: '',
-    type: 'alert'
+    type: 'warning'
   });
 
   // Build query parameters
   const queryParams: DenunciaQueryParams = useMemo(() => {
     const params: DenunciaQueryParams = {
       Estado: estado,
-      PageIndex: pageIndex + 1, // API expects 1-based pagination
+      PageIndex: pageIndex,
       PageSize: pageSize,
       orderBy: '-Interno',
-    };
+    } as DenunciaQueryParams;
     // Aplicar EmpCuit solo cuando es un CUIT válido (11 dígitos)
     if (typeof empCuit === 'number' && String(empCuit).length === 11) {
       params.EmpCuit = empCuit;
     }
+    try {
+      if (hasTask && typeof hasTask === 'function') {
+        const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
+        const verDenuncia = hasTask('Denuncia_VerDenuncia');
+        if (verPreDenuncia && !verDenuncia) {
+          (params as any).Tipo = 1;
+        } else if (verDenuncia && !verPreDenuncia) {
+          (params as any).Tipo = 2;
+        }
+        // ambas tareas → sin filtro Tipo (muestra denuncias y predenuncias)
+      }
+    } catch (e) {
+      // noop: en caso de error con hasTask, no aplicamos el filtro
+    }
+
     return params;
-  }, [estado, pageIndex, pageSize, empCuit]);
+  }, [estado, pageIndex, pageSize, empCuit, hasTask]);
 
   // API call using SWR
   const { data, error, isLoading, mutate: mutateDenuncias } = ArtAPI.useGetDenuncias(queryParams);
@@ -508,14 +636,14 @@ function DenunciasPage() {
       : {}
   ), [empCuit]);
   const { data: empresaByCuit } = ArtAPI.useGetEmpresaByCUIT(empresaParams);
-  
+
   // Check if error is 404 (not found) - treat as empty result instead of error
   const is404Error = error?.status === 404 || error?.response?.status === 404;
-  
+
   // Process data and update states
   useMemo(() => {
     if (!data && !error) {
-      setLoading(true);
+      if (!hasLoadedOnce.current) setLoading(true);
       return;
     }
 
@@ -532,31 +660,20 @@ function DenunciasPage() {
       setPageCount(data.data.length > 0 ? Math.ceil(data.data.length / pageSize) : 1);
     }
 
+    hasLoadedOnce.current = true;
     setLoading(false);
   }, [data, error, pageSize, is404Error]);
-
-  // Handle pagination
-  const handlePreviousPage = () => {
-    setPageIndex(prev => Math.max(0, prev - 1));
-  };
-
-  const handleNextPage = () => {
-    if (data?.data && data.data.length === pageSize) {
-      setPageIndex(prev => prev + 1);
-    }
-  };
 
   // Handle page size change
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
-    setPageIndex(0); // Reset to first page
+    setPageIndex(1); // Reset to first page (1-based)
   };
 
   // Handle estado filter change
-  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setEstado(value === '' ? undefined : Number(value));
-    setPageIndex(0); // Reset to first page when filtering
+  const handleEstadoChange = (value: string) => {
+    setEstado(value === '' ? undefined : value);
+    setPageIndex(1);
   };
 
   // Modal handlers
@@ -574,7 +691,7 @@ function DenunciasPage() {
     setModalMessage({
       open: false,
       message: '',
-      type: 'alert'
+      type: 'warning'
     });
   };
 
@@ -594,11 +711,13 @@ function DenunciasPage() {
     setRequestState({ method, denunciaData: initialDenunciaFormData });
   };
 
-  
-
   const handleCloseModal = () => {
     setRequestState({ method: null, denunciaData: null });
     setSelectedDenunciaId(null);
+  };
+
+  const handleTabChange = (_event: SyntheticEvent, newTabValue: number) => {
+    setActiveTabIndex(newTabValue);
   };
 
   // Map API DenunciaById response into DenunciaFormData when available
@@ -622,10 +741,6 @@ function DenunciasPage() {
 
         // Preferir valores anidados si existen, con fallback a top-level
         const enViaPublicaSel = normalizeApiSiNoBinary(sin?.enViaPublica ?? api.enViaPublica) || initialDenunciaFormData.enViaPublica;
-        const roamSel = normalizeApiSiNoBinary(sin?.roam ?? api.roam) || initialDenunciaFormData.roam;
-        const roamNumeroVal = (sin?.roamNumero ?? api.roamNumero) != null ? String(sin?.roamNumero ?? api.roamNumero) : initialDenunciaFormData.roamNro;
-        const roamInternoVal = (sin?.roamInterno ?? api.roamInterno) != null ? String(sin?.roamInterno ?? api.roamInterno) : initialDenunciaFormData.roamCodigo;
-        const roamAnioVal = (sin?.roamAnio ?? api.roamAnio) != null ? String(sin?.roamAnio ?? api.roamAnio) : initialDenunciaFormData.roamAno;
         const descripcionVal = (sin?.descripcion ?? api.descripcion) ?? initialDenunciaFormData.descripcion;
 
         // Fecha y hora: usar ISO (top-level o anidado en denunciaSiniestros[0])
@@ -636,6 +751,12 @@ function DenunciasPage() {
           : '';
         const horaFromIso = fechaIso && dayjs(fechaIso).isValid()
           ? dayjs(fechaIso).format('HH:mm')
+          : '';
+        // Fecha en la que se informó a la ART (puede venir en siniestroTomaConocimientoFechaHora)
+        const rawInfoIso = sin?.siniestroTomaConocimientoFechaHora ?? api.siniestroTomaConocimientoFechaHora ?? null;
+        const fechaInfoIso = rawInfoIso != null ? String(rawInfoIso) : null;
+        const fechaInformacionFromIso = fechaInfoIso && dayjs(fechaInfoIso).isValid()
+          ? dayjs(fechaInfoIso).format('YYYY-MM-DD')
           : '';
         const fechaCalc = fechaFromIso || parseApiDateToYMD(sin?.siniestroFecha);
         const horaCalc = horaFromIso || parseApiTimeToHM(sin?.siniestroHora);
@@ -658,16 +779,17 @@ function DenunciasPage() {
           empCodPostal: api.empOcCodPostal != null ? String(api.empOcCodPostal) : initialDenunciaFormData.empCodPostal,
           empTelefonos: api.empOcTelefonos ?? initialDenunciaFormData.empTelefonos,
           empEmail: api.empOceMail ?? initialDenunciaFormData.empEmail,
-          calle: api.empDomicilioCalle ?? initialDenunciaFormData.calle,
-          nro: api.empDomicilioNro ?? initialDenunciaFormData.nro,
-          piso: api.empDomicilioPiso ?? initialDenunciaFormData.piso,
-          dpto: api.empDomicilioDpto ?? initialDenunciaFormData.dpto,
-          entreCalle: api.empDomicilioEntreCalle1 ?? initialDenunciaFormData.entreCalle,
-          entreCalleY: api.empDomicilioEntreCalle2 ?? initialDenunciaFormData.entreCalleY,
+          calle: sin?.conIniDomicilioCalle ?? api.conIniDomicilioCalle ?? api.empDomicilioCalle ?? initialDenunciaFormData.calle,
+          nro: sin?.conIniDomicilioNumero ?? api.conIniDomicilioNumero ?? api.empDomicilioNro ?? initialDenunciaFormData.nro,
+          piso: sin?.conIniDomicilioPiso ?? api.conIniDomicilioPiso ?? api.empDomicilioPiso ?? initialDenunciaFormData.piso,
+          dpto: sin?.conIniDomicilioDepartamento ?? api.conIniDomicilioDepartamento ?? api.empDomicilioDpto ?? initialDenunciaFormData.dpto,
+          entreCalle: sin?.conIniDomicilioEntreCalle ?? api.conIniDomicilioEntreCalle ?? api.empDomicilioEntreCalle1 ?? initialDenunciaFormData.entreCalle,
+          entreCalleY: sin?.conIniDomicilioYCalle ?? api.conIniDomicilioYCalle ?? api.empDomicilioEntreCalle2 ?? initialDenunciaFormData.entreCalleY,
           codLocalidad: String(api.conIniCodLocalidad ?? api.empCodLocalidad ?? initialDenunciaFormData.codLocalidad) || initialDenunciaFormData.codLocalidad,
           codPostal: String(api.conIniCodPostal ?? api.empCodPostal ?? '') || initialDenunciaFormData.codPostal,
           telefonos: api.conIniTelefono ?? api.empTelefonos ?? initialDenunciaFormData.telefonos,
           prestadorInicialCuit: String(api.prestadorCuit ?? ''),
+          roam: normalizeApiRoamToSelect(api.roam ?? api?.roam ?? ''),
           cuil: api.afiCuil ? String(api.afiCuil) : initialDenunciaFormData.cuil,
           docTipo: api.afiDocTipo ?? initialDenunciaFormData.docTipo,
           docNumero: api.afiDocNumero ? String(api.afiDocNumero) : initialDenunciaFormData.docNumero,
@@ -680,23 +802,18 @@ function DenunciasPage() {
           domicilioNro: api.afiDomicilioNro ?? initialDenunciaFormData.domicilioNro,
           domicilioPiso: api.afiDomicilioPiso ?? initialDenunciaFormData.domicilioPiso,
           domicilioDpto: api.afiDomicilioDpto ?? initialDenunciaFormData.domicilioDpto,
+          domicilioEntreCalle1: api.afiDomicilioEntreCalle1 ?? initialDenunciaFormData.domicilioEntreCalle1,
+          domicilioEntreCalle2: api.afiDomicilioEntreCalle2 ?? initialDenunciaFormData.domicilioEntreCalle2,
           codPostalTrabajador: String(api.afiCodPostal ?? ''),
           codLocalidadTrabajador: api.afiCodLocalidad ? String(api.afiCodLocalidad) : initialDenunciaFormData.codLocalidadTrabajador,
           email: api.afieMail ?? initialDenunciaFormData.email,
           telefono: api.afiTelefono ?? initialDenunciaFormData.telefono,
           obraSocial: api.afiObraSocial ?? initialDenunciaFormData.obraSocial,
-          observaciones: api.estTrabObservaciones ?? api.comentario ?? initialDenunciaFormData.observaciones,
-          tipoTraslado: api.trasladoTipo ?? initialDenunciaFormData.tipoTraslado,
           descripcion: descripcionVal,
           fechaOcurrencia: fechaCalc || initialDenunciaFormData.fechaOcurrencia,
           hora: horaCalc || initialDenunciaFormData.hora,
+          fechaInformacionArt: fechaInformacionFromIso || initialDenunciaFormData.fechaInformacionArt,
           enViaPublica: enViaPublicaSel,
-          roam: roamSel,
-          roamNro: roamNumeroVal,
-          roamCodigo: roamInternoVal,
-          roamAno: roamAnioVal,
-          roamDescripcion: api.roamDescripcion ?? initialDenunciaFormData.roamDescripcion,
-          color: normalizeApiColorToSelect(api.estTrabColor ?? api.color),
           // Datos del Establecimiento (para poder editarlos)
           establecimientoCuit: api.empEstCuit != null ? String(api.empEstCuit) : initialDenunciaFormData.establecimientoCuit,
           establecimientoNombre: api.empEstEstablecimiento ?? api.empEstRazonSocial ?? initialDenunciaFormData.establecimientoNombre,
@@ -715,20 +832,62 @@ function DenunciasPage() {
           obraSocialCodigo: api.afiObraSocialCodigo ? String(api.afiObraSocialCodigo) : initialDenunciaFormData.obraSocialCodigo,
           localidad: api.afiLocalidad ?? initialDenunciaFormData.localidad,
           trabajadoresRelacionados: Array.isArray(api.trabajadoresRelacionados) ? api.trabajadoresRelacionados : initialDenunciaFormData.trabajadoresRelacionados,
-          prestadorTraslado: api.estTrabPrestadorTraslado ?? api.prestadorTraslado ?? initialDenunciaFormData.prestadorTraslado,
           prestadorInicialRazonSocial: api.prestadorInicialRazonSocial ?? initialDenunciaFormData.prestadorInicialRazonSocial,
-          verificaContactoInicial: api.estTrabVerificaContactoInicial ?? api.verificaContactoInicial ?? initialDenunciaFormData.verificaContactoInicial,
-          // Estado del Trabajador
-          estaConsciente: normalizeApiSiNoToSelect(api.estTrabEstaConsciente) || initialDenunciaFormData.estaConsciente,
-          habla: normalizeApiSiNoToSelect(api.estTrabHabla) || initialDenunciaFormData.habla,
-          gravedad: normalizeApiGravedadToSelect(api.estTrabGravedad) || initialDenunciaFormData.gravedad,
-          respira: normalizeApiSiNoToSelect(api.estTrabRespira) || initialDenunciaFormData.respira,
-          tieneHemorragia: normalizeApiSiNoToSelect(api.estTrabTieneHemorragia) || initialDenunciaFormData.tieneHemorragia,
-          contextoDenuncia: normalizeApiContextoToSelect(api.estTrabContextoDenuncia) || initialDenunciaFormData.contextoDenuncia,
+          verificaContactoInicial: api.verificaContactoInicial ?? initialDenunciaFormData.verificaContactoInicial,
+          estTrabEstaConsciente: normalizeApiSiNoIgnora(api.estTrabEstaConsciente) || initialDenunciaFormData.estTrabEstaConsciente,
+          estTrabColor: api.estTrabColor != null ? String(api.estTrabColor) : initialDenunciaFormData.estTrabColor,
+          estTrabHabla: normalizeApiSiNoIgnora(api.estTrabHabla) || initialDenunciaFormData.estTrabHabla,
+          estTrabGravedad: api.estTrabGravedad != null ? String(api.estTrabGravedad) : initialDenunciaFormData.estTrabGravedad,
+          estTrabRespira: normalizeApiSiNoIgnora(api.estTrabRespira) || initialDenunciaFormData.estTrabRespira,
+          estTrabObservaciones: String(api.estTrabObservaciones ?? initialDenunciaFormData.estTrabObservaciones),
+          estTrabTieneHemorragia: normalizeApiSiNoIgnora(api.estTrabTieneHemorragia) || initialDenunciaFormData.estTrabTieneHemorragia,
+          estTrabContextoDenuncia: normalizeApiSiNoIgnora(api.estTrabContextoDenuncia) || initialDenunciaFormData.estTrabContextoDenuncia,
           archivosAdjuntos: initialDenunciaFormData.archivosAdjuntos,
           aceptoTerminos: false,
         };
         setRequestState(prev => ({ ...prev, denunciaData: mapped }));
+
+        // Construir archivos existentes (base64 -> File) para mostrarlos en "Archivos Adjuntos"
+        try {
+          const inferContentType = (name?: string): string => {
+            const n = String(name || '').toLowerCase();
+            if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
+            if (n.endsWith('.png')) return 'image/png';
+            if (n.endsWith('.pdf')) return 'application/pdf';
+            if (n.endsWith('.doc')) return 'application/msword';
+            if (n.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            return 'application/octet-stream';
+          };
+          const base64ToFile = (b64: string, fileName: string, contentType: string): File => {
+            const byteChars = typeof window !== 'undefined' ? window.atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+            const byteNumbers = new Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) {
+              byteNumbers[i] = byteChars.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new File([byteArray], fileName, { type: contentType });
+          };
+          const instArr = Array.isArray((denunciaByIdData as any).denunciaInstancia) ? (denunciaByIdData as any).denunciaInstancia : [];
+          const files: File[] = [];
+          instArr.forEach((inst: any) => {
+            const imgs = Array.isArray(inst?.denunciaInstanciaImagenes) ? inst.denunciaInstanciaImagenes : [];
+            imgs.forEach((img: any) => {
+              const nombre = String(img?.archivoNombre || 'documento');
+              const tipo = inferContentType(nombre);
+              const b64 = String(img?.imagen || '');
+              if (b64) {
+                try {
+                  const file = base64ToFile(b64, nombre, tipo);
+                  files.push(file);
+                } catch { }
+              }
+            });
+          });
+          setInitialFiles(files);
+        } catch (e) {
+          console.warn('No se pudo convertir la documentación existente a File[]:', e);
+          setInitialFiles([]);
+        }
       }
     }
   }, [requestState.method, isLoadingDenunciaById, denunciaByIdError, denunciaByIdData]);
@@ -747,9 +906,16 @@ function DenunciasPage() {
       }
 
       if (method === "create") {
-        const postData = transformFormDataToPostRequest(data, empresaByCuit, empCuit, isFinal);
-        await postDenuncia(postData);
-        showModalMessage(isFinal ? "Su pre-denuncia ha sido registrada correctamente en nuestro sistema.Será validada por nuestro equipo en las próximas 24 horas hábiles." : "Borrador guardado exitosamente", "success");
+        const postData = await transformFormDataToPostRequest(data, empresaByCuit, empCuit, isFinal, canRealizaDenuncias);
+        const created = await postDenuncia(postData);
+        showModalMessage(
+          isFinal
+            ? (canRealizaDenuncias
+                ? "Su denuncia ya a sido Registrada y se encuentra en Estado Pendiente"
+                : `Su pre-denuncia ha sido registrada correctamente en nuestro sistema.\n Será validada por nuestro equipo en las próximas 24 horas hábiles.`)
+            : "Borrador guardado exitosamente",
+          "success"
+        );
         handleCloseModal();
         // Refrescar la lista sin recargar la página
         mutateDenuncias();
@@ -763,21 +929,28 @@ function DenunciasPage() {
           throw new Error("No se pudieron obtener los datos actuales de la denuncia para editar");
         }
 
-        const putData = transformFormDataToPutRequest(data, denunciaByIdData, empresaByCuit, empCuit, isFinal);
-        await putDenuncia({ id: selectedDenunciaId, data: putData });
+        const putData = await transformFormDataToPutRequest(data, denunciaByIdData, empresaByCuit, empCuit, isFinal);
 
-        // Si el envío es final, forzar el cambio de estado via PATCH
-        if (isFinal) {
-          const patchPayload: DenunciaPatchRequest = {
-            interno: Number(selectedDenunciaId),
-            patchDocument: [
-              { path: 'estado', value: 1 },
-            ],
-          };
-          await patchDenuncia(patchPayload);
-        }
+        const ordered = buildOrderedPutPayload(putData);
+        await putDenuncia({ id: selectedDenunciaId, data: ordered });
 
-        showModalMessage(isFinal ? "Denuncia enviada exitosamente" : "Borrador actualizado exitosamente", "success");
+        const patchPayload: DenunciaPatchRequest = {
+          interno: Number(selectedDenunciaId),
+          patchDocument: [
+            { path: 'estado', value: isFinal ? 'Pendiente' : 'Borrador' },
+          ],
+        };
+        await patchDenuncia(patchPayload);
+
+
+        showModalMessage(
+          isFinal
+            ? (canRealizaDenuncias
+                ? "Su denuncia ya a sido Registrada y se encuentra en Estado Pendiente"
+                : `Su pre-denuncia ha sido registrada correctamente en nuestro sistema.\n Será validada por nuestro equipo en las próximas 24 horas hábiles.`)
+            : "Borrador actualizado exitosamente",
+          "success"
+        );
         handleCloseModal();
         // Refrescar la lista sin recargar la página
         mutateDenuncias();
@@ -794,86 +967,97 @@ function DenunciasPage() {
   };
   
   // Table columns definition
-  const tableColumns = [
-    // { 
-    //   accessorKey: 'interno', 
-    //   header: 'Interno',
-    //   size: 80
-    // },
-    { 
-      accessorKey: 'denunciaNro', 
+  const baseTableColumns = [
+    {
+      accessorKey: 'denunciaNro',
       header: 'Nro. Denuncia',
+      size: 120,
+      cell: (info: any) => {
+        const original = info?.row?.original || {};
+        const estado = (original?.estado ?? '').toString();
+        if (estado === 'Borrador') return 0;
+        const pre = original?.nroPreDenuncia ?? 0;
+        if (pre && Number(pre) !== 0) return 0;
+        return info.getValue ? info.getValue() ?? 0 : (original?.denunciaNro ?? 0);
+      }
+    },
+    {
+      accessorKey: 'nroPreDenuncia',
+      header: 'Nro. Pre-Denuncia',
       size: 120
     },
-    // { 
-    //   accessorKey: 'siniestroNro', 
-    //   header: 'Nro. Siniestro',
-    //   size: 120
-    // },
-    { 
-      accessorKey: 'siniestroTipo', 
+    {
+      accessorKey: 'siniestroTipo',
       header: 'Tipo Siniestro',
       size: 150
     },
-    { 
-      accessorKey: 'empleadorCUIT', 
-      header: 'CUIT Empleador',
+    {
+      accessorKey: 'afiCuil',
+      header: 'CUIL Trabajador',
       cell: (info: any) => cuipFormatter(info.getValue()),
       size: 130
     },
-    { 
-      accessorKey: 'empleadorPoliza', 
-      header: 'Póliza',
+    {
+      accessorKey: 'afiNombre',
+      header: 'Nombre',
       size: 80
     },
-    { 
-      accessorKey: 'empleadorRazonSocial', 
-      header: 'Razón Social',
-      cell: (info: any) => {
-        const value = info.getValue();
-        return value && value.length > 50 ? `${value.substring(0, 50)}...` : value || '—';
-      }
-      
-    },
-        { 
-      accessorKey: 'estado', 
+    {
+      accessorKey: 'estado',
       header: 'Estado',
       size: 80
     },
-          {
-            id: 'actions',
-            header: 'Acción',
-            size: 80,
-            cell: ({ row }: any) => {
-              const estadoVal = row?.original?.estado;
-              const isPendiente = estadoVal === 0 || String(estadoVal ?? '').toLowerCase().includes('pendient');
+    {
+      id: 'actions',
+      header: 'Acción',
+      size: 80,
+      cell: ({ row }: any) => {
+        const estadoVal = row?.original?.estado;
+        const isEditable = String(estadoVal ?? '') === 'Borrador';
 
-              return (
-                <Box className={styles.actionCell}>
-                  {!isPendiente && (
-                    <Tooltip title="Editar" arrow>
-                      <IconButton
-                        size="small"
-                        color="warning"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Abrir modal en modo editar con los datos de la fila
-                          handleOpenModal("edit", row.original as DenunciaGetAll);
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-              );
-            },
-            meta: { align: 'center' },
-          },
+        return (
+          <Box className={styles.actionCell}>
+            {isEditable && (
+              <Tooltip title="Editar" arrow>
+                <IconButton
+                  size="small"
+                  color="warning"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Abrir modal en modo editar con los datos de la fila
+                    handleOpenModal("edit", row.original as DenunciaGetAll);
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        );
+      },
+      meta: { align: 'center' },
+    },
   ];
 
-  if (loading) return <Spinner />;
+  const tableColumns = useMemo(() => {
+    try {
+      if (hasTask && typeof hasTask === 'function') {
+        const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
+        const verDenuncia = hasTask('Denuncia_VerDenuncia');
+        if (verPreDenuncia && !verDenuncia) {
+          return baseTableColumns.filter(c => (c as any).accessorKey !== 'denunciaNro');
+        }
+        if (verDenuncia && !verPreDenuncia) {
+          return baseTableColumns.filter(c => (c as any).accessorKey !== 'nroPreDenuncia');
+        }
+      }
+    } catch (e) {
+      // noop
+    }
+    return baseTableColumns;
+  }, [hasTask]);
 
+  if (loading) return <Spinner />;
   if (error && !is404Error) {
     return (
       <div className={styles.inicioContainer}>
@@ -884,49 +1068,53 @@ function DenunciasPage() {
     );
   }
 
-
   // Current initial data for the form
   const currentInitialData = requestState.denunciaData || initialDenunciaFormData;
 
-  return (
-    <Box className={styles.inicioContainer}>
-
+  const tabItems = [
+    {
+      label: 'Denuncias',
+      value: 0,
+      content: (
+        <>
       {/* Filters */}
       <div className={styles.filtersContainer}>
-        <div className={styles.filterGroup}>
-          <label htmlFor="estado" className={styles.filterLabel}>
-            FILTROS
-          </label>
-          <select
-            id="estado"
-            value={estado ?? ''}
-            onChange={handleEstadoChange}
-            className={styles.filterSelect}
-          >
-            {estadoOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className={styles.cuitGroup}>
+          <CustomSelectSearch<Empresa>
+            options={empresas}
+            getOptionLabel={(e) => {
+              const cuitFmt = Formato.CUIP((e as any)?.cuit);
+              return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
+            }}
+            value={empresaSeleccionada}
+            onChange={(_ev, val) => {
+              setEmpresaSeleccionada(val as Empresa);
+              setPageIndex(1);
+            }}
+            label="Empresa"
+            loading={isLoadingEmpresas}
+            loadingText="Cargando empresas..."
+            noOptionsText={isLoadingEmpresas ? 'Cargando...' : 'No se encontraron empresas'}
+            disabled={isLoadingEmpresas}
+            size="medium"
+          />
         </div>
 
-        <div className={styles.cuitGroup}>
-          <input
-            id="cuitBusqueda"
-            type="text"
-            placeholder="Ingresá CUIT (11 dígitos)"
-            value={cuitBusqueda}
-            onChange={(e) => setCuitBusqueda((e.target.value || '').replace(/[^\d]/g, ''))}
-            disabled={!isAdmin}
-            className={styles.cuitInput}
+        <div className={styles.filterGroup}>
+          <CustomSelectSearch<{ value: string; label: string }>
+            options={estadoOptions}
+            getOptionLabel={(o) => o?.label ?? ''}
+            value={estadoOptions.find(o => o.value === (estado ?? '')) ?? estadoOptions[0]}
+            onChange={(_ev, val) => handleEstadoChange(val?.value ?? '')}
+            label="Estado"
+            sx={{ minWidth: 220 }}
           />
         </div>
       </div>
-      
+
       <div className={styles.actionsBar}>
         <CustomButton onClick={() => handleOpenModal("create")}>
-          Registrar Denuncia
+          {canRealizaDenuncias ? "Registrar Denuncia" : "Registrar Pre-Denuncia"}
         </CustomButton>
       </div>
 
@@ -945,19 +1133,32 @@ function DenunciasPage() {
         />
       </div>
 
-    {/* Empty state for no data */}
-    {!isLoading && ((data?.data && data.data.length === 0) || is404Error || (!data && !error)) && (
-      <div className={styles.emptyState}>
-        <p>No se encontraron denuncias con los filtros seleccionados.</p>
-      </div>
-    )}
-    
-    {/* Denuncia Form Modal */}
+      {/* Empty state for no data */}
+      {!isLoading && ((data?.data && data.data.length === 0) || is404Error || (!data && !error)) && (
+        <div className={styles.emptyState}>
+          <p>No se encontraron denuncias con los filtros seleccionados.</p>
+        </div>
+      )}
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Box className={styles.inicioContainer}>
+      <CustomTabs
+        tabs={tabItems}
+        currentTab={activeTabIndex}
+        onTabChange={handleTabChange}
+      />
+
+      {/* Denuncia Form Modal */}
       <DenunciaForm
         open={showModal}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
         initialData={currentInitialData}
+        initialFiles={initialFiles}
         errorMsg={formError}
         method={requestState.method || "create"}
         isSubmitting={isSubmitting || isPostingDenuncia || isPuttingDenuncia || isPatchingDenuncia}
@@ -967,22 +1168,21 @@ function DenunciasPage() {
       />
 
       {/* Modal Message */}
-      <CustomModalMessage         
-        open={modalMessage.open}         
-        message={modalMessage.message}         
-        type={modalMessage.type}         
-        onClose={handleClose}        
+      <CustomModalMessage
+        open={modalMessage.open}
+        message={modalMessage.message}
+        type={modalMessage.type}
+        onClose={handleClose}
         title={
           modalMessage.type === 'error'
-            ? 'Error al cargar denuncia'
+            ? 'Faltan cargar datos obligatorios'
             : modalMessage.type === 'success'
-              ? 'Pre-Denuncia Registrada con Éxito'
+              ? (canRealizaDenuncias ? 'Denuncia Realizada con Éxito' : 'Pre-Denuncia Registrada con Éxito')
               : undefined
-        }  
+        }
       />
     </Box>
   );
 }
 
 export default DenunciasPage;
-

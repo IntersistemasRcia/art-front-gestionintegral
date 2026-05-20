@@ -1,0 +1,77 @@
+/* Styles moved from inline styles in page.tsx */
+.container {
+  padding: 16px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.input {
+  height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #c7c7c7;
+  border-radius: 6px;
+  width: 280px;
+}
+
+.expired {
+  color: red;
+  font-weight: 700;
+}
+
+.iconActions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.iconButton {
+  font-size: 20px;
+  color: #E4840C;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.iconButton:hover {
+  opacity: 0.85;
+}
+
+.empresaSelectorContainer {
+  margin-bottom: 20px;
+  max-width: 500px;
+}
+
+.filtrosContainer {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filtrosContainer :global(.MuiAutocomplete-root) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.topRow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.selectItem {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.selectItem :global(.MuiAutocomplete-root) {
+  width: 100%;
+  min-width: 0;
+}

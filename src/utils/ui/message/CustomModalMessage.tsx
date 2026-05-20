@@ -2,18 +2,22 @@
 "use client";
 
 import React from 'react';
-import { Dialog, DialogContent, DialogTitle, Typography, Box } from '@mui/material';
+import { Dialog, DialogContent, DialogTitle, Typography, Box, DialogActions } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import InfoOutlineIcon from '@mui/icons-material/InfoOutline';
+import CustomButton from '@/utils/ui/button/CustomButton';
 import styles from './CustomModalMessage.module.css';
-export type MessageType = 'success' | 'error' | 'alert';
+export type MessageType = 'success' | 'error' | 'warning' | 'info';
 interface CustomModalMessageProps {
   open: boolean;
   message: string;
   type: MessageType;
   onClose: () => void;
   title?: string;
+  /** Texto adicional debajo del mensaje principal (p. ej. pasos posteriores a un alta). */
+  secondaryMessage?: string;
 }
 
 const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
@@ -22,6 +26,7 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
   type,
   onClose,
   title,
+  secondaryMessage,
 }) => {
 
   // Definir el ícono y la clase CSS basados en el tipo de mensaje
@@ -35,9 +40,18 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
       case 'error':
         return { 
           Icon: ErrorOutlineIcon, 
-          defaultTitle: 'Error' 
+          defaultTitle: 'Ocurrió un inconveniente' 
         };
-      case 'alert':
+      case 'warning':
+        return { 
+          Icon: WarningAmberIcon, 
+          defaultTitle: 'Advertencia' 
+        };
+      case 'info':
+        return { 
+          Icon: InfoOutlineIcon, 
+          defaultTitle: 'Información' 
+        };
       default:
         return { 
           Icon: WarningAmberIcon, 
@@ -70,13 +84,22 @@ const CustomModalMessage: React.FC<CustomModalMessageProps> = ({
         <Typography variant="body1" className={styles.messageText}>
           {message}
         </Typography>
+        {secondaryMessage ? (
+          <Typography
+            variant="body1"
+            component="p"
+            className={styles.secondaryMessage}
+          >
+            {secondaryMessage}
+          </Typography>
+        ) : null}
       </DialogContent>
       
-      {/* <DialogActions>
-        <Button onClick={onClose} color="primary">
+      <DialogActions>
+        <CustomButton onClick={onClose} color="primary" variant="contained">
           Cerrar
-        </Button>
-      </DialogActions> */}
+        </CustomButton>
+      </DialogActions>
     </Dialog>
   );
 };

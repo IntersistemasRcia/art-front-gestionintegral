@@ -1,0 +1,254 @@
+/* Contenedor principal de importación Excel */
+.excelImportContainer {
+  background: var(--verdeClaroClaro);
+  padding: 18px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 2px dashed var(--verde);
+}
+
+.excelImportContainerDisabled {
+  background: var(--grisClaroClaro);
+  padding: 18px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 2px dashed var(--grisClaro);
+  opacity: 0.6;
+}
+
+/* Header con ícono */
+.excelImportHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.excelImportTitle {
+  margin: 0;
+  color: var(--verdeOscuro);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.excelImportTitleDisabled {
+  margin: 0;
+  color: var(--gris);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.excelImportSubtitle {
+  font-size: 13px;
+  font-weight: normal;
+  margin-left: 10px;
+  color: var(--gris);
+}
+
+/* Descripción */
+.excelImportDescription {
+  margin: 0 0 15px 0;
+  color: var(--grisOscuro);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.excelImportDescriptionDisabled {
+  margin: 0 0 15px 0;
+  color: var(--grisClaro);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.excelImportNote {
+  margin: 0 0 12px 0;
+  color: var(--gris);
+  font-size: 12px;
+}
+
+.excelImportNoteDisabled {
+  margin: 0 0 12px 0;
+  color: var(--grisClaro);
+  font-size: 12px;
+}
+
+/* Botones */
+.excelImportButtons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.excelImportInput {
+  display: none;
+}
+
+.excelImportButton {
+  background: var(--verde);
+  color: var(--blanco);
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.excelImportButtonDisabled {
+  background: var(--grisClaro);
+  color: var(--gris);
+  cursor: not-allowed;
+}
+
+.excelImportButtonSecondary {
+  background: var(--verdeOscuro);
+}
+
+/* Modal de confirmación */
+.modalContent {
+  padding: 20px;
+}
+
+.modalHeader {
+  background: linear-gradient(135deg, var(--verde) 0%, var(--verdeOscuro) 100%);
+  padding: 20px;
+  border-radius: 5px 5px 0 0;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  margin: 0 0 10px 0;
+}
+
+/* Resumen de importación */
+.resumenGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.resumenCard {
+  background: var(--verdeClaroClaro);
+  padding: 10px;
+  border-radius: 3px;
+}
+
+.resumenCardLabel {
+  font-size: 12px;
+  color: var(--verdeOscuro);
+}
+
+.resumenCardValue {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--verdeOscuro);
+}
+
+.resumenCardExpuestos {
+  background: var(--verdeClaro);
+}
+
+.resumenCardNoExpuestos {
+  background: var(--naranjaClaroClaro);
+}
+
+.resumenCardNoExpuestosLabel {
+  font-size: 12px;
+  color: var(--naranjaOscuro);
+}
+
+.resumenCardNoExpuestosValue {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--naranjaOscuro);
+}
+
+/* Secciones de éxito y errores */
+.seccionExitosos {
+  margin-bottom: 20px;
+}
+
+.seccionExitososTitle {
+  margin: 0 0 10px 0;
+  color: var(--verdeOscuro);
+}
+
+.listaExitosos {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--verdeClaroClaro);
+  padding: 10px;
+  border-radius: 3px;
+}
+
+.listaExitososItems {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.itemExitoso {
+  margin-bottom: 5px;
+  color: var(--grisOscuro);
+}
+
+/* Errores */
+.seccionErrores {
+  margin-bottom: 20px;
+}
+
+.seccionErroresTitle {
+  margin: 0 0 10px 0;
+  color: var(--rojo);
+}
+
+.listaErrores {
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--naranjaClaroClaro);
+  padding: 10px;
+  border-radius: 3px;
+}
+
+.itemError {
+  background: var(--blanco);
+  padding: 10px;
+  border-radius: 3px;
+  margin-bottom: 10px;
+  border-left: 4px solid var(--rojo);
+}
+
+.itemErrorTitle {
+  font-weight: bold;
+  color: var(--rojo);
+}
+
+.itemErrorLista {
+  margin: 5px 0 0 0;
+  padding-left: 20px;
+  color: var(--rojoOscuro);
+}
+
+.itemErrorDetalle {
+  font-size: 13px;
+}
+
+/* Botones del modal */
+.modalButtons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modalButtonConfirmar {
+  background: var(--verde);
+  color: var(--blanco);
+}
+
+.modalButtonCancelar {
+  background: var(--gris);
+  color: var(--blanco);
+}

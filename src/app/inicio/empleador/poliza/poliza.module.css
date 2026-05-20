@@ -75,8 +75,17 @@
   color: #777;
 }
 
+.empresaSelectorContainer {
+  margin-bottom: 20px;
+  max-width: 500px;
+}
+
 @media (max-width: 768px) {
   .dataGrid {
     grid-template-columns: 1fr;
+  }
+  
+  .empresaSelectorContainer {
+    max-width: 100%;
   }
 }

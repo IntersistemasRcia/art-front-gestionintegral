@@ -1,14 +1,16 @@
 "use client";
 import * as React from 'react';
 import Link from 'next/link';
-import { useState, Dispatch, SetStateAction } from 'react';
+import { useState, useEffect, useMemo, Dispatch, SetStateAction } from 'react';
 import { usePathname } from 'next/navigation';
-import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data } from 'react-icons/bs';
+import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data, BsCreditCard, BsGear } from 'react-icons/bs';
+import { MdGroups } from "react-icons/md";
 import { FaFileInvoiceDollar } from "react-icons/fa6";
 import { IconType } from 'react-icons';
-import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse } from '@mui/material';
+import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse, Typography } from '@mui/material';
 import styles from './Sidebar.module.css';
 import { useAuth } from '@/data/AuthContext';
+import { useSearch } from '@/data/SearchContext';
 
 // Define la estructura de los datos del menú
 export interface MenuItem {
@@ -45,7 +47,7 @@ const menuItems: MenuItem[] = [
             { name: "Siniestros", icon: BsCalendar2Plus, link: "/inicio/empleador/siniestros", permissionTask: "empleador_Siniestros" },
             { name: "Avisos de Obra", icon: BsHouseGear, link: "/inicio/empleador/avisosDeObra", permissionTask: "empleador_AvisoDeObra" },
             { name: "SVCC", icon: BsFolder, link: "/inicio/empleador/svcc", permissionTask: "empleador_SVCC" },
-           // { name: "Credenciales", icon: BsCreditCard, link: "/inicio/empleador/credenciales", permissionTask: "empleador_Credenciales"},
+            { name: "Credenciales", icon: BsCreditCard, link: "/inicio/empleador/credenciales", permissionTask: "empleador_Credenciales"},
         ],
     },
     {
@@ -54,7 +56,8 @@ const menuItems: MenuItem[] = [
         permissionTask: "Comercializador",
         children: [
             { name: "Cuenta Corriente", icon: BsGraphUpArrow, link: "/inicio/comercializador/cuentaCorriente", permissionTask: "Comercializador_CuentaCorriente" },
-            { name: "Polizas", icon: BsFileText, link: "/inicio/comercializador/polizas",permissionTask: "Comercializador_Polizas" },
+            { name: "Pólizas", icon: BsFileText, link: "/inicio/comercializador/polizas",permissionTask: "Comercializador_Polizas" },
+            { name: "Administración", icon: MdGroups , link: "/inicio/comercializador/administracionComercializadores", permissionTask: "Comercializador_Administracion" },
         ],
     },
     {
@@ -85,6 +88,15 @@ const menuItems: MenuItem[] = [
     link: "/inicio/usuarios",
     permissionTask: "Usuarios",
   },
+  {
+    name: "Configuraciones",
+    icon: BsGear,
+    permissionTask: "Configuraciones",
+    children: [
+      { name: "Indicadores", icon: BsBarChartLineFill, link: "/inicio/configuraciones/indicadores", permissionTask: "Configuraciones_Indicadores" },
+      { name: "Parámetros", icon: BsClipboard2Data, link: "/inicio/configuraciones/parametros", permissionTask: "Configuraciones_Parametros" },
+    ],
+  },
 ];
 
 
@@ -95,10 +107,11 @@ export interface SidebarProps {
 
 
 const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
-    const [isLocked, setIsLocked] = useState(false);
+    const [isLocked, setIsLocked] = useState(true);
     const [openMenus, setOpenMenus] = useState<string[]>([]);
     const pathname = usePathname();
     const { hasTask } = useAuth();
+    const { searchTerm, clearSearch } = useSearch();
 
     const handleMenuClick = (menuName: string) => {
       setOpenMenus(prevOpenMenus => {
@@ -111,17 +124,14 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     };
 
     const handleToggleLock = () => {
-        if (isLocked) {
-            setIsLocked(false);
-            setIsOpen(false);
-        } else {
-            setIsLocked(true);
-            setIsOpen(true);
-        }
+        setIsOpen(!isOpen);
+        setIsLocked(!isOpen);
     };
 
     const handleMouseEnter = () => {
-        setIsOpen(true);
+        if (!isLocked) {
+            setIsOpen(true);
+        }
     };
 
     const handleMouseLeave = () => {
@@ -130,12 +140,84 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
         }
     };
 
+    // Función para normalizar texto eliminando acentos y diéresis
+    const normalizeText = (text: string): string => {
+        return text
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos (acentos, diéresis, etc.)
+            .toLowerCase();
+    };
+
+    // Función para verificar si un texto coincide con el término de búsqueda
+    const matchesSearch = (text: string, search: string): boolean => {
+        if (!search.trim()) return true;
+        const normalizedText = normalizeText(text);
+        const normalizedSearch = normalizeText(search);
+        return normalizedText.includes(normalizedSearch);
+    };
+
+    // Función para filtrar items recursivamente
+    const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
+        if (!searchTerm.trim()) return items;
+
+        const filtered: MenuItem[] = [];
+
+        items.forEach((item) => {
+            const itemMatches = matchesSearch(item.name, searchTerm);
+            
+            if (item.children) {
+                // Filtrar hijos recursivamente
+                const filteredChildren = filterMenuItems(item.children);
+                
+                // Si el item padre coincide o tiene hijos que coinciden, incluirlo
+                if (itemMatches || filteredChildren.length > 0) {
+                    filtered.push({
+                        ...item,
+                        children: filteredChildren,
+                    });
+                }
+            } else {
+                if (item.permissionTask && !hasTask(item.permissionTask)) {
+                    return;
+                }
+                if (itemMatches) {
+                    filtered.push(item);
+                }
+            }
+        });
+
+        return filtered;
+    };
+
+    // Obtener items filtrados con useMemo para optimizar
+    const filteredMenuItems = useMemo(() => filterMenuItems(menuItems), [searchTerm, hasTask]);
+    const hasResults = filteredMenuItems.length > 0;
+
+    // Abrir automáticamente los menús que tienen coincidencias cuando hay búsqueda activa
+    useEffect(() => {
+        if (searchTerm.trim()) {
+            const menusToOpen: string[] = [];
+            filteredMenuItems.forEach((item) => {
+                if (item.children && item.children.length > 0) {
+                    menusToOpen.push(item.name);
+                }
+            });
+            setOpenMenus(menusToOpen);
+        }
+    }, [searchTerm, filteredMenuItems]);
+
+    // Resetear búsqueda cuando se navega (solo cuando el pathname realmente cambia)
+    const prevPathnameRef = React.useRef<string>(pathname);
+    useEffect(() => {
+        // Solo limpiar si el pathname cambió (no en el primer render)
+        if (prevPathnameRef.current !== pathname && prevPathnameRef.current) {
+            clearSearch();
+        }
+        prevPathnameRef.current = pathname;
+    }, [pathname, clearSearch]);
+
     const renderMenuItems = (items: MenuItem[], isSubmenu: boolean = false) => {
         return items.map((item) => {
-            if (item.permissionTask && !hasTask(item.permissionTask)) {
-                return null;
-            }
-
             if (item.children) {
                 const renderedChildren = renderMenuItems(item.children, true);
                 const filteredChildren = renderedChildren.filter(child => child !== null);
@@ -175,7 +257,11 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                     </React.Fragment>
                 );
             }
-            
+
+            if (item.permissionTask && !hasTask(item.permissionTask)) {
+                return null;
+            }
+
             const isActive = item.link === pathname;
             const listItemButtonClasses = `${styles.menuItemButton} ${isOpen ? styles.menuItemButtonOpen : styles.menuItemButtonClosed} ${isSubmenu ? styles.submenuItem : ''} ${isActive ? styles.activeLink : ''}`;
             const listItemIconClasses = `${styles.icon} ${isOpen ? styles.iconOpen : styles.iconClosed}`;
@@ -219,7 +305,24 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                 {isOpen && <span className={styles.headerText}>ART Gestión</span>}
             </Box>
             <List className={styles.listContainer}>
-                {renderMenuItems(menuItems)}
+                {searchTerm.trim() && !hasResults ? (
+                    <ListItem disablePadding className={styles.listItem}>
+                        <Box sx={{ padding: '20px', textAlign: 'center', width: '100%' }}>
+                            <Typography 
+                                variant="body1" 
+                                sx={{ 
+                                    color: 'white', 
+                                    fontSize: '1.4rem',
+                                    fontStyle: 'italic'
+                                }}
+                            >
+                                No se encontraron coincidencias para "{searchTerm}"
+                            </Typography>
+                        </Box>
+                    </ListItem>
+                ) : (
+                    renderMenuItems(filteredMenuItems)
+                )}
             </List>
         </Box>
     );

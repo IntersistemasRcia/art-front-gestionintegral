@@ -1,8 +1,9 @@
 
 export type ViewCuentaCorriente = {    
     
-    interno: number;    /** Fecha y hora de creación o registro de la liquidación (formato ISO 8601 string). */
-    periodo: number;    /** Origen o tipo de liquidación (Ej: 'POL', 'SERV', 'AJUSTE'). */
+    interno: number;
+    periodo: number;
+    origen?: string;
     monto: number;    /** Monto de la comisión aplicada. */
     comision: number;    /** Monto por servicios adicionales o gastos. */
     serviciosAdicionales: number;
@@ -26,6 +27,44 @@ export type ViewCuentaCorrienteDetalle = {
     IVA: number;
     TotalSinIVA: number;
     TotalConIVA: number;
+}
+
+export type ParametersEmpleadorPagosComercializador = {
+    Periodo?: number;
+    ComercializadoresInternos?: string;
+    OrderBy?: string;
+    PageIndex?: number;
+    PageSize?: number;
+}
+
+export type ParametersAfipTranferencia = {
+    Periodo?: number;
+    CuitContribuyente?: string;
+    FechaProceso?: number;
+    OrderBy?: string;
+    // PageIndex?: number;
+    // PageSize?: number;
+}
+
+
+export type ParametersComercializadorPeriodoPago = {
+ComercializadoresInternos?: string;
+OrderBy?: string;
+PageIndex?: number;
+PageSize?: number;
+}
+
+export type ComercializadorPeriodoPago = {
+    srtcomercializadorInterno: number;
+    periodo: number;
+    montoPremio: number;
+    montoPrima: number;
+    comision: number;
+    serviciosAdicionales: number;
+    iva: number;
+    totalSinIva: number;
+    totalConIva: number;
+    interno: number;
 }
 
 export default ViewCuentaCorriente;

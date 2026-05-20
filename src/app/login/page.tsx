@@ -64,8 +64,43 @@ export default function Signin() {
       console.debug("[Login] signIn result:", res);
 
       if (res?.error) {
-        // Mostrar el error tal cual lo devuelve next-auth
-        setError(String(res.error));
+        // Intentar detectar si la API nos devolvió un link de restablecimiento
+        const errorStr = String(res.error || "");
+
+        const pendingEmail = errorStr.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
+        if (pendingEmail && /requiere validaci[oó]n/i.test(errorStr)) {
+          await usuarioAPI.reenviarCorreo(pendingEmail);
+          setError(`Su cuenta requiere validación. Le enviamos un correo electrónico a ${pendingEmail} para que pueda verificarla y activar su acceso.`);
+          return;
+        }
+
+        const resetRegex = /(https?:\/\/[^\s\"]*resetPassword\?[^\"\s]*)|(?:resetPassword\?[^\"\s]*)/i;
+        const match = errorStr.match(resetRegex);
+        if (match) {
+          let urlStr = match[0];
+          try {
+            let searchPart = "";
+            if (/^https?:\/\//i.test(urlStr)) {
+              const u = new URL(urlStr);
+              searchPart = u.search;
+            } else {
+              const idx = urlStr.indexOf("?");
+              searchPart = idx >= 0 ? urlStr.substring(idx) : "";
+            }
+            const params = new URLSearchParams(searchPart);
+            const email = params.get("email") || "";
+            const token = params.get("token") || "";
+            const target = 
+              `/resetPassword?${new URLSearchParams({ email, token }).toString()}`;
+            console.debug("[Login] redirigiendo a reset con:", { email, token });
+            return router.push(target);
+          } catch (e) {
+            console.warn("[Login] no se pudo parsear el link de reset:", e);
+          }
+        }
+
+        // Mostrar el error tal cual lo devuelve next-auth si no es un reset
+        setError(errorStr);
         // También registrar para comparar primer/segundo click
         console.warn("[Login] error de signIn:", res.error);
       } else if (res?.ok) {
@@ -76,9 +111,9 @@ export default function Signin() {
         setError("Error desconocido en el proceso de autenticación");
         console.warn("[Login] signIn retornó resultado inesperado:", res);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Login] excepción en handleSubmit:", err);
-      setError(err?.message ?? "Error inesperado al iniciar sesión");
+      setError(err instanceof Error ? err.message : "Error inesperado al iniciar sesión");
     } finally {
       setIsLoading(false);
     }
@@ -105,9 +140,9 @@ export default function Signin() {
         setOpenForgotPassword(false);
         setRecoveryMessage("");
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ForgotPassword] Error:", err);
-      setRecoveryError(err?.message || "Error al enviar el correo de recuperación");
+      setRecoveryError(err instanceof Error ? err.message : "Error al enviar el correo de recuperación");
     } finally {
       setIsSendingEmail(false);
     }

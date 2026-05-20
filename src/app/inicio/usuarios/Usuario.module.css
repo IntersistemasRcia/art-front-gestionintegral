@@ -20,6 +20,10 @@
   padding-right: 24px;
 }
 
+.tabsStableHeight {
+  min-height: 56rem;
+}
+
 .infoPanel {
   flex: 1;
   background-color: #f8f9fa;
@@ -27,6 +31,13 @@
   border-radius: 8px;
   padding: 20px;
   height: fit-content;
+}
+
+.infoColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
 }
 
 .infoPanelTitle {
@@ -162,3 +173,87 @@
     width: 100%;
   }
 }
+
+.phoneField {
+  width: 100%;
+}
+
+.phoneContainer {
+  width: 100% !important;
+}
+
+.phoneInput {
+  width: 100% !important;
+  height: 43px;
+  border: 1px solid #45661f !important;
+  border-radius: 4px !important;
+  color: #474747 !important;
+  font-family: Outfit, sans-serif !important;
+  font-size: 1.5rem !important;
+}
+
+.phoneButton {
+  border-color: #45661f !important;
+}
+
+.phoneContainer :global(.special-label) {
+  color: #45661f;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.showPasswordRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.roleDisabled {
+  color: #9aa0a6;
+}
+
+.empresaSelectorWrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.empresaSelectorBox {
+  min-width: 420px;
+}
+
+.accordionTitle {
+  font-weight: bold !important;
+  font-size: 1.5rem !important;
+  display: flex;
+  align-items: center;
+}
+
+.accordionIcon {
+  font-size: 2.5rem !important;
+  color: black;
+}
+
+.accordion {
+  margin-bottom: 16px;
+}
+
+.accordionSummaryContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.filterFieldCuit { min-width: 140px; }
+.filterFieldNombre { min-width: 320px; }
+.filterFieldEmail { min-width: 320px; }
+.filterFieldCombo { min-width: 160px; }

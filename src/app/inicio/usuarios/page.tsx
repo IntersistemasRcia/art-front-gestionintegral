@@ -1,17 +1,54 @@
 "use client";
 
-import { useState } from "react";
-import { Box, Typography } from "@mui/material";
-import UsuarioForm, { UsuarioFormFields } from "./UsuarioForm";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Box,
+  Typography,
+  TextField,
+  MenuItem,
+} from "@mui/material";
+import { MdExpandMore } from "react-icons/md";
+import { BsSliders } from "react-icons/bs";
+import UsuarioForm, {
+  type UsuarioFormFields,
+  LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR,
+} from "./UsuarioForm";
 import UsuarioTable from "./UsuarioTable";
+import EmpresaTable from "./EmpresaTable";
 import Tareas from "./Tareas";
 import useUsuarios from "./useUsuarios";
+import { type UsuarioUpdatePayload } from "@/data/usuarioAPI";
+import { useEmpresasStore } from "@/data/empresasStore";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import {
+  Empresa,
+  USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+} from "@/data/authAPI";
+import { useSearchParams } from "next/navigation";
+import Formato from "@/utils/Formato";
+import { useEmpresasLoader } from "@/data/useEmpresasLoader";
 import styles from "./Usuario.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
-import CustomModalMessage from "@/utils/ui/form/CustomModalMessage";
+import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import UsuarioRow from "./interfaces/UsuarioRow";
 import { useAuth } from "@/data/AuthContext";
 import IUsuarioDarDeBajaReactivar from "./interfaces/IUsuarioDarDeBajaReactivar";
+import CustomTabs from "@/utils/ui/tab/CustomTab";
+
+/** Valor sentinela en `Empresa.empresaId` para la opción "Todas las Empresas" en el listado de usuarios. */
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+
+const EMPRESA_OPCION_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+  cuit: 0,
+  razonSocial: "Todas las Empresas",
+  domicilio: "",
+  localidad: "",
+  provincia: "",
+};
 
 type RequestMethod =
   | "create"
@@ -30,10 +67,30 @@ interface PermisosModulo {
   moduloId: number;
   moduloDescripcion: string;
   habilitado: boolean;
+  tareas: {
+    tareaId: number;
+    moduloId: number;
+    habilitada: boolean;
+  }[];
+}
+
+function buildUsuarioUpdatePayload(data: UsuarioFormFields): UsuarioUpdatePayload {
+  return {
+    phoneNumber: String(data.phoneNumber ?? "").trim(),
+    nombre: String(data.nombre ?? "").trim(),
+    titulo: String(data.titulo ?? "").trim(),
+    matricula: String(data.matricula ?? "").trim(),
+    sectorId: Number(data.sectorId ?? 0),
+    cargoId: Number(data.cargoId ?? 0),
+    ...(data.password ? { password: String(data.password) } : {}),
+    ...(data.confirmPassword ? { confirmPassword: String(data.confirmPassword) } : {}),
+    email: String(data.email ?? "").trim(),
+  };
 }
 
 export default function UsuariosPage() {
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
+  const canConfigEmpresa = hasTask("Usuarios_EmpresaConfiguracion");
   
   // Determinar si el usuario es administrador
   const isAdmin = user?.rol?.toLowerCase() === "administrador";
@@ -48,13 +105,130 @@ export default function UsuariosPage() {
     phoneNumber: "",
     nombre: "",
     userName: "",
+    titulo: "",
+    matricula: "",
+    maxUsuarios: 0,
     // Usamos el `|| 1` como valor por defecto, aunque es mejor que el backend lo maneje si no existe
     empresaId: user?.empresaId || 0, 
     cargoId: undefined,
+    sectorId: undefined,
+  };
+
+  // Cargar empresas y preparar selector
+  useEmpresasLoader();
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const seleccionAutomaticaRef = useRef(false);
+  const [bloquearBusquedaPorCuit, setBloquearBusquedaPorCuit] = useState(false);
+  const searchParams = useSearchParams();
+  const cuitQuery = searchParams?.get("cuit") ?? searchParams?.get("cuil");
+  const cuitForzado = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
+
+  const sessionEmpresaIds = useMemo(() => {
+    const fromSession = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => e.empresaId)
+      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
+    const unique = Array.from(new Set(fromSession));
+    if (unique.length > 0) return unique;
+    return Array.from(new Set(empresas.map((e) => e.empresaId)));
+  }, [user?.empresas, empresas]);
+
+  const opcionesEmpresaSelector = useMemo(
+    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    [empresas]
+  );
+
+  useEffect(() => {
+    if (Number.isFinite(cuitForzado) && cuitForzado > 0) return;
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
+    }
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresaSeleccionada((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas, cuitForzado]);
+
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+    const hasCuitForzado = Number.isFinite(cuitForzado) && cuitForzado > 0;
+    setBloquearBusquedaPorCuit(hasCuitForzado);
+    if (!hasCuitForzado) return;
+    const match = empresas.find((e) => {
+      const digits = Number(String((e as any)?.cuit ?? "").replace(/\D/g, ""));
+      return Number.isFinite(digits) && digits === cuitForzado;
+    });
+    if (match) {
+      setEmpresaSeleccionada(match);
+      seleccionAutomaticaRef.current = true;
+    }
+  }, [cuitForzado, empresas, isLoadingEmpresas]);
+
+  const handleEmpresaChange = (_event: React.SyntheticEvent, newValue: Empresa | null) => {
+    if (bloquearBusquedaPorCuit) return;
+    setEmpresaSeleccionada(newValue);
+    seleccionAutomaticaRef.current = false;
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return "Todas las Empresas";
+    if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
+    const cuitFormateado = Formato.CUIP((empresa as any)?.cuit);
+    return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
+  };
+
+  const porEmpresaIdsListado = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      if (isAdmin) return [];
+      return sessionEmpresaIds;
+    }
+    return [empresaSeleccionada.empresaId];
+  }, [empresaSeleccionada, sessionEmpresaIds, isAdmin]);
+
+  const allowEmptyEmpresasPostUsuarios =
+    isAdmin &&
+    empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID;
+
+  const porEmpresaIdsListadoKey = useMemo(() => {
+    if (allowEmptyEmpresasPostUsuarios) return "admin:all";
+    return porEmpresaIdsListado.slice().sort((a, b) => a - b).join(",");
+  }, [porEmpresaIdsListado, allowEmptyEmpresasPostUsuarios]);
+
+  const [usuariosPageIndex, setUsuariosPageIndex] = useState(1);
+
+  useEffect(() => {
+    setUsuariosPageIndex(1);
+  }, [porEmpresaIdsListadoKey]);
+
+  const emptyFilter = { cuit: "", nombre: "", email: "", rol: "", estado: "" };
+  const [filterDraft, setFilterDraft] = useState(emptyFilter);
+  const [filterCommitted, setFilterCommitted] = useState(emptyFilter);
+
+  const handleBuscar = () => {
+    setUsuariosPageIndex(1);
+    setFilterCommitted(filterDraft);
+  };
+  const handleLimpiar = () => {
+    setFilterDraft(emptyFilter);
+    setFilterCommitted(emptyFilter);
+    setUsuariosPageIndex(1);
   };
 
   const {
     usuarios,
+    usuariosListadoMeta,
     roles,
     cargos,
     refEmpleadores,
@@ -67,13 +241,28 @@ export default function UsuariosPage() {
     usuarioReactivar,
     usuarioReestablecer,
     usuarioReenviarCorreo
-  } = useUsuarios();
+  } = useUsuarios({
+    porEmpresaIds: porEmpresaIdsListado,
+    allowEmptyEmpresasPost: allowEmptyEmpresasPostUsuarios,
+    pageIndex: usuariosPageIndex,
+    pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+    ...filterCommitted,
+  });
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  /** Tras alta exitosa con id: el modal exige al menos una empresa antes de cerrar. */
+  const [awaitingEmpresaAfterCreate, setAwaitingEmpresaAfterCreate] = useState(false);
   const [requestState, setRequestState] = useState<RequestState>({
     method: null,
     userData: null,
   });
+  const [currentTab, setCurrentTab] = useState<number>(0);
+
+  useEffect(() => {
+    if (!canConfigEmpresa && currentTab === 1) {
+      setCurrentTab(0);
+    }
+  }, [canConfigEmpresa, currentTab]);
 
   const [permisosModal, setPermisosModal] = useState<{
     open: boolean;
@@ -87,6 +276,7 @@ export default function UsuariosPage() {
     open: boolean;
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
+    secondaryMessage?: string;
   }>({
     open: false,
     message: '',
@@ -96,11 +286,16 @@ export default function UsuariosPage() {
   // Determina si el modal debe estar visible
   const showModal = requestState.method !== null;
 
-  const showModalMessage = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+  const showModalMessage = (
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info',
+    secondaryMessage?: string
+  ) => {
     setModalMessage({
       open: true,
       message,
-      type
+      type,
+      secondaryMessage: secondaryMessage ?? undefined,
     });
   };
 
@@ -108,12 +303,24 @@ export default function UsuariosPage() {
     setModalMessage({
       open: false,
       message: '',
-      type: 'info'
+      type: 'info',
+      secondaryMessage: undefined,
     });
   };
 
+  const handleEmpresaRelationSatisfied = useCallback(() => {
+    setAwaitingEmpresaAfterCreate(false);
+  }, []);
+
   const handleOpenModal = (method: RequestMethod, row?: UsuarioRow) => {
+    setAwaitingEmpresaAfterCreate(false);
     // CORRECCIÓN 2: Mapeamos la fila (UsuarioRow) a datos del formulario (UsuarioFormFields)
+    const sectorIdFromRow = row?.sectorId ?? (row as UsuarioRow & { SectorId?: number | string } | undefined)?.SectorId;
+    const resolvedSectorId =
+      sectorIdFromRow !== undefined && sectorIdFromRow !== null && sectorIdFromRow !== ""
+        ? Number(sectorIdFromRow)
+        : undefined;
+
     const dataToForm: UsuarioFormFields = row
       ? {
           cuit: row.cuit || "",
@@ -126,10 +333,13 @@ export default function UsuariosPage() {
           nombre: row.nombre || "",
           cargoId: row.cargoId || 1,
           userName: row.userName || "",
+          titulo: row.titulo || "",
+          matricula: row.matricula || "",
           // Limpiar cargo si está vacío, es null, undefined, o contiene valores no deseados
           // cargo: (row.cargo && row.cargo.trim() !== "" && row.cargo !== "null" && row.cargo !== "undefined") ? row.cargo : "",
           // Mantenemos la empresaId de la fila o del usuario actual
           empresaId: row.empresaId || user?.empresaId || 0, 
+          sectorId: resolvedSectorId,
           // Es crucial incluir el ID de usuario para edición/eliminación
           id: String(row.id), // <-- Aseguramos que el ID se convierte a string para el formulario
         }
@@ -143,6 +353,7 @@ export default function UsuariosPage() {
   };
 
   const handleCloseModal = () => {
+    setAwaitingEmpresaAfterCreate(false);
     setRequestState({ method: null, userData: null });
   };
 
@@ -222,6 +433,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
     // Aquí se crea el objeto completo para la API, añadiendo empresaId
     // La lógica de envío debe considerar el modo (create, edit, delete)
     const method = requestState.method;
+    let successSecondaryMessage: string | undefined;
     let result: { success: boolean; error: string | null } = {
       success: false,
       error: null,
@@ -244,7 +456,10 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   if (method === "edit") {
     // Lógica para editar usuario
     {
-      const rawResult = await usuarioUpdate(String(data.id), dataToSubmit);
+      const rawResult = await usuarioUpdate(
+        String(data.id),
+        buildUsuarioUpdatePayload(dataToSubmit)
+      );
       result = {
         success: rawResult.success,
         error: rawResult.error !== undefined ? rawResult.error : null,
@@ -277,10 +492,31 @@ const handleSubmit = async (data: UsuarioFormFields) => {
       };
     }
   } else if (method === "create") {
-    result = (await registrarUsuario(dataToSubmit)) as {
+    const createResult = (await registrarUsuario(dataToSubmit)) as {
       success: boolean;
       error: string | null;
+      data?: { id?: number | string };
     };
+    result = {
+      success: createResult.success,
+      error: createResult.error,
+    };
+    if (createResult.success) {
+      const createdUserId = createResult.data?.id;
+      if (createdUserId !== undefined && createdUserId !== null) {
+        setAwaitingEmpresaAfterCreate(true);
+        successSecondaryMessage = LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR;
+        setRequestState({
+          method: "edit",
+          userData: {
+            ...dataToSubmit,
+            id: String(createdUserId),
+          },
+        });
+      } else {
+        setAwaitingEmpresaAfterCreate(false);
+      }
+    }
   }
 
     if (result.success) {
@@ -291,10 +527,24 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         activate: "Usuario reactivado exitosamente"
       };
       
-      showModalMessage(successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente", "success");
-      handleCloseModal();
+      showModalMessage(
+        successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente",
+        "success",
+        successSecondaryMessage
+      );
+      if (method !== "create") {
+        handleCloseModal();
+      }
     } else {
-      const errorMessage = result.error || `Error al ${method} el usuario.`;
+      const rawError = result.error || `Error al ${method} el usuario.`;
+      const isInvalidEmailError =
+        /Mailbox.*does not exist|does not exist.*Mailbox/i.test(rawError) ||
+        /5\.1\.1/.test(rawError) ||
+        /4\.4\.5/.test(rawError) ||
+        /Directory harvest attack/i.test(rawError);
+      const errorMessage = isInvalidEmailError
+        ? "El email registrado no existe. Por favor inserte un email válido."
+        : rawError;
       showModalMessage(errorMessage, "error");
       setFormError(errorMessage);
     }
@@ -309,9 +559,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   }
 };
 
-  if (loading) {
-    return <Typography variant="h6">Cargando...</Typography>;
-  }
+
 
   if (error) {
     return (
@@ -327,27 +575,113 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   // AHORA currentInitialData siempre será UsuarioFormFields o initialForm
   // Lo cual satisface la prop initialData de UsuarioForm
   const currentInitialData = requestState.userData || initialForm; // LÍNEA 144
+
+  const tabs = [
+    {
+      label: "Configuracion de Usuario",
+      value: 0,
+      content: (
+        <>
+          <CustomButton
+            onClick={() => handleOpenModal("create")}
+            style={{ float: "right" }}
+          >
+            Crear usuario
+          </CustomButton>
+
+          {/* Selector empresa*/}
+          <Box className={styles.empresaSelectorWrapper}>
+            <Box className={styles.empresaSelectorBox}>
+              <CustomSelectSearch<Empresa>
+                options={opcionesEmpresaSelector}
+                getOptionLabel={getEmpresaLabel}
+                value={empresaSeleccionada}
+                onChange={handleEmpresaChange}
+                label="Seleccionar Empresa"
+                placeholder="Buscar empresa..."
+                loading={isLoadingEmpresas}
+                loadingText="Cargando empresas..."
+                noOptionsText={
+                  isLoadingEmpresas
+                    ? "Cargando..."
+                    : opcionesEmpresaSelector.length <= 1
+                      ? "No hay empresas disponibles"
+                      : "No se encontraron empresas"
+                }
+                disabled={isLoadingEmpresas || bloquearBusquedaPorCuit}
+                isOptionEqualToValue={(option, value) => option?.empresaId === value?.empresaId}
+              />
+            </Box>
+          </Box>
+
+          <Accordion className={styles.accordion}>
+            <AccordionSummary expandIcon={<MdExpandMore className={styles.accordionIcon} />}>
+              <div className={styles.accordionSummaryContent}>
+                <BsSliders size={20} />
+                <Typography className={styles.accordionTitle}>Configuración de Filtros</Typography>
+              </div>
+            </AccordionSummary>
+            <AccordionDetails>
+              <div className={styles.filterRow}>
+                <TextField label="CUIT" value={filterDraft.cuit.replace(/\D/g, "").length === 11 ? Formato.CUIP(filterDraft.cuit) : filterDraft.cuit} onChange={e => setFilterDraft(p => ({ ...p, cuit: e.target.value.replace(/\D/g, "").slice(0, 11) }))} className={styles.filterFieldCuit} />
+                <TextField label="Nombre" value={filterDraft.nombre} onChange={e => setFilterDraft(p => ({ ...p, nombre: e.target.value }))} className={styles.filterFieldNombre} />
+                <TextField label="Email" value={filterDraft.email} onChange={e => setFilterDraft(p => ({ ...p, email: e.target.value }))} className={styles.filterFieldEmail} />
+                <TextField select label="Rol" value={filterDraft.rol} onChange={e => setFilterDraft(p => ({ ...p, rol: e.target.value }))} className={styles.filterFieldCombo}>
+                  <MenuItem value="">Todos</MenuItem>
+                  {(roles ?? []).map(r => <MenuItem key={r.id} value={r.nombre}>{r.nombre}</MenuItem>)}
+                </TextField>
+                <TextField select label="Estado" value={filterDraft.estado} onChange={e => setFilterDraft(p => ({ ...p, estado: e.target.value }))} className={styles.filterFieldCombo}>
+                  <MenuItem value="">Todos</MenuItem>
+                  {["Activo", "Inactivo", "Pendiente activación"].map(e => <MenuItem key={e} value={e}>{e}</MenuItem>)}
+                </TextField>
+                <CustomButton onClick={handleBuscar}>Buscar</CustomButton>
+                <CustomButton onClick={handleLimpiar}>Limpiar</CustomButton>
+              </div>
+            </AccordionDetails>
+          </Accordion>
+
+          <UsuarioTable
+            data={usuarios}
+            onEdit={(row) => handleOpenModal("edit", row)}
+            onView={(row) => handleOpenModal("view", row)}
+            onDelete={(row) => handleOpenModal("delete", row)}
+            onActivate={(row) => handleOpenModal("activate", row)}
+            onRemove={(row) => handleOpenModal("remove", row)}
+            onReestablecer={(row) => handleReestablecer(row)}
+            onPermisos={handleOpenPermisos}
+            onReenviarCorreo={handleReenviarCorreo}
+            isLoading={loading}
+            serverPagination={
+              porEmpresaIdsListado.length > 0 || allowEmptyEmpresasPostUsuarios
+                ? {
+                    pageIndex: usuariosPageIndex,
+                    pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
+                    pageCount: Math.max(1, usuariosListadoMeta?.pages ?? 1),
+                    onPageChange: setUsuariosPageIndex,
+                  }
+                : undefined
+            }
+          />
+        </>
+      ),
+    },
+    ...(canConfigEmpresa
+      ? [
+          {
+            label: "Configuracion de Empresa",
+            value: 1,
+            content: <EmpresaTable />,
+          },
+        ]
+      : []),
+  ];
   
   return (
     <Box className={styles.usuariosPageContainer}>
-      <CustomButton
-        onClick={() => handleOpenModal("create")}
-        style={{ float: "right" }}
-      >
-        Crear usuario
-      </CustomButton>
-
-      <UsuarioTable
-        data={usuarios}
-        onEdit={(row) => handleOpenModal("edit", row)}
-        onView={(row) => handleOpenModal("view", row)}
-        onDelete={(row) => handleOpenModal("delete", row)}
-        onActivate={(row) => handleOpenModal("activate", row)}
-        onRemove={(row) => handleOpenModal("remove", row)}
-        onReestablecer={(row) => handleReestablecer(row)}
-        onPermisos={handleOpenPermisos}
-        onReenviarCorreo={handleReenviarCorreo}
-        isLoading={loading}
+      <CustomTabs
+        tabs={tabs}
+        currentTab={currentTab}
+        onTabChange={(_event, newTabValue) => setCurrentTab(newTabValue)}
       />
 
       <UsuarioForm
@@ -357,11 +691,14 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         roles={roles}
         cargos={cargos}
         refEmpleadores={refEmpleadores}
+        usuarios={usuarios}
         initialData={currentInitialData}
         errorMsg={formError}
         method={requestState.method || "create"}
         isAdmin={isAdmin}
         isSubmitting={isSubmitting}
+        awaitingEmpresaRelation={awaitingEmpresaAfterCreate}
+        onEmpresaRelationSatisfied={handleEmpresaRelationSatisfied}
       />
 
       <Tareas
@@ -376,7 +713,8 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         message={modalMessage.message}         
         type={modalMessage.type}         
         onClose={handleClose}        
-        title="Atención requerida"  
+        title={modalMessage.type === "success" ? "Operación exitosa" : undefined}
+        secondaryMessage={modalMessage.secondaryMessage}
       />
     </Box>
   );

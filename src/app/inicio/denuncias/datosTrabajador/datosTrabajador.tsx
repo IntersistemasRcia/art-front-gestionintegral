@@ -22,6 +22,7 @@ import {
 import Formato from "@/utils/Formato";
 import ArtAPI from "@/data/artAPI";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
+import dayjs from "dayjs";
 
 type DatosTrabajadorProps = {
   form: DenunciaFormData;
@@ -45,9 +46,10 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   onBlur,
 }) => {
 
-
   // Traemos países desde /api/Paises
   const { data: paisesData } = ArtAPI.useGetRefPaises();
+  // Máxima fecha de nacimiento permitida 16 años
+  const maxNacimiento = useMemo(() => dayjs().subtract(16, "year").format("YYYY-MM-DD"), []);
 
   // Nos aseguramos de tener un array y lo ordenamos por denominación
   const paisesOrdenados = useMemo(
@@ -115,13 +117,12 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   }
 
   const isValidating = isValidatingNombre || isValidatingCP;
-
   const telInputRef = useRef<HTMLInputElement | null>(null);
   const afiLoadingRef = useRef(false);
   const [afiLoading, setAfiLoading] = useState(false);
   const [afiModalOpen, setAfiModalOpen] = useState(false);
   const [afiModalMessage, setAfiModalMessage] = useState("");
-  const [afiModalType, setAfiModalType] = useState<MessageType>("alert");
+  const [afiModalType, setAfiModalType] = useState<MessageType>("warning");
   const lastAfiCuilRef = useRef<string>("");
   // CUIL inicial proveniente de la base (solo se setea una vez)
   const initialCuilRef = useRef<string | null>(null);
@@ -162,6 +163,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     onBlur("telefono");
   };
 
+
   const handleBuscarLocalidades = () => {
     const text = busqueda.trim();
     if (text) {
@@ -183,8 +185,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     setNombreBuscado(null);
     setCpBuscado(cp);
   };
-
-  
 
   // Helper para mantener sólo dígitos
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
@@ -219,9 +219,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     }
   }, [form.cuil]);
 
-
   // Generador de handlers para campos numéricos.
-  // Opcionalmente aplica un formateo cuando la longitud de dígitos coincide con formatWhenLen.
   const numericChange = (
     name: string,
     options?: { format?: (digits: string) => string; formatWhenLen?: number }
@@ -246,8 +244,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
   };
 
   // Autocompletado por CUIL: cuando se ingresan 11 dígitos válidos, consulta afiliado y completa.
-  // En edición: si la base trae CUIL y coincide con el actual, no consulta.
-  // Si el CUIL actual difiere del inicial o no hay CUIL inicial, consulta.
   useEffect(() => {
     const digits = onlyDigits(form.cuil);
     if (isDisabled) return;
@@ -266,7 +262,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
           const data: AfiApiResponse = await ArtAPI.getAfiliadoCuil({ CUIL: Number(digits) });
           if (!data) {
             setAfiModalMessage("El trabajador no se encuentra registrado como afiliado.");
-            setAfiModalType("alert");
+            setAfiModalType("warning");
             setAfiModalOpen(true);
             const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
             onTextFieldChange(syntheticClear);
@@ -307,12 +303,11 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
           textEvent("domicilioNro", domNro ?? "");
           textEvent("domicilioPiso", domPiso ?? "");
           textEvent("domicilioDpto", domDpto ?? "");
-          // Entre calles disponibles: domEntre1, domEntre2
-
+          textEvent("domicilioEntreCalle1", domEntre1 ?? "");
+          textEvent("domicilioEntreCalle2", domEntre2 ?? "");
           // Localidad y CP
           selectEvent("codLocalidadTrabajador", String(locSrt ?? ""));
           textEvent("codPostalTrabajador", String(cpPostal ?? ""));
-
           // Contacto: completar solo si no hay datos pre-cargados
           if (!form.telefono) {
             textEvent("telefono", data.telefono ?? "");
@@ -327,7 +322,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
           lastAfiCuilRef.current = digits;
         } catch (err) {
           setAfiModalMessage("No se pudo verificar el CUIL del trabajador.");
-          setAfiModalType("alert");
+          setAfiModalType("warning");
           setAfiModalOpen(true);
           const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
           onTextFieldChange(syntheticClear);
@@ -341,7 +336,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
       fetchAndFill();
       return;
     }
-
     // En creación: si hay 11 dígitos, realizar búsqueda (evita duplicados)
     if (digits.length !== 11) return;
     if (lastAfiCuilRef.current === digits) return;
@@ -353,7 +347,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         const data: AfiApiResponse = await ArtAPI.getAfiliadoCuil({ CUIL: Number(digits) });
         if (!data) {
           setAfiModalMessage("El trabajador no se encuentra registrado como afiliado.");
-          setAfiModalType("alert");
+          setAfiModalType("warning");
           setAfiModalOpen(true);
           const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
           onTextFieldChange(syntheticClear);
@@ -394,8 +388,8 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         textEvent("domicilioNro", domNro ?? "");
         textEvent("domicilioPiso", domPiso ?? "");
         textEvent("domicilioDpto", domDpto ?? "");
-        // Entre calles no están visibles como campos separados en el formulario actual,
-        // pero si se agregan, estos valores están disponibles: domEntre1, domEntre2
+        textEvent("domicilioEntreCalle1", domEntre1 ?? "");
+        textEvent("domicilioEntreCalle2", domEntre2 ?? "");
 
         // Localidad y CP
         selectEvent("codLocalidadTrabajador", String(locSrt ?? ""));
@@ -415,7 +409,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         lastAfiCuilRef.current = digits;
       } catch (err) {
         setAfiModalMessage("No se pudo verificar el CUIL del trabajador.");
-        setAfiModalType("alert");
+        setAfiModalType("warning");
         setAfiModalOpen(true);
         const syntheticClear = { target: { name: 'cuil', value: '' } } as any;
         onTextFieldChange(syntheticClear);
@@ -429,7 +423,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
     fetchAndFill();
   }, [form.cuil, isDisabled, isEditing]);
 
-
   return (
     <>
       <CustomModalMessage
@@ -437,7 +430,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         type={afiModalType}
         message={afiModalMessage}
         onClose={() => setAfiModalOpen(false)}
-        title={afiModalType === 'alert' ? 'CUIL no afiliado' : undefined}
+        title={afiModalType === 'warning' ? 'CUIL no afiliado' : undefined}
       />
       {/* Trabajador */}
       <div className={styles.formSection}>
@@ -446,26 +439,25 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         </Typography>
 
         <div className={styles.formRow}>
-          <TextField
-            label="Cuil"
-            name="cuil"
-            value={form.cuil}
-            onChange={numericChange("cuil", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
-
-
-            error={touched.cuil && !!errors.cuil}
-            helperText={touched.cuil && errors.cuil}
-            fullWidth
-            required={!isDisabled}
-            disabled={isDisabled}
-            placeholder="Ingrese CUIL"
-            className={styles.compactField}
-          />
-          {afiLoading && (
-            <Typography variant="caption" className={styles.captionNote}>
-              Buscando afiliado para autocompletar...
-            </Typography>
-          )}
+          <div className={`${styles.compactField} ${styles.flexColumn}`}>
+            <TextField
+              label="Cuil"
+              name="cuil"
+              value={form.cuil}
+              onChange={numericChange("cuil", { format: (d) => Formato.CUIP(d), formatWhenLen: 11 })}
+              error={touched.cuil && !!errors.cuil}
+              helperText={touched.cuil && errors.cuil}
+              fullWidth
+              required={!isDisabled}
+              disabled={isDisabled}
+              placeholder="Ingrese CUIL"
+            />
+            {afiLoading && (
+              <Typography variant="caption" className={styles.captionNote}>
+                cargando...
+              </Typography>
+            )}
+          </div>
 
           <FormControl
             fullWidth
@@ -544,12 +536,13 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
             required={!isDisabled}
             disabled={isDisabled}
             InputLabelProps={{ shrink: true }}
+            inputProps={{ max: maxNacimiento }}
             className={styles.compactField}
           />
 
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.sexo && !!errors.sexo}
             disabled={isDisabled}
             className={styles.compactField}
@@ -574,7 +567,7 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
 
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.estadoCivil && !!errors.estadoCivil}
             disabled={isDisabled}
             className={styles.compactField}
@@ -824,23 +817,6 @@ const DatosTrabajador: React.FC<DatosTrabajadorProps> = ({
         </div>
       </div>
 
-      {/* Tabla de trabajadores relacionados */}
-      <div className={styles.formSection}>
-        <div className={styles.relatedWorkersContainer}>
-          {/* Encabezados de la tabla */}
-          <div className={styles.relatedWorkersHeader}>
-            <div>Trabajador</div>
-            <div>Empresa</div>
-            <div>Período</div>
-            <div>Origen</div>
-          </div>
-
-          {/* Contenido de la tabla (vacío por ahora) */}
-          <div className={styles.relatedWorkersBody}>
-            {/* Aquí se mostrarían los trabajadores relacionados */}
-          </div>
-        </div>
-      </div>
     </>
   );
 };

@@ -16,15 +16,15 @@ const Breadcrumbs = () => {
         {pathnames.map((value, index) => {
           const to = `/${pathnames.slice(0, index + 1).join('/')}`;
           const isLast = index === pathnames.length - 1;
-          const name = value.charAt(0).toUpperCase() + value.slice(1);
+          const displayName = formatBreadcrumbLabel(value);
 
           return (
             <li key={to}>
               <span className={styles.separator}>/</span>
               {isLast ? (
-                <span>{name}</span>
+                <span>{displayName}</span>
               ) : (
-                <Link href={to}>{name}</Link>
+                <Link href={to}>{displayName}</Link>
               )}
             </li>
           );
@@ -33,5 +33,12 @@ const Breadcrumbs = () => {
     </nav>
   );
 };
+
+const formatBreadcrumbLabel = (segment: string) =>
+  decodeURIComponent(segment)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[-_]+/g, ' ')
+    .toLowerCase()
+    .trim();
 
 export default Breadcrumbs;

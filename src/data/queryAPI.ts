@@ -1,6 +1,7 @@
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 import { AxiosError } from "axios";
+import { useSession } from "next-auth/react";
 import { token } from "./usuarioAPI";
 import { ExternalAPI } from "./api";
 import { camelCaseKeys, toURLSearch } from "@/utils/utils";
@@ -154,6 +155,77 @@ export type GetDisponibilidadSWRKey = [url: string, token: string, params: strin
 
 //#endregion filters
 
+//#region dashboard
+export type IndicadorDTO = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  valor: number;
+  link?: string;
+  opcionAsociada?: string;
+  filtroId?: number;
+};
+export type GetIndicadoresParams = { cuit?: number };
+export type GetIndicadoresSWRKey = [url: string, token: string, cuit: number | undefined];
+//#endregion dashboard
+
+//#region indicadores gestion
+export type IndicadorGestionDTO = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  filtroId: number;
+  tablaBase: string;
+  rolId: string;
+  cargoId?: number | null;
+  sectorId?: number | null;
+  estado: "Activo" | "Inactivo";
+  link?: string;
+  guid?: GUIDString;
+  createdDate?: ISODateString;
+  createdBy?: GUIDString;
+  lastModifiedDate?: ISODateString;
+  lastModifiedBy?: GUIDString;
+  deletedDate?: ISODateString;
+  deletedBy?: GUIDString;
+  deletedObs?: string;
+};
+
+export type IndicadorCreateCommand = {
+  nombre: string;
+  descripcion: string;
+  filtroId: number;
+  tablaBase: string;
+  rolId: string;
+  cargoId?: number | null;
+  sectorId?: number | null;
+  estado: "Activo" | "Inactivo";
+  link?: string;
+};
+
+export type IndicadorUpdateCommand = {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  filtroId: number;
+  tablaBase: string;
+  rolId: string;
+  cargoId?: number | null;
+  sectorId?: number | null;
+  estado: "Activo" | "Inactivo";
+  link?: string;
+};
+
+export type IndicadorDeleteCommand = {
+  id: number;
+  observaciones?: string;
+};
+
+export type GetIndicadoresGestionSWRKey = [url: string, token: string];
+export type IndicadorGestionSWRKey = [url: string, token: string];
+export type IndicadorGestionDeleteSWRKey = [url: string, token: string];
+//#endregion indicadores gestion
+
 //#endregion Types
 
 const tokenizable = token.configure();
@@ -270,6 +342,158 @@ export class QueriesAPIClass extends ExternalAPI {
   //#endregion getDisponibilidad
 
   //#endregion filters
+
+  //#region dashboard
+
+  //#region getIndicadores
+  readonly getIndicadoresURL = (params?: GetIndicadoresParams) =>
+    this.getURL({ path: "/api/Dashboard/Indicadores", search: params?.cuit != null ? { cuit: String(params.cuit) } : undefined }).toString();
+  getIndicadores = async (params?: GetIndicadoresParams) => tokenizable.get<IndicadorDTO[]>(
+    this.getIndicadoresURL(params)
+  ).then(({ data }) => data, (error) => reject<IndicadorDTO[]>(error));
+  swrGetIndicadores = Object.freeze({
+    key: (cuit?: number): GetIndicadoresSWRKey => [this.getIndicadoresURL({ cuit }), token.getToken(), cuit],
+    fetcher: (key: GetIndicadoresSWRKey) => this.getIndicadores({ cuit: key[2] }),
+  });
+  useGetIndicadores = (enabled: boolean = true) => {
+    const { data: session, status } = useSession();
+    const accessToken = (session as { accessToken?: string })?.accessToken;
+    const isAuthenticated = status === 'authenticated';
+    const user = session?.user as Record<string, unknown> | undefined;
+    const empresaCUITRaw = user?.empresaCUIT ?? user?.EmpresaCUIT ?? user?.empresaCuit;
+    const empresaCUIT = Number(empresaCUITRaw);
+    const cuit = empresaCUIT > 0 ? empresaCUIT : undefined;
+    
+    const swrKey = enabled && isAuthenticated && accessToken 
+      ? [this.getIndicadoresURL({ cuit }), accessToken, cuit] as GetIndicadoresSWRKey
+      : null;
+    
+    return useSWR<IndicadorDTO[], APIError>(
+      swrKey,
+      this.swrGetIndicadores.fetcher,
+      {
+        revalidateOnFocus: true,
+        revalidateOnReconnect: true,
+        revalidateOnMount: true,
+        refreshInterval: 0,
+      }
+    );
+  };
+  //#endregion getIndicadores
+
+  //#endregion dashboard
+
+  //#region indicadores gestion
+
+  //#region getIndicadoresGestion
+  readonly getIndicadoresGestionURL = this.getURL({ path: "/api/Indicadores" }).toString();
+  getIndicadoresGestion = async () => {
+    try {
+      const response = await tokenizable.get<Pagination<IndicadorGestionDTO>>(this.getIndicadoresGestionURL);
+      console.log("API Response Indicadores:", response.data);
+      // La API devuelve un objeto Pagination, extraer el array data
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching Indicadores:", error);
+      return reject<IndicadorGestionDTO[]>(error as AxiosError);
+    }
+  };
+  swrGetIndicadoresGestion = Object.freeze({
+    key: (): GetIndicadoresGestionSWRKey => [this.getIndicadoresGestionURL, token.getToken()],
+    fetcher: (key: GetIndicadoresGestionSWRKey) => this.getIndicadoresGestion(),
+  });
+  useGetIndicadoresGestion = () => {
+    // Usar useSession para obtener el token directamente y que se actualice reactivamente
+    const { data: session, status } = useSession();
+    const accessToken = (session as any)?.accessToken;
+    const isAuthenticated = status === 'authenticated';
+    
+    // Crear la key con el token de la sesión para que cambie cuando se autentica
+    const swrKey = isAuthenticated && accessToken 
+      ? [this.getIndicadoresGestionURL, accessToken] as GetIndicadoresGestionSWRKey
+      : null;
+    
+    return useSWR<IndicadorGestionDTO[], APIError>(
+      swrKey,
+      this.swrGetIndicadoresGestion.fetcher,
+      {
+        revalidateOnFocus: true,
+        revalidateOnReconnect: true,
+        revalidateOnMount: true,
+      }
+    );
+  };
+  //#endregion getIndicadoresGestion
+
+  //#region createIndicador
+  readonly createIndicadorURL = this.getURL({ path: "/api/Indicadores" }).toString();
+  createIndicador = async (indicador: IndicadorCreateCommand) => tokenizable.post<IndicadorGestionDTO>(
+    this.createIndicadorURL, indicador
+  ).then(({ data }) => data, (error) => reject<IndicadorGestionDTO>(error));
+  swrCreateIndicador: {
+    key: IndicadorGestionSWRKey,
+    fetcher: (key: IndicadorGestionSWRKey, options: { arg: IndicadorCreateCommand }) => Promise<IndicadorGestionDTO>,
+  } = Object.freeze({
+    key: [this.createIndicadorURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.createIndicador(arg),
+  });
+  useCreateIndicador = () => {
+    const { mutate } = this.useGetIndicadoresGestion();
+    return useSWRMutation<IndicadorGestionDTO, APIError, IndicadorGestionSWRKey, IndicadorCreateCommand>(
+      this.swrCreateIndicador.key,
+      this.swrCreateIndicador.fetcher,
+      { onSuccess: () => mutate() }
+    );
+  };
+  //#endregion createIndicador
+
+  //#region updateIndicador
+  readonly updateIndicadorURL = (id: number) => this.getURL({ path: `/api/Indicadores/${id}` }).toString();
+  updateIndicador = async (id: number, indicador: IndicadorUpdateCommand) => tokenizable.put<IndicadorGestionDTO>(
+    this.updateIndicadorURL(id), indicador
+  ).then(({ data }) => data, (error) => reject<IndicadorGestionDTO>(error));
+  swrUpdateIndicador = Object.freeze({
+    key: (id: number): IndicadorGestionSWRKey => [this.updateIndicadorURL(id), token.getToken()],
+    fetcher: (_key: IndicadorGestionSWRKey, { arg }: { arg: { id: number; data: IndicadorUpdateCommand } }) => 
+      this.updateIndicador(arg.id, arg.data),
+  });
+  useUpdateIndicador = () => {
+    const { mutate } = this.useGetIndicadoresGestion();
+    const baseKey: IndicadorGestionSWRKey = [this.updateIndicadorURL(0), token.getToken()];
+    return useSWRMutation<IndicadorGestionDTO, APIError, IndicadorGestionSWRKey, { id: number; data: IndicadorUpdateCommand }>(
+      baseKey,
+      async (_key: IndicadorGestionSWRKey, { arg }: { arg: { id: number; data: IndicadorUpdateCommand } }) => {
+        return this.updateIndicador(arg.id, arg.data);
+      },
+      { onSuccess: () => mutate() }
+    );
+  };
+  //#endregion updateIndicador
+
+  //#region deleteIndicador
+  readonly deleteIndicadorURL = (id: number) => this.getURL({ path: `/api/Indicadores/${id}` }).toString();
+  deleteIndicador = async (id: number, command: IndicadorDeleteCommand) => tokenizable.delete<IndicadorGestionDTO>(
+    this.deleteIndicadorURL(id), { data: command }
+  ).then(({ data }) => data, (error) => reject<IndicadorGestionDTO>(error));
+  swrDeleteIndicador = Object.freeze({
+    key: (id: number): IndicadorGestionDeleteSWRKey => [this.deleteIndicadorURL(id), token.getToken()],
+    fetcher: (_key: IndicadorGestionDeleteSWRKey, { arg }: { arg: IndicadorDeleteCommand }) => 
+      this.deleteIndicador(arg.id, arg),
+  });
+  useDeleteIndicador = () => {
+    const { mutate } = this.useGetIndicadoresGestion();
+    const baseKey: IndicadorGestionDeleteSWRKey = [this.deleteIndicadorURL(0), token.getToken()];
+    return useSWRMutation<IndicadorGestionDTO, APIError, IndicadorGestionDeleteSWRKey, IndicadorDeleteCommand>(
+      baseKey,
+      async (_key: IndicadorGestionDeleteSWRKey, { arg }: { arg: IndicadorDeleteCommand }) => {
+        return this.deleteIndicador(arg.id, arg);
+      },
+      { onSuccess: () => mutate() }
+    );
+  };
+  //#endregion deleteIndicador
+
+  //#endregion indicadores gestion
 }
 
 const QueriesAPI = Object.freeze(new QueriesAPIClass());

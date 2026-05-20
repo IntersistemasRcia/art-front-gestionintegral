@@ -1,0 +1,33 @@
+.container {
+  padding: 20px;
+}
+
+.topRow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.selectItem {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.selectItem :global(.MuiAutocomplete-root) {
+  width: 100%;
+  min-width: 0;
+}
+
+.tabLabel {
+  margin: 0 0 8px 0;
+  font-size: 1.7rem;
+}
+
+.notice {
+  display: block;
+  margin-top: 12px;
+  font-size: 2rem;
+  color: rgba(0, 0, 0, 0.6);
+}

@@ -12,9 +12,11 @@ import { SelectChangeEvent } from "@mui/material/Select";
 import styles from "../denuncias.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import ArtAPI from "@/data/artAPI";
+import { useAuth } from "@/data/AuthContext";
 import Formato from "@/utils/Formato";
 import {
   DenunciaFormData,
+  PrestadorResponse,
   RELACION_ACCIDENTADO,
   DatosInicialesProps,
 } from "../types/tDenuncias";
@@ -31,6 +33,40 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
   onSelectChange,
   onBlur,
 }) => {
+  const { hasTask } = useAuth();
+  const canEditRelacionAccidentado = hasTask("Denuncia_Formulario_RealizaDenuncias");
+
+  const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
+
+  const [prestadorLoading, setPrestadorLoading] = useState(false);
+  const lastPrestadorCuitRef = useRef<string>("");
+
+  // Generador de handlers para campos numéricos.
+  const numericChange = (
+    name: string,
+    options?: { format?: (digits: string) => string; formatWhenLen?: number; maxDigits?: number }
+  ) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    let digits = onlyDigits(e.target.value || "");
+    if (options?.maxDigits != null) {
+      digits = digits.slice(0, options.maxDigits);
+    }
+    const synthetic = { target: { name, value: digits } } as any;
+    onTextFieldChange(synthetic);
+    try {
+      if (
+        options?.format &&
+        options.formatWhenLen != null &&
+        digits.length === options.formatWhenLen &&
+        !isDisabled
+      ) {
+        const formatted = options.format(digits);
+        const syntheticEvent = { target: { name, value: formatted } } as any;
+        onTextFieldChange(syntheticEvent);
+      }
+    } catch (err) {
+      // Ignorar errores de formateo
+    }
+  };
 
 
   // CP que se usó para buscar localidades
@@ -79,6 +115,51 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
   const isValidating = isValidatingNombre || isValidatingCP;
 
   const telInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Formateo inicial de CUIT de Prestador Inicial si viene desde la base
+  const prestadorCuitInitialFormattedRef = useRef(false);
+  React.useEffect(() => {
+    if (prestadorCuitInitialFormattedRef.current) return;
+    const digits = onlyDigits(String(form.prestadorInicialCuit || ""));
+    if (digits.length === 11) {
+      try {
+        const formatted = Formato.CUIP(digits);
+        if (formatted && formatted !== String(form.prestadorInicialCuit || "")) {
+          const synthetic = { target: { name: "prestadorInicialCuit", value: formatted } } as any;
+          onTextFieldChange(synthetic);
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    prestadorCuitInitialFormattedRef.current = true;
+  }, [form.prestadorInicialCuit, onTextFieldChange]);
+
+  // Autocompleestador al ingresar 11 dígitos dtar Razón Social Pre CUIT
+  React.useEffect(() => {
+    const digits = onlyDigits(String(form.prestadorInicialCuit || ""));
+    if (isDisabled) return;
+    if (digits.length !== 11) return;
+    if (lastPrestadorCuitRef.current === digits) return;
+
+    const fetchPrestador = async () => {
+      try {
+        setPrestadorLoading(true);
+        const data: PrestadorResponse = await ArtAPI.getPrestador({ CUIT: Number(digits) });
+        if (!data) return;
+        const razonSocial = data.razonSocial ?? "";
+        const synthetic = { target: { name: "prestadorInicialRazonSocial", value: razonSocial } } as any;
+        onTextFieldChange(synthetic);
+        lastPrestadorCuitRef.current = digits;
+      } catch (_err) {
+        // Silenciar errores (no encontrado u otros)
+      } finally {
+        setPrestadorLoading(false);
+      }
+    };
+
+    fetchPrestador();
+  }, [form.prestadorInicialCuit, isDisabled, isEditing, onTextFieldChange]);
 
   // En edición: autocompletar provincia, CP y nombre de localidad
   React.useEffect(() => {
@@ -194,6 +275,31 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
     onTextFieldChange(synthetic);
   }, [isEditing, isDisabled, form.apellidoNombres, form.nombre, onTextFieldChange]);
 
+  // Si el tipo de denuncia es "Enfermedad Profesional", bloquear campos relacionados con "Accidente de Trabajo"
+  const bloquearPorEnfermedad = String(form.tipoDenuncia ?? "") === "Enfermedad";
+  const tituloAccidenteTrabajo = bloquearPorEnfermedad ? "Enfermedad Profesional" : "Accidente de Trabajo";
+
+  const tipoDenunciaKey = String(form.tipoDenuncia ?? "");
+  const tipoSiniestroOptions = React.useMemo(() => {
+    if (tipoDenunciaKey === "AccidenteTrabajo") {
+      return ["Accidente Trabajo", "Accidente In Itinere", "Reingreso"];
+    }
+    if (tipoDenunciaKey === "Enfermedad") {
+      return ["Enfermedad Profesional", "Reingreso"];
+    }
+    return [] as string[];
+  }, [tipoDenunciaKey]);
+
+  // Si cambia tipoDenuncia y el tipoSiniestro actual no aplica, limpiarlo
+  React.useEffect(() => {
+    const current = String(form.tipoSiniestro ?? "");
+    if (!current) return;
+    if (tipoSiniestroOptions.length === 0 || !tipoSiniestroOptions.includes(current)) {
+      const syntheticClear = { target: { name: "tipoSiniestro", value: "" } } as any;
+      onTextFieldChange(syntheticClear);
+    }
+  }, [tipoDenunciaKey, form.tipoSiniestro, tipoSiniestroOptions, onTextFieldChange]);
+
   return (
     <>
       {/* Contacto Inicial */}
@@ -232,14 +338,15 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
           />
           <FormControl
             fullWidth
-            required={!isDisabled}
+            required={false}
             error={touched.relacionAccidentado && !!errors.relacionAccidentado}
-            disabled={isDisabled}
+            disabled={isDisabled || !canEditRelacionAccidentado}
+            className={isDisabled || !canEditRelacionAccidentado ? styles.disabledOpacity : undefined}
           >
             <InputLabel>Relación c/accidentado</InputLabel>
             <Select
               name="relacionAccidentado"
-              value={form.relacionAccidentado}
+              value={canEditRelacionAccidentado ? form.relacionAccidentado : "EMPLEADOR"}
               label="Relación c/accidentado"
               onChange={onSelectChange}
               onBlur={() => onBlur("relacionAccidentado")}
@@ -300,18 +407,37 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             )}
           </FormControl>
 
-          <TextField
-            label="Tipo Siniestro"
-            name="tipoSiniestro"
-            value={form.tipoSiniestro}
-            onChange={onTextFieldChange}
-            onBlur={() => onBlur("tipoSiniestro")}
+          <FormControl
             fullWidth
-            disabled={isDisabled}
-            placeholder="Tipo de siniestro"
-          />
+            error={touched.tipoSiniestro && !!errors.tipoSiniestro}
+            disabled={isDisabled || !tipoDenunciaKey}
+          >
+            <InputLabel>Tipo Siniestro</InputLabel>
+            <Select
+              name="tipoSiniestro"
+              value={form.tipoSiniestro}
+              label="Tipo Siniestro"
+              onChange={onSelectChange}
+              onBlur={() => onBlur("tipoSiniestro")}
+            >
+              {tipoSiniestroOptions.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </Select>
+            {touched.tipoSiniestro && errors.tipoSiniestro && (
+              <Typography
+                variant="caption"
+                color="error"
+                className={styles.captionNote}
+              >
+                {errors.tipoSiniestro}
+              </Typography>
+            )}
+          </FormControl>
 
-          <FormControl fullWidth disabled={isDisabled}>
+          <FormControl fullWidth disabled={isDisabled || bloquearPorEnfermedad} className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}>
             <InputLabel>¿En Vía Pública?</InputLabel>
             <Select
               name="enViaPublica"
@@ -323,13 +449,27 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               <MenuItem value="No">No</MenuItem>
             </Select>
           </FormControl>
+          
+          <TextField
+            label="Fecha en la que se informa a la ART"
+            name="fechaInformacionArt"
+            type="date"
+            value={form.fechaInformacionArt}
+            onChange={onTextFieldChange}
+            onBlur={() => onBlur('fechaInformacionArt')}
+            error={touched.fechaInformacionArt && !!errors.fechaInformacionArt}
+            helperText={touched.fechaInformacionArt && errors.fechaInformacionArt}
+            fullWidth
+            disabled={isDisabled}
+            InputLabelProps={{ shrink: true }}
+          />
         </div>
       </div>
 
       {/* Accidente de Trabajo */}
       <div className={styles.formSection}>
         <Typography variant="h5" component="h2" className={styles.sectionTitle}>
-          Accidente de Trabajo
+          {tituloAccidenteTrabajo}
         </Typography>
 
         <div className={styles.formRow}>
@@ -343,8 +483,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             error={touched.fechaOcurrencia && !!errors.fechaOcurrencia}
             helperText={touched.fechaOcurrencia && errors.fechaOcurrencia}
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             InputLabelProps={{ shrink: true }}
           />
           <TextField
@@ -357,8 +499,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             error={touched.hora && !!errors.hora}
             helperText={touched.hora && errors.hora}
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             InputLabelProps={{ shrink: true }}
           />
         </div>
@@ -372,10 +516,11 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             onBlur={() => onBlur("calle")}
             error={touched.calle && !!errors.calle}
             helperText={touched.calle && errors.calle}
-            className={styles.halfField}
             fullWidth
-            required={!isDisabled}
+            required={!isDisabled && !bloquearPorEnfermedad}
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={`${styles.halfField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Nombre de la calle"
           />
           <div className={`${styles.halfField} ${styles.inlineGroup}`}>
@@ -386,6 +531,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               onChange={onTextFieldChange}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               placeholder="Número"
             />
             <TextField
@@ -395,6 +542,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               onChange={onTextFieldChange}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               placeholder="Piso"
             />
             <TextField
@@ -404,6 +553,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
               onChange={onTextFieldChange}
               fullWidth
               disabled={isDisabled}
+              InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               placeholder="Depto"
             />
           </div>
@@ -417,6 +568,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             onChange={onTextFieldChange}
             fullWidth
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             placeholder="Entre calle"
           />
           <TextField
@@ -426,6 +579,8 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             onChange={onTextFieldChange}
             fullWidth
             disabled={isDisabled}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
             placeholder="y calle"
           />
         </div>
@@ -454,9 +609,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             name="busqueda"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className={styles.smallField}
             fullWidth
-            disabled={isDisabled}
+            disabled={isDisabled || bloquearPorEnfermedad}
+            InputProps={{ readOnly: bloquearPorEnfermedad || undefined }}
+            className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Buscar..."
           />
 
@@ -467,13 +623,15 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             // icon={<span>🔍</span>}
             aria-label="buscar localidad"
             onClick={handleBuscarLocalidades}
+            disabled={bloquearPorEnfermedad || false}
           >
             <FaSearch />
           </CustomButton>
 
           <div className={styles.smallField}>
             <Autocomplete
-              disabled={isDisabled}
+              disabled={isDisabled || bloquearPorEnfermedad}
+              className={bloquearPorEnfermedad ? styles.disabledOpacity : undefined}
               options={localidadesOptions}
               getOptionLabel={(opt: any) => String(opt?.nombreCompleto ?? opt?.nombre ?? "")}
               isOptionEqualToValue={(opt: any, val: any) => String(opt?.codigo) === String(val?.codigo)}
@@ -519,10 +677,10 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             name="codPostal"
             value={form.codPostal}
             onChange={onTextFieldChange}
-            className={styles.smallField}
             fullWidth
-            disabled={isDisabled}
+            disabled={isDisabled || bloquearPorEnfermedad}
             InputProps={{ readOnly: true }}
+            className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
             placeholder="Código postal"
           />
 
@@ -532,11 +690,57 @@ const DatosIniciales: React.FC<DatosInicialesProps> = ({
             value={form.litProvincia}
             onChange={onTextFieldChange}
             onBlur={() => onBlur("litProvincia")}
-            className={styles.smallField}
+            fullWidth
+            disabled={isDisabled || bloquearPorEnfermedad}
+            InputProps={{ readOnly: true }}
+            className={`${styles.smallField} ${bloquearPorEnfermedad ? styles.disabledOpacity : ''}`}
+            placeholder="Provincia"
+          />
+        </div>
+      </div>
+
+      {/* Prestador Inicial */}
+      <div className={styles.formSection}>
+        <Typography variant="h6" className={styles.sectionTitle}>
+          Prestador Inicial
+        </Typography>
+
+        <div className={styles.formRow}>
+          <TextField
+            label="CUIT Prestador Inicial"
+            name="prestadorInicialCuit"
+            value={form.prestadorInicialCuit}
+            onChange={numericChange("prestadorInicialCuit", { format: (d) => Formato.CUIP(d), formatWhenLen: 11, maxDigits: 11 })}
+            inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+            onBlur={() => onBlur("prestadorInicialCuit")}
+            error={touched.prestadorInicialCuit && !!errors.prestadorInicialCuit}
+            helperText={
+              prestadorLoading
+                ? "Buscando prestador inicial..."
+                : touched.prestadorInicialCuit
+                ? errors.prestadorInicialCuit
+                : undefined
+            }
             fullWidth
             disabled={isDisabled}
+            placeholder="CUIT del prestador inicial"
+          />
+
+          <TextField
+            label="Razón Social Prestador"
+            name="prestadorInicialRazonSocial"
+            value={form.prestadorInicialRazonSocial}
+            onChange={onTextFieldChange}
+            onBlur={() => onBlur("prestadorInicialRazonSocial")}
             InputProps={{ readOnly: true }}
-            placeholder="Provincia"
+            error={touched.prestadorInicialRazonSocial && !!errors.prestadorInicialRazonSocial}
+            helperText={
+              touched.prestadorInicialRazonSocial &&
+              errors.prestadorInicialRazonSocial
+            }
+            fullWidth
+            disabled={isDisabled}
+            placeholder="Razón social del prestador"
           />
         </div>
       </div>

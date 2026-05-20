@@ -195,7 +195,9 @@ export function DataTable<TData extends object>({
     onRowSelectionChange: setRowSelection,
     onPaginationChange: setLocalPagination,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    ...(manualPagination
+      ? {}
+      : { getPaginationRowModel: getPaginationRowModel() }),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     enableRowSelection,
@@ -250,13 +252,17 @@ export function DataTable<TData extends object>({
                 {hg.headers.map(header => {
                   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
                   const alignClass = styles[`align-${meta?.align || "left"}`] || styles["align-left"];
+                  const widthStyle = meta?.width ? { width: typeof meta.width === 'number' ? `${meta.width}px` : meta.width } : {};
                   return (
                     <TableCell
                       key={header.id}
                       colSpan={header.colSpan}
                       className={`${styles.tableHeaderCell} ${headerPaddingClass} ${alignClass}`}
                       onClick={enableSorting && header.id !== "select" ? header.column.getToggleSortingHandler() : undefined}
-                      style={{ cursor: enableSorting && header.id !== "select" ? "pointer" : "default" }}
+                      style={{ 
+                        cursor: enableSorting && header.id !== "select" ? "pointer" : "default",
+                        ...widthStyle
+                      }}
                     >
                       <Box sx={{ display: "flex", alignItems: "center" }}>
                         {!header.isPlaceholder && flexRender(header.column.columnDef.header, header.getContext())}
@@ -295,8 +301,13 @@ export function DataTable<TData extends object>({
                     {row.getVisibleCells().map(cell => {
                       const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
                       const alignClass = styles[`align-${meta?.align || "left"}`] || styles["align-left"];
+                      const widthStyle = meta?.width ? { width: typeof meta.width === 'number' ? `${meta.width}px` : meta.width } : {};
                       return (
-                        <TableCell key={cell.id} className={`${styles.tableBodyCell} ${cellPaddingClass} ${alignClass} ${isSelected ? styles.selectedCell : ""}`}>
+                        <TableCell 
+                          key={cell.id} 
+                          className={`${styles.tableBodyCell} ${cellPaddingClass} ${alignClass} ${isSelected ? styles.selectedCell : ""}`}
+                          style={widthStyle}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       );

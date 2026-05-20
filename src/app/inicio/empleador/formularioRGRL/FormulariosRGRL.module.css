@@ -38,6 +38,14 @@
   font-weight: 600;
   text-transform: uppercase;
 }
+
+/* Centrar columnas: RESPUESTA (3) y FECHA DE REGULARIZACIÓN (4) */
+.detalleTable thead th:nth-child(3),
+.detalleTable thead th:nth-child(4),
+.detalleTable tbody td:nth-child(3),
+.detalleTable tbody td:nth-child(4) {
+  text-align: center;
+}
 .categoriaHeader {
   font-weight: 700;
   text-align: center;
@@ -107,9 +115,9 @@
 .iconActions {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: center;
-  width: 80%;
+  width: 100%;
 }
 
 .iconButton {
@@ -121,5 +129,44 @@
 
 .iconButton:hover {
   opacity: 0.85;
+}
+
+.iconDisabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: auto;
+}
+
+.iconDelete {
+  font-size: 24px;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.panelPlanillas {
+  margin-top: 10px;
+}
+
+.panelLoadingTab {
+  padding: 12px;
+  text-align: center;
+}
+
+.panelCondiciones {
+  margin-top: 18px;
+}
+
+.panelLoadingDetalle {
+  padding: 16px;
+  text-align: center;
+}
+
+.panelVacio {
+  padding: 12px;
+  text-align: center;
+  opacity: 0.7;
 }
 

@@ -6,6 +6,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import theme from '@/styles/theme';
 import React from 'react';
 import { AuthProvider } from '@/data/AuthContext'; // Importa tu AuthProvider
+import { SearchProvider } from '@/data/SearchContext';
 import EmotionCacheProvider from './EmotionCacheProvider';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       >
         <ThemeProvider theme={theme}>
           <AuthProvider>
-            {children}
+            <SearchProvider>
+              {children}
+            </SearchProvider>
           </AuthProvider>
         </ThemeProvider>
       </SessionProvider>

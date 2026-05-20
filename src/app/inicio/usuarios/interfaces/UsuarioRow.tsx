@@ -1,10 +1,14 @@
 import IModulo from "./IModulo";
 
 export default interface UsuarioRow {
-  id: number;
+  id: number | string;
   cuit: string;
   nombre: string;
   tipo: string;
+  sectorId?: number;
+  titulo?: string;
+  matricula?: string;
+  sectorDescripcion?: string;
   userName: string;
   email: string;
   estado: string;

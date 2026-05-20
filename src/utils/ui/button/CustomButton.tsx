@@ -12,7 +12,8 @@ interface CustomButtonProps extends Omit<ButtonProps, 'classes' | 'size' | 'full
   isLoading?: boolean;
   width?: string;
   icon?: React.ReactNode;
-  size?: 'small' | 'mid' | 'large'; 
+  size?: 'small' | 'mid' | 'large';
+  download?: any;
 }
 
 const CustomButton: React.FC<CustomButtonProps> = ({

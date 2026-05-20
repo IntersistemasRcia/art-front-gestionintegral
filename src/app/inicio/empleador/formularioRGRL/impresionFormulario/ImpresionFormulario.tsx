@@ -137,14 +137,6 @@ const ImpresionFormulario: React.FC<ImpresionProps> = (props) => {
           <Text style={[styles.cell, styles.cSus]}>Sustancia</Text>
           <Text style={[styles.cell, styles.cSiNo]}>Sí/No</Text>
         </View>
-
-        {planillaB.map((r, i) => (
-          <View key={i} style={styles.row}>
-            <Text style={[styles.cell, styles.cCod]}>{r.Codigo}</Text>
-            <Text style={[styles.cell, styles.cSus]}>{r.Sustancia}</Text>
-            <Text style={[styles.cell, styles.cSiNo]}>{r.SiNo}</Text>
-          </View>
-        ))}
       </View>
     </>
   );
@@ -259,7 +251,6 @@ const ImpresionFormulario: React.FC<ImpresionProps> = (props) => {
 
       <Page size="A4" style={styles.page} wrap>
         {!!planillaA.length && <TablaPlanillaA />}
-        {!!planillaB.length && <TablaPlanillaB />}
         {!!planillaC.length && <TablaPlanillaC />}
         {!!gremios.length && <TablaGremios />}
         {!!contratistas.length && <TablaContratistas />}

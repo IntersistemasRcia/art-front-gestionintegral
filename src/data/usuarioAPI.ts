@@ -6,6 +6,7 @@ import TokenConfigurator from "@/types/TokenConfigurator";
 import { toURLSearch } from "@/utils/utils";
 import IUsuarioDarDeBaja from "@/app/inicio/usuarios/interfaces/IUsuarioDarDeBajaReactivar";
 import CargoInterface from "@/app/inicio/usuarios/interfaces/CargoInterface";
+import RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface";
 
 //#region Types
 export interface Auditable {
@@ -23,6 +24,11 @@ export interface Auditable {
 export interface LoginCommand {
   usuario?: string;
   password?: string;
+}
+export interface LoginErrorResponse {
+  StatusCode?: number;
+  Mensaje?: string;
+  message?: string;
 }
 export interface TokenDTO {
   tokenId?: string;
@@ -66,6 +72,15 @@ export type Modulo = {
   tareas: Tarea[];
 };
 
+export type UsuarioEmpresaSesion = {
+  id: number;
+  usuarioId?: string;
+  empresaId: number;
+  empresaCUIT?: number;
+  empresaRazonSocial?: string;
+  fechaBaja?: string | null;
+};
+
 export interface UsuarioVm {
   id?: string;
   cuit: number;
@@ -89,6 +104,8 @@ export interface UsuarioVm {
   empresaId?: number;
   empresaCUIT: number;
   empresaRazonSocial: string;
+  /** Relación usuario–empresa en sesión (ids para filtros multi-empresa). */
+  empresas?: UsuarioEmpresaSesion[];
   modulos?: Modulo[]; //ToDo: verificar el tipo de arreglo
   exclusiones?: UsuarioExclusionVm[];
 }
@@ -100,17 +117,33 @@ export interface UsuarioGetAllParams {
   sort?: string;
   pageIndex?: number;
   pageSize?: number;
+  cuit?: string;
+  nombre?: string;
+  email?: string;
+  rol?: string;
+  estado?: string;
 }
 export interface UsuarioGetAllResult {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
   data: UsuarioRow[];
 }
 //#endregion /api/Usuario/GetAll types
-//#region /api/Roles types
-export interface RolesInterface {
-  id: string;
+
+export type UsuarioUpdatePayload = {
+  phoneNumber: string;
   nombre: string;
-  nombreNormalizado: string;
-}
+  titulo: string;
+  matricula: string;
+  sectorId: number;
+  cargoId: number;
+  password?: string;
+  confirmPassword?: string;
+  email: string;
+};
+//#region /api/Roles types
 //#endregion /api/Roles types
 //#region /api/Tablas types
 export interface Campo extends Auditable {
@@ -153,26 +186,51 @@ export const token = Object.seal(new TokenConfigurator());
 const tokenizable = token.configure();
 
 export class UsuarioAPIClass extends ExternalAPI {
-  readonly basePath =
-    process.env.NEXT_PUBLIC_API_SEGURIDAD_URL || "http://fallback-prod.url";
+  readonly basePath = (() => {
+    const url = process.env.NEXT_PUBLIC_API_AUTH_URL || "http://fallback-prod.url";
+    // Normalizar: remover trailing slash y /api si existe
+    const normalized = url.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    // Log para depuración (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[UsuarioAPI] basePath configurado:', normalized);
+      console.log('[UsuarioAPI] NEXT_PUBLIC_API_AUTH_URL:', process.env.NEXT_PUBLIC_API_AUTH_URL);
+    }
+    return normalized;
+  })();
   //#region login
-  readonly loginURL = () =>
-    this.getURL({ path: "/api/Usuario/Login" }).toString();
+  readonly loginURL = () => {
+    const url = this.getURL({ path: "/api/Usuario/Login" }).toString();
+    // Log para depuración (solo en desarrollo)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[UsuarioAPI] loginURL:', url);
+    }
+    return url;
+  };
   login = async (login: LoginCommand) =>
     axios.post<UsuarioVm>(this.loginURL(), login).then(
       ({ data }) => data,
       (error) => {
         if (axios.isAxiosError(error)) {
+          const responseData = error.response?.data as LoginErrorResponse | string | undefined;
+          const apiMessage =
+            typeof responseData === "string"
+              ? responseData
+              : responseData?.Mensaje || responseData?.message;
+
           console.error(
             "Authentication failed:",
             error.response?.data || error.message
           );
+
+          // Propaga el mensaje de la API (ej: "Confirmación Pendiente...")
+          throw new Error(apiMessage || "Credenciales inválidas");
         } else if (error instanceof Error) {
           console.error("An unexpected error occurred:", error.message);
+          throw error;
         } else {
           console.error("An unexpected error occurred:", error);
+          throw new Error("Error inesperado al iniciar sesión");
         }
-        return null;
       }
     );
   useLogin = (login: LoginCommand) =>
@@ -194,9 +252,10 @@ export class UsuarioAPIClass extends ExternalAPI {
           new AxiosError(`Error en la petición: ${response.data}`)
         );
       });
-  useGetAll = (params: UsuarioGetAllParams = {}) =>
-    useSWR([this.getAllURL(params), token.getToken()], () =>
-      this.getAll(params)
+  useGetAll = (params?: UsuarioGetAllParams | null) =>
+    useSWR(
+      params === null ? null : [this.getAllURL(params ?? {}), token.getToken()],
+      () => this.getAll(params ?? {})
     );
   //#endregion getAll
 
@@ -212,7 +271,10 @@ export class UsuarioAPIClass extends ExternalAPI {
         );
       });
   useGetRoles = (query: any = {}) =>
-    useSWR([this.getRolesURL(), token.getToken()], () => this.getRoles(query));
+    useSWR(
+      query === null ? null : [this.getRolesURL(), token.getToken()],
+      () => this.getRoles(query ?? {})
+    );
   //#endregion getRoles
 
   //#region registrar
@@ -232,14 +294,16 @@ export class UsuarioAPIClass extends ExternalAPI {
   //#region Update
   readonly updateURL = (usuarioId: string) =>
     this.getURL({ path: `/api/Usuario/${usuarioId}` }).toString();
-  update = async (usuarioId: string, data: any) =>
-    axios.put(this.updateURL(usuarioId), data).then(async (response) => {
-      if (response.status === 200) return response.data;
-      return Promise.reject(
-        new AxiosError(`Error en la petición: ${response.data}`)
-      );
-    });
-  useUsuarioUpdate = (usuarioId: string, data: any) =>
+  update = async (usuarioId: string, data: UsuarioUpdatePayload) =>
+    tokenizable
+      .put(this.updateURL(usuarioId), data)
+      .then(async (response) => {
+        if (response.status === 200) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
+  useUsuarioUpdate = (usuarioId: string, data: UsuarioUpdatePayload) =>
     useSWR([this.updateURL(usuarioId)], () => this.update(usuarioId, data));
   //#endregion Update
 
@@ -281,7 +345,15 @@ export class UsuarioAPIClass extends ExternalAPI {
     }).toString();
   tareasUpdate = async (
     usuarioId: string,
-    data: Array<{ moduloId: number; habilitado: boolean }>
+    data: Array<{
+      moduloId: number;
+      habilitado: boolean;
+      tareas: Array<{
+        tareaId: number;
+        moduloId: number;
+        habilitada: boolean;
+      }>;
+    }>
   ) =>
     tokenizable
       .put(
@@ -296,7 +368,15 @@ export class UsuarioAPIClass extends ExternalAPI {
       });
   useTareasUpdate = (
     usuarioId: string,
-    data: Array<{ moduloId: number; habilitado: boolean }>
+    data: Array<{
+      moduloId: number;
+      habilitado: boolean;
+      tareas: Array<{
+        tareaId: number;
+        moduloId: number;
+        habilitada: boolean;
+      }>;
+    }>
   ) =>
     useSWR(
       [this.tareasUpdateURL(usuarioId), token.getToken(), JSON.stringify(data)],
@@ -308,12 +388,14 @@ export class UsuarioAPIClass extends ExternalAPI {
   readonly darDeBajaURL = () =>
     this.getURL({ path: `/api/Usuario/DarDeBaja` }).toString();
   darDeBaja = async (data: IUsuarioDarDeBaja) =>
-    axios.put(this.darDeBajaURL(), data).then(async (response) => {
-      if (response.status === 200) return response.data;
-      return Promise.reject(
-        new AxiosError(`Error en la petición: ${response.data}`)
-      );
-    });
+    tokenizable
+      .put(this.darDeBajaURL(), data)
+      .then(async (response) => {
+        if (response.status === 200) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
   useUsuarioDarDeBaja = (data: IUsuarioDarDeBaja) =>
     useSWR([this.darDeBajaURL(), token.getToken()], () => this.darDeBaja(data));
   //#endregion DarDeBaja Usuario
@@ -322,12 +404,14 @@ export class UsuarioAPIClass extends ExternalAPI {
   readonly reactivarURL = () =>
     this.getURL({ path: `/api/Usuario/Reactivar` }).toString();
   reactivar = async (data: IUsuarioDarDeBaja) =>
-    axios.put(this.reactivarURL(), data).then(async (response) => {
-      if (response.status === 200) return response.data;
-      return Promise.reject(
-        new AxiosError(`Error en la petición: ${response.data}`)
-      );
-    });
+    tokenizable
+      .put(this.reactivarURL(), data)
+      .then(async (response) => {
+        if (response.status === 200) return response.data;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.data}`)
+        );
+      });
   useUsuarioReactivar = (data: IUsuarioDarDeBaja) =>
     useSWR([this.reactivarURL(), token.getToken()], () => this.reactivar(data));
   //#endregion Reactivar Usuario
@@ -335,7 +419,8 @@ export class UsuarioAPIClass extends ExternalAPI {
   //#region Cargos
 
   readonly getCargosUrl = (empresaId: number) =>
-    this.getURL({ path: `/api/Cargos/Empresa/${empresaId}` }).toString();
+    //this.getURL({ path: `/api/Cargos/Empresa/${empresaId}` }).toString();
+    this.getURL({ path: `/api/Cargos/Empresa` }).toString();
   getCargos = async (query: any = {}) =>
     tokenizable
       .get<CargoInterface[]>(this.getCargosUrl(query.empresaId), {
@@ -419,22 +504,6 @@ export class UsuarioAPIClass extends ExternalAPI {
     );
   //#endregion
 
-  //#region EnviarCorreo Cotización
-  readonly postEnviarCorreoURL = () =>
-    this.getURL({ path: '/Api/Usuario/EnviarCorreo' }).toString();
-
-  enviarCorreo = async (data: EnviarCorreoRequest) =>
-    axios
-      .post(this.postEnviarCorreoURL(), data, {
-        headers: { 'Content-Type': 'application/json' },
-      })
-      .then(async (response) => {
-        if (response.status === 200 || response.status === 201) return response.data;
-        return Promise.reject(
-          new AxiosError(`Error en la petición: ${response.data}`)
-        );
-      });
-  //#endregion
 
   //#region Confirmar Email
   readonly confirmarEmailURL = () =>

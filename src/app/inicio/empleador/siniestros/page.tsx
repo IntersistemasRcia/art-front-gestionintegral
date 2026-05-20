@@ -5,15 +5,25 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
 import gestionEmpleadorAPI from '@/data/gestionEmpleadorAPI';
-import { token } from '@/data/usuarioAPI';
 import type { Parameters } from '@/app/inicio/empleador/cobertura/types/persona';
 
 import DataTable from '@/utils/ui/table/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
-
+import { Box, Typography } from '@mui/material';
 
 import CondicionesTabla from './table';
 import type { SiniestroItem, InstanciaSiniestro } from './types/tipos';
+import { useEmpresasStore } from '@/data/empresasStore';
+import { Empresa } from '@/data/authAPI';
+import { useAuth } from '@/data/AuthContext';
+import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
+import CustomButton from '@/utils/ui/button/CustomButton';
+import Formato from '@/utils/Formato';
+import styles from './siniestros.module.css';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { EmpleadorSiniestrosContextProvider, useEmpleadorSiniestrosContext } from './context';
+import useSWR from 'swr';
+import QueriesAPI, { type Pagination, type FiltroVm } from '@/data/queryAPI';
 
 
 const fmtDateTime = (v?: string | null) => {
@@ -45,8 +55,10 @@ const cols: ColumnDef<SiniestroItem>[] = [
     header: 'Fecha y Hora Siniestro',
     accessorKey: 'siniestroFechaHora',
     cell: ({ getValue }) => fmtDateTime(getValue() as string | null),
+    meta: { align: 'center' },
   },
-  { header: 'Diagnóstico', accessorKey: 'diagnostico' },
+  { header: 'Diagnóstico', accessorKey: 'diagnostico', meta: { align: 'center' }, },
+  
   {
     header: 'Categoría',
     accessorKey: 'siniestroCategoria',
@@ -56,58 +68,171 @@ const cols: ColumnDef<SiniestroItem>[] = [
     header: 'Próx. Control Médico',
     accessorKey: 'proximoControlMedicoFechaHora',
     cell: ({ getValue }) => fmtDateTime(getValue() as string | null),
+    meta: { align: 'center' },
   },
   { header: 'Prestador inicial', accessorKey: 'prestador' },
   {
     header: 'Alta Médica',
     accessorKey: 'altaMedicaFecha',
     cell: ({ getValue }) => fmtDate(getValue() as string | null),
+    meta: { align: 'center' },
   },
 ];
 
+const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+const EMPRESA_TODAS_ID = -1;
+const EMPRESA_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_ID,
+  cuit: 0,
+  razonSocial: "Todas las Empresas",
+  domicilio: "",
+  localidad: "",
+  provincia: "",
+};
+
 
 export default function SiniestrosPage() {
+  const { user } = useAuth();
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const [selectedDenuncia, setSelectedDenuncia] = useState<number | null>(null);
+  const [selectedDenunciaCuit, setSelectedDenunciaCuit] = useState<number | undefined>(undefined);
 
+  const cuitQuery = searchParams.get('cuit') ?? searchParams.get('cuil') ?? '';
+  const cuitDesdeQuery = normalizeDigits(cuitQuery);
+  const bloquearBusquedaPorCuit = Boolean(cuitDesdeQuery);
+  const filtroIdParam = searchParams.get('filtroId');
+  const filtroNombreParam = searchParams.get('filtroNombre') ?? '';
 
-  const params: Parameters = {};
+  const filtersParams = filtroIdParam ? { id: Number(filtroIdParam) } : null;
+  const { data: filtersData } = useSWR<Pagination<FiltroVm>>(
+    filtersParams ? QueriesAPI.swrGetFilters.key(filtersParams) : null,
+    QueriesAPI.swrGetFilters.fetcher
+  );
+  const proposition = useMemo(() => {
+    const data = filtersData?.data;
+    if (!Array.isArray(data) || data.length === 0) return null;
+    return data[0]?.proposition ?? null;
+  }, [filtersData?.data]);
 
+  const cuitEmpresaSeleccionada = normalizeDigits((empresaSeleccionada as any)?.cuit);
+  const isAdmin = String(user?.rol ?? "").trim().toLowerCase() === "administrador";
+  const cuitEmpresasUsuario = useMemo(() => {
+    const desdeSesion = (user?.empresas ?? [])
+      .filter((e) => e?.fechaBaja == null)
+      .map((e) => Number(e.empresaCUIT))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    if (desdeSesion.length > 0) return Array.from(new Set(desdeSesion));
+    const desdeStore = empresas
+      .map((e) => Number((e as any)?.cuit))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    return Array.from(new Set(desdeStore));
+  }, [empresas, user?.empresas]);
+  const mostrarOpcionTodas = !bloquearBusquedaPorCuit && empresas.length > 1;
+  const opcionesEmpresaSelector = useMemo(
+    () => (mostrarOpcionTodas ? [EMPRESA_TODAS, ...empresas] : empresas),
+    [empresas, mostrarOpcionTodas]
+  );
+  const empresaSeleccionadaEsValida = useMemo(() => {
+    if (empresaSeleccionada == null) return false;
+    return opcionesEmpresaSelector.some(
+      (o) => o.empresaId === empresaSeleccionada.empresaId
+    );
+  }, [empresaSeleccionada, opcionesEmpresaSelector]);
+  const esOpcionTodasSeleccionada = empresaSeleccionada?.empresaId === EMPRESA_TODAS_ID;
+  const cuitFinalStr = cuitDesdeQuery || (esOpcionTodasSeleccionada ? "" : cuitEmpresaSeleccionada);
+  const cuitFinal = cuitFinalStr ? Number(cuitFinalStr) : undefined;
+  const cuitsContexto = useMemo<number[] | undefined>(() => {
+    if (cuitFinal) return [cuitFinal];
+    if (isAdmin) return undefined;
+    return cuitEmpresasUsuario.length > 0 ? cuitEmpresasUsuario : undefined;
+  }, [cuitFinal, isAdmin, cuitEmpresasUsuario]);
 
-  const { data, error, isLoading } =  gestionEmpleadorAPI.useGetVEmpleadorSiniestros(params);
+  // Si viene CUIT por query param, forzar selección por CUIT y bloquear el selector
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+    if (!cuitDesdeQuery) return;
+
+    const match = empresas.find((e) => normalizeDigits((e as any)?.cuit) === cuitDesdeQuery);
+    if (match) setEmpresaSeleccionada(match);
+  }, [cuitDesdeQuery, empresas, isLoadingEmpresas]);
+
+  // Por defecto: "Todas las empresas" si existe esa opción; si no, la única empresa del usuario.
+  useEffect(() => {
+    if (bloquearBusquedaPorCuit) return;
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 0) return;
+    if (empresaSeleccionadaEsValida) return;
+
+    if (mostrarOpcionTodas) setEmpresaSeleccionada(EMPRESA_TODAS);
+    else setEmpresaSeleccionada(empresas[0]);
+  }, [
+    bloquearBusquedaPorCuit,
+    isLoadingEmpresas,
+    empresas,
+    mostrarOpcionTodas,
+    empresaSeleccionadaEsValida,
+  ]);
+
+  // Limpiar la denuncia seleccionada cuando cambia el CUIT (empresa/forzado)
+  useEffect(() => {
+    setSelectedDenuncia(null);
+    setSelectedDenunciaCuit(undefined);
+  }, [cuitFinalStr]);
+
+  const handleEmpresaChange = (
+    _event: React.SyntheticEvent,
+    newValue: Empresa | null
+  ) => {
+    if (bloquearBusquedaPorCuit) return;
+    setEmpresaSeleccionada(newValue);
+  };
+
+  const getEmpresaLabel = (empresa: Empresa | null): string => {
+    if (!empresa) return "";
+    if (empresa.empresaId === EMPRESA_TODAS_ID) return "Todas las Empresas";
+    if (bloquearBusquedaPorCuit) return String((empresa as any)?.razonSocial ?? "");
+    return `${empresa.razonSocial} - ${Formato.CUIP(empresa.cuit)}`;
+  };
+
+  const handleLimpiarFiltro = () => {
+    const params = new URLSearchParams();
+    if (cuitQuery) params.set('cuit', cuitQuery);
+    router.replace(params.toString() ? `${pathname}?${params}` : pathname);
+  };
+
+  const tieneFiltroAplicado = Boolean(filtroIdParam && filtroNombreParam);
+
+  const cuitParaInstancias = cuitFinal ?? selectedDenunciaCuit;
+  const instanciasParams: Parameters = cuitParaInstancias ? { CUIT: cuitParaInstancias } : {};
+  if (selectedDenuncia != null && cuitParaInstancias) {
+    (instanciasParams as any).Denuncia = selectedDenuncia;
+  }
 
   const {
     data: instanciasData,
     isLoading: isLoadingInst,
     error: errorInst,
-  } = gestionEmpleadorAPI.useGetVEmpleadorSiniestrosInstancias(
-    selectedDenuncia != null ? ({ Denuncia: selectedDenuncia } as any) : ({} as any)
-  );
+  } = gestionEmpleadorAPI.useGetVEmpleadorSiniestrosInstancias(instanciasParams);
 
-  // Log con token enmascarado y URL (debug)
-  const url = useMemo(
-    () => gestionEmpleadorAPI.getVEmpleadorSiniestrosURL(params),
-    [params]
-  );
-  useEffect(() => {
-    const raw = token.getToken?.();
-    console.log("raw",raw)
-    const masked =
-      typeof raw === 'string'
-        ? `Bearer ${raw.slice(0, 6)}…${raw.slice(-6)}`
-        : '(objeto/token compuesto)';
-    console.log('[GET] VEmpleadorSiniestros →', { url, params, tokenPreview: masked });
-  }, [url, params]);
-
-  // Filas principales
-  const rows: SiniestroItem[] = useMemo(
-    () => (Array.isArray(data) ? data : []),
-    [data]
-  );
-
-  // Carga instancias de esa denuncia
+  // Carga instancias de esa denuncia (como antes: denunciaNro o siniestroNro para abrir el panel)
   const handleRowClick = (row: SiniestroItem) => {
-    const den = Number(row.denunciaNro ?? 0);
-    if (den) setSelectedDenuncia(den);
+    const den = Number(row.denunciaNro ?? 0) || Number(row.siniestroNro ?? 0);
+    const cuitFilaRaw =
+      (row as any)?.empCUIT ??
+      (row as any)?.empCuit ??
+      (row as any)?.CUIT ??
+      (row as any)?.Cuit ??
+      (row as any)?.cuit ??
+      0;
+    const cuitFila = Number(normalizeDigits(cuitFilaRaw));
+    if (den) {
+      setSelectedDenuncia(den);
+      setSelectedDenunciaCuit(Number.isFinite(cuitFila) && cuitFila > 0 ? cuitFila : undefined);
+    }
   };
 
   const instanciasRows: InstanciaSiniestro[] = useMemo(() => {
@@ -126,22 +251,41 @@ export default function SiniestrosPage() {
 
   return (
     <div style={{ padding: 16 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', marginBottom: 2 }}>
+        <Box className={styles.empresaSelectorContainer} sx={{ flexShrink: 0 }}>
+          <CustomSelectSearch<Empresa>
+            label="Seleccionar Empresa"
+            options={opcionesEmpresaSelector}
+            value={empresaSeleccionada}
+            onChange={handleEmpresaChange}
+            getOptionLabel={getEmpresaLabel}
+            isOptionEqualToValue={(option, value) => option.empresaId === value.empresaId}
+            loading={isLoadingEmpresas}
+            disabled={isLoadingEmpresas || opcionesEmpresaSelector.length === 0 || bloquearBusquedaPorCuit}
+          />
+        </Box>
+        {tieneFiltroAplicado && (
+          <>
+            <Typography variant="h5" sx={{ fontWeight: 500 }}>
+              Filtro aplicado: <strong>{decodeURIComponent(filtroNombreParam)}</strong>
+            </Typography>
+            <CustomButton variant="outlined" size="small" onClick={handleLimpiarFiltro}>
+              Limpiar Filtro
+            </CustomButton>
+          </>
+        )}
+      </Box>
 
-      {error && (
-        <p style={{ color: 'crimson' }}>
-          {String((error as any)?.message ?? error)}
-        </p>
-      )}
+      <EmpleadorSiniestrosContextProvider cuit={cuitFinal} cuits={cuitsContexto} isAdmin={isAdmin} proposition={proposition}>
+        <TablaSiniestrosPadre
+          cuitDesdeQuery={cuitDesdeQuery}
+          empresaSeleccionada={empresaSeleccionada}
+          setEmpresaSeleccionada={setEmpresaSeleccionada}
+          onRowClick={handleRowClick}
+        />
+      </EmpleadorSiniestrosContextProvider>
 
-      <DataTable<SiniestroItem>
-        data={rows}
-        columns={cols}
-        isLoading={isLoading}
-        size="mid"
-        onRowClick={handleRowClick}
-      />
-
-      {/* Panel inferior*/}
+      {/* Tabla hija (instancias): lógica original, sin cambios */}
       {selectedDenuncia != null && (
         <>
           {errorInst && (
@@ -149,7 +293,6 @@ export default function SiniestrosPage() {
               {String((errorInst as any)?.message ?? errorInst)}
             </p>
           )}
-
           <CondicionesTabla
             rows={instanciasRows}
             loading={isLoadingInst}
@@ -158,5 +301,46 @@ export default function SiniestrosPage() {
         </>
       )}
     </div>
+  );
+}
+
+type TablaSiniestrosPadreProps = {
+  cuitDesdeQuery: string;
+  empresaSeleccionada: Empresa | null;
+  setEmpresaSeleccionada: React.Dispatch<React.SetStateAction<Empresa | null>>;
+  onRowClick: (row: SiniestroItem) => void;
+};
+
+/** Solo la tabla padre de siniestros (fetch vía queryAPI/context). La tabla hija de instancias queda en la page. */
+function TablaSiniestrosPadre({
+  cuitDesdeQuery,
+  empresaSeleccionada,
+  setEmpresaSeleccionada,
+  onRowClick,
+}: TablaSiniestrosPadreProps) {
+  const { rows, isLoading, error, razonSocialFromQuery } = useEmpleadorSiniestrosContext();
+
+  useEffect(() => {
+    if (!cuitDesdeQuery) return;
+    if (empresaSeleccionada) return;
+    if (!razonSocialFromQuery) return;
+    setEmpresaSeleccionada({ razonSocial: razonSocialFromQuery } as Empresa);
+  }, [cuitDesdeQuery, empresaSeleccionada, razonSocialFromQuery, setEmpresaSeleccionada]);
+
+  return (
+    <>
+      {error && (
+        <p style={{ color: 'crimson' }}>
+          {String((error as any)?.message ?? error)}
+        </p>
+      )}
+      <DataTable<SiniestroItem>
+        data={rows}
+        columns={cols}
+        isLoading={isLoading}
+        size="mid"
+        onRowClick={onRowClick}
+      />
+    </>
   );
 }

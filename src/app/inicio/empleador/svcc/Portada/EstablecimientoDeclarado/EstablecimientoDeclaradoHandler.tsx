@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import { Data } from "@/utils/ui/table/Browse";
-import gestionEmpleadorAPI, {
-  EstablecimientoDeclaradoDTO, SVCCEstablecimientoDeclaradoUpdateParams, SVCCEstablecimientoDeclaradoDeleteParams
+import ArtAPI from "@/data/artAPI";
+import type {
+  EstablecimientoDeclaradoBaseDTO,
+  EstablecimientoDeclaradoCreateDTO,
+  EstablecimientoDeclaradoDTO,
+  SVCCEstablecimientoDeclaradoUpdateParams,
+  SVCCEstablecimientoDeclaradoDeleteParams,
 } from "@/data/gestionEmpleadorAPI";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
@@ -17,7 +22,7 @@ const {
   useSVCCEstablecimientoDeclaradoCreate,
   useSVCCEstablecimientoDeclaradoUpdate,
   useSVCCEstablecimientoDeclaradoDelete,
-} = gestionEmpleadorAPI;
+} = ArtAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<EstablecimientoDeclaradoDTO>, "onChange"> & {
@@ -26,11 +31,11 @@ type EditState = Omit<FormProps<EstablecimientoDeclaradoDTO>, "onChange"> & {
 };
 export default function EstablecimientoDeclaradoHandler() {
   const [edit, setEdit] = useState<EditState>({ data: {} });
-  const { ultima: { data: presentacion }, establecimientos } = useSVCCPresentacionContext();
-  const [{ index, size }, setPage] = useState({ index: 0, size: 100 });
+  const { presentacion: { selected: presentacion }, establecimientos } = useSVCCPresentacionContext();
+  const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<EstablecimientoDeclaradoDTO>>({ index, size, count: 0, pages: 0, data: [] });
   const { isLoading, isValidating, mutate } = useSVCCEstablecimientoDeclaradoList(
-    { page: `${index + 1},${size}` },
+    { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
@@ -135,7 +140,7 @@ export default function EstablecimientoDeclaradoHandler() {
   function handleEditOnConfirm() {
     switch (edit.action) {
       case "create": {
-        triggerCreate(edit.data as EstablecimientoDeclaradoDTO)
+        triggerCreate({ presentacionId: presentacion?.interno ?? 0, ...edit.data } as EstablecimientoDeclaradoCreateDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();
@@ -146,7 +151,7 @@ export default function EstablecimientoDeclaradoHandler() {
         break;
       }
       case "update": {
-        triggerUpdate(edit.data as EstablecimientoDeclaradoDTO)
+        triggerUpdate(edit.data as EstablecimientoDeclaradoBaseDTO)
           .then((data) => {
             console.info(data);
             handleEditOnClose();
