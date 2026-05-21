@@ -148,11 +148,12 @@ jobs:
           # Check if PM2 is available
           if (Get-Command pm2 -ErrorAction SilentlyContinue) {
             Write-Host "Stopping PM2 application: $appName"
-            pm2 stop $appName -s | Out-Null
+            pm2 stop $appName --silent 2>&1 | Out-Null
             Write-Host "Application stopped successfully"
           } else {
             Write-Host "PM2 not found, skipping stop"
           }
+          exit 0
 
       - name: Install production dependencies on deploy dir (Windows)
         shell: powershell
