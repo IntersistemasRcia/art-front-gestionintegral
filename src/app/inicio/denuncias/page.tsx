@@ -208,7 +208,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     siniestroTipo: formData.tipoDenuncia,
     empCuit: empCuitNum,
     empPoliza: Number(formData.empPoliza ?? 0),
-    empRazonSocial: String(formData.empRazonSocial ?? ''),
+    empRazonSocial: String(emp?.razonSocial ?? formData.empRazonSocial ?? ''),
     empCiiu: Number(onlyDigits((formData as any).empCiiu as any)) || 0,
     empDomicilioCalle: String(formData.empDomicilioCalle ?? ''),
     empDomicilioNro: String(formData.empDomicilioNro ?? ''),
@@ -237,8 +237,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     empOceMail: String((formData as any).establecimientoEmail ?? ''),
    // Datos del Establecimiento (empEst*)
     empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
-    // Usamos la razón social de la empresa como razón social del establecimiento
-    empEstRazonSocial: String(emp?.razonSocial ?? formData.empRazonSocial ?? ''),
+    empEstRazonSocial: String(formData.establecimientoNombre ?? ''),
     empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
     empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
     empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
@@ -389,7 +388,7 @@ const transformFormDataToPutRequest = async (
     ...base,
     descripcion: String(formData.descripcion || ''),
     empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
-    empEstRazonSocial: String((empresa as any)?.razonSocial ?? formData.empRazonSocial ?? ''),
+    empEstRazonSocial: String(formData.establecimientoNombre ?? ''),
     empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
     empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
     empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
@@ -995,6 +994,16 @@ function DenunciasPage() {
       accessorKey: 'nroPreDenuncia',
       header: 'Nro. Pre-Denuncia',
       size: 120
+    },
+    {
+      accessorKey: 'empleadorCUIT',
+      header: 'CUIT',
+      size: 140
+    },
+    {
+      accessorKey: 'empleadorRazonSocial',
+      header: 'Razon Social',
+      size: 200
     },
     {
       accessorKey: 'siniestroTipo',

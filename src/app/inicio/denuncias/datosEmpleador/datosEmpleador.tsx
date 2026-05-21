@@ -44,8 +44,8 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
     const cuit = val ? String((val as any)?.cuit ?? '') : '';
     const digits = cuit.replace(/\D/g, '');
     const formatted = digits.length === 11 ? Formato.CUIP(digits) : digits;
-    const synthetic = { target: { name: 'empCuit', value: formatted } } as any;
-    onTextFieldChange(synthetic);
+    onTextFieldChange({ target: { name: 'empCuit', value: formatted } } as any);
+    onTextFieldChange({ target: { name: 'empRazonSocial', value: val?.razonSocial ?? '' } } as any);
   };
 
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
