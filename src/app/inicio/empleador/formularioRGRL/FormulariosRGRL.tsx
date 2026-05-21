@@ -933,7 +933,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
                     <CustomButton
                       key={n}
                       onClick={() => { setActiveTab('none'); setDetallePage(n); }}
-                      color={activeTab === 'none' && n === detallePage ? 'secondary' : 'white'}
+                      color={activeTab === 'none' && n === detallePage ? 'secondary' : 'primary'}
                     >
                       {n}
                     </CustomButton>
@@ -953,7 +953,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
                   <CustomButton
                     key={t.key}
                     onClick={() => handleOpenTab(t.key as TabKey)}
-                    color={activeTab === (t.key as TabKey) ? 'secondary' : 'white'}
+                    color={activeTab === (t.key as TabKey) ? 'secondary' : 'primary'}
                     style={{ padding: '6px 12px' }}
                   >
                     {t.label}
