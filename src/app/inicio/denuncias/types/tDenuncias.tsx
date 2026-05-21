@@ -379,11 +379,11 @@ export type DenunciaGetAll = {
   conIniDomicilioYCalle?: string;
 };
 export type DenunciaQueryParams = {
-  Estado?: number | string;
-  Tipo?: number
-  PageIndex?: number;
-  PageSize?: number;
-  EmpCuit?: number;
+  empCuit?: number[];
+  estado?: string;
+  tipo?: number;
+  pageIndex?: number;
+  pageSize?: number;
   orderBy?: string;
 };
 
