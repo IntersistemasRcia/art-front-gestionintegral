@@ -79,7 +79,7 @@ export interface UsuarioFormFields {
   sectorId?: number;
 }
 
-const ROLES_EXCLUIDOS_USUARIOS = ["comercializador", "grupoorganizador", "organizadorcomercializador"];
+const ROLES_EXCLUIDOS_USUARIOS = ["comercializador", "grupoorganizador", "organizadorcomercializador", "administrador"];
 
 export interface Props {
   open: boolean;

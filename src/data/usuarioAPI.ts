@@ -142,6 +142,7 @@ export type UsuarioUpdatePayload = {
   password?: string;
   confirmPassword?: string;
   email: string;
+  rol: string;
 };
 //#region /api/Roles types
 //#endregion /api/Roles types
