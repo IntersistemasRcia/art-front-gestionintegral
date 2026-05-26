@@ -1469,20 +1469,16 @@ export class ArtAPIClass extends ExternalAPI {
 
 
   //#region Denuncias
-  readonly getDenunciasURL = (params: DenunciaQueryParams = {}) => {
+  readonly getDenunciasURL = () =>
     //params.CUIT ??= useAuth().user?.empresaCUIT ?? 0; este parametro lo paso desde el componente que lo usa
     // Ordenar por defecto: más nuevas primero (Interno descendente)
     //params.orderBy ??= "-Interno";
-    return this.getURL({
-      path: "/api/Denuncias",
-      search: toURLSearch(params),
-    }).toString();
-  };
+    this.getURL({ path: "/api/Denuncias/GetBySpecs" }).toString();
   getDenuncias = async (params: DenunciaQueryParams = {}) =>
-    tokenizable.get<DenunciasApiResponse>(this.getDenunciasURL(params)).then(({ data }) => data);
+    tokenizable.post<DenunciasApiResponse>(this.getDenunciasURL(), params).then(({ data }) => data);
   useGetDenuncias = (params: DenunciaQueryParams = {}) =>
     useSWR(
-      [this.getDenunciasURL(params), token.getToken()],
+      [this.getDenunciasURL(), JSON.stringify(params), token.getToken()],
       () => this.getDenuncias(params),
       {
         // No volver a revalidar al volver al foco, reconectar o al montar si ya hay cache

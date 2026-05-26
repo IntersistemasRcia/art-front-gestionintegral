@@ -208,7 +208,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     siniestroTipo: formData.tipoDenuncia,
     empCuit: empCuitNum,
     empPoliza: Number(formData.empPoliza ?? 0),
-    empRazonSocial: String(formData.empRazonSocial ?? ''),
+    empRazonSocial: String(emp?.razonSocial ?? formData.empRazonSocial ?? ''),
     empCiiu: Number(onlyDigits((formData as any).empCiiu as any)) || 0,
     empDomicilioCalle: String(formData.empDomicilioCalle ?? ''),
     empDomicilioNro: String(formData.empDomicilioNro ?? ''),
@@ -237,8 +237,7 @@ const buildBaseDenunciaPayload = (formData: DenunciaFormData, empresa?: any, emp
     empOceMail: String((formData as any).establecimientoEmail ?? ''),
    // Datos del Establecimiento (empEst*)
     empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
-    // Usamos la razón social de la empresa como razón social del establecimiento
-    empEstRazonSocial: String(emp?.razonSocial ?? formData.empRazonSocial ?? ''),
+    empEstRazonSocial: String(formData.establecimientoNombre ?? ''),
     empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
     empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
     empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
@@ -389,7 +388,7 @@ const transformFormDataToPutRequest = async (
     ...base,
     descripcion: String(formData.descripcion || ''),
     empEstCuit: Number(onlyDigits(formData.establecimientoCuit)),
-    empEstRazonSocial: String((empresa as any)?.razonSocial ?? formData.empRazonSocial ?? ''),
+    empEstRazonSocial: String(formData.establecimientoNombre ?? ''),
     empEstEstablecimiento: String(formData.establecimientoNombre ?? ''),
     empEstCiiu: Number(onlyDigits(formData.establecimientoCiiu)),
     empEstDomicilioCalle: String(formData.establecimientoCalle ?? ''),
@@ -541,6 +540,9 @@ function DenunciasPage() {
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
 
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const EMPRESA_TODAS_ID = -1;
+  const EMPRESA_OPCION_TODAS: Empresa = { empresaId: EMPRESA_TODAS_ID, cuit: 0, razonSocial: 'Todas las Empresas', domicilio: '', localidad: '', provincia: '' };
+  const opcionesEmpresaSelector = useMemo(() => [EMPRESA_OPCION_TODAS, ...empresas], [empresas]);
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
 
@@ -551,16 +553,28 @@ function DenunciasPage() {
   const [pageCount, setPageCount] = useState<number>(0);
   const hasLoadedOnce = useRef(false);
 
-  const empCuit: number | undefined = empresaSeleccionada
-    ? Number(String((empresaSeleccionada as any)?.cuit ?? '').replace(/\D/g, '')) || undefined
-    : undefined;
+  // CUITs para el filtro: admin + "Todas" → []; no-admin + "Todas" → todos los CUITs del store
+  const empCuits: number[] = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    if (empresaSeleccionada.empresaId === EMPRESA_TODAS_ID) {
+      if (isAdmin) return [];
+      return empresas
+        .map(e => Number(String(e.cuit ?? '').replace(/\D/g, '')))
+        .filter(c => String(c).length === 11);
+    }
+    const c = Number(String(empresaSeleccionada.cuit ?? '').replace(/\D/g, ''));
+    return String(c).length === 11 ? [c] : [];
+  }, [empresaSeleccionada, empresas, isAdmin]);
 
-  // Selección automática si hay una sola empresa
+  // Selección automática a "Todas las Empresas" cuando hay empresas disponibles
   useEffect(() => {
-    if (!isLoadingEmpresas && empresas.length === 1) {
-      setEmpresaSeleccionada(empresas[0]);
+    if (!isLoadingEmpresas && empresas.length >= 1) {
+      setEmpresaSeleccionada((prev) => {
+        if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+        return EMPRESA_OPCION_TODAS;
+      });
       seleccionAutomaticaRef.current = true;
-    } else if (!isLoadingEmpresas && empresas.length !== 1 && seleccionAutomaticaRef.current) {
+    } else if (!isLoadingEmpresas && empresas.length === 0 && seleccionAutomaticaRef.current) {
       setEmpresaSeleccionada(null);
       seleccionAutomaticaRef.current = false;
     }
@@ -600,23 +614,20 @@ function DenunciasPage() {
   // Build query parameters
   const queryParams: DenunciaQueryParams = useMemo(() => {
     const params: DenunciaQueryParams = {
-      Estado: estado,
-      PageIndex: pageIndex,
-      PageSize: pageSize,
+      estado,
+      pageIndex,
+      pageSize,
       orderBy: '-Interno',
-    } as DenunciaQueryParams;
-    // Aplicar EmpCuit solo cuando es un CUIT válido (11 dígitos)
-    if (typeof empCuit === 'number' && String(empCuit).length === 11) {
-      params.EmpCuit = empCuit;
-    }
+    };
+    params.empCuit = empCuits;
     try {
       if (hasTask && typeof hasTask === 'function') {
         const verPreDenuncia = hasTask('Denuncia_VerPreDenuncia');
         const verDenuncia = hasTask('Denuncia_VerDenuncia');
         if (verPreDenuncia && !verDenuncia) {
-          (params as any).Tipo = 1;
+          params.tipo = 1;
         } else if (verDenuncia && !verPreDenuncia) {
-          (params as any).Tipo = 2;
+          params.tipo = 2;
         }
         // ambas tareas → sin filtro Tipo (muestra denuncias y predenuncias)
       }
@@ -625,16 +636,14 @@ function DenunciasPage() {
     }
 
     return params;
-  }, [estado, pageIndex, pageSize, empCuit, hasTask]);
+  }, [estado, pageIndex, pageSize, empCuits, hasTask]);
 
   // API call using SWR
   const { data, error, isLoading, mutate: mutateDenuncias } = ArtAPI.useGetDenuncias(queryParams);
   // Empresa por CUIT (para mapear campos emp*)
   const empresaParams = useMemo(() => (
-    typeof empCuit === 'number' && String(empCuit).length === 11
-      ? { CUIT: empCuit }
-      : {}
-  ), [empCuit]);
+    empCuits.length === 1 ? { CUIT: empCuits[0] } : {}
+  ), [empCuits]);
   const { data: empresaByCuit } = ArtAPI.useGetEmpresaByCUIT(empresaParams);
 
   // Check if error is 404 (not found) - treat as empty result instead of error
@@ -906,7 +915,7 @@ function DenunciasPage() {
       }
 
       if (method === "create") {
-        const postData = await transformFormDataToPostRequest(data, empresaByCuit, empCuit, isFinal, canRealizaDenuncias);
+        const postData = await transformFormDataToPostRequest(data, empresaByCuit, empCuits[0], isFinal, canRealizaDenuncias);
         const created = await postDenuncia(postData);
         showModalMessage(
           isFinal
@@ -929,7 +938,7 @@ function DenunciasPage() {
           throw new Error("No se pudieron obtener los datos actuales de la denuncia para editar");
         }
 
-        const putData = await transformFormDataToPutRequest(data, denunciaByIdData, empresaByCuit, empCuit, isFinal);
+        const putData = await transformFormDataToPutRequest(data, denunciaByIdData, empresaByCuit, empCuits[0], isFinal);
 
         const ordered = buildOrderedPutPayload(putData);
         await putDenuncia({ id: selectedDenunciaId, data: ordered });
@@ -985,6 +994,16 @@ function DenunciasPage() {
       accessorKey: 'nroPreDenuncia',
       header: 'Nro. Pre-Denuncia',
       size: 120
+    },
+    {
+      accessorKey: 'empleadorCUIT',
+      header: 'CUIT',
+      size: 140
+    },
+    {
+      accessorKey: 'empleadorRazonSocial',
+      header: 'Razon Social',
+      size: 200
     },
     {
       accessorKey: 'siniestroTipo',
@@ -1081,14 +1100,15 @@ function DenunciasPage() {
       <div className={styles.filtersContainer}>
         <div className={styles.cuitGroup}>
           <CustomSelectSearch<Empresa>
-            options={empresas}
+            options={opcionesEmpresaSelector}
             getOptionLabel={(e) => {
+              if ((e as Empresa).empresaId === EMPRESA_TODAS_ID) return 'Todas las Empresas';
               const cuitFmt = Formato.CUIP((e as any)?.cuit);
               return `${cuitFmt} - ${(e as any)?.razonSocial ?? ''}`;
             }}
             value={empresaSeleccionada}
             onChange={(_ev, val) => {
-              setEmpresaSeleccionada(val as Empresa);
+              setEmpresaSeleccionada((val as Empresa) ?? EMPRESA_OPCION_TODAS);
               setPageIndex(1);
             }}
             label="Empresa"

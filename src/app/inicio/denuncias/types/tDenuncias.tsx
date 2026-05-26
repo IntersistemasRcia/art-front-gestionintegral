@@ -341,14 +341,14 @@ export const initialDenunciaFormData: DenunciaFormData = {
   establecimientoTelefono: '',
   establecimientoEmail: '',
   verificaContactoInicial: '',
-  estTrabEstaConsciente: 'Ignora',
-  estTrabColor: 'Ind.',
-  estTrabHabla: 'Ignora',
-  estTrabGravedad: 'Ignora',
-  estTrabRespira: 'Ignora',
+  estTrabEstaConsciente: '',
+  estTrabColor: '',
+  estTrabHabla: '',
+  estTrabGravedad: '',
+  estTrabRespira: '',
   estTrabObservaciones: '',
-  estTrabTieneHemorragia: 'Ignora',
-  estTrabContextoDenuncia: 'Ignora',
+  estTrabTieneHemorragia: '',
+  estTrabContextoDenuncia: '',
   estTrabPrestadorTraslado: '',
   trasladoTipo: '',
   // ROAM defaults
@@ -379,11 +379,11 @@ export type DenunciaGetAll = {
   conIniDomicilioYCalle?: string;
 };
 export type DenunciaQueryParams = {
-  Estado?: number | string;
-  Tipo?: number
-  PageIndex?: number;
-  PageSize?: number;
-  EmpCuit?: number;
+  empCuit?: number[];
+  estado?: string;
+  tipo?: number;
+  pageIndex?: number;
+  pageSize?: number;
   orderBy?: string;
 };
 
