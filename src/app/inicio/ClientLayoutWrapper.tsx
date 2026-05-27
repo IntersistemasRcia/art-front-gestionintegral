@@ -10,9 +10,6 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import styles from './ClientLayoutWrapper.module.css';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/data/AuthContext'; // Importa el hook de contexto
-import { useEmpresasLoader } from '@/data/useEmpresasLoader';
-import { useRolesLoader } from '@/data/useRolesLoader';
-import { useAccesosRapidosLoader } from '@/data/useAccesosRapidosLoader';
 import { useEmpresasStore } from '@/data/empresasStore';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 
@@ -64,11 +61,6 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   const [isEmptyEmpresasModalOpen, setIsEmptyEmpresasModalOpen] = useState(false);
   const { emptyEmpresasMessage, setEmptyEmpresasMessage } = useEmpresasStore();
   
-  // Cargar roles, empresas y accesos rápidos al autenticarse
-  useRolesLoader();
-  useAccesosRapidosLoader();
-  useEmpresasLoader();
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const pathname = usePathname();
   const pageTitle = formatTitleFromPath(pathname);

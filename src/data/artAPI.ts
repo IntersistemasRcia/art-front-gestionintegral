@@ -10,7 +10,7 @@ import { toURLSearch } from "@/utils/utils";
 import type { ApiFormularioRGRL, ApiEstablecimientoEmpresa, FormularioRGRLDeleteParams, FormularioRGRLDeleteResponse } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 import type { FormularioVm, TipoFormulario } from "@/app/inicio/empleador/formularioRGRL/generar/types/generar";
 import { ParametersLocalidad, ParametersLocalidadCodigo, ParametersLocalidadNombre, DenunciaQueryParams, DenunciasApiResponse, DenunciaPostRequest, DenunciaQueryParamsID, AfiQueryParams, AfiApiResponse, PrestadorQueryParams, PrestadorResponse, DenunciaPutRequest, DenunciaPatchRequest, RefPaises, RefObraSocial, Roam, ParametersEmpleadorT, RefPrestadores, ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
-import { ParametersPoliza, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador, ParametersComercializadoresAsociados } from "@/app/inicio/comercializador/polizas/types/poliza";
+import { ParametersPoliza, ParametersPolizaAcotada, ParametersComercializador, OrganizadorComercializador, GrupoOrganizadorComercializador, ParametersComercializadoresAsociados, SRTPolizaAcotada } from "@/app/inicio/comercializador/polizas/types/poliza";
 import { ComercializadorPostRequest, ComercializadorPostResponse, ComercializadorPutRequest, ComercializadorPutResponse, ComercializadorDeleteParams, ComercializadorDeleteResponse, ComercializadorOrganizadoresPostRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest, ComercializadorGOrganizadorById, ComercializadorById, ComercializadorOrganizadorById, SRTComercializadoresAsociadosPostRequest, SRTComercializadoresAsociadosPostResponse, SRTComercializadoresAsociadosPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios"
 import { ParametersEmpleadorPagosComercializador, ParametersComercializadorPeriodoPago, ParametersAfipTranferencia } from "@/app/inicio/comercializador/cuentaCorriente/types/cuentaCorriente";
 import { CoberturaPost, CoberturaPostResponse, ParametersCobertura } from "@/app/inicio/empleador/cobertura/types/cobertura";
@@ -1803,7 +1803,25 @@ export class ArtAPIClass extends ExternalAPI {
     }
   );
 
+  //#region Polizas Acotado Comercializador
+  readonly getPolizasAcotadoURL = (params: ParametersPolizaAcotada = {}) =>
+    this.getURL({ path: "/api/SRTPolizas/Acotado", search: toURLSearch(params) }).toString();
 
+  getPolizasAcotado = async (params: ParametersPolizaAcotada = {}) =>
+    tokenizable
+      .get<SRTPolizaAcotada[]>(this.getPolizasAcotadoURL(params))
+      .then(({ data }) => data);
+
+  useGetPolizasAcotadoURL = (params: ParametersPolizaAcotada | null = {}) =>
+    useSWR(
+      params === null ? null : [this.getPolizasAcotadoURL(params), token.getToken()],
+      () => this.getPolizasAcotado(params ?? {}),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion Polizas Acotado Comercializador
 
   //#region Comercializador
 
