@@ -29,7 +29,6 @@ import {
 } from "@/data/authAPI";
 import { useSearchParams } from "next/navigation";
 import Formato from "@/utils/Formato";
-import { useEmpresasLoader } from "@/data/useEmpresasLoader";
 import styles from "./Usuario.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
@@ -115,8 +114,6 @@ export default function UsuariosPage() {
     sectorId: undefined,
   };
 
-  // Cargar empresas y preparar selector
-  useEmpresasLoader();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);

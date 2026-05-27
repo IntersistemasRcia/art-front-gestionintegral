@@ -4,6 +4,9 @@
 import { createContext, useContext, ReactNode, useMemo } from 'react';
 import { Modulo, Usuario, Tarea } from '@/data/usuarioAPI'; // usa la Interface que declaro rodri
 import { useSession } from 'next-auth/react';
+import { useRolesLoader } from '@/data/useRolesLoader';
+import { useAccesosRapidosLoader } from '@/data/useAccesosRapidosLoader';
+import { useEmpresasLoader } from '@/data/useEmpresasLoader';
 
 interface AuthContextType {
     session: any;
@@ -13,6 +16,13 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const SessionBootstrap = () => {
+    useRolesLoader();
+    useAccesosRapidosLoader();
+    useEmpresasLoader();
+    return null;
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: session, status } = useSession();
@@ -53,7 +63,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         hasTask,
     }), [session, status, user]);
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    return (
+        <AuthContext.Provider value={value}>
+            <SessionBootstrap />
+            {children}
+        </AuthContext.Provider>
+    );
 };
 
 export const useAuth = () => {
