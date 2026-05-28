@@ -40,7 +40,9 @@ export type EmpresaParametroApiResponse = unknown;
 
 export type ParametersParamEntidadEmpresa = {
   Nombre?: string;
-  CUIT?: number | string;
+  CUIT?: number;
+  PageIndex: number;
+  PageSize: number;
 };
 
 

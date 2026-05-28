@@ -1,174 +1,114 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Alert, Box, IconButton, TextField, Tooltip, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
+import useSWR from "swr";
 import DataTable from "@/utils/ui/table/DataTable";
 import ArtAPI from "@/data/artAPI";
-import AuthAPI from "@/data/authAPI";
+import AuthAPI, { token } from "@/data/authAPI";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import Formato from "@/utils/Formato";
-import type { EmpresaRow, ParametroEntidad, EmpresaById, Props } from "./types/empresa";
+import type { ParametroEntidad } from "@/data/authAPI";
+import styles from "./Usuario.module.css";
+import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 
-export default function EmpresaTable({ data, isLoading }: Props) {
-	const { useGetRefEmpleadores, usePutEmpresaParametro } = ArtAPI;
-	const { useGetParametrosEntidadURL } = AuthAPI;
-	const {
-		data: refEmpleadores,
-		isLoading: isLoadingRef,
-		mutate: mutateRefEmpleadores,
-	} = useGetRefEmpleadores();
-	const {
-		data: parametrosEntidadData,
-		isLoading: isLoadingParametros,
-		mutate: mutateParametrosEntidad,
-	} = useGetParametrosEntidadURL({ parametroId: 1, PageIndex: 1, PageSize: 500 });
+const PAGE_SIZE = 10;
+
+type EmpresaFiltroOption = Pick<ParametroEntidad, "cuit" | "razonSocial" | "entidadId">;
+
+const OPCION_TODAS: EmpresaFiltroOption = { entidadId: -1, cuit: 0, razonSocial: "Todas las Empresas" };
+
+export default function EmpresaTable() {
+	const { usePutEmpresaParametro, useGetRefEmpleadores } = ArtAPI;
 	const { trigger: putEmpresaParametro, isMutating: isSaving } = usePutEmpresaParametro();
-	const parametrosEntidad = (parametrosEntidadData ?? []) as ParametroEntidad[];
+	const { data: refEmpleadores } = useGetRefEmpleadores();
+
+	const [pageIndex, setPageIndex] = useState(1);
+	const [empresaFiltro, setEmpresaFiltro] = useState<EmpresaFiltroOption>(OPCION_TODAS);
+
+	const paramsCombo = useMemo(() => ({ PageIndex: 1, PageSize: 500 }), []);
+	const { data: responseCombo } = useSWR(
+		[AuthAPI.getParamEntidadEmpresaURL(paramsCombo), token.getToken()],
+		() => AuthAPI.getParamEntidadEmpresa(paramsCombo),
+		{ revalidateOnFocus: false, revalidateOnReconnect: false }
+	);
+	const opcionesCombo: EmpresaFiltroOption[] = useMemo(
+		() => [OPCION_TODAS, ...((responseCombo as { data?: ParametroEntidad[] } | undefined)?.data ?? []).map(
+			({ cuit, razonSocial, entidadId }) => ({ cuit, razonSocial, entidadId })
+		)],
+		[responseCombo]
+	);
+
+	const params = { PageIndex: pageIndex, PageSize: PAGE_SIZE, ...(empresaFiltro.entidadId !== -1 ? { CUIT: empresaFiltro.cuit } : {}) };
+	const { data: response, isLoading, mutate } = useSWR(
+		[AuthAPI.getParamEntidadEmpresaURL(params), token.getToken(), pageIndex, empresaFiltro?.cuit],
+		() => AuthAPI.getParamEntidadEmpresa(params),
+		{ revalidateOnFocus: false, revalidateOnReconnect: false }
+	);
+
+	const tableData: ParametroEntidad[] = (response as { data?: ParametroEntidad[] } | undefined)?.data ?? [];
+	const pageCount: number = (response as { pages?: number } | undefined)?.pages ?? 1;
 
 	const [openModal, setOpenModal] = useState(false);
-	const [selectedEmpresaId, setSelectedEmpresaId] = useState<number | null>(null);
-	const [empresasById, setEmpresasById] = useState<Record<number, EmpresaById>>({});
-	const [isLoadingEmpresasById, setIsLoadingEmpresasById] = useState(true);
+	const [selectedItem, setSelectedItem] = useState<ParametroEntidad | null>(null);
 	const [cantidadUsuariosMaxima, setCantidadUsuariosMaxima] = useState<number>(0);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const [modalMsgOpen, setModalMsgOpen] = useState(false);
 	const [modalMsgText, setModalMsgText] = useState<string>("");
 	const [modalMsgType, setModalMsgType] = useState<MessageType>("info");
 
-	useEffect(() => {
-		let active = true;
-		const loadEmpresasById = async () => {
-			setIsLoadingEmpresasById(true);
-			const empresas = await Promise.all(
-				parametrosEntidad.map(async (parametro) => {
-					try {
-						return (await ArtAPI.getEmpresaById({ id: parametro.entidadId })) as EmpresaById;
-					} catch {
-						return null;
-					}
-				})
-			);
-			if (!active) return;
-			setEmpresasById(
-				empresas.filter((empresa): empresa is EmpresaById => empresa !== null).reduce<Record<number, EmpresaById>>((acc, empresa) => {
-					acc[empresa.interno] = empresa;
-					return acc;
-				}, {})
-			);
-			setIsLoadingEmpresasById(false);
-		};
-
-		if (parametrosEntidad.length > 0) {
-			loadEmpresasById();
-		} else {
-			setEmpresasById({});
-			setIsLoadingEmpresasById(false);
-		}
-
-		return () => {
-			active = false;
-		};
-	}, [parametrosEntidad]);
-
-	const tableData = useMemo<EmpresaRow[]>(() => {
-		if (data && data.length > 0) {
-			return data;
-		}
-		if (isLoadingEmpresasById) return [];
-		return parametrosEntidad.flatMap((parametro) => {
-			const empresa = empresasById[parametro.entidadId];
-			if (!empresa) return [];
-			return [{
-				interno: parametro.entidadId,
-				cuit: String(empresa.cuit),
-				nombreEmpresa: empresa.razonSocial,
-				parametro: parametro.parametroNombre,
-				action: "",
-			}];
-		});
-	}, [data, parametrosEntidad, empresasById, isLoadingEmpresasById]);
-
-	const selectedEmpresa = useMemo(() => {
-		if (!refEmpleadores || selectedEmpresaId == null) return null;
-		return refEmpleadores.find((e) => e.interno === selectedEmpresaId) ?? null;
-	}, [refEmpleadores, selectedEmpresaId]);
-
-	const selectedParametro = useMemo(() => {
-		if (selectedEmpresaId == null) return null;
-		return parametrosEntidad.find((p) => p.entidadId === selectedEmpresaId) ?? null;
-	}, [parametrosEntidad, selectedEmpresaId]);
-
-	useEffect(() => {
-		if (!openModal) return;
+	const handleOpenEdit = (row: ParametroEntidad) => {
+		setSelectedItem(row);
+		setCantidadUsuariosMaxima(Number(row.valor));
 		setSaveError(null);
-		// Revalidar al abrir para cumplir con “consulta a /api/Empresas”
-		mutateRefEmpleadores();
-	}, [openModal, mutateRefEmpleadores]);
-
-	useEffect(() => {
-		if (!openModal) return;
-		setCantidadUsuariosMaxima(Number(selectedParametro?.valor ?? 0));
-	}, [openModal, selectedParametro]);
-
-	const handleOpenEdit = (row: EmpresaRow) => {
-		setSelectedEmpresaId(row.interno ?? null);
 		setOpenModal(true);
 	};
 
 	const handleCloseModal = () => {
 		setOpenModal(false);
-		setSelectedEmpresaId(null);
+		setSelectedItem(null);
 		setSaveError(null);
 	};
 
 	const handleSave = async () => {
-		if (!selectedEmpresa || !selectedParametro) return;
-		const actuales = selectedEmpresa.cantidadUsuarios ?? 0;
+		if (!selectedItem) return;
+		const actuales = refEmpleadores?.find((e) => e.interno === selectedItem.entidadId)?.cantidadUsuarios ?? 0;
 		if (cantidadUsuariosMaxima < actuales) {
 			setModalMsgType("warning");
-			setModalMsgText(
-				"No se puede establecer una Cantidad Usuarios Máxima menor a la Cantidad Usuarios Actuales."
-			);
+			setModalMsgText("No se puede establecer una Cantidad Usuarios Máxima menor a la Cantidad Usuarios Actuales.");
 			setModalMsgOpen(true);
 			return;
 		}
 		setSaveError(null);
 		try {
 			await putEmpresaParametro({
-				id: selectedEmpresa.interno,
+				id: selectedItem.entidadId,
 				data: {
-					nombre: selectedParametro.parametroNombre,
+					nombre: selectedItem.parametroNombre,
 					valor: String(cantidadUsuariosMaxima),
 				},
 			});
-			await mutateRefEmpleadores();
-			await mutateParametrosEntidad();
+			await mutate();
 			handleCloseModal();
 		} catch (e: unknown) {
-			const errorMessage = e instanceof Error ? e.message : "No se pudo guardar el parámetro.";
-			setSaveError(errorMessage);
+			setSaveError(e instanceof Error ? e.message : "No se pudo guardar el parámetro.");
 		}
 	};
 
-	const columns = useMemo<ColumnDef<EmpresaRow>[]>(
+	const columns = useMemo<ColumnDef<ParametroEntidad>[]>(
 		() => [
 			{
 				accessorKey: "cuit",
 				header: "CUIT",
-				cell: ({ row }) => {
-					const raw = row.original.cuit ?? "";
-					const n = raw ? Number(raw) : NaN;
-					return Number.isFinite(n) ? Formato.CUIP(n) : raw;
-				},
+				cell: ({ getValue }) => Formato.CUIP(getValue<number>()),
 			},
-			{ accessorKey: "nombreEmpresa", header: "Nombre Empresa" },
-			{ accessorKey: "parametro", header: "Parametro" },
+			{ accessorKey: "razonSocial", header: "Razón Social" },
 			{
-				accessorKey: "accion",
+				id: "accion",
 				header: "Accion",
 				cell: ({ row }) => (
 					<Tooltip title="Editar" arrow>
@@ -189,10 +129,29 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 
 	return (
 		<>
+			<Box className={styles.empresaSelectorWrapper}>
+				<Box className={styles.empresaSelectorBox}>
+					<CustomSelectSearch<EmpresaFiltroOption>
+						options={opcionesCombo}
+						value={empresaFiltro}
+						onChange={(_e, val) => { setEmpresaFiltro(val ?? OPCION_TODAS); setPageIndex(1); }}
+						getOptionLabel={(o) => !o || o.entidadId === -1 ? (o?.razonSocial ?? "") : `${Formato.CUIP(o.cuit ?? 0)} - ${o.razonSocial ?? ""}`}
+						isOptionEqualToValue={(a, b) => a.entidadId === b.entidadId}
+						label="Filtrar por empresa"
+						placeholder="Buscar por razón social o CUIT..."
+						noOptionsText="No se encontraron empresas"
+					/>
+				</Box>
+			</Box>
 			<DataTable
 				data={tableData}
 				columns={columns}
-				isLoading={(isLoading ?? false) || isLoadingRef || isLoadingParametros || isLoadingEmpresasById}
+				isLoading={isLoading}
+				manualPagination
+				pageIndex={pageIndex}
+				pageSize={PAGE_SIZE}
+				pageCount={pageCount}
+				onPageChange={setPageIndex}
 			/>
 
 			<CustomModal
@@ -202,7 +161,7 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 				size="mid"
 				actions={
 					<Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-						<CustomButton onClick={handleSave} isLoading={isSaving} disabled={!selectedEmpresa || isSaving}>
+						<CustomButton onClick={handleSave} isLoading={isSaving} disabled={!selectedItem || isSaving}>
 							Guardar
 						</CustomButton>
 						<CustomButton onClick={handleCloseModal} color="secondary" disabled={isSaving}>
@@ -217,7 +176,7 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 					</Alert>
 				)}
 
-				{!selectedEmpresa ? (
+				{!selectedItem ? (
 					<Typography variant="body1">
 						No se encontró la empresa seleccionada.
 					</Typography>
@@ -228,19 +187,18 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 							type="number"
 							label="Cantidad Usuarios Máxima"
 							value={cantidadUsuariosMaxima}
-								onChange={(e) => {
-									const v = Number(e.target.value);
-									setCantidadUsuariosMaxima(Number.isFinite(v) ? v : 0);
-								}}
+							onChange={(e) => {
+								const v = Number(e.target.value);
+								setCantidadUsuariosMaxima(Number.isFinite(v) ? v : 0);
+							}}
 							disabled={isSaving}
-							inputProps={{ min: 0 }}
+							slotProps={{ htmlInput: { min: 0 } }}
 						/>
-
 						<TextField
 							fullWidth
 							type="number"
 							label="Cantidad Usuarios Actuales"
-							value={selectedEmpresa.cantidadUsuarios ?? 0}
+							value={refEmpleadores?.find((e) => e.interno === selectedItem.entidadId)?.cantidadUsuarios ?? 0}
 							disabled
 						/>
 					</Box>
