@@ -1032,19 +1032,18 @@ export default function UsuarioForm({
 
             </div>
             {isAdmin && (
-              <div className={styles.formRow}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={isAdminUser}
-                      onChange={handleIsAdminUserChange}
-                      disabled={isDisabled}
-                      color="primary"
-                    />
-                  }
-                  label="Es Administrador"
-                />
-              </div>
+              <FormControlLabel
+                className={styles.checkboxInline}
+                control={
+                  <Checkbox
+                    checked={isAdminUser}
+                    onChange={handleIsAdminUserChange}
+                    disabled={isDisabled}
+                    color="primary"
+                  />
+                }
+                label="Es Administrador"
+              />
             )}
 
             {/* Credenciales de Acceso (Ocultas en View y Deleted)*/}
