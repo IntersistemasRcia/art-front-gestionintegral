@@ -22,7 +22,12 @@ export const useAccesosRapidosLoader = () => {
 
   const shouldFetch = status === "authenticated" && !isLoaded;
   const { data, error, isLoading } = useGetParametrosEntidadURL(
-    shouldFetch ? {} : null
+    shouldFetch
+      ? {
+          PageIndex: 1,
+          PageSize: 1000,
+        }
+      : null
   );
 
   useEffect(() => {
