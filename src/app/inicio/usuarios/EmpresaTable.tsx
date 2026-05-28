@@ -25,7 +25,7 @@ export default function EmpresaTable({ data, isLoading }: Props) {
 		data: parametrosEntidadData,
 		isLoading: isLoadingParametros,
 		mutate: mutateParametrosEntidad,
-	} = useGetParametrosEntidadURL({ parametroId: 1 });
+	} = useGetParametrosEntidadURL({ parametroId: 1, PageIndex: 1, PageSize: 500 });
 	const { trigger: putEmpresaParametro, isMutating: isSaving } = usePutEmpresaParametro();
 	const parametrosEntidad = (parametrosEntidadData ?? []) as ParametroEntidad[];
 

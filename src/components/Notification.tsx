@@ -28,11 +28,15 @@ export default function Notification({ empresaCUIT }: Props) {
           setMissingList([]);
           return;
         }
-        const [ests, forms, poliza] = await Promise.all([
+        const [estsResult, formsResult, polizaResult] = await Promise.allSettled([
           ArtAPI.getEstablecimientosEmpresa(c, "true"),
           ArtAPI.getFormulariosRGRL({ CUIT: c }),
           gestionEmpleadorAPI.getPoliza({ CUIT: c }),
         ]);
+
+        const ests = estsResult.status === "fulfilled" ? estsResult.value : [];
+        const forms = formsResult.status === "fulfilled" ? formsResult.value : null;
+        const poliza = polizaResult.status === "fulfilled" ? polizaResult.value : null;
 
         // Helper mínimo para parsear fechas en ISO o en formato dd/MM/yyyy
         const parseDate = (raw: any): Date | null => {
