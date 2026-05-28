@@ -149,6 +149,16 @@ export function UsuarioEmpresasUsuarioTab({
         empresaId: Number(empresaAAgregar.empresaId),
         vigencia: "2099-12-31T00:00:00.000Z",
       });
+
+      const parametros = await AuthAPI.getParamEntidadEmpresa({ CUIT: empresaAAgregar.cuit });
+      if (Array.isArray(parametros) && parametros.length === 0) {
+        await AuthAPI.postParamEntidadEmpresaRAR({
+          entidadId: Number(empresaAAgregar.empresaId),
+          parametroId: 1,
+          parametroValor: "20",
+        });
+      }
+
       showModalMessage("Empresa agregada correctamente.", "success");
       setEmpresaAAgregar(null);
       await mutate();
@@ -161,7 +171,7 @@ export function UsuarioEmpresasUsuarioTab({
             err.message
           : err instanceof Error
             ? err.message
-            : "Error al agregar la empresa.";
+            : "Ocurrió un inconveniente al procesar la empresa. Por favor intente de nuevo.";
       showModalMessage(String(msg), "error");
     } finally {
       setIsMutating(false);
