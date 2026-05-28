@@ -359,17 +359,17 @@ export class AuthAPIClass extends ExternalAPI {
   //#endregion
 
   // Empresa parametroEntidad GET {parametros: CUIT, RazonSocial}
-  readonly getParamEntidadEmpresaURL = (params: ParametersParamEntidadEmpresa = {}) => {
+  readonly getParamEntidadEmpresaURL = (params: ParametersParamEntidadEmpresa) => {
     return this.getURL({
       path: "/api/ParametrosEntidades/Empresa",
       search: toURLSearch(params),
     }).toString();
   };
 
-  getParamEntidadEmpresa = async (params: ParametersParamEntidadEmpresa = {}) =>
+  getParamEntidadEmpresa = async (params: ParametersParamEntidadEmpresa) =>
     tokenizable.get(this.getParamEntidadEmpresaURL(params)).then(({ data }) => data);
 
-  useGetParamEntidadEmpresa = (params: ParametersParamEntidadEmpresa = {}) =>
+  useGetParamEntidadEmpresa = (params: ParametersParamEntidadEmpresa) =>
     useSWR(
       params && params.Nombre
         ? [this.getParamEntidadEmpresaURL(params), token.getToken()]
