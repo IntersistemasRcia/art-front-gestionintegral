@@ -568,17 +568,23 @@ function DenunciasPage() {
 
   // Selección automática a "Todas las Empresas" cuando hay empresas disponibles
   useEffect(() => {
-    if (!isLoadingEmpresas && empresas.length >= 1) {
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 1) {
+      setEmpresaSeleccionada(empresas[0]);
+      seleccionAutomaticaRef.current = true;
+      return;
+    }
+    if (empresas.length === 0) {
+      setEmpresaSeleccionada(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
       setEmpresaSeleccionada((prev) => {
         if (!seleccionAutomaticaRef.current && prev !== null) return prev;
         return EMPRESA_OPCION_TODAS;
       });
       seleccionAutomaticaRef.current = true;
-    } else if (!isLoadingEmpresas && empresas.length === 0 && seleccionAutomaticaRef.current) {
-      setEmpresaSeleccionada(null);
-      seleccionAutomaticaRef.current = false;
-    }
-  }, [empresas.length, isLoadingEmpresas]);
+  }, [empresas, isLoadingEmpresas]);
 
   // Hook para POST de denuncia
   const { trigger: postDenuncia, isMutating: isPostingDenuncia } = ArtAPI.usePostDenuncia();
@@ -638,8 +644,12 @@ function DenunciasPage() {
     return params;
   }, [estado, pageIndex, pageSize, empCuits, hasTask]);
 
+  const canFetch = empresaSeleccionada !== null;
+
   // API call using SWR
-  const { data, error, isLoading, mutate: mutateDenuncias } = ArtAPI.useGetDenuncias(queryParams);
+  const { data: rawData, error: rawError, isLoading, mutate: mutateDenuncias } = ArtAPI.useGetDenuncias(queryParams);
+  const data = canFetch ? rawData : undefined;
+  const error = canFetch ? rawError : undefined;
   // Empresa por CUIT (para mapear campos emp*)
   const empresaParams = useMemo(() => (
     empCuits.length === 1 ? { CUIT: empCuits[0] } : {}
@@ -1108,7 +1118,7 @@ function DenunciasPage() {
             }}
             value={empresaSeleccionada}
             onChange={(_ev, val) => {
-              setEmpresaSeleccionada((val as Empresa) ?? EMPRESA_OPCION_TODAS);
+              setEmpresaSeleccionada(val);
               setPageIndex(1);
             }}
             label="Empresa"
