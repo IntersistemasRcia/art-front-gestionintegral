@@ -151,7 +151,11 @@ const Poliza = () => {
   );
 
   // Cargar parámetros de entidad (entidadId = 0) para Datos de la Aseguradora
-  const { data: parametrosEntidadData } = AuthAPI.useGetParametrosEntidadURL({ entidadId: 0 });
+  const { data: parametrosEntidadData } = AuthAPI.useGetParametrosEntidadURL({
+    entidadId: 0,
+    PageIndex: 1,
+    PageSize: 100,
+  });
   const parametrosMap: Record<string, string> = (parametrosEntidadData ?? []).reduce(
     (acc: Record<string, string>, p: any) => {
       if (p?.parametroNombre) acc[p.parametroNombre] = String(p?.valor ?? "");

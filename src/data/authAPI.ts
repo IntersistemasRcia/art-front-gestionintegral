@@ -12,16 +12,46 @@ export interface EmpresasParams {
 export interface ParametersParamEntidad {
   entidadId?: number;
   parametroId?: number;
+  PageIndex?: number;
+  PageSize?: number;
 }
 
 export type ParametroEntidad = {
   id: number;
   entidadId: number;
+  cuit?: number;
+  razonSocial?: string;
   entidadTipo: string;
   parametroId: number;
   parametroNombre: string;
   valor: string;
 };
+
+export type ParametrosEntidadPagedResponse = {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
+  data: ParametroEntidad[];
+};
+
+export const PARAMETROS_ENTIDAD_DEFAULT_PAGE_INDEX = 1;
+export const PARAMETROS_ENTIDAD_DEFAULT_PAGE_SIZE = 500;
+
+export function normalizeParametrosEntidadResponse(
+  payload: ParametroEntidad[] | ParametrosEntidadPagedResponse | null | undefined
+): ParametroEntidad[] {
+  if (!payload) {
+    return [];
+  }
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return [];
+}
 
 export interface Empresa {
   empresaId: number;
@@ -279,10 +309,18 @@ export class AuthAPIClass extends ExternalAPI {
   readonly getParametrosEntidadURL = (params: ParametersParamEntidad = {}) => {
     return this.getURL({ path: "/api/ParametrosEntidades", search: toURLSearch(params) }).toString();
   };
-  getParametrosEntidad = async (params: ParametersParamEntidad = {}) =>
-    tokenizable
-      .get<ParametroEntidad[]>(this.getParametrosEntidadURL(params))
-      .then(({ data }) => data);
+  getParametrosEntidad = async (params: ParametersParamEntidad = {}) => {
+    const query: ParametersParamEntidad = {
+      PageIndex: params.PageIndex ?? PARAMETROS_ENTIDAD_DEFAULT_PAGE_INDEX,
+      PageSize: params.PageSize ?? PARAMETROS_ENTIDAD_DEFAULT_PAGE_SIZE,
+      ...params,
+    };
+    return tokenizable
+      .get<ParametroEntidad[] | ParametrosEntidadPagedResponse>(
+        this.getParametrosEntidadURL(query)
+      )
+      .then(({ data }) => normalizeParametrosEntidadResponse(data));
+  };
   useGetParametrosEntidadURL = (params: ParametersParamEntidad | null = {}) =>
     useSWR(
       params === null ? null : [this.getParametrosEntidadURL(params), token.getToken()],

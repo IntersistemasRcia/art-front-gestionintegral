@@ -13,7 +13,9 @@ const PARAMETROS_TASK = "Configuraciones_Parametros";
 export default function ParametrosPage() {
   const { hasTask } = useAuth();
   const canAccess = hasTask(PARAMETROS_TASK);
-  const { data, isLoading, error } = useGetParametrosEntidadURL(canAccess ? {} : null);
+  const { data, isLoading, error } = useGetParametrosEntidadURL(
+    canAccess ? { PageIndex: 1, PageSize: 500 } : null
+  );
 
   if (!canAccess) {
     return (
