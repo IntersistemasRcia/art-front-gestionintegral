@@ -150,8 +150,9 @@ export function UsuarioEmpresasUsuarioTab({
         vigencia: "2099-12-31T00:00:00.000Z",
       });
 
-      const parametros = await AuthAPI.getParamEntidadEmpresa({ CUIT: empresaAAgregar.cuit });
-      if (Array.isArray(parametros) && parametros.length === 0) {
+      const parametros = await AuthAPI.getParamEntidadEmpresa({ CUIT: empresaAAgregar.cuit, PageIndex: 1, PageSize: 1 });
+      const parametrosData = (parametros as { data?: unknown[] })?.data ?? (Array.isArray(parametros) ? parametros : []);
+      if (parametrosData.length === 0) {
         await AuthAPI.postParamEntidadEmpresaRAR({
           entidadId: Number(empresaAAgregar.empresaId),
           parametroId: 1,
