@@ -89,6 +89,7 @@ export default function UsuarioForm({
   const { user } = useAuth();
   const isOrganizadorComercializador = String((user as any)?.rol ?? "").toLowerCase() === 'organizadorcomercializador';
   const isGrupoOrganizador = String((user as any)?.rol ?? "").toLowerCase() === 'grupoorganizador';
+  const isAdministradorComercializador = String((user as any)?.rol ?? "").toLowerCase() === 'administradorcomercializador';
   const isAdministrador = isAdmin || String((user as any)?.rol ?? "").toLowerCase() === "administrador";
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
   const userCuitValid = Number.isFinite(userCuit) && userCuit > 0 ? userCuit : undefined;
@@ -116,13 +117,13 @@ export default function UsuarioForm({
   const organizadorSelfGrupoInterno = Number(organizadorSelf?.srtComercializadorGOrganizadorInterno ?? NaN);
 
   const { data: gOrgData } = useSWR(
-    isAdministrador
+    isAdministrador || isAdministradorComercializador
       ? ["SRTComercializadoresGOrganizadores", "ALL"]
       : isGrupoOrganizador && userCuitValid
         ? ["SRTComercializadoresGOrganizadores", userCuitValid]
         : null,
     () =>
-      isAdministrador
+      isAdministrador || isAdministradorComercializador
         ? ArtAPI.getGOrganizador({} as any)
         : ArtAPI.getGOrganizador({ CUIL: userCuitValid } as any),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
@@ -150,7 +151,7 @@ export default function UsuarioForm({
 
   const selectedGrupoInterno = selectedGrupoId ? Number(selectedGrupoId) : undefined;
 
-  const canFetchOrganizadores = !isOrganizadorComercializador && (isAdministrador || (isGrupoOrganizador && selectedGrupoInterno));
+  const canFetchOrganizadores = !isOrganizadorComercializador && (isAdministrador || isAdministradorComercializador || (isGrupoOrganizador && selectedGrupoInterno));
 
   const { data: organizadorData } = useSWR(
     canFetchOrganizadores
@@ -694,6 +695,16 @@ export default function UsuarioForm({
     </>
   );
 
+  const asociadosGrupoFijo = isGrupoOrganizador && grupoOptions.length
+    ? Number(grupoOptions[0].value)
+    : isOrganizadorComercializador && Number.isFinite(organizadorSelfGrupoInterno) && organizadorSelfGrupoInterno > 0
+      ? organizadorSelfGrupoInterno
+      : undefined;
+
+  const asociadosOrganizadorFijo = isOrganizadorComercializador && organizadorSelf
+    ? Number(organizadorSelf?.interno ?? organizadorSelf?.Interno ?? 0) || undefined
+    : undefined;
+
   const tabItems = [
     {
       label: "Datos del Comercializador",
@@ -703,7 +714,7 @@ export default function UsuarioForm({
     {
       label: "Asociados",
       value: 1,
-      content: <Asociados ref={asociadosRef} comercializadorInterno={Number(form.id ?? 0)} comercializadorNombre={String(form.nombre ?? "")} readOnly={isViewing} />,
+      content: <Asociados ref={asociadosRef} comercializadorInterno={Number(form.id ?? 0)} comercializadorNombre={String(form.nombre ?? "")} readOnly={isViewing} grupoInternoFijo={asociadosGrupoFijo} organizadorInternoFijo={asociadosOrganizadorFijo} />,
     },
   ];
 

@@ -51,11 +51,11 @@ function NombreAsociadoCell({ tipo, asociadoId }: NombreAsociadoCellProps) {
 }
 
 const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados(
-	{ comercializadorInterno, comercializadorNombre, readOnly = false },
+	{ comercializadorInterno, comercializadorNombre, readOnly = false, grupoInternoFijo, organizadorInternoFijo },
 	ref
 ) {
-	const [selectedGrupoId, setSelectedGrupoId] = useState<number | null>(null);
-	const [selectedOrganizacionId, setSelectedOrganizacionId] = useState<number | null>(null);
+	const [selectedGrupoId, setSelectedGrupoId] = useState<number | null>(grupoInternoFijo ?? null);
+	const [selectedOrganizacionId, setSelectedOrganizacionId] = useState<number | null>(organizadorInternoFijo ?? null);
 	const [tableRows, setTableRows] = useState<AsociadoRow[]>([]);
 	const [pendingBajaRow, setPendingBajaRow] = useState<AsociadoRow | null>(null);
 	const [showBajaSuccess, setShowBajaSuccess] = useState(false);
@@ -116,15 +116,17 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 	const grupoOptions = useMemo<SelectOption[]>(
 		() => asArray(gruposData as ApiGrupoItem[] | { DATA?: ApiGrupoItem[]; data?: ApiGrupoItem[] } | undefined)
 			.map(item => ({ value: Number(item.interno ?? 0), label: String(item.razonSocial ?? item.descripcion ?? "") }))
-			.filter(item => item.value > 0),
-		[gruposData]
+			.filter(item => item.value > 0)
+			.filter(item => !grupoInternoFijo || item.value === grupoInternoFijo),
+		[gruposData, grupoInternoFijo]
 	);
 
 	const organizacionOptions = useMemo<SelectOption[]>(
 		() => asArray(organizacionesData as ApiOrganizacionItem[] | { DATA?: ApiOrganizacionItem[]; data?: ApiOrganizacionItem[] } | undefined)
 			.map(item => ({ value: Number(item.interno ?? 0), label: String(item.razonSocial ?? item.observacion ?? item.observaciones ?? "") }))
-			.filter(item => item.value > 0),
-		[organizacionesData]
+			.filter(item => item.value > 0)
+			.filter(item => !organizadorInternoFijo || item.value === organizadorInternoFijo),
+		[organizacionesData, organizadorInternoFijo]
 	);
 
 	const editOrganizacionOptions = useMemo<SelectOption[]>(
@@ -166,11 +168,11 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 	const handleOpenEdit = (row: AsociadoRow) => {
 		setEditRow(row);
 		if (row.tipo === "Organizador") {
-			setEditOrganizacionId(row.asociadoId);
-			setEditGrupoId(null);
+			setEditOrganizacionId(organizadorInternoFijo ?? row.asociadoId);
+			setEditGrupoId(grupoInternoFijo ?? null);
 		} else {
 			setEditGrupoId(row.asociadoId);
-			setEditOrganizacionId(null);
+			setEditOrganizacionId(organizadorInternoFijo ?? null);
 		}
 	};
 
@@ -268,7 +270,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 					}}
 					renderInput={(params) => <TextField {...params} label="Grupo" />}
 					fullWidth
-					disabled={readOnly}
+					disabled={readOnly || !!grupoInternoFijo}
 				/>
 				<Autocomplete<SelectOption, false, false, false>
 					options={organizacionOptions}
@@ -278,7 +280,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 					onChange={(_event, newValue) => setSelectedOrganizacionId(newValue?.value ?? null)}
 					renderInput={(params) => <TextField {...params} label="Organización" />}
 					fullWidth
-					disabled={readOnly}
+					disabled={readOnly || !!organizadorInternoFijo}
 				/>
 			</Box>
 			<Box className={styles.asociadosActions}>
@@ -359,6 +361,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 						}}
 						renderInput={(params) => <TextField {...params} label="Grupo" />}
 						fullWidth
+						disabled={!!grupoInternoFijo}
 					/>
 					<Autocomplete<SelectOption, false, false, false>
 						options={editOrganizacionOptions}
@@ -368,6 +371,7 @@ const Asociados = forwardRef<AsociadosHandle, AsociadosProps>(function Asociados
 						onChange={(_event, newValue) => setEditOrganizacionId(newValue?.value ?? null)}
 						renderInput={(params) => <TextField {...params} label="Organización" />}
 						fullWidth
+						disabled={!!organizadorInternoFijo}
 					/>
 				</Box>
 			</CustomModal>

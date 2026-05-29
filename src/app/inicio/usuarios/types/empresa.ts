@@ -28,3 +28,24 @@ export interface Props {
 export type EmpresaParamsID = {
   id?: number;
 };
+
+
+export type EmpresaParametroPostRequest = {
+    entidadId: number;
+    parametroId: number;
+    parametroValor: string;
+};
+
+export type EmpresaParametroApiResponse = unknown;
+
+export type ParametersParamEntidadEmpresa = {
+  Nombre?: string;
+  CUIT?: number;
+  PageIndex: number;
+  PageSize: number;
+};
+
+
+export type EmpresaParametroPUTRequest = EmpresaParametroPostRequest;
+
+export type EmpresaParametroPUTResponse = unknown;

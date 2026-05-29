@@ -213,6 +213,10 @@
   color: #9aa0a6;
 }
 
+.checkboxInline {
+  width: fit-content;
+}
+
 .empresaSelectorWrapper {
   display: flex;
   align-items: center;

@@ -3,6 +3,8 @@ import useSWR from "swr";
 import { ExternalAPI } from "./api";
 import TokenConfigurator from "@/types/TokenConfigurator";
 import { toURLSearch } from "@/utils/utils";
+import { EmpresaParametroApiResponse, EmpresaParametroPostRequest, EmpresaParametroPUTRequest, EmpresaParametroPUTResponse, ParametersParamEntidadEmpresa } from "@/app/inicio/usuarios/types/empresa";
+import useSWRMutation from "swr/mutation";
 
 //#region Types
 export interface EmpresasParams {
@@ -305,7 +307,7 @@ export class AuthAPIClass extends ExternalAPI {
   //#endregion
 
 
-    //GET ParametrosEntidad
+  //GET ParametrosEntidad
   readonly getParametrosEntidadURL = (params: ParametersParamEntidad = {}) => {
     return this.getURL({ path: "/api/ParametrosEntidades", search: toURLSearch(params) }).toString();
   };
@@ -332,6 +334,81 @@ export class AuthAPIClass extends ExternalAPI {
     );
   //endregion
 
+
+  // ----- REGION EMPRESAS -----
+
+  // #region Empresa parametroEntidad POST
+  readonly postFormularioRARURL = this.getURL({ path: "/api/ParametrosEntidades" }).toString();
+
+  postParamEntidadEmpresaRAR = async (payload: EmpresaParametroPostRequest) =>
+    tokenizable.post<EmpresaParametroApiResponse>(this.postFormularioRARURL, payload).then(({ data }) => data);
+
+  swrPostFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: EmpresaParametroPostRequest }) => Promise<EmpresaParametroApiResponse>;
+  } = Object.freeze({
+    key: [this.postFormularioRARURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postParamEntidadEmpresaRAR(arg),
+  });
+
+  usePostFormularioRAR = () =>
+    useSWRMutation<EmpresaParametroApiResponse, Error, [url: string, token: string], EmpresaParametroPostRequest>(
+      this.swrPostFormularioRAR.key,
+      this.swrPostFormularioRAR.fetcher
+    );
+  //#endregion
+
+  // Empresa parametroEntidad GET {parametros: CUIT, RazonSocial}
+  readonly getParamEntidadEmpresaURL = (params: ParametersParamEntidadEmpresa) => {
+    return this.getURL({
+      path: "/api/ParametrosEntidades/Empresa",
+      search: toURLSearch(params),
+    }).toString();
+  };
+
+  getParamEntidadEmpresa = async (params: ParametersParamEntidadEmpresa) =>
+    tokenizable.get(this.getParamEntidadEmpresaURL(params)).then(({ data }) => data);
+
+  useGetParamEntidadEmpresa = (params: ParametersParamEntidadEmpresa) =>
+    useSWR(
+      params && params.Nombre
+        ? [this.getParamEntidadEmpresaURL(params), token.getToken()]
+        : null,
+      () => this.getParamEntidadEmpresa(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+
+
+
+  //Empresa parametroEntidad PUT
+  readonly putFormularioRARBaseURL = this.getURL({ path: "/api/ParametrosEntidades" }).toString();
+
+  readonly putParamEntidadEmpresaURL = (id: number | string) =>
+    this.getURL({ path: `/api/ParametrosEntidades/${id}` }).toString();
+
+  putParamEntidadEmpresaRAR = async (id: number | string, data: EmpresaParametroPUTRequest) =>
+    tokenizable.put<EmpresaParametroPUTResponse>(this.putParamEntidadEmpresaURL(id), data).then(({ data }) => data);
+
+  swrPutFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: EmpresaParametroPUTRequest } }) => Promise<EmpresaParametroPUTResponse>;
+  } = Object.freeze({
+    key: [this.putFormularioRARBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putParamEntidadEmpresaRAR(arg.id, arg.data),
+  });
+
+  usePutFormularioRAR = () =>
+    useSWRMutation<EmpresaParametroPUTResponse, Error, [url: string, token: string], { id: number | string; data: EmpresaParametroPUTRequest }>(
+      this.swrPutFormularioRAR.key,
+      this.swrPutFormularioRAR.fetcher
+    );
+  //#endregion
+
+
   //#region UsuariosEmpresas / UsuarioLogueado
   readonly postUsuariosEmpresasUsuarioLogueadoURL = () =>
     this.getURL({ path: "/api/UsuariosEmpresas/UsuarioLogueado" }).toString();
@@ -353,12 +430,12 @@ export class AuthAPIClass extends ExternalAPI {
     useSWR(
       body !== null
         ? [
-            this.postUsuariosEmpresasUsuarioLogueadoURL(),
-            token.getToken(),
-            JSON.stringify([...body.empresasId].sort((a, b) => a - b)),
-            String(body.pageIndex),
-            String(body.pageSize),
-          ]
+          this.postUsuariosEmpresasUsuarioLogueadoURL(),
+          token.getToken(),
+          JSON.stringify([...body.empresasId].sort((a, b) => a - b)),
+          String(body.pageIndex),
+          String(body.pageSize),
+        ]
         : null,
       () => this.postUsuariosEmpresasUsuarioLogueado(body!)
     );
