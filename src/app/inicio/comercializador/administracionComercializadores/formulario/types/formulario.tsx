@@ -86,6 +86,8 @@ export interface AsociadosProps {
   comercializadorInterno: number;
   comercializadorNombre: string;
   readOnly?: boolean;
+  grupoInternoFijo?: number;
+  organizadorInternoFijo?: number;
 }
 
 export interface NombreAsociadoCellProps {
