@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import { Data } from "@/utils/ui/table/Browse";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import type {
   EstablecimientoDeclaradoBaseDTO,
   EstablecimientoDeclaradoCreateDTO,
@@ -22,7 +22,7 @@ const {
   useSVCCEstablecimientoDeclaradoCreate,
   useSVCCEstablecimientoDeclaradoUpdate,
   useSVCCEstablecimientoDeclaradoDelete,
-} = ArtAPI;
+} = SvccAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<EstablecimientoDeclaradoDTO>, "onChange"> & {

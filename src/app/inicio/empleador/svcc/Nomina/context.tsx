@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
 import type { SustanciaDTO } from "@/data/gestionEmpleadorAPI";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import { AnexoVContextProvider } from "../AnexoV/context";
 import { useSVCCPresentacionContext } from "../context";
 
@@ -13,7 +13,7 @@ export type NominaContextType = {
   };
 }
 
-const { useSVCCSustanciaList } = ArtAPI;
+const { useSVCCSustanciaList } = SvccAPI;
 
 const NominaContext = createContext<NominaContextType | undefined>(undefined);
 

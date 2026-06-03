@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
 import type { EstablecimientoDeclaradoDTO } from "@/data/gestionEmpleadorAPI";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import { useSVCCPresentacionContext } from "../../context";
 
 type SustanciaContextType = {
@@ -14,7 +14,7 @@ type SustanciaContextType = {
 
 const SustanciaContext = createContext<SustanciaContextType | undefined>(undefined);
 
-const { useSVCCEstablecimientoDeclaradoList } = ArtAPI;
+const { useSVCCEstablecimientoDeclaradoList } = SvccAPI;
 
 export function useSustanciaContext() {
   const context = useContext(SustanciaContext);

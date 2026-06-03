@@ -7,7 +7,7 @@ import dayjs from "dayjs";
 import { toURLSearch } from "@/utils/utils";
 import { useAuth } from '@/data/AuthContext';
 import { AxiosError } from "axios";
-import type { SVCCTrabajadorReadSWRKey } from "./artAPI";
+import type { SVCCTrabajadorReadSWRKey } from "./svccAPI";
 
 const tokenizable = token.configure();
 
@@ -15,7 +15,7 @@ const getCurrentPeriodo = (): number => {
   return Number(dayjs().subtract(2, 'month').format('YYYYMM'));
 };
 
-/** Reexport solo de tipos SVCC definidos en artAPI (misma fuente que el fetching ART). */
+/** Reexport de tipos SVCC definidos en svccAPI. */
 export type {
   Pagination,
   PresentacionBaseDTO,
@@ -119,7 +119,8 @@ export type {
   SVCCTrabajadorDeleteParams,
   SVCCTrabajadorDeleteSWRKey,
   SVCCTrabajadorDeleteOptions,
-} from "./artAPI";
+  PresentacionUltimaDTO,
+} from "./svccAPI";
 
 //#region Types SRTSiniestralidadCIUO88
 export type SRTSiniestralidadCIUO88 = {

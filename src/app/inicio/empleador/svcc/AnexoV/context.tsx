@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext } from "react";
 import type { EmpresaTercerizadaDTO, EstablecimientoDeclaradoDTO } from "@/data/gestionEmpleadorAPI";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import { useSVCCPresentacionContext } from "../context";
 
 export type AnexoVContextType = {
@@ -21,7 +21,7 @@ export type AnexoVContextType = {
 const {
   useSVCCEmpresaTercerizadaList,
   useSVCCEstablecimientoDeclaradoList,
-} = ArtAPI;
+} = SvccAPI;
 
 const AnexoVContext = createContext<AnexoVContextType | undefined>(undefined);
 
