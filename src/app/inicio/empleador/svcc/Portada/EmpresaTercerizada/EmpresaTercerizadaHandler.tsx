@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Grid, Typography } from "@mui/material";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import type {
   EmpresaTercerizadaBaseDTO,
   EmpresaTercerizadaCreateDTO,
@@ -22,7 +22,7 @@ const {
   useSVCCEmpresaTercerizadaCreate,
   useSVCCEmpresaTercerizadaUpdate,
   useSVCCEmpresaTercerizadaDelete,
-} = ArtAPI;
+} = SvccAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<EmpresaTercerizadaDTO>, "onChange"> & {

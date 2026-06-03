@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import type {
   TrabajadorBaseDTO,
   TrabajadorCreateDTO,
@@ -22,7 +22,7 @@ const {
   useSVCCTrabajadorCreate,
   useSVCCTrabajadorUpdate,
   useSVCCTrabajadorDelete,
-} = ArtAPI;
+} = SvccAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<TrabajadorDTO>, "onChange"> & {
