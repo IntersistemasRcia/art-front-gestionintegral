@@ -2,7 +2,8 @@
 "use client";
 
 import { createContext, useContext, ReactNode, useMemo } from 'react';
-import { Modulo, Usuario, Tarea } from '@/data/usuarioAPI'; // usa la Interface que declaro rodri
+import { Usuario } from '@/data/usuarioAPI';
+import { userHasTask } from '@/utils/userTasksUtils';
 import { useSession } from 'next-auth/react';
 import { useRolesLoader } from '@/data/useRolesLoader';
 import { useAccesosRapidosLoader } from '@/data/useAccesosRapidosLoader';
@@ -32,28 +33,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Verificación de si el usuario está autenticado
     const isAuthenticated = status === 'authenticated';
-    const userModules: Modulo[] = (user?.modulos || []).filter(modulo => modulo?.habilitado);
-    const userTasks: Tarea[] = userModules
-        .flatMap(modulo => modulo?.tareas || [])
-        .filter(tarea => tarea?.habilitada);
-
-
-    const hasTask = (taskName: string): boolean => {
-            
-        if (isAuthenticated && user) {
-            const userRol = String(user.rol || '').trim().toLowerCase();
-            // Si tiene el rol "Administrador", siempre permite el acceso.
-            if (userRol === "administrador") {
-                return true;
-            }
-
-            // Si no es Administrador, verifica la tarea específica.
-            const normalizedTaskName = taskName.trim().toLowerCase();
-            return userTasks.some(tarea => (tarea?.tareaDescripcion || '').toLowerCase() === normalizedTaskName);
-        }
-
-        return false;
-    };
+    const hasTask = (taskName: string): boolean =>
+        isAuthenticated ? userHasTask(user, taskName) : false;
     
     // Usamos useMemo para optimizar el valor del contexto
     const value = useMemo(() => ({

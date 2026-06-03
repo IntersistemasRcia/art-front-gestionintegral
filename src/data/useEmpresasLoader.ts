@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import AuthAPI, { type Empresa } from "./authAPI";
+import type { Usuario } from "@/data/usuarioAPI";
 import ArtAPI from "./artAPI";
 import { useEmpresasStore } from "./empresasStore";
 import { fetchRolesForEmpresas } from "./useRolesLoader";
@@ -10,8 +11,10 @@ import type RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface
 import type { SRTPolizaAcotada } from "@/app/inicio/comercializador/polizas/types/poliza";
 import {
   ADMINISTRADOR_COMERCIALIZADOR_ROLE,
+  VER_TODAS_LAS_EMPRESAS_TASK,
   isAdministradorComercializadorOrChild,
   isAdministradorEmpleadorOrChild,
+  isAdministradorTodasEmpresasRole,
   isComercializadorEmpresasRole,
   isComercializadorEmpresasRoleFromSession,
   isComercializadorRole,
@@ -20,6 +23,7 @@ import {
   isOrganizadorComercializadorRole,
   needsRolesHierarchyForEmpresas,
 } from "@/utils/rolesUtils";
+import { userHasTask } from "@/utils/userTasksUtils";
 
 type SessionUser = {
   rol?: string;
@@ -66,11 +70,9 @@ export const useEmpresasLoader = () => {
       try {
         const sessionUser = (session?.user ?? {}) as SessionUser;
         const userRole = String(sessionUser.rol ?? "");
-        const isAdministrador = userRole.toLowerCase() === "administrador";
 
-        if (isAdministrador) {
-          const empresasRef = await ArtAPI.getRefEmpleadores();
-          setEmpresas(mapRefEmpleadoresToEmpresas(empresasRef ?? []));
+        if (isAdministradorTodasEmpresasRole(userRole)) {
+          setEmpresas(await loadAllEmpresasFromRef());
           hasLoadedRef.current = true;
           return;
         }
@@ -100,20 +102,30 @@ export const useEmpresasLoader = () => {
           return;
         }
 
-        const resolvedEmpresas = empresasAuth || [];
-        setEmpresas(resolvedEmpresas);
-        hasLoadedRef.current = true;
+        if (isAdministradorEmpleadorOrChild(userRole, roles)) {
+          const resolvedEmpresas = empresasAuth || [];
+          setEmpresas(resolvedEmpresas);
+          hasLoadedRef.current = true;
+          if (resolvedEmpresas.length === 0) {
+            const nombreUsuario =
+              String(sessionUser.userName ?? "").trim() || "sin nombre";
+            setEmptyEmpresasMessage(
+              `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
+            );
+          }
+          return;
+        }
 
         if (
-          resolvedEmpresas.length === 0 &&
-          isAdministradorEmpleadorOrChild(userRole, roles)
+          userHasTask(session?.user as Usuario | undefined, VER_TODAS_LAS_EMPRESAS_TASK)
         ) {
-          const nombreUsuario =
-            String(sessionUser.userName ?? "").trim() || "sin nombre";
-          setEmptyEmpresasMessage(
-            `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
-          );
+          setEmpresas(await loadAllEmpresasFromRef());
+          hasLoadedRef.current = true;
+          return;
         }
+
+        setEmpresas(empresasAuth || []);
+        hasLoadedRef.current = true;
       } catch (error) {
         console.error("Error al cargar empresas:", error);
         setError(
@@ -140,6 +152,11 @@ export const useEmpresasLoader = () => {
     clearEmpresas,
   ]);
 };
+
+async function loadAllEmpresasFromRef(): Promise<Empresa[]> {
+  const empresasRef = await ArtAPI.getRefEmpleadores();
+  return mapRefEmpleadoresToEmpresas(empresasRef ?? []);
+}
 
 function mapRefEmpleadoresToEmpresas(
   empresasRef: { interno: number; cuit: number; razonSocial?: string }[]

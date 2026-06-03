@@ -1,7 +1,10 @@
 import type RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface";
 
+export const ADMINISTRADOR_ROLE = "Administrador";
+export const ADMINISTRADOR_ART_ROLE = "AdministradorART";
 export const ADMINISTRADOR_EMPLEADOR_ROLE = "AdministradorEmpleador";
 export const ADMINISTRADOR_COMERCIALIZADOR_ROLE = "AdministradorComercializador";
+export const VER_TODAS_LAS_EMPRESAS_TASK = "VerTodasLasEmpresas";
 export const COMERCIALIZADOR_ROLE = "Comercializador";
 export const ORGANIZADOR_COMERCIALIZADOR_ROLE = "OrganizadorComercializador";
 export const GRUPO_ORGANIZADOR_ROLE = "GrupoOrganizador";
@@ -89,6 +92,21 @@ export function isExactRole(
   return normalizeRoleName(userRole) === normalizeRoleName(targetRoleName);
 }
 
+export function isAdministradorRole(userRole: string | undefined | null): boolean {
+  return isExactRole(userRole, ADMINISTRADOR_ROLE);
+}
+
+export function isAdministradorARTRole(userRole: string | undefined | null): boolean {
+  return isExactRole(userRole, ADMINISTRADOR_ART_ROLE);
+}
+
+/** Administrador o AdministradorART: cargan todas las empresas (ref empleadores). */
+export function isAdministradorTodasEmpresasRole(
+  userRole: string | undefined | null
+): boolean {
+  return isAdministradorRole(userRole) || isAdministradorARTRole(userRole);
+}
+
 /** Indica si el rol del usuario es AdministradorEmpleador o un rol hijo (directo o en cadena). */
 export function isAdministradorEmpleadorOrChild(
   userRole: string | undefined | null,
@@ -148,7 +166,7 @@ export function needsRolesHierarchyForEmpresas(
   if (!userRole?.trim()) {
     return true;
   }
-  if (normalizeRoleName(userRole) === "administrador") {
+  if (isAdministradorTodasEmpresasRole(userRole)) {
     return false;
   }
   if (isComercializadorEmpresasRoleFromSession(userRole)) {
