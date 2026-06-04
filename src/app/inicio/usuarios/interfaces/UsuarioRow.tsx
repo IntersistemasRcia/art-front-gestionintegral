@@ -1,4 +1,5 @@
 import IModulo from "./IModulo";
+import { type UsuarioEmpresasListadoEmpresaVm } from "@/data/authAPI";
 
 export default interface UsuarioRow {
   id: number | string;
@@ -20,5 +21,6 @@ export default interface UsuarioRow {
   empresaId: number;
   deletedDate: string | null;
   modulos: IModulo[];
+  empresas?: UsuarioEmpresasListadoEmpresaVm[];
   // Add other fields if needed
 }

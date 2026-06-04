@@ -237,7 +237,7 @@ export class AuthAPIClass extends ExternalAPI {
 
   deleteUsuariosEmpresasBorrar = async (id: number | string) =>
     tokenizable
-      .delete(this.deleteUsuariosEmpresasBorrarURL(id))
+      .patch(this.deleteUsuariosEmpresasBorrarURL(id), {})
       .then(async (response) => {
         if (response.status === 200 || response.status === 204) return;
         return Promise.reject(

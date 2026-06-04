@@ -97,6 +97,7 @@ export interface Props {
   /** Tras registrar usuario: forzar pestaña Empresas y al menos una relación antes de cerrar el modal. */
   awaitingEmpresaRelation?: boolean;
   onEmpresaRelationSatisfied?: () => void;
+  onEmpresaMutate?: () => Promise<void>;
 }
 
 const initialFormState: UsuarioFormFields = {
@@ -205,6 +206,7 @@ export default function UsuarioForm({
   isAdmin = false,
   awaitingEmpresaRelation = false,
   onEmpresaRelationSatisfied,
+  onEmpresaMutate,
 }: Props) {
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -1147,7 +1149,9 @@ export default function UsuarioForm({
                                 usuarioId={String(form.id ?? "")}
                                 cuitForm={form.cuit}
                                 puedeEditar={isEditing}
+                                empresasIniciales={usuarios.find((u) => String(u.id) === String(form.id))?.empresas}
                                 onEmpresasRelacionadasMetaChange={handleEmpresasRelacionadasMetaChange}
+                                onMutate={onEmpresaMutate}
                               />
                             </>
                           ),

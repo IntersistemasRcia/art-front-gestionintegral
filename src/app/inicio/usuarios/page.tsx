@@ -238,7 +238,8 @@ export default function UsuariosPage() {
     usuarioDarDeBaja,
     usuarioReactivar,
     usuarioReestablecer,
-    usuarioReenviarCorreo
+    usuarioReenviarCorreo,
+    mutateUsuarios,
   } = useUsuarios({
     porEmpresaIds: porEmpresaIdsListado,
     allowEmptyEmpresasPost: allowEmptyEmpresasPostUsuarios,
@@ -697,6 +698,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         isSubmitting={isSubmitting}
         awaitingEmpresaRelation={awaitingEmpresaAfterCreate}
         onEmpresaRelationSatisfied={handleEmpresaRelationSatisfied}
+        onEmpresaMutate={mutateUsuarios}
       />
 
       <Tareas

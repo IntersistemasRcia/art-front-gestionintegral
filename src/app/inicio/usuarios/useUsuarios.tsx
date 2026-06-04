@@ -53,6 +53,7 @@ function mapUsuarioEmpresasLogueadoItemToRow(
     empresaId: firstEmpresa?.empresaId ?? 0,
     deletedDate: u.deletedDate ?? null,
     modulos: (u.modulos ?? []) as UsuarioRow["modulos"],
+    empresas: u.empresas,
   };
 }
 
@@ -338,6 +339,7 @@ export default function useUsuarios(listFilter?: UseUsuariosListFilter) {
     usuarioDarDeBaja,
     usuarioReactivar,
     usuarioReestablecer,
-    usuarioReenviarCorreo
+    usuarioReenviarCorreo,
+    mutateUsuarios,
   };
 };
