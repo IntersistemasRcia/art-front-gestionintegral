@@ -5,22 +5,17 @@ import { useSession } from "next-auth/react";
 import AuthAPI, { type Empresa } from "./authAPI";
 import type { Usuario } from "@/data/usuarioAPI";
 import ArtAPI from "./artAPI";
+import SrtAPI from "./srtAPI";
 import { useEmpresasStore } from "./empresasStore";
 import { fetchRolesForEmpresas } from "./useRolesLoader";
 import type RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface";
 import type { SRTPolizaAcotada } from "@/app/inicio/comercializador/polizas/types/poliza";
 import {
-  ADMINISTRADOR_COMERCIALIZADOR_ROLE,
   VER_TODAS_LAS_EMPRESAS_TASK,
-  isAdministradorComercializadorOrChild,
   isAdministradorEmpleadorOrChild,
   isAdministradorTodasEmpresasRole,
   isComercializadorEmpresasRole,
   isComercializadorEmpresasRoleFromSession,
-  isComercializadorRole,
-  isExactRole,
-  isGrupoOrganizadorRole,
-  isOrganizadorComercializadorRole,
   needsRolesHierarchyForEmpresas,
 } from "@/utils/rolesUtils";
 import { userHasTask } from "@/utils/userTasksUtils";
@@ -77,13 +72,7 @@ export const useEmpresasLoader = () => {
           return;
         }
 
-        if (isComercializadorEmpresasRoleFromSession(userRole)) {
-          setEmpresas(
-            await loadEmpresasComercializador(userRole, sessionUser.cuit, [])
-          );
-          hasLoadedRef.current = true;
-          return;
-        }
+        const skipAuthEmpresas = isComercializadorEmpresasRoleFromSession(userRole);
 
         const rolesPromise = needsRolesHierarchyForEmpresas(userRole)
           ? fetchRolesForEmpresas()
@@ -91,13 +80,15 @@ export const useEmpresasLoader = () => {
 
         const [roles, empresasAuth] = await Promise.all([
           rolesPromise,
-          AuthAPI.getEmpresas(sessionUser.cuit ? { CUIT: sessionUser.cuit } : {}),
+          skipAuthEmpresas
+            ? Promise.resolve([] as Empresa[])
+            : AuthAPI.getEmpresas(
+                sessionUser.cuit ? { CUIT: sessionUser.cuit } : {}
+              ),
         ]);
 
         if (isComercializadorEmpresasRole(userRole, roles)) {
-          setEmpresas(
-            await loadEmpresasComercializador(userRole, sessionUser.cuit, roles)
-          );
+          setEmpresas(await loadEmpresasUsuarioLogueado());
           hasLoadedRef.current = true;
           return;
         }
@@ -171,16 +162,15 @@ function mapRefEmpleadoresToEmpresas(
   }));
 }
 
-function digits(value: unknown): string {
-  return String(value ?? "").replace(/\D/g, "");
-}
-
-function mapPolizasAcotadasToEmpresas(polizas: SRTPolizaAcotada[]): Empresa[] {
+function mapPolizasUsuarioLogueadoToEmpresas(
+  polizas: SRTPolizaAcotada[]
+): Empresa[] {
   const seen = new Set<string>();
   const empresas: Empresa[] = [];
 
   for (const poliza of polizas) {
-    const empresaId = Number(poliza.interno);
+    const empresaId =
+      Number(poliza.interno) || Number(poliza.refEmpleadorInterno);
     const cuit = Number(poliza.cuit);
     if (!empresaId || !cuit) {
       continue;
@@ -203,53 +193,8 @@ function mapPolizasAcotadasToEmpresas(polizas: SRTPolizaAcotada[]): Empresa[] {
   return empresas;
 }
 
-async function fetchEmpresasFromPolizasAcotado(
-  comercializadoresInternos?: number[]
-): Promise<Empresa[]> {
-  const valid = (comercializadoresInternos ?? []).filter(
-    (id) => Number.isFinite(id) && id > 0
-  );
-  const params =
-    valid.length > 0
-      ? { ComercializadoresInternos: valid.map(String).join(",") }
-      : {};
-
-  const polizas = await ArtAPI.getPolizasAcotado(params);
-  return mapPolizasAcotadasToEmpresas(polizas ?? []);
-}
-
-async function loadEmpresasComercializador(
-  userRole: string,
-  userCuit: number | undefined,
-  roles: RolesInterface[]
-): Promise<Empresa[]> {
-  if (
-    isExactRole(userRole, ADMINISTRADOR_COMERCIALIZADOR_ROLE) ||
-    isAdministradorComercializadorOrChild(userRole, roles)
-  ) {
-    return fetchEmpresasFromPolizasAcotado();
-  }
-
-  const cuil = Number(digits(userCuit));
-  if (!cuil) {
-    return [];
-  }
-
-  if (isComercializadorRole(userRole)) {
-    const comercializadores = await ArtAPI.getComercializador({ CUIL: cuil });
-    const internos = (comercializadores ?? [])
-      .map((item) => Number((item as { interno?: number }).interno))
-      .filter((id) => id > 0);
-    return fetchEmpresasFromPolizasAcotado(internos);
-  }
-
-  if (isOrganizadorComercializadorRole(userRole) || isGrupoOrganizadorRole(userRole)) {
-    const asociados = await ArtAPI.getComercializadoresAsociados({ CUIL: cuil });
-    const internos = (asociados ?? [])
-      .map((item) => Number(item.srtComercializadorInterno))
-      .filter((id) => id > 0);
-    return fetchEmpresasFromPolizasAcotado(internos);
-  }
-
-  return [];
+/** Roles comercializador (+ hijos): GET /api/SRTPolizas/UsuarioLogueado sin parámetros. */
+async function loadEmpresasUsuarioLogueado(): Promise<Empresa[]> {
+  const polizas = await SrtAPI.getPolizasUsuarioLogueado();
+  return mapPolizasUsuarioLogueadoToEmpresas(polizas ?? []);
 }

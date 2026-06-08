@@ -149,13 +149,37 @@ export function isComercializadorEmpresasRoleFromSession(
   );
 }
 
+export function isComercializadorOrChild(
+  userRole: string | undefined | null,
+  roles: RolesInterface[]
+): boolean {
+  return isRoleOrChild(userRole, roles, COMERCIALIZADOR_ROLE);
+}
+
+export function isOrganizadorComercializadorOrChild(
+  userRole: string | undefined | null,
+  roles: RolesInterface[]
+): boolean {
+  return isRoleOrChild(userRole, roles, ORGANIZADOR_COMERCIALIZADOR_ROLE);
+}
+
+export function isGrupoOrganizadorOrChild(
+  userRole: string | undefined | null,
+  roles: RolesInterface[]
+): boolean {
+  return isRoleOrChild(userRole, roles, GRUPO_ORGANIZADOR_ROLE);
+}
+
 export function isComercializadorEmpresasRole(
   userRole: string | undefined | null,
   roles: RolesInterface[]
 ): boolean {
   return (
     isComercializadorEmpresasRoleFromSession(userRole) ||
-    isAdministradorComercializadorOrChild(userRole, roles)
+    isAdministradorComercializadorOrChild(userRole, roles) ||
+    isComercializadorOrChild(userRole, roles) ||
+    isOrganizadorComercializadorOrChild(userRole, roles) ||
+    isGrupoOrganizadorOrChild(userRole, roles)
   );
 }
 
