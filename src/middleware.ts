@@ -24,6 +24,7 @@ const permissionMap: { [key: string]: string | null } = {
   "/inicio/informes/comisionesMedicas": "Informes_ComisionesMedicas",
   "/inicio/informes/siniestros": "Informes_Siniestros",
   "/inicio/informes/atencionAlPublico": "Informes_AtencionAlPublico",
+  "/inicio/pruebasLotesSRT/RGRL": "PruebasLotesSRT_RGRL",
   "/inicio/usuarios": "Usuarios",
 };
 

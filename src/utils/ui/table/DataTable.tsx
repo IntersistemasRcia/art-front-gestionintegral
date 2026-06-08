@@ -180,6 +180,7 @@ export function DataTable<TData extends object>({
   const table = useReactTable({
     data,
     columns: finalColumns,
+    getRowId: (row) => getRowKey(row),
     state: {
       sorting,
       columnFilters,

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { BsFillStarFill, BsLayoutSplit, BsBriefcaseFill, BsPersonFillGear, BsFolder, BsFillChatRightQuoteFill , BsHouseGear, BsCalendar2Plus, BsBarChartLineFill, BsList, BsChevronDown, BsChevronRight, BsFileText, BsCardChecklist, BsGraphUpArrow, BsClipboard2Data, BsCreditCard, BsGear } from 'react-icons/bs';
 import { MdGroups } from "react-icons/md";
 import { FaFileInvoiceDollar } from "react-icons/fa6";
+import { FaLayerGroup } from "react-icons/fa";
 import { IconType } from 'react-icons';
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Collapse, Typography } from '@mui/material';
 import styles from './Sidebar.module.css';
@@ -74,6 +75,14 @@ const menuItems: MenuItem[] = [
             { name: "Comisiones Médicas", icon: BsGraphUpArrow, link: "/inicio/informes/comisionesMedicas", permissionTask: "Informes_ComisionesMedicas" },
             { name: "Siniestros", icon: BsGraphUpArrow, link: "/inicio/informes/siniestros", permissionTask: "Informes_Siniestros" },
             { name: "Atención Al Público", icon: BsGraphUpArrow, link: "/inicio/informes/atencionAlPublico", permissionTask: "Informes_AtencionAlPublico" },
+    ],
+  },
+  {
+    name: "Pruebas Lotes SRT",
+    icon: FaLayerGroup,
+    permissionTask: "PruebasLotesSRT",
+    children: [
+      { name: "RGRL", icon: BsClipboard2Data, link: "/inicio/pruebasLotesSRT/RGRL", permissionTask: "PruebasLotesSRT_RGRL" },
     ],
   },
   {

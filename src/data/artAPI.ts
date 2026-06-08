@@ -74,6 +74,7 @@ export type ApiFormulariosRGRLParams = {
   pageIndex?: number;
   pageSize?: number;
   orderBy?: string;
+  soloCompletados?: boolean;
 };
 
 export type ApiFormulariosRGRLResponse = {
@@ -98,6 +99,7 @@ type GetFormulariosRGRLBySpecsBody = {
   pageIndex: number;
   pageSize: number;
   orderBy: string;
+  soloCompletados?: boolean;
 };
 
 /** Body POST `/api/VEmpleadorDDJJ` */
@@ -677,6 +679,7 @@ export class ArtAPIClass extends ExternalAPI {
       pageIndex: params.pageIndex ?? params.PageIndex ?? 0,
       pageSize: params.pageSize ?? params.PageSize ?? 10,
       orderBy: params.orderBy ?? params.OrderBy ?? "-creacionFechaHora",
+      soloCompletados: params.soloCompletados,
     };
     return tokenizable
       .post<ApiFormulariosRGRLResponse>(this.getFormulariosRGRLURL(), body)
