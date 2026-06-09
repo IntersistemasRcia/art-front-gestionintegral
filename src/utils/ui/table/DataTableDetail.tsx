@@ -6,24 +6,37 @@ import { FirstPage, KeyboardArrowLeft, KeyboardArrowRight, LastPage } from '@mui
 import styles from './DataTableDetail.module.css';
 import { DataTableDetailProps } from './types';
 
-function DataTableDetail<T>({ columns, rows, rowKey, pageSize = 10, title, groupBy, groupOrder }: DataTableDetailProps<T>) {
+function DataTableDetail<T>({ columns, rows, rowKey, pageSize = 10, title, groupBy, groupOrder, onRowClick, manualPagination, pageCount: pageCountProp, onPageChange }: DataTableDetailProps<T>) {
   const [pageIndex, setPageIndex] = useState(0);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const pageRows = rows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+  const pageCount = manualPagination ? (pageCountProp ?? 1) : Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageRows = manualPagination ? rows : rows.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
   const canPrev = pageIndex > 0;
   const canNext = pageIndex < pageCount - 1;
 
+  const handlePageChange = (next: number) => {
+    setPageIndex(next);
+    if (manualPagination) onPageChange?.(next + 1);
+  };
+
   const renderRows = () => {
     if (!groupBy) {
-      return pageRows.map((row, i) => (
-        <tr key={rowKey(row, pageIndex * pageSize + i)}>
+      return pageRows.map((row, i) => {
+        const key = rowKey(row, pageIndex * pageSize + i);
+        return (
+          <tr
+            key={key}
+            onClick={onRowClick ? () => { setSelectedKey(key); onRowClick(row); } : undefined}
+            className={`${i % 2 === 0 ? styles.rowOdd : styles.rowEven}${onRowClick ? ` ${styles.rowClickable}` : ""}${selectedKey === key ? ` ${styles.rowSelected}` : ""}`}
+          >
           {columns.map((col, j) => (
             <td key={j} style={col.align ? { textAlign: col.align } : undefined}>{col.render(row)}</td>
           ))}
         </tr>
-      ));
+      );
+      });
     }
 
     const groups: Record<string, T[]> = {};
@@ -75,16 +88,16 @@ function DataTableDetail<T>({ columns, rows, rowKey, pageSize = 10, title, group
 
       <Box className={styles.paginationContainer}>
         <Box className={styles.paginationIcons}>
-          <IconButton onClick={() => setPageIndex(0)} disabled={!canPrev}>
+          <IconButton onClick={() => handlePageChange(0)} disabled={!canPrev}>
             <FirstPage />
           </IconButton>
-          <IconButton onClick={() => setPageIndex(p => p - 1)} disabled={!canPrev}>
+          <IconButton onClick={() => handlePageChange(pageIndex - 1)} disabled={!canPrev}>
             <KeyboardArrowLeft />
           </IconButton>
-          <IconButton onClick={() => setPageIndex(p => p + 1)} disabled={!canNext}>
+          <IconButton onClick={() => handlePageChange(pageIndex + 1)} disabled={!canNext}>
             <KeyboardArrowRight />
           </IconButton>
-          <IconButton onClick={() => setPageIndex(pageCount - 1)} disabled={!canNext}>
+          <IconButton onClick={() => handlePageChange(pageCount - 1)} disabled={!canNext}>
             <LastPage />
           </IconButton>
         </Box>

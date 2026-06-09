@@ -6,11 +6,36 @@ import { toURLSearch } from "@/utils/utils";
 const tokenizable = token.configure();
 
 export type SRTEnviosRGRLParams = {
-  ArchivoTipo?: string;
+  SrtenviosRgrlinterno?: number;
   ArchivoNombre?: string;
   PageNumber?: number;
   PageSize?: number;
   OrderBy?: string;
+};
+
+export type SRTEnviosRGRLRespuestasParams = {
+  SrtenviosRgrlinterno?: number;
+  PageNumber?: number;
+  PageSize?: number;
+};
+
+export type SRTEnvioRGRLRespuesta = {
+  interno: number;
+  srtenviosRgrlinterno: number;
+  respuestasFormularioInterno: number;
+  registro: string;
+  createdAt: string | null;
+  createdBy: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+export type SRTEnviosRGRLRespuestasResponse = {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
+  data: SRTEnvioRGRLRespuesta[];
 };
 
 export type SRTEnvioRGRL = {
@@ -43,6 +68,21 @@ export class SrtAPIClass extends ExternalAPI {
     useSWR(
       [this.getSRTEnviosRGRLURL(params), token.getToken()],
       () => this.getSRTEnviosRGRL(params),
+      { revalidateOnFocus: false, revalidateOnReconnect: false }
+    );
+  //#endregion
+
+  //#region SRTEnviosRGRLRespuestas
+  readonly getSRTEnviosRGRLRespuestasURL = (params: SRTEnviosRGRLRespuestasParams = {}) =>
+    this.getURL({ path: "/api/SRTEnviosRGRLRespuestas", search: toURLSearch(params) }).toString();
+
+  getSRTEnviosRGRLRespuestas = async (params: SRTEnviosRGRLRespuestasParams = {}): Promise<SRTEnviosRGRLRespuestasResponse> =>
+    tokenizable.get<SRTEnviosRGRLRespuestasResponse>(this.getSRTEnviosRGRLRespuestasURL(params)).then(({ data }) => data);
+
+  useGetSRTEnviosRGRLRespuestas = (params: SRTEnviosRGRLRespuestasParams = {}) =>
+    useSWR(
+      [this.getSRTEnviosRGRLRespuestasURL(params), token.getToken()],
+      () => this.getSRTEnviosRGRLRespuestas(params),
       { revalidateOnFocus: false, revalidateOnReconnect: false }
     );
   //#endregion

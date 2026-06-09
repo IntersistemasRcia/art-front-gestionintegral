@@ -15,6 +15,10 @@ export type DataTableDetailProps<T> = {
   title?: string;
   groupBy?: (row: T) => string;
   groupOrder?: (row: T) => number;
+  onRowClick?: (row: T) => void;
+  manualPagination?: boolean;
+  pageCount?: number;
+  onPageChange?: (page: number) => void;
 };
 import {
   ColumnDef,

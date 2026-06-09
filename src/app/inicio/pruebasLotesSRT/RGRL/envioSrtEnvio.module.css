@@ -16,3 +16,7 @@
 .iconButton:hover {
   opacity: 0.85;
 }
+
+.detalle {
+  margin-top: 1rem;
+}

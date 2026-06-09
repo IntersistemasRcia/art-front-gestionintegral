@@ -100,3 +100,16 @@
 .wrapper tbody tr.rowEven td {
   background: #f7fbf4;
 }
+
+.rowClickable {
+  cursor: pointer;
+}
+
+.rowClickable:hover td {
+  background: #fef3e8 !important;
+}
+
+.rowSelected td {
+  background: #fde4bc !important;
+  font-weight: 600;
+}
