@@ -60,8 +60,10 @@ export function UsuarioEmpresasUsuarioTab({
     open && usuarioId && cuitNum ? { CUIT: cuitNum } : undefined
   );
 
+  const esSinEmpresaAsociada = user?.rol === "Administrador" || user?.rol === "AdministradorArt";
+
   const { data: empresasLogueado } = AuthAPI.useGetEmpresas(
-    open && user?.cuit ? { CUIT: user.cuit } : undefined
+    open && !esSinEmpresaAsociada && user?.cuit ? { CUIT: user.cuit } : undefined
   );
 
   // Empresas activas del usuario (sin fecha de baja), con el id de relación cruzado
@@ -90,9 +92,9 @@ export function UsuarioEmpresasUsuarioTab({
   const rows = useMemo<UsuarioEmpresaPorCuitFila[]>(() => {
     if (!Array.isArray(data)) return [];
     return (data as Empresa[])
-      .filter((e) => relacionesActivas.has(e.empresaId) && empresasLogueadoIds.has(e.empresaId))
+      .filter((e) => relacionesActivas.has(e.empresaId) && (esSinEmpresaAsociada || empresasLogueadoIds.has(e.empresaId)))
       .map((e) => ({ ...e, relacionId: relacionById.get(e.empresaId) ?? 0 }));
-  }, [data, relacionesActivas, relacionById, empresasLogueadoIds]);
+  }, [data, relacionesActivas, relacionById, empresasLogueadoIds, esSinEmpresaAsociada]);
 
   useEffect(() => {
     if (!open || !onEmpresasRelacionadasMetaChange) return;
