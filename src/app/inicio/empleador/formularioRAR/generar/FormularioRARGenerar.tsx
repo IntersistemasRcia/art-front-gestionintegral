@@ -542,14 +542,8 @@ React.useEffect(() => {
       if (cancel) return;
 
       // En réplica, siempre usar el CUIT y razón social del formulario original
-      const cuitOriginal = data.cuit || (data as any).CUIT;
-      if (cuitOriginal) {
-        setCuitActual(String(cuitOriginal));
-      }
-      const razonSocialOriginal = data.empresaRazonSocial || (data as any).EmpresaRazonSocial || (data as any).razonSocial;
-      if (razonSocialOriginal) {
-        setRazonSocialActual(String(razonSocialOriginal));
-      }
+      if (data.cuit) setCuitActual(String(data.cuit));
+      if (data.empresaRazonSocial) setRazonSocialActual(data.empresaRazonSocial);
 
       // Cantidades
       setCantExpuestos(String(data.cantTrabajadoresExpuestos || 0));
