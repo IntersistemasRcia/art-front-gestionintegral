@@ -32,7 +32,7 @@ import {
   SRTComercializadoresAsociadosPostResponse,
   SRTComercializadoresAsociadosPutRequest,
 } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios";
-import { SRTEnviosRGRLParams, SRTEnviosRGRLResponse, SRTEnviosRGRLRespuestasParams, SRTEnviosRGRLRespuestasResponse } from "@/app/inicio/pruebasLotesSRT/RGRL/types/rgrlLotes";
+import { SRTEnviosRGRLParams, SRTEnviosRGRLResponse, SRTEnviosRGRLRespuestasParams, SRTEnviosRGRLRespuestasResponse, SRTPublicacionesCIIUConversionesParams } from "@/app/inicio/pruebasLotesSRT/RGRL/types/rgrlLotes";
 
 const tokenizable = token.configure();
 
@@ -66,8 +66,8 @@ export class SrtAPIClass extends ExternalAPI {
       }
     );
 
-    //Region LoclaidadSrt Codigo {codigo}
-      readonly getLocalidadByCodigoURL = (params: ParametersLocalidadbyCodigo) => {
+  //Region LoclaidadSrt Codigo {codigo}
+  readonly getLocalidadByCodigoURL = (params: ParametersLocalidadbyCodigo) => {
     return this.getURL({
       path: `/api/SRTLocalidades/codigo/${params.codigo}`,
     }).toString();
@@ -619,6 +619,23 @@ export class SrtAPIClass extends ExternalAPI {
       () => this.getSRTEnviosRGRLRespuestas(params),
       { revalidateOnFocus: false, revalidateOnReconnect: false }
     );
+  //#endregion
+
+
+  //#region SRTPublicacionesCIIUConversiones
+  readonly getSRTPublicacionesCIIUConversionesURL = (params: SRTPublicacionesCIIUConversionesParams = {}) => {
+    return this.getURL({ path: "/api/SRTPublicacionesCIIUConversiones", search: toURLSearch(params) }).toString();
+  };
+  getSRTPublicacionesCIIUConversiones = async (params: SRTPublicacionesCIIUConversionesParams = {}) => tokenizable.get(
+    this.getSRTPublicacionesCIIUConversionesURL(params),
+  ).then(({ data }) => data);
+  useGetSRTPublicacionesCIIUConversiones = (params: SRTPublicacionesCIIUConversionesParams = {}) => useSWR(
+    [this.getSRTPublicacionesCIIUConversionesURL(params), token.getToken()], () => this.getSRTPublicacionesCIIUConversiones(params),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
   //#endregion
 
 

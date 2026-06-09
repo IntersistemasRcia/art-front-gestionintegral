@@ -25,6 +25,32 @@ export type SRTEnviosRGRLRespuestasParams = {
   PageSize?: number;
 };
 
+export type SRTPublicacionesCIIUConversionesParams = {
+  rev4Ciiu6d?: number;
+};
+
+export type SRTPoliza = {
+  interno: number;
+  cuit: number;
+  numero: number;
+  ciiu: number;
+};
+
+export type SRTCIIUConversion = {
+  rev4Ciiu6d: number;
+  rev3Ciiu6d: number;
+};
+
+export type SRTEstablecimiento = {
+  interno: number;
+  superficie: number;
+  cantTrabajadores: number;
+  fechaBaja: string | null;
+  bajaMotivo: number | null;
+  estadoAccion: string;
+  ciiu: number;
+};
+
 export type SRTEnvioRGRLRespuesta = {
   interno: number;
   srtenviosRgrlinterno: number;

@@ -8,6 +8,7 @@ import type { ApiFormularioRGRL } from "./types/rgrlLotes";
 import styles from "./rgrlTable.module.css";
 import { Empresa } from "@/data/authAPI";
 import CustomButton from "@/utils/ui/button/CustomButton";
+import { generarCodigoDatosGeneralesEstablecimiento } from "./codigos/DatosGeneralesEstablecimiento";
 
 const PAGE_SIZE = 10;
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
@@ -51,7 +52,8 @@ export default function RgrlTable({ empresaSeleccionada }: RgrlTableProps) {
   const [pageIndex, setPageIndex] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [loading, setLoading]     = useState(false);
-  const [, setSelectedRows] = useState<ApiFormularioRGRL[]>([]);
+  const [selectedRows, setSelectedRows] = useState<ApiFormularioRGRL[]>([]);
+  const [loadingIncorporar, setLoadingIncorporar] = useState(false);
 
   const empresasIdParaFiltro = useCallback((empresa: Empresa): number[] => {
     if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return [];
@@ -85,12 +87,24 @@ export default function RgrlTable({ empresaSeleccionada }: RgrlTableProps) {
     load(page, empresaSeleccionada);
   }, [load, empresaSeleccionada]);
 
+  const handleIncorporarMarcados = useCallback(async () => {
+    setLoadingIncorporar(true);
+    try {
+      for (const rgrl of selectedRows) {
+        const codigo = await generarCodigoDatosGeneralesEstablecimiento(rgrl);
+        console.log(codigo);
+      }
+    } finally {
+      setLoadingIncorporar(false);
+    }
+  }, [selectedRows]);
+
   const cols = useMemo(() => columns, []);
 
   return (
     <div className={styles.container}>
       <div className={styles.actions}>
-        <CustomButton>Incorporar marcados a Envío</CustomButton>
+        <CustomButton onClick={handleIncorporarMarcados} isLoading={loadingIncorporar}>Incorporar marcados a Envío</CustomButton>
         <CustomButton>Quitar marcados del Envío</CustomButton>
       </div>
       <DataTable
