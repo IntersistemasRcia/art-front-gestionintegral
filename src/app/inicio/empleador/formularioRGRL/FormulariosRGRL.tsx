@@ -1120,7 +1120,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       >
         <GenerarFormularioRGRL
           //Generar
-          initialCuit={empresaSeleccionada?.cuit || undefined}
+          initialCuit={replicaDe ? undefined : (empresaSeleccionada?.cuit || undefined)}
           empresasIdGetBySpecs={empresasIdGetBySpecsModalGenerar}
           replicaDe={replicaDe}
           onClose={() => setOpenGenerar(false)}

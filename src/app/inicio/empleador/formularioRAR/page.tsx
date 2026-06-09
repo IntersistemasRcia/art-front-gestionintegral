@@ -1088,12 +1088,12 @@ const FormulariosRAR: React.FC = () => {
         </div>
       ) : viewMode === 'crear' ? (
         <FormularioRARGenerar
-          cuit={empresaSeleccionada?.cuit ?? cuit}
+          cuit={replicaDe ? undefined : (empresaSeleccionada?.cuit ?? cuit)}
           internoEstablecimiento={internoEstablecimiento}
           finalizaCarga={handleFinalizaCarga}
           formulariosRAR={formulariosRAR}
           replicaDe={replicaDe}
-          razonSocial={empresaSeleccionada?.razonSocial}
+          razonSocial={replicaDe ? undefined : empresaSeleccionada?.razonSocial}
         />
       ) : (
         <FormularioRARGenerar

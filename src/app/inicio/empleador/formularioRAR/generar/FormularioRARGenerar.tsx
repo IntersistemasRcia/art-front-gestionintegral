@@ -30,7 +30,7 @@ const cuipFormatter = (v: any) => Formato.CUIP(v);
 const normalizarCuil = (v: string) => (v || '').replace(/\D/g, '');
 
 interface CrearProps {
-  cuit: number;
+  cuit?: number;
   internoEstablecimiento?: number; // opcional en creación
   referenteDatos?: unknown;
   finalizaCarga: (ret?: boolean) => void;
@@ -132,6 +132,8 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
   const [filtroCuil, setFiltroCuil] = React.useState<string>('');
 
   const guardandoRef = React.useRef(false);
+
+  const establecimientoReplicaRef = React.useRef<string | null>(null);
 
   // ===== Funciones para manejo de trabajadores =====
   // Función para editar un trabajador
@@ -539,12 +541,23 @@ React.useEffect(() => {
       const data = await ArtAPI.getFormularioRARById(replicaDe);
       if (cancel) return;
 
+      // En réplica, siempre usar el CUIT y razón social del formulario original
+      const cuitOriginal = data.cuit || (data as any).CUIT;
+      if (cuitOriginal) {
+        setCuitActual(String(cuitOriginal));
+      }
+      const razonSocialOriginal = data.empresaRazonSocial || (data as any).EmpresaRazonSocial || (data as any).razonSocial;
+      if (razonSocialOriginal) {
+        setRazonSocialActual(String(razonSocialOriginal));
+      }
+
       // Cantidades
       setCantExpuestos(String(data.cantTrabajadoresExpuestos || 0));
       setCantNoExpuestos(String(data.cantTrabajadoresNoExpuestos || 0));
 
       // Establecimiento (interno)
       if (data.internoEstablecimiento) {
+        establecimientoReplicaRef.current = String(data.internoEstablecimiento);
         setEstablecimientoSeleccionado(String(data.internoEstablecimiento));
       }
 
@@ -615,9 +628,15 @@ React.useEffect(() => {
         if (!cancel) setOpcionesEstablecimientos(opciones);
 
         // Preselección si viene por props
-        if (!cancel && internoEstablecimiento && String(internoEstablecimiento) !== '0' && opciones.length > 0) {
-          const existe = opciones.some(o => o.interno === String(internoEstablecimiento));
-          if (existe) setEstablecimientoSeleccionado(String(internoEstablecimiento));
+        if (!cancel && opciones.length > 0) {
+          const internoReplica = establecimientoReplicaRef.current;
+          if (internoReplica && internoReplica !== '0') {
+            const existe = opciones.some(o => o.interno === internoReplica);
+            if (existe) setEstablecimientoSeleccionado(internoReplica);
+          } else if (internoEstablecimiento && String(internoEstablecimiento) !== '0') {
+            const existe = opciones.some(o => o.interno === String(internoEstablecimiento));
+            if (existe) setEstablecimientoSeleccionado(String(internoEstablecimiento));
+          }
         }
 
         // Agentes
