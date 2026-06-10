@@ -5,12 +5,14 @@ import { useAuth } from '@/data/AuthContext';
 import DataTable from '@/utils/ui/table/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import ArtAPI from '@/data/artAPI';
+import { type Empresa } from '@/data/authAPI';
+import { useEmpresasStore } from '@/data/empresasStore';
 import Formato from '@/utils/Formato';
 import styles from './poliza.module.css';
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 'react-icons/bs';
 import Link from 'next/link';
-import type { Poliza, EmpresaOption } from "./types/poliza";
+import type { Poliza } from "./types/poliza";
 
 const columns: ColumnDef<Poliza>[] = [
   { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
@@ -116,10 +118,12 @@ function digits(value: unknown) {
 
 function PolizasListado({ params, groupSelect, organizadorSelect, comercializadorSelect, emptyMessage, forceEmpty, }: { params: any; groupSelect?: React.ReactNode; organizadorSelect?: React.ReactNode; comercializadorSelect?: React.ReactNode; emptyMessage?: string; forceEmpty?: boolean; }) {
   const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
+  const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
 
   const apiData = forceEmpty ? [] : (apiDataRaw ?? []);
   const error = forceEmpty ? undefined : apiError;
   const isLoading = forceEmpty ? false : apiIsLoading;
+  const isComboLoading = isLoadingEmpresas || isLoading;
 
   const rows = useMemo(() => {
     const list = (apiData ?? []) as any[];
@@ -135,34 +139,23 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
     }));
   }, [apiData]);
 
-  const empresas = useMemo(() => {
-    const map = new Map<string, EmpresaOption>();
-    for (const r of rows) {
-      const razon = String(r?.Empleador_Denominacion ?? '').trim();
-      const cuit = digits(r?.CUIT);
-      const key = cuit || razon.toLowerCase();
-      if (!key) continue;
-      if (!map.has(key)) map.set(key, { razonSocial: razon || cuit, cuit: cuit || undefined });
-    }
-    return Array.from(map.values()).sort((a, b) =>
-      a.razonSocial.localeCompare(b.razonSocial, 'es', { sensitivity: 'base' })
-    );
-  }, [rows]);
-
-  const formatEmpresaLabel = (e?: EmpresaOption | null) => {
+  const formatEmpresaLabel = (e?: Empresa | null) => {
     if (!e) return '';
     const razon = String(e.razonSocial ?? '').trim();
-    const cuit = String(e.cuit ?? '').trim();
+    const cuit = digits(e.cuit);
     const cuitForm = cuit ? Formato.CUIP(cuit) || cuit : '';
-    return cuit ? `${razon}${cuitForm ? ' - ' + cuitForm : ''}` : razon;
+    return cuitForm ? `${razon} - ${cuitForm}` : razon;
   };
 
-  const [empresa, setEmpresa] = useState<EmpresaOption | null>(null);
+  const [empresa, setEmpresa] = useState<Empresa | null>(null);
 
   const filteredRows = useMemo(() => {
     if (!empresa) return rows;
-    if (empresa.cuit) return rows.filter((r) => digits(r?.CUIT) === empresa.cuit);
-    const rs = empresa.razonSocial.trim().toLowerCase();
+    const cuitEmpresa = digits(empresa.cuit);
+    if (cuitEmpresa) {
+      return rows.filter((r) => digits(r?.CUIT) === cuitEmpresa);
+    }
+    const rs = String(empresa.razonSocial ?? '').trim().toLowerCase();
     return rows.filter((r) => String(r?.Empleador_Denominacion ?? '').trim().toLowerCase() === rs);
   }, [rows, empresa]);
 
@@ -171,7 +164,7 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
       <div className={styles.container}>
         <div className={styles.topRow}>
           <div className={styles.selectItem}>
-            <CustomSelectSearch<EmpresaOption>
+            <CustomSelectSearch<Empresa>
             options={empresas}
             getOptionLabel={(e) => formatEmpresaLabel(e)}
               value={empresa}
@@ -180,10 +173,16 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
               }}
               label="Empresa"
               placeholder="Filtrar por razón social..."
-              loading={isLoading}
+              loading={isComboLoading}
               loadingText="Cargando..."
-              noOptionsText={isLoading ? "Cargando..." : "No se encontraron empresas"}
-              disabled={isLoading || empresas.length === 0}
+              noOptionsText={
+                isComboLoading
+                  ? "Cargando..."
+                  : empresas.length === 0
+                  ? "No hay empresas disponibles"
+                  : "No se encontraron empresas"
+              }
+              disabled={isComboLoading || empresas.length === 0}
             />
           </div>
           <div className={styles.selectItem}>{groupSelect}</div>
@@ -199,7 +198,7 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
     <div className={styles.container}>
       <div className={styles.topRow}>
         <div className={styles.selectItem}>
-          <CustomSelectSearch<EmpresaOption>
+          <CustomSelectSearch<Empresa>
             options={empresas}
             getOptionLabel={(e) => formatEmpresaLabel(e)}
             value={empresa}
@@ -208,10 +207,16 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
             }}
             label="Empresa"
             placeholder="Filtrar por razón social..."
-            loading={isLoading}
+            loading={isComboLoading}
             loadingText="Cargando..."
-            noOptionsText={isLoading ? "Cargando..." : "No se encontraron empresas"}
-            disabled={isLoading || empresas.length === 0}
+            noOptionsText={
+              isComboLoading
+                ? "Cargando..."
+                : empresas.length === 0
+                ? "No hay empresas disponibles"
+                : "No se encontraron empresas"
+            }
+            disabled={isComboLoading || empresas.length === 0}
           />
         </div>
         <div className={styles.selectItem}>{groupSelect}</div>

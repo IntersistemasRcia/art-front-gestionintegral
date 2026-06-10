@@ -12,6 +12,7 @@ import DataTable from "@/utils/ui/table/DataTable";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import Formato from "@/utils/Formato";
+import { isAdministradorTodasEmpresasRole } from "@/utils/rolesUtils";
 
 export type UsuarioEmpresaPorCuitFila = Empresa & { relacionId: number };
 type EmpresaComboOption = Pick<Empresa, "empresaId" | "cuit" | "razonSocial">;
@@ -60,11 +61,7 @@ export function UsuarioEmpresasUsuarioTab({
     open && usuarioId && cuitNum ? { CUIT: cuitNum } : undefined
   );
 
-  const esSinEmpresaAsociada = user?.rol === "Administrador" || user?.rol === "AdministradorArt";
-
-  const { data: empresasLogueado } = AuthAPI.useGetEmpresas(
-    open && !esSinEmpresaAsociada && user?.cuit ? { CUIT: user.cuit } : undefined
-  );
+  const esSinEmpresaAsociada = isAdministradorTodasEmpresasRole(user?.rol);
 
   // Empresas activas del usuario (sin fecha de baja), con el id de relación cruzado
   const relacionesActivas = useMemo(() => {
@@ -85,8 +82,8 @@ export function UsuarioEmpresasUsuarioTab({
   }, [empresasIniciales]);
 
   const empresasLogueadoIds = useMemo(
-    () => new Set((empresasLogueado ?? []).map((e) => e.empresaId)),
-    [empresasLogueado]
+    () => new Set((empresasStore ?? []).map((e) => e.empresaId)),
+    [empresasStore]
   );
 
   const rows = useMemo<UsuarioEmpresaPorCuitFila[]>(() => {
