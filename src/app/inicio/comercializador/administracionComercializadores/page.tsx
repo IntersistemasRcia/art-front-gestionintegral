@@ -73,8 +73,11 @@ export default function AdminUserPage() {
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
   const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador';
+  const isAdminComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'administradorcomercializador';
+  const isAdministradorART = String((user as any)?.rol ?? '').toLowerCase() === 'administradorart';
   const isComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'comercializador';
-  const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdministrador;
+  const isAdminLevel = isAdministrador || isAdminComercializador || isAdministradorART;
+  const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdminLevel;
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
   const userCuitValid = Number.isFinite(userCuit) && userCuit > 0 ? userCuit : undefined;
 
@@ -91,10 +94,10 @@ export default function AdminUserPage() {
   };
 
   const { data: gOrgData, isLoading: isLoadingGOrg, mutate: mutateGOrg } = useSWR(
-    (isGrupoOrganizador && userCuitValid) || isAdministrador
-      ? ['SRTComercializadoresGOrganizadores', isAdministrador ? 'ALL' : userCuitValid]
+    (isGrupoOrganizador && userCuitValid) || isAdminLevel
+      ? ['SRTComercializadoresGOrganizadores', isAdminLevel ? 'ALL' : userCuitValid]
       : null,
-    () => (isAdministrador ? ArtAPI.getGOrganizador({} as any) : ArtAPI.getGOrganizador({ CUIL: userCuitValid } as any)),
+    () => (isAdminLevel ? ArtAPI.getGOrganizador({} as any) : ArtAPI.getGOrganizador({ CUIL: userCuitValid } as any)),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   );
 
@@ -104,15 +107,15 @@ export default function AdminUserPage() {
     return Number.isFinite(interno) && interno >= 0 ? interno : undefined;
   }, [gOrgData]);
 
-  const organizadorKey = isGrupoOrganizador || isAdministrador
+  const organizadorKey = isGrupoOrganizador || isAdminLevel
     ? (selectedGrupoInterno ?? gOrganizadorInterno)
     : isOrganizadorComercializador
       ? userCuitValid
       : undefined;
 
   const { data: organizadorData, isLoading: isLoadingOrganizador, mutate: mutateOrganizador } = useSWR(
-    canLoadComercializadores && (isAdministrador || organizadorKey !== undefined)
-      ? ['SRTComercializadoresOrganizadores', isAdministrador ? 'ALL' : isGrupoOrganizador ? 'GO' : 'OC', organizadorKey ?? 'ALL']
+    canLoadComercializadores && (isAdminLevel || organizadorKey !== undefined)
+      ? ['SRTComercializadoresOrganizadores', isAdminLevel ? 'ALL' : isGrupoOrganizador ? 'GO' : 'OC', organizadorKey ?? 'ALL']
       : null,
     () =>
       isGrupoOrganizador
@@ -155,13 +158,13 @@ export default function AdminUserPage() {
 
   const comercializadorInternosCSV = selectedOrganizadorInterno !== undefined
     ? String(selectedOrganizadorInterno)
-    : isAdministrador
+    : isAdminLevel
       ? undefined
       : organizadorInternosCSV;
 
   const comercializadorKey = selectedOrganizadorInterno !== undefined
     ? String(selectedOrganizadorInterno)
-    : isAdministrador
+    : isAdminLevel
       ? 'ALL'
       : comercializadorInternosCSV;
 
@@ -170,14 +173,14 @@ export default function AdminUserPage() {
       ? ['SRTComercializadores', comercializadorKey]
       : null,
     () =>
-      isAdministrador && selectedOrganizadorInterno === undefined
+      isAdminLevel && selectedOrganizadorInterno === undefined
         ? ArtAPI.getComercializador({} as any)
         : ArtAPI.getComercializador({ ComercializadoresOrganizadoresInternos: comercializadorInternosCSV } as any),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   );
 
   const grupoRows: ComercializadoresGOrganizadoresRow[] = useMemo(() => {
-    if (!isGrupoOrganizador && !isAdministrador && !isOrganizadorComercializador) return [];
+    if (!isGrupoOrganizador && !isAdminLevel && !isOrganizadorComercializador) return [];
 
     const source = isOrganizadorComercializador
       ? (gOrgByIdData ? [gOrgByIdData] : [])
@@ -201,7 +204,7 @@ export default function AdminUserPage() {
       estado: estadoFromDeletedAt(x?.deletedAt ?? x?.DeletedAt ?? null),
       accion: '',
     }));
-  }, [gOrgData, gOrgByIdData, isAdministrador, isGrupoOrganizador, isOrganizadorComercializador]);
+  }, [gOrgData, gOrgByIdData, isAdminLevel, isGrupoOrganizador, isOrganizadorComercializador]);
 
   useEffect(() => {
     if (selectedGrupoInterno === undefined) return;
@@ -316,7 +319,7 @@ export default function AdminUserPage() {
     if (isComercializador) return false;
     if (isOrganizadorComercializador) return tabIndex === 2; // solo Comercializador
     if (isGrupoOrganizador) return tabIndex === 1 || tabIndex === 2; // Organizador o Comercializador
-    if (isAdministrador) return true;
+    if (isAdminLevel) return true;
     return false;
   };
 
@@ -964,7 +967,7 @@ export default function AdminUserPage() {
         initialData={formInitialData}
         isSubmitting={isSubmitting}
         errorMsg={formError}
-        isAdmin={isAdministrador}
+        isAdmin={isAdminLevel}
       />
 
     </div>

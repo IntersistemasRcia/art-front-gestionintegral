@@ -100,11 +100,13 @@ export function isAdministradorARTRole(userRole: string | undefined | null): boo
   return isExactRole(userRole, ADMINISTRADOR_ART_ROLE);
 }
 
-/** Administrador o AdministradorART: cargan todas las empresas (ref empleadores). */
+/** Administrador, AdministradorART o AdministradorComercializador: cargan todas las empresas (ref empleadores). */
 export function isAdministradorTodasEmpresasRole(
   userRole: string | undefined | null
 ): boolean {
-  return isAdministradorRole(userRole) || isAdministradorARTRole(userRole);
+  return (isAdministradorRole(userRole) || isAdministradorARTRole(userRole) ||
+    isExactRole(userRole, ADMINISTRADOR_COMERCIALIZADOR_ROLE)
+  );
 }
 
 /** Indica si el rol del usuario es AdministradorEmpleador o un rol hijo (directo o en cadena). */

@@ -42,9 +42,12 @@ function CuentaCorrienteComercializador() {
     const cuil = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
 
     const isAdmin = rol === 'administrador';
+    const isAdminComercializador = rol === 'administradorcomercializador';
+    const isAdministradorART = rol === 'administradorart';
     const isGrupoOrganizador = rol === 'grupoorganizador';
     const isOrganizadorComercializador = rol === 'organizadorcomercializador';
     const isComercializador = rol === 'comercializador';
+    const isAdminLevel = isAdmin || isAdminComercializador || isAdministradorART;
 
     const [grupo, setGrupo] = useState<any>(null);
     const [organizador, setOrganizador] = useState<any>(null);
@@ -66,7 +69,7 @@ function CuentaCorrienteComercializador() {
     // Accede a las propiedades de la sesión con seguridad
 
     const { data: gOrgData } = ArtAPI.useGetGOrganizadorURL(
-        isAdmin ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
+        isAdminLevel ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
     );
 
     const { data: organizadorMeData } = ArtAPI.useGetOrganizadorURL(
@@ -100,7 +103,7 @@ function CuentaCorrienteComercializador() {
         } as any)
         : null;
 
-    const grupoValue = isAdmin
+    const grupoValue = isAdminLevel
         ? grupo
         : isGrupoOrganizador
             ? (gOrgData?.[0] ?? null)
@@ -112,7 +115,7 @@ function CuentaCorrienteComercializador() {
 
     const grupoInterno = Number((grupoValue as any)?.interno ?? 0);
 
-    const organizadorValue = isAdmin
+    const organizadorValue = isAdminLevel
         ? organizador
         : isOrganizadorComercializador
             ? organizadorMe
@@ -336,7 +339,7 @@ function CuentaCorrienteComercializador() {
 
     const groupSelect = (
         <CustomSelectSearch<any>
-            options={isAdmin ? (gOrgData ?? []) : grupoValue ? [grupoValue] : []}
+            options={isAdminLevel ? (gOrgData ?? []) : grupoValue ? [grupoValue] : []}
             getOptionLabel={(x) => String((x as any)?.comercializadorGOrganizadorDescripcion ?? (x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')}
             value={grupoValue ?? null}
             onChange={(_e, v) => {
@@ -345,13 +348,13 @@ function CuentaCorrienteComercializador() {
                 setComercializador(null);
             }}
             label="Grupo Organizador"
-            disabled={!isAdmin}
+            disabled={!isAdminLevel}
         />
     );
 
     const organizadorSelect = (
         <CustomSelectSearch<any>
-            options={isAdmin || isGrupoOrganizador ? (organizadoresData ?? []) : organizadorValue ? [organizadorValue] : []}
+            options={isAdminLevel || isGrupoOrganizador ? (organizadoresData ?? []) : organizadorValue ? [organizadorValue] : []}
             getOptionLabel={(x) => String((x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')}
             value={organizadorValue ?? null}
             onChange={(_e, v) => {
@@ -359,7 +362,7 @@ function CuentaCorrienteComercializador() {
                 setComercializador(null);
             }}
             label="Organizador"
-            disabled={isOrganizadorComercializador || isComercializador || (!grupoValue && !isAdmin)}
+            disabled={isOrganizadorComercializador || isComercializador || (!grupoValue && !isAdminLevel)}
         />
     );
 
@@ -374,7 +377,7 @@ function CuentaCorrienteComercializador() {
             value={comercializadorValue ?? null}
             onChange={(_e, v) => setComercializador(v)}
             label="Comercializador"
-            disabled={isComercializador || ((!grupoValue && !isOrganizadorComercializador) && !isAdmin)}
+            disabled={isComercializador || ((!grupoValue && !isOrganizadorComercializador) && !isAdminLevel)}
         />
     );
 
