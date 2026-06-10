@@ -233,6 +233,13 @@ export default function UsuarioForm({
   const empresasTabDisabled = isCreating && !Boolean(form.id);
   const requiresTituloMatricula = form.rol === "MedicinaLaboral" || form.rol === "SeguridadEHigiene";
 
+  const rolRequiereEmpresa = useMemo(() => {
+    const rolObj = roles.find(r => r.nombre === form.rol || r.nombreNormalizado === form.rol);
+    const adminEmpleador = roles.find(r => r.nombreNormalizado?.toLowerCase() === "administradorempleador");
+    return rolObj?.nombreNormalizado?.toLowerCase() === "administradorempleador" ||
+      adminEmpleador?.rolesHijos.some(h => h.id === rolObj?.id) === true;
+  }, [roles, form.rol]);
+
   const roleOptions = useMemo(() => {
     const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
     const baseRoles = (!userRole || userRole.rolesHijos.length === 0)
@@ -315,7 +322,7 @@ export default function UsuarioForm({
     setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
     setEmpresasRelMeta(null);
     setFichaTab(awaitingEmpresaRelation ? 1 : 0);
-  }, [initialData, open, isEditing, isCreating, awaitingEmpresaRelation]);
+  }, [initialData, open, isEditing, isCreating]);
 
   useEffect(() => {
     if (!awaitingEmpresaRelation) return;
@@ -1215,10 +1222,12 @@ export default function UsuarioForm({
                   <li>La contraseña temporal deberá ser cambiada</li>
                   <li>Posteriormente se podrán configurar los permisos</li>
                   <li>Los campos marcados con * son obligatorios</li>
+                  {rolRequiereEmpresa && (
                   <li>
                     Tras registrar, use la solapa &quot;Empresas del Usuario&quot;: debe asociar al menos una
                     empresa antes de guardar cambios o cerrar el asistente.
                   </li>
+                  )}
                 </ul>
               </div>
 
