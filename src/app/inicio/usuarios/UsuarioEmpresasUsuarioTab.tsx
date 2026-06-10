@@ -12,6 +12,7 @@ import DataTable from "@/utils/ui/table/DataTable";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import Formato from "@/utils/Formato";
+import { isAdministradorTodasEmpresasRole } from "@/utils/rolesUtils";
 
 export type UsuarioEmpresaPorCuitFila = Empresa & { relacionId: number };
 type EmpresaComboOption = Pick<Empresa, "empresaId" | "cuit" | "razonSocial">;
@@ -41,7 +42,7 @@ export function UsuarioEmpresasUsuarioTab({
   onEmpresasRelacionadasMetaChange,
   onMutate,
 }: UsuarioEmpresasUsuarioTabProps) {
-  const { hasTask } = useAuth();
+  const { hasTask, user } = useAuth();
   const { empresas: empresasStore } = useEmpresasStore();
   const [empresaAAgregar, setEmpresaAAgregar] = useState<EmpresaComboOption | null>(null);
   const [isMutating, setIsMutating] = useState(false);
@@ -59,6 +60,8 @@ export function UsuarioEmpresasUsuarioTab({
   const { data, error, isLoading, mutate } = AuthAPI.useGetEmpresas(
     open && usuarioId && cuitNum ? { CUIT: cuitNum } : undefined
   );
+
+  const esSinEmpresaAsociada = isAdministradorTodasEmpresasRole(user?.rol);
 
   // Empresas activas del usuario (sin fecha de baja), con el id de relación cruzado
   const relacionesActivas = useMemo(() => {
@@ -86,9 +89,9 @@ export function UsuarioEmpresasUsuarioTab({
   const rows = useMemo<UsuarioEmpresaPorCuitFila[]>(() => {
     if (!Array.isArray(data)) return [];
     return (data as Empresa[])
-      .filter((e) => relacionesActivas.has(e.empresaId) && empresasLogueadoIds.has(e.empresaId))
+      .filter((e) => relacionesActivas.has(e.empresaId) && (esSinEmpresaAsociada || empresasLogueadoIds.has(e.empresaId)))
       .map((e) => ({ ...e, relacionId: relacionById.get(e.empresaId) ?? 0 }));
-  }, [data, relacionesActivas, relacionById, empresasLogueadoIds]);
+  }, [data, relacionesActivas, relacionById, empresasLogueadoIds, esSinEmpresaAsociada]);
 
   useEffect(() => {
     if (!open || !onEmpresasRelacionadasMetaChange) return;

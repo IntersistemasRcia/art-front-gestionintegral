@@ -280,8 +280,10 @@ const GenerarFormularioRGRL: React.FC<{
       const c = Number((frm as any).cuit ?? 0) || undefined;
       if (c) setCuit(c);
 
+      const empresaIdReplica = c != null ? empresaIdDesdeStorePorCuit(empresas, c) : undefined;
+      const empresasIdReplica = empresaIdReplica != null ? [empresaIdReplica] : (empresaIdFromEditUrl != null ? [empresaIdFromEditUrl] : []);
       const [formulariosRes, ests, tfs] = await Promise.all([
-        c ? ArtAPI.getFormulariosRGRL(buildGetBySpecsParams({ CUIT: c, PageIndex: 1, PageSize: 1 })) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
+        c ? ArtAPI.getFormulariosRGRL({ CUIT: c, empresasId: empresasIdReplica, PageIndex: 1, PageSize: 1 }) : Promise.resolve({ data: [], index: 0, size: 0, pages: 0, count: 0 }),
         c ? fetchEstablecimientos(c) : Promise.resolve([] as Establecimiento[]),
         ArtAPI.getTiposFormulariosRGRL(),
       ]);
