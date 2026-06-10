@@ -49,7 +49,7 @@ const EMPRESA_OPCION_TODAS: Empresa = {
 
 const FormulariosRAR: React.FC = () => {
   const { user } = useAuth();
-  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const isAdmin = user?.rol?.toLowerCase() === 'administrador' || user?.rol?.toLowerCase() === 'administradorart';
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT, cuit } = user as any;
 

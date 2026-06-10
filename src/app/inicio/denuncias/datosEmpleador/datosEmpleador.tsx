@@ -21,7 +21,7 @@ const DatosEmpleador: React.FC<DatosEmpleadorProps> = ({
 
   const empresaId = Number((user as any)?.empresaId ?? 0);
   const isEmpleador = empresaId > 0;
-  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador' || String(user?.rol || '').toLowerCase() === 'administradorart');
 
   const lockAllFields = isDisabled || (isEmpleador && !canRealizaDenuncias);
   const lockNonCuitFields = !isEmpleador && !isAdmin;

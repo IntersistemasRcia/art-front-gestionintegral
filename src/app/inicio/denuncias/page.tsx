@@ -536,7 +536,7 @@ const Spinner: React.FC = () => (
 
 function DenunciasPage() {
   const { user, hasTask } = useAuth();
-  const isAdmin = (user?.rol || '').toLowerCase() === 'administrador';
+  const isAdmin = (user?.rol || '').toLowerCase() === 'administrador' || (user?.rol || '').toLowerCase() === 'administradorart';
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
 
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();

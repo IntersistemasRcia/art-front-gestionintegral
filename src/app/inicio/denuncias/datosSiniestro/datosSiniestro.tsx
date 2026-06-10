@@ -72,7 +72,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
 
   const { user, hasTask } = useAuth();
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
-  const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador' || String(user?.rol || '').toLowerCase() === 'administradorart');
   const empresaId = Number((user as any)?.empresaId ?? 0);
   //const isEmpleador = empresaId > 0;
 

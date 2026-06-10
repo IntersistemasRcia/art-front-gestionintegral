@@ -305,7 +305,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const { user, hasTask } = useAuth();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
-  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const isAdmin = user?.rol?.toLowerCase() === 'administrador' || user?.rol?.toLowerCase() === 'administradorart';
   const sessionEmpresaIds = useMemo(() => {
     const fromSession = (user?.empresas ?? [])
       .filter((e) => e?.fechaBaja == null)
@@ -1120,7 +1120,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       >
         <GenerarFormularioRGRL
           //Generar
-          initialCuit={replicaDe ? undefined : (empresaSeleccionada?.cuit || undefined)}
+          initialCuit={empresaSeleccionada?.cuit || undefined}
           empresasIdGetBySpecs={empresasIdGetBySpecsModalGenerar}
           replicaDe={replicaDe}
           onClose={() => setOpenGenerar(false)}
