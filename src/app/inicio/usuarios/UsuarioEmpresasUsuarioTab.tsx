@@ -41,7 +41,7 @@ export function UsuarioEmpresasUsuarioTab({
   onEmpresasRelacionadasMetaChange,
   onMutate,
 }: UsuarioEmpresasUsuarioTabProps) {
-  const { hasTask, user } = useAuth();
+  const { hasTask } = useAuth();
   const { empresas: empresasStore } = useEmpresasStore();
   const [empresaAAgregar, setEmpresaAAgregar] = useState<EmpresaComboOption | null>(null);
   const [isMutating, setIsMutating] = useState(false);
@@ -58,10 +58,6 @@ export function UsuarioEmpresasUsuarioTab({
 
   const { data, error, isLoading, mutate } = AuthAPI.useGetEmpresas(
     open && usuarioId && cuitNum ? { CUIT: cuitNum } : undefined
-  );
-
-  const { data: empresasLogueado } = AuthAPI.useGetEmpresas(
-    open && user?.cuit ? { CUIT: user.cuit } : undefined
   );
 
   // Empresas activas del usuario (sin fecha de baja), con el id de relación cruzado
@@ -83,8 +79,8 @@ export function UsuarioEmpresasUsuarioTab({
   }, [empresasIniciales]);
 
   const empresasLogueadoIds = useMemo(
-    () => new Set((empresasLogueado ?? []).map((e) => e.empresaId)),
-    [empresasLogueado]
+    () => new Set((empresasStore ?? []).map((e) => e.empresaId)),
+    [empresasStore]
   );
 
   const rows = useMemo<UsuarioEmpresaPorCuitFila[]>(() => {

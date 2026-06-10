@@ -1349,9 +1349,22 @@ export class ArtAPIClass extends ExternalAPI {
 
 type ArtAPIInstance = ArtAPIClass & SrtAPIClass;
 
+const ART_API_BASE_PATH =
+  process.env.NEXT_PUBLIC_API_ART_URL || "http://fallback-prod.url";
+
+const artAPICore = new ArtAPIClass();
+
 const ArtAPI = Object.seal(
-  Object.assign(new ArtAPIClass(), SrtAPI)
+  Object.assign(artAPICore, SrtAPI)
 ) as ArtAPIInstance;
+
+// Object.assign copia basePath de SrtAPI (8304) y rompe endpoints ART como /api/Empresas (8302).
+Object.defineProperty(artAPICore, "basePath", {
+  value: ART_API_BASE_PATH,
+  writable: false,
+  enumerable: true,
+  configurable: false,
+});
 
 export default ArtAPI;
 
