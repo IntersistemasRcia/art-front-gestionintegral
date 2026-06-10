@@ -33,7 +33,7 @@ const EMPRESA_OPCION_TODAS: Empresa = {
 const AvisosObraHandler: React.FC = () => {
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
     const { user } = useAuth();
-    const isAdmin = user?.rol?.toLowerCase() === "administrador";
+    const isAdmin = user?.rol?.toLowerCase() === 'administrador' || user?.rol?.toLowerCase() === 'administradorart';
     const empresaCUIT = user?.empresaCUIT;
     const empresaRazonSocial = user?.empresaRazonSocial;
 

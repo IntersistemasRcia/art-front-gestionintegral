@@ -9,7 +9,7 @@ export function userHasTask(
   }
 
   const userRol = String(user.rol ?? "").trim().toLowerCase();
-  if (userRol === "administrador") {
+  if (userRol === 'administrador') {
     return true;
   }
 

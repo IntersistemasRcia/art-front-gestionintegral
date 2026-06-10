@@ -64,7 +64,7 @@ export async function middleware(req: NextRequest) {
     .flatMap((modulo: Module) => modulo?.tareas || [])
     .filter((tarea: Task) => tarea?.habilitada);
 
-  if (userRol?.toLowerCase() == 'administrador') { // Si es Admin, acceso ilimitado
+  if (userRol?.toLowerCase() == 'administrador' || userRol?.toLowerCase() == 'administradorart') { // Si es Admin o AdminART, acceso ilimitado
         return NextResponse.next();
   }
 

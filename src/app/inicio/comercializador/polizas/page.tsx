@@ -243,7 +243,7 @@ function PolizasPage() {
   const rol = String((user as any)?.rol ?? '').toLowerCase();
   const cuil = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
 
-  const isAdmin = rol === 'administrador';
+  const isAdmin = rol === 'administrador' || rol === 'administradorart';
   const isGrupoOrganizador = rol === 'grupoorganizador';
   const isOrganizadorComercializador = rol === 'organizadorcomercializador';
   const isComercializador = rol === 'comercializador';

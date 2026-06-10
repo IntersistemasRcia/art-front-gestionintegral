@@ -93,7 +93,7 @@ export default function UsuariosPage() {
   const canConfigEmpresa = hasTask("Usuarios_EmpresaConfiguracion");
   
   // Determinar si el usuario es administrador
-  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const isAdmin = user?.rol?.toLowerCase() === 'administrador';
 
   const initialForm: UsuarioFormFields = {
     cuit: "",

@@ -72,7 +72,7 @@ export default function AdminUserPage() {
 
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
-  const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador';
+  const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador' || String((user as any)?.rol ?? '').toLowerCase() === 'administradorart';
   const isComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'comercializador';
   const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdministrador;
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));

@@ -119,7 +119,7 @@ export default function SiniestrosPage() {
   }, [filtersData?.data]);
 
   const cuitEmpresaSeleccionada = normalizeDigits((empresaSeleccionada as any)?.cuit);
-  const isAdmin = String(user?.rol ?? "").trim().toLowerCase() === "administrador";
+  const isAdmin = String(user?.rol ?? "").trim().toLowerCase() === 'administrador' || String(user?.rol ?? "").trim().toLowerCase() === 'administradorart';
   const cuitEmpresasUsuario = useMemo(() => {
     const desdeSesion = (user?.empresas ?? [])
       .filter((e) => e?.fechaBaja == null)

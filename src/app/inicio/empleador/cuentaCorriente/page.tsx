@@ -80,7 +80,7 @@ function CuentaCorrientePage() {
     const searchParams = useSearchParams();
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
-    const isAdmin = String(user?.rol ?? '').trim().toLowerCase() === 'administrador';
+    const isAdmin = String(user?.rol ?? '').trim().toLowerCase() === 'administrador' || String(user?.rol ?? '').trim().toLowerCase() === 'administradorart';
 
     const opcionesEmpresaSelector = useMemo(
         () => [EMPRESA_OPCION_TODAS_CTA_CTE, ...empresas],
