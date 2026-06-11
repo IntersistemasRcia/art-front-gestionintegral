@@ -259,7 +259,7 @@ function CuentaCorrienteComercializador() {
         { header: 'Monto Premio', accessorKey: 'montoPremio', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Monto Prima', accessorKey: 'montoPrima', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Comisión', accessorKey: 'comision', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
-        { header: 'Servicio Adicional', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
+        // { header: 'Servicio Adicional', accessorKey: 'serviciosAdicionales', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'IVA', accessorKey: 'iva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Total Sin IVA', accessorKey: 'totalSinIva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
         { header: 'Total Con IVA', accessorKey: 'totalConIva', cell: info => formatCurrency(info.getValue() as number), meta: { align: 'center' } },
