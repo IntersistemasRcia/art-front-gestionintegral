@@ -271,6 +271,21 @@
   width: 100%;
 }
 
+.phoneFieldWidth {
+  flex: 0 0 200px;
+  min-width: 0;
+}
+
+.fieldNarrow {
+  flex: 0 0 180px;
+  min-width: 0;
+}
+
+.fieldSmall {
+  flex: 0 0 140px;
+  min-width: 0;
+}
+
 .phoneContainer {
   width: 100% !important;
 }
