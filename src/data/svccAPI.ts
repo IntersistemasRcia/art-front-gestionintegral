@@ -290,7 +290,15 @@ export type SVCCPresentacionTodasParams = {
   PageIndex?: number;
   PageSize?: number;
   Order?: string;
-}
+};
+
+export type SVCCPresentacionTodasPostBody = {
+  empleadorCuit: number[];
+  order?: string;
+  pageIndex?: number;
+  pageSize?: number;
+};
+
 export type SVCCPresentacionTodasSWRKey = [url: string, token: string, params: string];
 export type SVCCPresentacionTodasOptions = SWRConfiguration<Pagination<PresentacionDTO>, AxiosError, Fetcher<Pagination<PresentacionDTO>, SVCCPresentacionTodasSWRKey>>
 //#endregion Types SVCC/Presentaciones/Todas
@@ -538,21 +546,23 @@ export type SVCCTrabajadorDeleteOptions = SWRMutationConfiguration<TrabajadorDTO
 }
 //#endregion Types SVCC/Trabajador - Delete
 //#endregion Types SVCC
-function svccPresentacionTodasSearchParams(params?: SVCCPresentacionTodasParams): URLSearchParams | undefined {
-  if (params == null) return undefined;
-  const search = new URLSearchParams();
-  const multicit = params.empleadorCuit;
-  if (multicit != null && multicit.length > 0) {
-    for (const c of multicit) {
-      search.append("empleadorCuit", `${c}`);
-    }
-  } else if (params.empleadorCUIT != null && params.empleadorCUIT !== undefined) {
-    search.append("empleadorCUIT", `${params.empleadorCUIT}`);
+function svccPresentacionTodasPostBody(
+  params?: SVCCPresentacionTodasParams
+): SVCCPresentacionTodasPostBody {
+  let empleadorCuit: number[] = [];
+
+  if (params?.empleadorCuit != null) {
+    empleadorCuit = params.empleadorCuit;
+  } else if (params?.empleadorCUIT != null) {
+    empleadorCuit = [params.empleadorCUIT];
   }
-  if (params.PageIndex != null) search.set("PageIndex", `${params.PageIndex}`);
-  if (params.PageSize != null) search.set("PageSize", `${params.PageSize}`);
-  if (params.Order != null) search.set("Order", params.Order);
-  return search.size > 0 ? search : undefined;
+
+  return {
+    empleadorCuit,
+    order: params?.Order ?? "-interno",
+    pageIndex: params?.PageIndex ?? 1,
+    pageSize: params?.PageSize ?? 10,
+  };
 }
 
 /** Fila devuelta por `/api/Presentaciones/Ultima` (y equivalentes con campos extra). */
@@ -626,17 +636,24 @@ export class SvccAPIClass extends ExternalAPI {
   //#region SVCC
   //#region SVCC/Presentaciones
   //#region SVCC/Presentaciones/Todas
-  readonly svccPresentacionTodasURL = (params?: SVCCPresentacionTodasParams) =>
-    this.getURL({ path: "/api/Presentaciones", search: svccPresentacionTodasSearchParams(params) }).toString();
+  readonly svccPresentacionTodasURL = () =>
+    this.getURL({ path: "/api/Presentaciones" }).toString();
   svccPresentacionTodas = async (params?: SVCCPresentacionTodasParams) =>
     tokenizable
-      .get<unknown>(this.svccPresentacionTodasURL(params))
+      .post<unknown>(
+        this.svccPresentacionTodasURL(),
+        svccPresentacionTodasPostBody(params)
+      )
       .then(({ data }) => normalizeSvccPresentacionTodasResponse(data));
   swrSVCCPresentacionTodas: {
     key: (params?: SVCCPresentacionTodasParams) => SVCCPresentacionTodasSWRKey,
     fetcher: (key: SVCCPresentacionTodasSWRKey) => Promise<Pagination<PresentacionDTO>>
   } = Object.freeze({
-    key: (params) => [this.svccPresentacionTodasURL(params), token.getToken(), JSON.stringify(params)],
+    key: (params) => [
+      this.svccPresentacionTodasURL(),
+      token.getToken(),
+      JSON.stringify(params),
+    ],
     fetcher: ([_url, _token, params]) => this.svccPresentacionTodas(JSON.parse(params)),
   });
   useSVCCPresentacionTodas = (params?: SVCCPresentacionTodasParams, options?: SVCCPresentacionTodasOptions) =>

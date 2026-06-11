@@ -6,6 +6,7 @@ import Formato from '@/utils/Formato';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
 import { useAuth } from '@/data/AuthContext';
+import { isAdministradorTodasEmpresasRole } from '@/utils/rolesUtils';
 import { SVCCPresentacionContextProvider } from './context';
 import type { SVCCPresentacionFilterBase } from './context';
 import PresentacionesHandler from './Presentaciones/PresentacionesHandler';
@@ -30,7 +31,7 @@ type FiltrosSvccMemo = {
 export default function SVCCPage() {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const { user } = useAuth();
-  const isAdmin = user?.rol?.toLowerCase() === 'administrador' || user?.rol?.toLowerCase() === 'administradorart';
+  const isAdmin = isAdministradorTodasEmpresasRole(user?.rol);
 
   const cuitsEmpresasRelacionadas = useMemo(
     () =>
@@ -88,6 +89,7 @@ export default function SVCCPage() {
   const filtrosMemo = useMemo((): FiltrosSvccMemo | null => {
     if (empresaSeleccionada == null) return null;
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      // Administrador / AdministradorART: array vacío = todas las presentaciones.
       const empleadorCuit = isAdmin ? [] : cuitsEmpresasRelacionadas;
       if (!isAdmin && empleadorCuit.length === 0) return null;
       return {
@@ -101,7 +103,7 @@ export default function SVCCPage() {
     return {
       empresaCUITParaAcciones: cuitNum,
       empresaCUITUltima: cuitNum,
-      filtrosPresentacionesBase: { empleadorCUIT: cuitNum },
+      filtrosPresentacionesBase: { empleadorCuit: [cuitNum] },
     };
   }, [empresaSeleccionada, isAdmin, cuitsEmpresasRelacionadas]);
 
