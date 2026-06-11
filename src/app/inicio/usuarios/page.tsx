@@ -276,6 +276,7 @@ export default function UsuariosPage() {
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
     secondaryMessage?: string;
+    title?: string;
   }>({
     open: false,
     message: '',
@@ -288,13 +289,15 @@ export default function UsuariosPage() {
   const showModalMessage = (
     message: string,
     type: 'success' | 'error' | 'warning' | 'info',
-    secondaryMessage?: string
+    secondaryMessage?: string,
+    title?: string
   ) => {
     setModalMessage({
       open: true,
       message,
       type,
       secondaryMessage: secondaryMessage ?? undefined,
+      title,
     });
   };
 
@@ -502,7 +505,11 @@ const handleSubmit = async (data: UsuarioFormFields) => {
     };
     if (createResult.success) {
       const createdUserId = createResult.data?.id;
-      if (createdUserId !== undefined && createdUserId !== null) {
+      const rolObj = roles.find(r => r.nombre === dataToSubmit.rol || r.nombreNormalizado === dataToSubmit.rol);
+      const rolRequiereEmpresa =
+        rolObj?.nombreNormalizado?.toLowerCase() === "administradorempleador" ||
+        roles.find(r => r.nombreNormalizado?.toLowerCase() === "administradorempleador")?.rolesHijos.some(h => h.id === rolObj?.id);
+      if (createdUserId !== undefined && createdUserId !== null && rolRequiereEmpresa) {
         setAwaitingEmpresaAfterCreate(true);
         successSecondaryMessage = LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR;
         setRequestState({
@@ -519,19 +526,29 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   }
 
     if (result.success) {
-      const successMessages = {
+      const successTitles = {
         create: "Usuario creado exitosamente",
-        edit: "Usuario actualizado exitosamente", 
+        edit: "Usuario actualizado exitosamente",
         delete: "Usuario dado de baja exitosamente",
         activate: "Usuario reactivado exitosamente"
       };
-      
+
+      const successBodyMessages = {
+        create: "Usuario Registrado",
+        edit: "Usuario Actualizado",
+        delete: "Usuario dado de baja",
+        activate: "Usuario Reactivado"
+      };
+
+      const successTitle = successTitles[method as keyof typeof successTitles] || "Operación completada exitosamente";
+      const successMessage = successBodyMessages[method as keyof typeof successBodyMessages] || "Operación completada";
       showModalMessage(
-        successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente",
+        successMessage,
         "success",
-        successSecondaryMessage
+        successSecondaryMessage,
+        successTitle
       );
-      if (method !== "create") {
+      if (method !== "create" || !successSecondaryMessage) {
         handleCloseModal();
       }
     } else {
@@ -713,7 +730,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         message={modalMessage.message}         
         type={modalMessage.type}         
         onClose={handleClose}        
-        title={modalMessage.type === "success" ? "Operación exitosa" : undefined}
+        title={modalMessage.title}
         secondaryMessage={modalMessage.secondaryMessage}
       />
     </Box>

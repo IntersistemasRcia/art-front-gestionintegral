@@ -46,6 +46,7 @@ export function UsuarioEmpresasUsuarioTab({
   const { empresas: empresasStore } = useEmpresasStore();
   const [empresaAAgregar, setEmpresaAAgregar] = useState<EmpresaComboOption | null>(null);
   const [isMutating, setIsMutating] = useState(false);
+  const [relacionByIdLocal, setRelacionByIdLocal] = useState<Map<number, number>>(new Map());
   const [modalMsg, setModalMsg] = useState<{
     open: boolean;
     message: string;
@@ -63,23 +64,16 @@ export function UsuarioEmpresasUsuarioTab({
 
   const esSinEmpresaAsociada = isAdministradorTodasEmpresasRole(user?.rol);
 
-  // Empresas activas del usuario (sin fecha de baja), con el id de relación cruzado
-  const relacionesActivas = useMemo(() => {
-    const activas = new Set(
-      (empresasIniciales ?? [])
-        .filter((e) => e.fechaBaja == null)
-        .map((e) => e.empresaId)
-    );
-    return activas;
-  }, [empresasIniciales]);
-
-  const relacionById = useMemo(() => {
+  // Al cambiar de usuario, reinicializar desde props
+  useEffect(() => {
     const map = new Map<number, number>();
     (empresasIniciales ?? [])
       .filter((e) => e.fechaBaja == null)
       .forEach((e) => map.set(e.empresaId, e.id));
-    return map;
-  }, [empresasIniciales]);
+    setRelacionByIdLocal(map);
+  }, [usuarioId]);
+
+  const relacionesActivas = new Set(relacionByIdLocal.keys());
 
   const empresasLogueadoIds = useMemo(
     () => new Set((empresasStore ?? []).map((e) => e.empresaId)),
@@ -90,8 +84,8 @@ export function UsuarioEmpresasUsuarioTab({
     if (!Array.isArray(data)) return [];
     return (data as Empresa[])
       .filter((e) => relacionesActivas.has(e.empresaId) && (esSinEmpresaAsociada || empresasLogueadoIds.has(e.empresaId)))
-      .map((e) => ({ ...e, relacionId: relacionById.get(e.empresaId) ?? 0 }));
-  }, [data, relacionesActivas, relacionById, empresasLogueadoIds, esSinEmpresaAsociada]);
+      .map((e) => ({ ...e, relacionId: relacionByIdLocal.get(e.empresaId) ?? 0 }));
+  }, [data, relacionByIdLocal, empresasLogueadoIds, esSinEmpresaAsociada]);
 
   useEffect(() => {
     if (!open || !onEmpresasRelacionadasMetaChange) return;
@@ -132,6 +126,11 @@ export function UsuarioEmpresasUsuarioTab({
       setIsMutating(true);
       try {
         await AuthAPI.deleteUsuariosEmpresasBorrar(row.relacionId);
+        setRelacionByIdLocal(prev => {
+          const next = new Map(prev);
+          next.delete(row.empresaId);
+          return next;
+        });
         void onMutate?.();
         await mutate();
         showModalMessage("Empresa desvinculada correctamente.", "success");
@@ -176,6 +175,11 @@ export function UsuarioEmpresasUsuarioTab({
         });
       }
 
+      setRelacionByIdLocal(prev => {
+        const next = new Map(prev);
+        next.set(Number(empresaAAgregar.empresaId), 0);
+        return next;
+      });
       void onMutate?.();
       await mutate();
       showModalMessage("Empresa agregada correctamente.", "success");
