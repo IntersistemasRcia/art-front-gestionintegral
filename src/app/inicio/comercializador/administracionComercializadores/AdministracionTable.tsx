@@ -66,6 +66,7 @@ export default function AdministracionTable({
     () => [
       { accessorKey: 'cuil', header: 'CUIT/CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'razonSocial', header: 'Nombre' },
+      { accessorKey: 'matricula', header: 'Matrícula' },
       { accessorKey: 'email', header: 'Email' },
       { accessorKey: 'telefono', header: 'Teléfono' },
       { accessorKey: 'estado', header: 'Estado' },
@@ -129,6 +130,7 @@ export default function AdministracionTable({
     () => [
       { accessorKey: 'cuil', header: 'CUIT/CUIL', cell: ({ row }) => CUIP(row.original.cuil) },
       { accessorKey: 'razonSocial', header: 'Nombre' },
+      { accessorKey: 'matricula', header: 'Matrícula' },
       { accessorKey: 'email', header: 'Email' },
       { accessorKey: 'telefono', header: 'Teléfono' },
       { accessorKey: 'estado', header: 'Estado' },
