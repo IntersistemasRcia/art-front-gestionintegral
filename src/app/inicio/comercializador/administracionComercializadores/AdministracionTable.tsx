@@ -68,6 +68,7 @@ export default function AdministracionTable({
       { accessorKey: 'razonSocial', header: 'Nombre' },
       { accessorKey: 'email', header: 'Email' },
       { accessorKey: 'telefono', header: 'Teléfono' },
+      { accessorKey: 'matricula', header: 'Matrícula' },
       { accessorKey: 'estado', header: 'Estado' },
       {
         id: 'accion',
@@ -131,6 +132,7 @@ export default function AdministracionTable({
       { accessorKey: 'razonSocial', header: 'Nombre' },
       { accessorKey: 'email', header: 'Email' },
       { accessorKey: 'telefono', header: 'Teléfono' },
+      { accessorKey: 'matricula', header: 'Matrícula' },
       { accessorKey: 'estado', header: 'Estado' },
       {
         id: 'accion',

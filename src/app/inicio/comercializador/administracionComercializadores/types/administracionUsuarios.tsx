@@ -4,6 +4,7 @@ export type ComercializadoresGOrganizadoresRow = {
 	descripcion?: string;
 	email: string;
 	telefono: string;
+	matricula?: string | number;
 	razonSocial?: string;
 	fechaNacimiento?: string;
 	domocilioCalle?: string;
@@ -24,6 +25,7 @@ export type ComercializadoresOrganizadoresRow = {
 	observacion?: string;
 	email: string;
 	telefono: string;
+	matricula?: string | number;
 	srtComercializadorGOrganizadorInterno?: number;
 	observaciones?: string;
 	razonSocial?: string;
