@@ -14,6 +14,7 @@ export interface EmpresasParams {
 export interface ParametersParamEntidad {
   entidadId?: number;
   parametroId?: number;
+  EntidadTipo?: string;
   PageIndex?: number;
   PageSize?: number;
 }
