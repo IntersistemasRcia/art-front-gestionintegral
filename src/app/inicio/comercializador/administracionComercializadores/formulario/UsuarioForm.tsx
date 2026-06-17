@@ -248,7 +248,7 @@ export default function UsuarioForm({
       ...prev,
       nombre: ([arcaData.nombre, arcaData.apellido].filter(Boolean).join(' ')) || prev.nombre,
       apellido: arcaData.apellido ?? prev.apellido,
-      fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
+      fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('YYYY-MM-DD') : prev.fechaNacimiento,
     }));
   }, [arcaData]);
 
