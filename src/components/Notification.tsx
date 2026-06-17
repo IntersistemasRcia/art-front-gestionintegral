@@ -6,12 +6,17 @@ import styles from './Navbar.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import ArtAPI from '@/data/artAPI';
 import gestionEmpleadorAPI from '@/data/gestionEmpleadorAPI';
+import AuthAPI from '@/data/authAPI';
+import { useAuth } from '@/data/AuthContext';
+
+const NOTIFICACION_RGRL_ENTIDAD_TIPO = 'Activar_NotificacionRGRL';
 
 type Props = {
   empresaCUIT?: number | string | null;
 };
 
 export default function Notification({ empresaCUIT }: Props) {
+  const { user } = useAuth();
   const [campanaOpen, setCampanaOpen] = useState(false);
   const [missingCount, setMissingCount] = useState<number>(0);
   const [campanaLoading, setCampanaLoading] = useState<boolean>(false);
@@ -23,7 +28,10 @@ export default function Notification({ empresaCUIT }: Props) {
       try {
         setCampanaLoading(true);
         const c = Number(empresaCUIT ?? 0);
-        if (!c || Number.isNaN(c)) {
+        const rolesHabilitados = await AuthAPI.getParametrosEntidad({ EntidadTipo: NOTIFICACION_RGRL_ENTIDAD_TIPO });
+        const userRol = (user?.rol ?? '').trim().toLowerCase();
+        const canViewAlertas = rolesHabilitados.some((p) => (p.valor ?? '').trim().toLowerCase() === userRol);
+        if (!canViewAlertas || !c || Number.isNaN(c)) {
           setMissingCount(0);
           setMissingList([]);
           return;
@@ -100,7 +108,7 @@ export default function Notification({ empresaCUIT }: Props) {
 
     load();
     return () => { mounted = false; };
-  }, [empresaCUIT]);
+  }, [empresaCUIT, user?.rol]);
 
   return (
     <li className={styles.menuItem} onClick={(e) => { e.stopPropagation(); setCampanaOpen(v => !v); }}>

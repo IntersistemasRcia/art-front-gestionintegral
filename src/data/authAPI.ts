@@ -14,6 +14,7 @@ export interface EmpresasParams {
 export interface ParametersParamEntidad {
   entidadId?: number;
   parametroId?: number;
+  EntidadTipo?: string;
   PageIndex?: number;
   PageSize?: number;
 }
@@ -228,6 +229,34 @@ export class AuthAPIClass extends ExternalAPI {
       this.getEmpresas(params)
     );
   //#endregion getEmpresas
+
+    //#region Usuario DELETE
+  readonly deleteUsuarioBaseURL = this.getURL({ path: "/api/Usuario" }).toString();
+
+  deleteUsuario = async (id: string) =>
+    tokenizable
+      .delete(`${this.deleteUsuarioBaseURL}/${encodeURIComponent(id)}`)
+      .then(async (response) => {
+        if (response.status === 200 || response.status === 204) return;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.statusText}`)
+        );
+      });
+
+  swrDeleteUsuario: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: string }) => Promise<void>;
+  } = Object.freeze({
+    key: [this.deleteUsuarioBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.deleteUsuario(arg),
+  });
+
+  useDeleteUsuario = () =>
+    useSWRMutation<void, Error, [url: string, token: string], string>(
+      this.swrDeleteUsuario.key,
+      this.swrDeleteUsuario.fetcher
+    );
+  //#endregion Usuario DELETE
 
   //#region UsuariosEmpresas (asignación / baja)
   readonly deleteUsuariosEmpresasBorrarURL = (id: number | string) =>
