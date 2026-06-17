@@ -112,17 +112,23 @@ export interface UsuarioVm {
 export type Usuario = Omit<UsuarioVm, "token">;
 //#endregion /api/Usuario/Login types
 //#region /api/Usuario/GetAll types
-export interface UsuarioGetAllParams {
-  empresaId?: number;
-  sort?: string;
-  pageIndex?: number;
-  pageSize?: number;
-  cuit?: string;
+export type UsuarioGetAllBody = {
+  empresaId?: number[];
+  cuit?: number;
   nombre?: string;
   email?: string;
   rol?: string;
   estado?: string;
-}
+  sort?: string;
+  pageIndex?: number;
+  pageSize?: number;
+};
+
+/** @deprecated Usar `UsuarioGetAllBody` */
+export type UsuarioGetAllParams = UsuarioGetAllBody;
+
+export type UsuarioGetAllSWRKey = [url: string, token: string, body: string];
+
 export interface UsuarioGetAllResult {
   index: number;
   size: number;
@@ -239,24 +245,25 @@ export class UsuarioAPIClass extends ExternalAPI {
   //#endregion login
 
   //#region getAll
-  readonly getAllURL = (params: UsuarioGetAllParams = {}) =>
-    this.getURL({
-      path: "/api/Usuario/GetAll",
-      search: toURLSearch(params),
-    }).toString();
-  getAll = async (params: UsuarioGetAllParams = {}) =>
+  readonly getAllURL = () =>
+    this.getURL({ path: "/api/Usuario/GetAll" }).toString();
+
+  getAll = async (body: UsuarioGetAllBody = {}) =>
     tokenizable
-      .get<UsuarioGetAllResult>(this.getAllURL(params))
+      .post<UsuarioGetAllResult>(this.getAllURL(), buildUsuarioGetAllBody(body))
       .then(async (response) => {
         if (response.status === 200) return response.data;
         return Promise.reject(
           new AxiosError(`Error en la petición: ${response.data}`)
         );
       });
-  useGetAll = (params?: UsuarioGetAllParams | null) =>
+
+  useGetAll = (body?: UsuarioGetAllBody | null) =>
     useSWR(
-      params === null ? null : [this.getAllURL(params ?? {}), token.getToken()],
-      () => this.getAll(params ?? {})
+      body === null
+        ? null
+        : [this.getAllURL(), token.getToken(), JSON.stringify(buildUsuarioGetAllBody(body ?? {}))],
+      () => this.getAll(body ?? {})
     );
   //#endregion getAll
 
@@ -524,6 +531,31 @@ export class UsuarioAPIClass extends ExternalAPI {
       () => this.confirmarEmail(query.token, query.email)
     );
 
+}
+
+function parseUsuarioGetAllCuit(cuit: string | number | undefined): number | undefined {
+  if (cuit == null || cuit === "") return undefined;
+  const n = typeof cuit === "number" ? cuit : Number(String(cuit).replace(/\D/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+function buildUsuarioGetAllBody(body: UsuarioGetAllBody = {}): UsuarioGetAllBody {
+  const payload: UsuarioGetAllBody = {
+    empresaId: body.empresaId ?? [],
+    pageIndex: body.pageIndex ?? 1,
+    pageSize: body.pageSize ?? 10,
+  };
+
+  const cuit = parseUsuarioGetAllCuit(body.cuit);
+  if (cuit != null) payload.cuit = cuit;
+
+  if (body.nombre?.trim()) payload.nombre = body.nombre.trim();
+  if (body.email?.trim()) payload.email = body.email.trim();
+  if (body.rol?.trim()) payload.rol = body.rol.trim();
+  if (body.estado?.trim()) payload.estado = body.estado.trim();
+  if (body.sort?.trim()) payload.sort = body.sort.trim();
+
+  return payload;
 }
 
 const UsuarioAPI = Object.seal(new UsuarioAPIClass());

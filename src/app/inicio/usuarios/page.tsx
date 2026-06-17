@@ -36,6 +36,7 @@ import UsuarioRow from "./interfaces/UsuarioRow";
 import { useAuth } from "@/data/AuthContext";
 import IUsuarioDarDeBajaReactivar from "./interfaces/IUsuarioDarDeBajaReactivar";
 import CustomTabs from "@/utils/ui/tab/CustomTab";
+import { isAdministradorTodasEmpresasRole } from "@/utils/rolesUtils";
 
 /** Valor sentinela en `Empresa.empresaId` para la opción "Todas las Empresas" en el listado de usuarios. */
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
@@ -93,8 +94,8 @@ export default function UsuariosPage() {
   const canConfigEmpresa = hasTask("Usuarios_EmpresaConfiguracion");
   
   // Determinar si el usuario es administrador
-  const isAdmin = user?.rol?.toLowerCase() === 'administrador';
-
+  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const isAdminTodasEmpresas = isAdministradorTodasEmpresasRole(user?.rol);
   const initialForm: UsuarioFormFields = {
     cuit: "",
     email: "",
@@ -122,18 +123,20 @@ export default function UsuariosPage() {
   const cuitQuery = searchParams?.get("cuit") ?? searchParams?.get("cuil");
   const cuitForzado = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
 
-  const sessionEmpresaIds = useMemo(() => {
-    const fromSession = (user?.empresas ?? [])
-      .filter((e) => e?.fechaBaja == null)
-      .map((e) => e.empresaId)
-      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
-    const unique = Array.from(new Set(fromSession));
-    if (unique.length > 0) return unique;
-    return Array.from(new Set(empresas.map((e) => e.empresaId)));
-  }, [user?.empresas, empresas]);
+  const empresasIdsStore = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          empresas
+            .map((e) => Number(e.empresaId))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        )
+      ).sort((a, b) => a - b),
+    [empresas]
+  );
 
   const opcionesEmpresaSelector = useMemo(
-    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    () => (empresas.length === 1 ? empresas : [EMPRESA_OPCION_TODAS, ...empresas]),
     [empresas]
   );
 
@@ -189,20 +192,20 @@ export default function UsuariosPage() {
   const porEmpresaIdsListado = useMemo(() => {
     if (!empresaSeleccionada) return [];
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
-      if (isAdmin) return [];
-      return sessionEmpresaIds;
+      if (isAdminTodasEmpresas) return [];
+      return empresasIdsStore;
     }
     return [empresaSeleccionada.empresaId];
-  }, [empresaSeleccionada, sessionEmpresaIds, isAdmin]);
+  }, [empresaSeleccionada, isAdminTodasEmpresas, empresasIdsStore]);
 
-  const allowEmptyEmpresasPostUsuarios =
-    isAdmin &&
+  const consultarGetAllSinEmpresaId =
+    isAdminTodasEmpresas &&
     empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID;
 
   const porEmpresaIdsListadoKey = useMemo(() => {
-    if (allowEmptyEmpresasPostUsuarios) return "admin:all";
+    if (consultarGetAllSinEmpresaId) return "todas";
     return porEmpresaIdsListado.slice().sort((a, b) => a - b).join(",");
-  }, [porEmpresaIdsListado, allowEmptyEmpresasPostUsuarios]);
+  }, [porEmpresaIdsListado, consultarGetAllSinEmpresaId]);
 
   const [usuariosPageIndex, setUsuariosPageIndex] = useState(1);
 
@@ -242,7 +245,7 @@ export default function UsuariosPage() {
     mutateUsuarios,
   } = useUsuarios({
     porEmpresaIds: porEmpresaIdsListado,
-    allowEmptyEmpresasPost: allowEmptyEmpresasPostUsuarios,
+    allowEmptyEmpresasPost: consultarGetAllSinEmpresaId,
     pageIndex: usuariosPageIndex,
     pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
     ...filterCommitted,
@@ -668,7 +671,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
             onReenviarCorreo={handleReenviarCorreo}
             isLoading={loading}
             serverPagination={
-              porEmpresaIdsListado.length > 0 || allowEmptyEmpresasPostUsuarios
+              porEmpresaIdsListado.length > 0 || consultarGetAllSinEmpresaId
                 ? {
                     pageIndex: usuariosPageIndex,
                     pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
