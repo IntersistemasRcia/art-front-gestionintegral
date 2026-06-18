@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'; 
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import SrtAPI from "@/data/srtAPI";
 import ArtAPI from '@/data/artAPI';
 import Persona from './types/persona';
 import DataTable from '@/utils/ui/table/DataTable';
@@ -23,7 +23,7 @@ import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
 
-const { useGetPoliza } = gestionEmpleadorAPI;
+const { useGetPoliza } = SrtAPI;
 
 export default function CoberturaPage() {
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();

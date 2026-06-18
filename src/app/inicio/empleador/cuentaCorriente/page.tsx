@@ -5,7 +5,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Box, Typography } from '@mui/material';
 import CustomTab from '@/utils/ui/tab/CustomTab';
 import Formato from '@/utils/Formato';
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import SrtAPI from "@/data/srtAPI";
 import type { CuentaCorrienteRegistro, DDJJRegistro } from './types/cuentaCorriente';
 import ExportButtons from './components/ExportButtons';
 import { useEmpresasStore } from "@/data/empresasStore";
@@ -217,7 +217,7 @@ function CuentaCorrientePage() {
         };
     }, [bloquearBusquedaPorCuit, cuitDesdeQuery, ddjjPageIndex, empresaSeleccionada, empresas, isAdmin]);
 
-    const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
+    const { data: polizaRawData } = SrtAPI.useGetPoliza(
         cuitFinal ? { CUIT: cuitFinal } : {}
     );
     const { data: CtaCteRawData, isLoading: isCtaCteLoading } = ArtAPI.useVEmpleadorDDJJ(ddjjBody);

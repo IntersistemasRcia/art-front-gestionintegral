@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from '@/data/AuthContext';
 import DataTable from '@/utils/ui/table/DataTable';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -13,6 +13,17 @@ import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 'react-icons/bs';
 import Link from 'next/link';
 import type { Poliza } from "./types/poliza";
+
+const EMPRESA_TODAS_EMPRESAS_ID = -1;
+
+const EMPRESA_OPCION_TODAS: Empresa = {
+  empresaId: EMPRESA_TODAS_EMPRESAS_ID,
+  cuit: 0,
+  razonSocial: 'Todas las Empresas',
+  domicilio: '',
+  localidad: '',
+  provincia: '',
+};
 
 const columns: ColumnDef<Poliza>[] = [
   { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
@@ -119,6 +130,7 @@ function digits(value: unknown) {
 function PolizasListado({ params, groupSelect, organizadorSelect, comercializadorSelect, emptyMessage, forceEmpty, }: { params: any; groupSelect?: React.ReactNode; organizadorSelect?: React.ReactNode; comercializadorSelect?: React.ReactNode; emptyMessage?: string; forceEmpty?: boolean; }) {
   const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
+  const seleccionAutomaticaRef = useRef(false);
 
   const apiData = forceEmpty ? [] : (apiDataRaw ?? []);
   const error = forceEmpty ? undefined : apiError;
@@ -139,8 +151,14 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
     }));
   }, [apiData]);
 
+  const empresasOptions = useMemo(
+    () => (empresas.length > 1 ? [EMPRESA_OPCION_TODAS, ...empresas] : empresas),
+    [empresas]
+  );
+
   const formatEmpresaLabel = (e?: Empresa | null) => {
     if (!e) return '';
+    if (e.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return 'Todas las Empresas';
     const razon = String(e.razonSocial ?? '').trim();
     const cuit = digits(e.cuit);
     const cuitForm = cuit ? Formato.CUIP(cuit) || cuit : '';
@@ -149,8 +167,23 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
 
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
 
+  useEffect(() => {
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 0) {
+      setEmpresa(null);
+      seleccionAutomaticaRef.current = false;
+      return;
+    }
+    setEmpresa((prev) => {
+      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
+      return empresas.length === 1 ? empresas[0] : EMPRESA_OPCION_TODAS;
+    });
+    seleccionAutomaticaRef.current = true;
+  }, [empresas, isLoadingEmpresas]);
+
   const filteredRows = useMemo(() => {
     if (!empresa) return rows;
+    if (empresa.empresaId === EMPRESA_TODAS_EMPRESAS_ID) return rows;
     const cuitEmpresa = digits(empresa.cuit);
     if (cuitEmpresa) {
       return rows.filter((r) => digits(r?.CUIT) === cuitEmpresa);
@@ -165,11 +198,12 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
         <div className={styles.topRow}>
           <div className={styles.selectItem}>
             <CustomSelectSearch<Empresa>
-            options={empresas}
+            options={empresasOptions}
             getOptionLabel={(e) => formatEmpresaLabel(e)}
               value={empresa}
               onChange={(_event, newValue) => {
                 setEmpresa(newValue);
+                seleccionAutomaticaRef.current = false;
               }}
               label="Empresa"
               placeholder="Filtrar por razón social..."
@@ -178,11 +212,11 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
               noOptionsText={
                 isComboLoading
                   ? "Cargando..."
-                  : empresas.length === 0
+                  : empresasOptions.length === 0
                   ? "No hay empresas disponibles"
                   : "No se encontraron empresas"
               }
-              disabled={isComboLoading || empresas.length === 0}
+              disabled={isComboLoading || empresasOptions.length === 0}
             />
           </div>
           <div className={styles.selectItem}>{groupSelect}</div>
@@ -199,11 +233,12 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
       <div className={styles.topRow}>
         <div className={styles.selectItem}>
           <CustomSelectSearch<Empresa>
-            options={empresas}
+            options={empresasOptions}
             getOptionLabel={(e) => formatEmpresaLabel(e)}
             value={empresa}
             onChange={(_event, newValue) => {
               setEmpresa(newValue);
+              seleccionAutomaticaRef.current = false;
             }}
             label="Empresa"
             placeholder="Filtrar por razón social..."
@@ -212,11 +247,11 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
             noOptionsText={
               isComboLoading
                 ? "Cargando..."
-                : empresas.length === 0
+                : empresasOptions.length === 0
                 ? "No hay empresas disponibles"
                 : "No se encontraron empresas"
             }
-            disabled={isComboLoading || empresas.length === 0}
+            disabled={isComboLoading || empresasOptions.length === 0}
           />
         </div>
         <div className={styles.selectItem}>{groupSelect}</div>

@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import gestionEmpleadorAPI, { PresentacionCreateDTO, PresentacionDTO, PresentacionFinalizaDTO, RefCIIU, SRTSiniestralidadCIUO88 } from '@/data/gestionEmpleadorAPI';
+import gestionEmpleadorAPI, { PresentacionCreateDTO, PresentacionDTO, PresentacionFinalizaDTO, RefCIIU } from '@/data/gestionEmpleadorAPI';
+import SrtAPI, { type SRTSiniestralidadCIUO88 } from '@/data/srtAPI';
 import SvccAPI from '@/data/svccAPI';
 import type { PresentacionUltimaDTO, SVCCPresentacionTodasParams, SVCCPresentacionUltimaParams } from '@/data/svccAPI';
 import ArtAPI, { EstablecimientoVm, EstablecimientoVmDescripcion } from "@/data/artAPI";
@@ -80,6 +81,9 @@ const { useEstablecimientoList } = ArtAPI;
 
 const {
   useSRTSiniestralidadCIUO88List,
+} = SrtAPI;
+
+const {
   useRefCIIUList,
 } = gestionEmpleadorAPI;
 

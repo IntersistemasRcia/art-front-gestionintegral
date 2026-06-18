@@ -11,7 +11,7 @@ export interface Context {
   fields?: Record<string, Field>
 }
 
-export const DateFormatter: FieldFormatter = (v: any) => dayjs(v).format("YYYY-MM-DD");
+export const DateFormatter: FieldFormatter = (v: any) => dayjs(v).format("DD/MM/YYYY");
 export const TimeFormatter: FieldFormatter = (v: any) => dayjs(v).format("HH:mm:ss.SSS");
 export const DateTimeFormatter: FieldFormatter = (v: any) => dayjs(v).format("YYYY-MM-DDTHH:mm:ss.SSS");
 

@@ -5,7 +5,7 @@ import { GoBellFill } from 'react-icons/go';
 import styles from './Navbar.module.css';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import ArtAPI from '@/data/artAPI';
-import gestionEmpleadorAPI from '@/data/gestionEmpleadorAPI';
+import SrtAPI from '@/data/srtAPI';
 
 type Props = {
   empresaCUIT?: number | string | null;
@@ -31,7 +31,7 @@ export default function Notification({ empresaCUIT }: Props) {
         const [estsResult, formsResult, polizaResult] = await Promise.allSettled([
           ArtAPI.getEstablecimientosEmpresa(c, "true"),
           ArtAPI.getFormulariosRGRL({ CUIT: c }),
-          gestionEmpleadorAPI.getPoliza({ CUIT: c }),
+          SrtAPI.getPoliza({ CUIT: c }),
         ]);
 
         const ests = estsResult.status === "fulfilled" ? estsResult.value : [];

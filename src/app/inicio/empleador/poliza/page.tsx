@@ -6,7 +6,7 @@ import styles from "./poliza.module.css";
 import { useAuth } from "@/data/AuthContext";
 import { TextField, Box } from "@mui/material";
 import Formato from "@/utils/Formato";
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import SrtAPI from "@/data/srtAPI";
 import ArtAPI from '@/data/artAPI';
 import AuthAPI from '@/data/authAPI';
 import type { ComercializadorById, VComercializadorRow } from '@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios';
@@ -19,7 +19,7 @@ import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
 
-const { useGetPoliza } = gestionEmpleadorAPI;
+const { useGetPoliza } = SrtAPI;
 
 const Poliza = () => {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();

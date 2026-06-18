@@ -1,4 +1,4 @@
-import { SRTSiniestralidadCIUO88 } from "@/data/gestionEmpleadorAPI";
+import { SRTSiniestralidadCIUO88 } from "@/data/srtAPI";
 import Browse, { defaultActionsColumns } from "@/utils/ui/table/Browse";
 
 export const SRTSiniestralidadCIUO88Browse = Browse<SRTSiniestralidadCIUO88>(

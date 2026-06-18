@@ -1,8 +1,10 @@
-﻿import useSWR from "swr";
+﻿import useSWR, { type Fetcher, type SWRConfiguration } from "swr";
 import useSWRMutation from "swr/mutation";
+import { AxiosError } from "axios";
 import { ExternalAPI } from "./api";
 import { token } from "./usuarioAPI";
 import { toURLSearch } from "@/utils/utils";
+import type { Parameters } from "@/app/inicio/empleador/cobertura/types/persona";
 import srtProvincia from "@/app/inicio/usuarios/interfaces/SrtProvincia";
 import { ParametersLocalidadSRT, ParametersLocalidadbyCodigo } from "@/app/inicio/denuncias/types/tDenuncias";
 import {
@@ -36,6 +38,31 @@ import {
 const tokenizable = token.configure();
 
 export type SRTPolizaUsuarioLogueada = SRTPolizaAcotada;
+
+//#region Types SRTSiniestralidadCIUO88
+export type SRTSiniestralidadCIUO88 = {
+  id: number;
+  ciuO88: number;
+  descripcion?: string;
+};
+
+export type SRTSiniestralidadCIUO88ListSWRKey = [url: string, token: string];
+export type SRTSiniestralidadCIUO88ListOptions = SWRConfiguration<
+  SRTSiniestralidadCIUO88[],
+  AxiosError,
+  Fetcher<SRTSiniestralidadCIUO88[], SRTSiniestralidadCIUO88ListSWRKey>
+>;
+
+export type SRTSiniestralidadCIUO88ReadParams = {
+  pId: number;
+};
+export type SRTSiniestralidadCIUO88ReadSWRKey = [url: string, token: string, params: string];
+export type SRTSiniestralidadCIUO88ReadOptions = SWRConfiguration<
+  SRTSiniestralidadCIUO88,
+  AxiosError,
+  Fetcher<SRTSiniestralidadCIUO88, SRTSiniestralidadCIUO88ReadSWRKey>
+>;
+//#endregion Types SRTSiniestralidadCIUO88
 
 export class SrtAPIClass extends ExternalAPI {
   readonly basePath =
@@ -118,6 +145,29 @@ export class SrtAPIClass extends ExternalAPI {
       revalidateOnReconnect: false,
     }
   );
+
+  //#region SRTPoliza
+  readonly getPolizaURL = (params: Parameters = {}) => {
+    return this.getURL({ path: "/api/SRTPoliza", search: toURLSearch(params) }).toString();
+  };
+
+  getPoliza = async (params: Parameters = {}) =>
+    tokenizable
+      .get(this.getPolizaURL(params))
+      .then(({ data }) => data[0]);
+
+  useGetPoliza = (params: Parameters = {}) => {
+    const hasCUIT = params?.CUIT != null && params.CUIT !== 0;
+    return useSWR(
+      hasCUIT ? [this.getPolizaURL(params), token.getToken()] : null,
+      () => this.getPoliza(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  };
+  //#endregion SRTPoliza
 
   //#region Polizas Acotado Comercializador
   readonly getPolizasAcotadoURL = (params: ParametersPolizaAcotada = {}) =>
@@ -566,6 +616,57 @@ export class SrtAPIClass extends ExternalAPI {
       this.swrPutSRTComercializadoresAsociadosEdit.fetcher
     );
   //#endregion
+
+  //#region SRTSiniestralidadCIUO88
+  //#region SRTSiniestralidadCIUO88 - List
+  readonly srtSiniestralidadCIUO88ListURL = this.getURL({ path: "/api/SRTSiniestralidadCIUO88" }).toString();
+
+  srtSiniestralidadCIUO88List = async () =>
+    tokenizable
+      .get<SRTSiniestralidadCIUO88[]>(this.srtSiniestralidadCIUO88ListURL)
+      .then(({ data }) => data);
+
+  swrSRTSiniestralidadCIUO88List: {
+    key: SRTSiniestralidadCIUO88ListSWRKey,
+    fetcher: (key: SRTSiniestralidadCIUO88ListSWRKey) => Promise<SRTSiniestralidadCIUO88[]>
+  } = Object.freeze({
+    key: [this.srtSiniestralidadCIUO88ListURL, token.getToken()],
+    fetcher: ([_url, _token]) => this.srtSiniestralidadCIUO88List(),
+  });
+
+  useSRTSiniestralidadCIUO88List = (options?: SRTSiniestralidadCIUO88ListOptions) =>
+    useSWR<SRTSiniestralidadCIUO88[], AxiosError>(
+      this.swrSRTSiniestralidadCIUO88List.key,
+      this.swrSRTSiniestralidadCIUO88List.fetcher,
+      options
+    );
+  //#endregion SRTSiniestralidadCIUO88 - List
+
+  //#region SRTSiniestralidadCIUO88 - Read
+  readonly srtSiniestralidadCIUO88ReadURL = ({ pId }: SRTSiniestralidadCIUO88ReadParams) =>
+    this.getURL({ path: `/api/SRTSiniestralidadCIUO88/${pId}` }).toString();
+
+  srtSiniestralidadCIUO88Read = async (params: SRTSiniestralidadCIUO88ReadParams) =>
+    tokenizable
+      .get<SRTSiniestralidadCIUO88>(this.srtSiniestralidadCIUO88ReadURL(params))
+      .then(({ data }) => data);
+
+  swrSRTSiniestralidadCIUO88Read: {
+    key: (params: SRTSiniestralidadCIUO88ReadParams) => SRTSiniestralidadCIUO88ReadSWRKey,
+    fetcher: (key: SRTSiniestralidadCIUO88ReadSWRKey) => Promise<SRTSiniestralidadCIUO88>
+  } = Object.freeze({
+    key: (params) => [this.srtSiniestralidadCIUO88ReadURL(params), token.getToken(), JSON.stringify(params)],
+    fetcher: ([_url, _token, params]) => this.srtSiniestralidadCIUO88Read(JSON.parse(params)),
+  });
+
+  useSRTSiniestralidadCIUO88Read = (params?: SRTSiniestralidadCIUO88ReadParams, options?: SRTSiniestralidadCIUO88ReadOptions) =>
+    useSWR<SRTSiniestralidadCIUO88, AxiosError>(
+      params ? this.swrSRTSiniestralidadCIUO88Read.key(params) : null,
+      this.swrSRTSiniestralidadCIUO88Read.fetcher,
+      options
+    );
+  //#endregion SRTSiniestralidadCIUO88 - Read
+  //#endregion SRTSiniestralidadCIUO88
 
 
   //#region Polizas Usuario Logueado
