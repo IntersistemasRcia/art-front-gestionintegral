@@ -10,6 +10,8 @@ import type { UsuarioFormFields } from '@/app/inicio/comercializador/administrac
 import useUsuarios from '@/app/inicio/usuarios/useUsuarios';
 import { useAuth } from "@/data/AuthContext";
 import ArtAPI from "@/data/artAPI";
+import AuthAPI from "@/data/authAPI";
+import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import type { VComercializadorRow, EditKind, FormMethod, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow, ComercializadorPutRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios";
 import AdministracionTable from "@/app/inicio/comercializador/administracionComercializadores/AdministracionTable";
 import styles from "./administracionUsuarios.module.css";
@@ -49,9 +51,7 @@ export default function AdminUserPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isDeletingGrupo, setIsDeletingGrupo] = useState<boolean>(false);
-  const [pendingComercializador, setPendingComercializador] = useState<UsuarioFormFields | null>(null);
-  const [pendingOrganizador, setPendingOrganizador] = useState<UsuarioFormFields | null>(null);
-  const [pendingGrupoOrganizador, setPendingGrupoOrganizador] = useState<UsuarioFormFields | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [editOrganizadorBase, setEditOrganizadorBase] = useState<ComercializadorOrganizadoresPutRequest | null>(null);
   const [editGrupoBase, setEditGrupoBase] = useState<ComercializadorGOrganizadoresPutRequest | null>(null);
   const [selectedGrupoRowKey, setSelectedGrupoRowKey] = useState<string | null>(null);
@@ -69,6 +69,7 @@ export default function AdminUserPage() {
   const { trigger: triggerPutComercializador } = ArtAPI.usePutComercializador();
   const { trigger: triggerDeleteComercializador, isMutating: isDeletingComercializador } = ArtAPI.useDeleteComercializador();
   const { trigger: triggerDeleteOrganizador, isMutating: isDeletingOrganizador } = ArtAPI.useDeleteComercializadoresOrganizadores();
+  const { trigger: triggerDeleteUsuario } = AuthAPI.useDeleteUsuario();
 
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
@@ -289,9 +290,6 @@ export default function AdminUserPage() {
 
   const openFormCreate = () => {
     setFormError(null);
-    setPendingComercializador(null);
-    setPendingOrganizador(null);
-    setPendingGrupoOrganizador(null);
     setFormMethod("create");
     setFormInitialData(undefined);
     setEditKind(null);
@@ -329,9 +327,6 @@ export default function AdminUserPage() {
     const interno = Number((row as any)?.interno ?? NaN);
 
     setFormError(null);
-    setPendingComercializador(null);
-    setPendingOrganizador(null);
-    setPendingGrupoOrganizador(null);
     setFormMethod("edit");
     setEditKind(kind);
 
@@ -491,9 +486,6 @@ export default function AdminUserPage() {
 
   const openFormDeleteFromRow = async (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => {
     setFormError(null);
-    setPendingComercializador(null);
-    setPendingOrganizador(null);
-    setPendingGrupoOrganizador(null);
     setFormMethod("delete");
     await openFormEditFromRow(row, kind);
     setFormMethod("delete");
@@ -820,27 +812,16 @@ export default function AdminUserPage() {
             const isOrganizador = rol.toLowerCase() === 'organizadorcomercializador';
             const isGrupoOrganizadorRol = rol.toLowerCase() === 'grupoorganizador';
 
-            // Si ya creamos el usuario pero falló el comercializador, permitimos reintentar
-            const isRetryOnlyComercializador =
-              !!pendingComercializador &&
-              String(pendingComercializador.cuit ?? '') === String(data.cuit ?? '');
-
-            const isRetryOnlyOrganizador =
-              !!pendingOrganizador &&
-              String(pendingOrganizador.cuit ?? '') === String(data.cuit ?? '');
-
-            const isRetryOnlyGrupoOrganizador =
-              !!pendingGrupoOrganizador &&
-              String(pendingGrupoOrganizador.cuit ?? '') === String(data.cuit ?? '');
-
-            if (!isRetryOnlyComercializador && !isRetryOnlyOrganizador && !isRetryOnlyGrupoOrganizador) {
-              const { matricula: _matricula, ...userPayload } = (data as any) ?? {};
-              const result = await registrarUsuario(userPayload);
-              if (!result?.success) {
-                setFormError(result?.error || 'Error al crear usuario');
-                return;
-              }
+            const { matricula: _matricula, ...userPayload } = (data as any) ?? {};
+            const result = await registrarUsuario(userPayload);
+            if (!result?.success) {
+              setFormOpen(false);
+              setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
+              return;
             }
+            const createdUserId = String(result.data?.id ?? '');
+
+            const rollbackUsuario = () => triggerDeleteUsuario(createdUserId).catch(console.error);
 
             if (isComercializador) {
               const cleanCuit = digits((data as any)?.cuit ?? '');
@@ -872,7 +853,7 @@ export default function AdminUserPage() {
                   srtComercializadorOrganizadorInterno: Number.isFinite(organizadorInternoForPost) ? Number(organizadorInternoForPost) : 0,
 
                   razonSocial: String((data as any)?.nombre ?? ''),
-                  fechaNacimiento: String((data as any)?.fechaNacimiento ?? ''),
+                  fechaNacimiento: toISOFechaNacimiento(String((data as any)?.fechaNacimiento ?? '')),
                   domocilioCalle: String((data as any)?.domicilioCalle ?? ''),
                   domicilioNumero: String((data as any)?.domicilioNro ?? ''),
                   domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
@@ -882,12 +863,12 @@ export default function AdminUserPage() {
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
                   ...(data.comercializadorAsociados?.length ? { comercializadorAsociados: data.comercializadorAsociados } : {}),
                 } as any);
-                setPendingComercializador(null);
                 await mutateComercializador();
               } catch (err) {
-                setPendingComercializador(data);
-                setFormError('El usuario se creó, pero falló la creación del comercializador. Reintentá el envío para crear el comercializador.');
                 console.error(err);
+                rollbackUsuario();
+                setFormOpen(false);
+                setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
                 return;
               }
             }
@@ -918,12 +899,12 @@ export default function AdminUserPage() {
                   codLocalidad: String((data as any)?.codLocalidad ?? ''),
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
                 } as any);
-                setPendingOrganizador(null);
                 await mutateOrganizador();
               } catch (err) {
-                setPendingOrganizador(data);
-                setFormError('El usuario se creó, pero falló la creación del organizador. Reintentá el envío para crear el organizador.');
                 console.error(err);
+                rollbackUsuario();
+                setFormOpen(false);
+                setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
                 return;
               }
             }
@@ -953,12 +934,12 @@ export default function AdminUserPage() {
 
               try {
                 await triggerPostGrupoOrganizador(payload as any);
-                setPendingGrupoOrganizador(null);
                 await mutateGrupoTable();
               } catch (err) {
-                setPendingGrupoOrganizador(data);
-                setFormError('El usuario se creó, pero falló la creación del Grupo Organizador. Reintentá el envío para crear el Grupo Organizador.');
                 console.error(err);
+                rollbackUsuario();
+                setFormOpen(false);
+                setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
                 return;
               }
             }
@@ -976,6 +957,13 @@ export default function AdminUserPage() {
         isSubmitting={isSubmitting}
         errorMsg={formError}
         isAdmin={isAdminLevel}
+      />
+
+      <CustomModalMessage
+        open={modalError !== null}
+        type="error"
+        message={modalError ?? ''}
+        onClose={() => setModalError(null)}
       />
 
     </div>
