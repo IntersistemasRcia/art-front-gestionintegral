@@ -171,7 +171,7 @@ export function UsuarioEmpresasUsuarioTab({
         await AuthAPI.postParamEntidadEmpresaRAR({
           entidadId: Number(empresaAAgregar.empresaId),
           parametroId: 1,
-          parametroValor: "20",
+          parametroValor: "10",
         });
       }
 
