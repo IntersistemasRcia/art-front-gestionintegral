@@ -531,7 +531,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
     if (result.success) {
       const successTitles = {
         create: "Usuario creado exitosamente",
-        edit: "Usuario actualizado exitosamente",
+        edit: "Usuario actualizado exitosamente", 
         delete: "Usuario dado de baja exitosamente",
         activate: "Usuario reactivado exitosamente"
       };
@@ -543,12 +543,15 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         activate: "Usuario Reactivado"
       };
 
-      const successTitle = successTitles[method as keyof typeof successTitles] || "Operación completada exitosamente";
+      const baseSuccessTitle = successTitles[method as keyof typeof successTitles] || "Operación completada exitosamente";
+      const successTitle = successSecondaryMessage
+        ? `${baseSuccessTitle}. ${successSecondaryMessage}`
+        : baseSuccessTitle;
       const successMessage = successBodyMessages[method as keyof typeof successBodyMessages] || "Operación completada";
       showModalMessage(
         successMessage,
         "success",
-        successSecondaryMessage,
+        undefined,
         successTitle
       );
       if (method !== "create" || !successSecondaryMessage) {

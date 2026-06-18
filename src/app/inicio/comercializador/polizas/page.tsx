@@ -236,7 +236,7 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
             options={empresasOptions}
             getOptionLabel={(e) => formatEmpresaLabel(e)}
             value={empresa}
-            onChange={(_event, newValue) => {
+            onChange={(_event, newValue) => { 
               setEmpresa(newValue);
               seleccionAutomaticaRef.current = false;
             }}
@@ -401,7 +401,7 @@ const organizadoresInternos = useMemo(() => {
 
   const params = useMemo(() => {
     const interno = Number((comercializadorValue as any)?.interno ?? 0);
-    if (interno) return { ComercializadoresInternos: String(interno) } as any;
+    if (interno) return { ComercializadoresInternos: String(interno), SoloActivas: true } as any;
     const hasFiltro =
       isGrupoOrganizador ||
       isOrganizadorComercializador ||
@@ -409,8 +409,10 @@ const organizadoresInternos = useMemo(() => {
       !!grupoValue ||
       !!organizadorValue ||
       !!comercializadorValue;
-    if (hasFiltro && !comercializadoresInternos) return { ComercializadoresInternos: '0' } as any;
-    return comercializadoresInternos ? ({ ComercializadoresInternos: comercializadoresInternos } as any) : ({} as any);
+    if (hasFiltro && !comercializadoresInternos) return { ComercializadoresInternos: '0', SoloActivas: true } as any;
+    return comercializadoresInternos
+      ? ({ ComercializadoresInternos: comercializadoresInternos, SoloActivas: true } as any)
+      : ({ SoloActivas: true } as any);
   }, [
     comercializadorValue,
     comercializadoresInternos,
