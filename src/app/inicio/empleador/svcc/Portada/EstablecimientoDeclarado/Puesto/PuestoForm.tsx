@@ -80,7 +80,11 @@ export const PuestoForm: Form<PuestoDTO> = ({
                 isLoading={ciuo88.isLoading || ciuo88.isValidating}
                 data={{ data: ciuo88.data ?? [] }}
                 onSelect={(select) => () => {
-                  onChange({ ciuo: select.ciuO88 });
+                  const ciuo = Number(select.ciuO88 ?? (select as any).ciuo88);
+                  onChange({
+                    ciuo: Number.isFinite(ciuo) ? ciuo : undefined,
+                    nombre: select.descripcion,
+                  });
                   setLookupCIUO(false);
                 }}
               />
