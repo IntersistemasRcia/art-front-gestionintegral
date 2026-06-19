@@ -148,7 +148,7 @@ export class SrtAPIClass extends ExternalAPI {
 
   //#region SRTPoliza
   readonly getPolizaURL = (params: Parameters = {}) => {
-    return this.getURL({ path: "/api/SRTPoliza", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/SRTPolizas", search: toURLSearch(params) }).toString();
   };
 
   getPoliza = async (params: Parameters = {}) =>
