@@ -815,8 +815,7 @@ export default function AdminUserPage() {
             const { matricula: _matricula, ...userPayload } = (data as any) ?? {};
             const result = await registrarUsuario(userPayload);
             if (!result?.success) {
-              setFormOpen(false);
-              setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
+              setModalError(result.error ?? 'Hubo un inconveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
               return;
             }
             const createdUserId = String(result.data?.id ?? '');
@@ -867,8 +866,8 @@ export default function AdminUserPage() {
               } catch (err) {
                 console.error(err);
                 rollbackUsuario();
-                setFormOpen(false);
-                setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
+                const msg = (err as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+                setModalError(msg ?? 'Hubo un inconveniente al registrar el comercializador, por favor intente de nuevo.');
                 return;
               }
             }
@@ -903,8 +902,8 @@ export default function AdminUserPage() {
               } catch (err) {
                 console.error(err);
                 rollbackUsuario();
-                setFormOpen(false);
-                setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
+                const msg = (err as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+                setModalError(msg ?? 'Hubo un inconveniente al registrar el organizador, por favor intente de nuevo.');
                 return;
               }
             }
@@ -938,8 +937,8 @@ export default function AdminUserPage() {
               } catch (err) {
                 console.error(err);
                 rollbackUsuario();
-                setFormOpen(false);
-                setModalError('Hubo un incoveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
+                const msg = (err as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+                setModalError(msg ?? 'Hubo un inconveniente al registrar el grupo organizador, por favor intente de nuevo.');
                 return;
               }
             }
