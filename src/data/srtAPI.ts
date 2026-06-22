@@ -43,6 +43,7 @@ export type SRTPolizaUsuarioLogueada = SRTPolizaAcotada;
 export type SRTSiniestralidadCIUO88 = {
   id: number;
   ciuO88: number;
+  ciuo88?: number;
   descripcion?: string;
 };
 
@@ -624,7 +625,7 @@ export class SrtAPIClass extends ExternalAPI {
   srtSiniestralidadCIUO88List = async () =>
     tokenizable
       .get<SRTSiniestralidadCIUO88[]>(this.srtSiniestralidadCIUO88ListURL)
-      .then(({ data }) => data);
+      .then(({ data }) => data.map(normalizeSRTSiniestralidadCIUO88));
 
   swrSRTSiniestralidadCIUO88List: {
     key: SRTSiniestralidadCIUO88ListSWRKey,
@@ -649,7 +650,7 @@ export class SrtAPIClass extends ExternalAPI {
   srtSiniestralidadCIUO88Read = async (params: SRTSiniestralidadCIUO88ReadParams) =>
     tokenizable
       .get<SRTSiniestralidadCIUO88>(this.srtSiniestralidadCIUO88ReadURL(params))
-      .then(({ data }) => data);
+      .then(({ data }) => normalizeSRTSiniestralidadCIUO88(data));
 
   swrSRTSiniestralidadCIUO88Read: {
     key: (params: SRTSiniestralidadCIUO88ReadParams) => SRTSiniestralidadCIUO88ReadSWRKey,
@@ -693,3 +694,12 @@ export class SrtAPIClass extends ExternalAPI {
 const SrtAPI = Object.seal(new SrtAPIClass()) as SrtAPIClass;
 
 export default SrtAPI;
+
+function normalizeSRTSiniestralidadCIUO88(
+  item: SRTSiniestralidadCIUO88
+): SRTSiniestralidadCIUO88 {
+  return {
+    ...item,
+    ciuO88: Number(item.ciuO88 ?? item.ciuo88 ?? 0),
+  };
+}
