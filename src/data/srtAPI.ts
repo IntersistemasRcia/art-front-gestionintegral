@@ -139,8 +139,8 @@ export class SrtAPIClass extends ExternalAPI {
   getPolizaComercializador = async (params: ParametersPoliza = {}) => tokenizable.get(
     this.getpolizaComercializadorURL(params),
   ).then(({ data }) => data);
-  useGetPolizaComercializadorURL = (params: ParametersPoliza = {}) => useSWR(
-    [this.getpolizaComercializadorURL(params), token.getToken()], () => this.getPolizaComercializador(params),
+  useGetPolizaComercializadorURL = (params: ParametersPoliza | null = {}) => useSWR(
+    params === null ? null : [this.getpolizaComercializadorURL(params), token.getToken()], () => this.getPolizaComercializador(params ?? {}),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -199,8 +199,8 @@ export class SrtAPIClass extends ExternalAPI {
   getComercializador = async (params: ParametersComercializador = {}) => tokenizable.get(
     this.getComercializadorURL(params),
   ).then(({ data }) => data);
-  useGetComercializadorURL = (params: ParametersComercializador = {}) => useSWR(
-    [this.getComercializadorURL(params), token.getToken()], () => this.getComercializador(params),
+  useGetComercializadorURL = (params: ParametersComercializador | null = {}) => useSWR(
+    params === null ? null : [this.getComercializadorURL(params), token.getToken()], () => this.getComercializador(params ?? {}),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -314,8 +314,8 @@ export class SrtAPIClass extends ExternalAPI {
   getOrganizador = async (params: OrganizadorComercializador = {}) => tokenizable.get(
     this.getOrganizadorURL(params),
   ).then(({ data }) => data);
-  useGetOrganizadorURL = (params: OrganizadorComercializador = {}) => useSWR(
-    [this.getOrganizadorURL(params), token.getToken()], () => this.getOrganizador(params),
+  useGetOrganizadorURL = (params: OrganizadorComercializador | null = {}) => useSWR(
+    params === null ? null : [this.getOrganizadorURL(params), token.getToken()], () => this.getOrganizador(params ?? {}),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
