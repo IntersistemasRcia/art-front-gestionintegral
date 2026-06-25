@@ -342,7 +342,7 @@ const Poliza = () => {
           label="Localidad:"
           name="Localidad"
           value={`${formatEmpleadorValue(polizaRawData?.empleadorDomicilioLocalidadDescripcion)
-          } - CP: ${formatEmpleadorValue(polizaRawData?.empleadorDomicilioCP ?? (polizaRawData as any)?.empleador_Domicilio_CP)}`}
+          } - CP: ${formatEmpleadorValue(polizaRawData?.empleadorDomicilioCP ?? (polizaRawData as any)?.empleadorDomicilioCp)}`}
           fullWidth
           variant="standard"
         />
@@ -437,7 +437,7 @@ const Poliza = () => {
         <TextField
           label="Operación:"
           name="Operacion"
-          value={polizaRawData ? `${polizaRawData.codigoOperacion} - ${polizaRawData.operacionDescripcion}` : "---"}
+          value={polizaRawData ? `${polizaRawData.movimientoCodigoOperacion} - ${polizaRawData.movimientoDescripcionOperacion}` : "---"}
           fullWidth
           variant="standard"
         />
@@ -445,7 +445,7 @@ const Poliza = () => {
         <TextField
           label="Codigo Motivo Sorteo:"
           name="Sorteo"
-          value={polizaRawData?.codigoMotivoSorteo}
+          value={polizaRawData?.codigoMotivoSorteo || "0"}
           fullWidth
           variant="standard"
         />
