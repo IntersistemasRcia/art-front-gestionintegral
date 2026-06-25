@@ -1,0 +1,40 @@
+.topRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.cuilField {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.razonSocialField {
+  flex: 1;
+}
+
+.autocompleteField {
+  width: 500px;
+  flex-shrink: 0;
+}
+
+.disabledOpacity {
+  opacity: 0.6;
+}
+
+.checkbox {
+  margin-bottom: 1rem;
+}
+
+.tableDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}

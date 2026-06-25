@@ -13,6 +13,9 @@ import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 'react-icons/bs';
 import Link from 'next/link';
 import type { Poliza } from "./types/poliza";
+import CustomTabs from '@/utils/ui/tab/CustomTab';
+import HistorialPoliza from './historialPoliza/historialPoliza';
+import SrtAPI from '@/data/srtAPI';
 
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
 
@@ -127,7 +130,9 @@ function digits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
-function PolizasListado({ params, groupSelect, organizadorSelect, comercializadorSelect, emptyMessage, forceEmpty, }: { params: any; groupSelect?: React.ReactNode; organizadorSelect?: React.ReactNode; comercializadorSelect?: React.ReactNode; emptyMessage?: string; forceEmpty?: boolean; }) {
+type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
+
+function PolizasListado({ params, groupSelect, organizadorSelect, comercializadorSelect, emptyMessage, forceEmpty, onRowClick, selectedRowKey }: { params: any; groupSelect?: React.ReactNode; organizadorSelect?: React.ReactNode; comercializadorSelect?: React.ReactNode; emptyMessage?: string; forceEmpty?: boolean; onRowClick?: (row: PolizaRow) => void; selectedRowKey?: string; }) {
   const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const seleccionAutomaticaRef = useRef(false);
@@ -268,6 +273,8 @@ function PolizasListado({ params, groupSelect, organizadorSelect, comercializado
         data={filteredRows}
         pageSizeOptions={[5, 10, 20]}
         isLoading={isLoading}
+        onRowClick={onRowClick}
+        selectedRowKeyProp={selectedRowKey}
       />
     </div>
   );
@@ -289,6 +296,8 @@ function PolizasPage() {
   const [grupo, setGrupo] = useState<any>(null);
   const [organizador, setOrganizador] = useState<any>(null);
   const [comercializador, setComercializador] = useState<any>(null);
+  const [tab, setTab] = useState(0);
+  const [selectedPoliza, setSelectedPoliza] = useState<PolizaRow | null>(null);
 
   const { data: gOrgData } = ArtAPI.useGetGOrganizadorURL(
     isAdminLevel ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
@@ -473,7 +482,56 @@ const organizadoresInternos = useMemo(() => {
       ? 'No hay pólizas para el filtro seleccionado.'
       : undefined;
 
-  return <PolizasListado params={params} groupSelect={groupSelect} organizadorSelect={organizadorSelect} comercializadorSelect={comercializadorSelect} emptyMessage={emptyMessage} forceEmpty={forceEmpty} />;
+  const polizaInterno = selectedPoliza ? Number(selectedPoliza.interno) : undefined;
+  const { data: historialData, isLoading: historialLoading } = SrtAPI.useGetSRTComercializadoresHistorialByPolizaId(polizaInterno);
+
+  const historialRows = useMemo(() => {
+    if (!historialData) return [];
+    return (historialData as any[]).map((item) => ({
+      ...item,
+      numeroPoliza: selectedPoliza?.numero ?? String(item.srtPolizaInterno),
+    }));
+  }, [historialData, selectedPoliza]);
+
+  const historial = (
+    <HistorialPoliza
+      data={historialRows}
+      isLoading={historialLoading}
+      hasSelection={!!selectedPoliza}
+      empleadorCuit={selectedPoliza?.CUIT ?? ""}
+      empleadorRazonSocial={selectedPoliza?.Empleador_Denominacion ?? ""}
+    />
+  );
+
+  return (
+    <CustomTabs
+      currentTab={tab}
+      onTabChange={(_e, v) => setTab(v)}
+      tabs={[
+        {
+          label: "Polizas",
+          value: 0,
+          content: (
+            <PolizasListado
+              params={params}
+              groupSelect={groupSelect}
+              organizadorSelect={organizadorSelect}
+              comercializadorSelect={comercializadorSelect}
+              emptyMessage={emptyMessage}
+              forceEmpty={forceEmpty}
+              onRowClick={setSelectedPoliza}
+              selectedRowKey={selectedPoliza?.interno}
+            />
+          ),
+        },
+        {
+          label: "Historial",
+          value: 1,
+          content: historial,
+        },
+      ]}
+    />
+  );
 }
 
 export default PolizasPage;

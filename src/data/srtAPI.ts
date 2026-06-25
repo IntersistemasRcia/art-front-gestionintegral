@@ -39,6 +39,20 @@ const tokenizable = token.configure();
 
 export type SRTPolizaUsuarioLogueada = SRTPolizaAcotada;
 
+//#region Types SRTComercializadoresHistorial
+export type SRTComercializadoresHistorialPostRequest = {
+  srtPolizaInterno: number;
+  srtComercializadorInterno: number;
+  fechaHasta: string;
+};
+export type SRTComercializadoresHistorialPutRequest = {
+  srtPolizaInterno: number;
+  srtComercializadorInterno: number;
+  srtComercializadorAsociadoInterno: number;
+  fechaHasta: string;
+};
+//#endregion Types SRTComercializadoresHistorial
+
 //#region Types SRTSiniestralidadCIUO88
 export type SRTSiniestralidadCIUO88 = {
   id: number;
@@ -169,6 +183,56 @@ export class SrtAPIClass extends ExternalAPI {
     );
   };
   //#endregion SRTPoliza
+
+  //#region SRTPolizas PUT Comercializador
+  readonly putSRTPolizaComercializadorBaseURL = this.getURL({ path: "/api/SRTPolizas" }).toString();
+
+  readonly putSRTPolizaComercializadorURL = (id: number) =>
+    this.getURL({ path: `/api/SRTPolizas/${id}` }).toString();
+
+  putSRTPolizaComercializador = async (id: number, data: { srtComercializadorInterno: number }) =>
+    tokenizable.put(this.putSRTPolizaComercializadorURL(id), data).then(({ data }) => data);
+
+  swrPutSRTPolizaComercializador: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number; data: { srtComercializadorInterno: number } } }) => Promise<unknown>;
+  } = Object.freeze({
+    key: [this.putSRTPolizaComercializadorBaseURL, token.getToken()],
+    fetcher: (_key: [string, string], { arg }: { arg: { id: number; data: { srtComercializadorInterno: number } } }) =>
+      this.putSRTPolizaComercializador(arg.id, arg.data),
+  });
+
+  usePutSRTPolizaComercializador = () =>
+    useSWRMutation<unknown, Error, [url: string, token: string], { id: number; data: { srtComercializadorInterno: number } }>(
+      this.swrPutSRTPolizaComercializador.key,
+      this.swrPutSRTPolizaComercializador.fetcher
+    );
+  //#endregion
+
+  //#region SRTPolizas PUT AsignarComercializadorAsociado
+  readonly putSRTPolizaAsignarAsociadoBaseURL = this.getURL({ path: "/api/SRTPolizas" }).toString() + "#AsignarAsociado";
+
+  readonly putSRTPolizaAsignarAsociadoURL = (id: number) =>
+    this.getURL({ path: `/api/SRTPolizas/${id}/AsignarComercializadorAsociado` }).toString();
+
+  putSRTPolizaAsignarAsociado = async (id: number, data: { srtComercializadorAsociadoInterno: number }) =>
+    tokenizable.put(this.putSRTPolizaAsignarAsociadoURL(id), data).then(({ data }) => data);
+
+  swrPutSRTPolizaAsignarAsociado: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number; data: { srtComercializadorAsociadoInterno: number } } }) => Promise<unknown>;
+  } = Object.freeze({
+    key: [this.putSRTPolizaAsignarAsociadoBaseURL, token.getToken()],
+    fetcher: (_key: [string, string], { arg }: { arg: { id: number; data: { srtComercializadorAsociadoInterno: number } } }) =>
+      this.putSRTPolizaAsignarAsociado(arg.id, arg.data),
+  });
+
+  usePutSRTPolizaAsignarAsociado = () =>
+    useSWRMutation<unknown, Error, [url: string, token: string], { id: number; data: { srtComercializadorAsociadoInterno: number } }>(
+      this.swrPutSRTPolizaAsignarAsociado.key,
+      this.swrPutSRTPolizaAsignarAsociado.fetcher
+    );
+  //#endregion
 
   //#region Polizas Acotado Comercializador
   readonly getPolizasAcotadoURL = (params: ParametersPolizaAcotada = {}) =>
@@ -617,6 +681,125 @@ export class SrtAPIClass extends ExternalAPI {
       this.swrPutSRTComercializadoresAsociadosEdit.fetcher
     );
   //#endregion
+
+  // Region crud SRTComercializadoresHistorial
+
+  //#region SRTComercializadoresHistorial por Id
+  readonly getSRTComercializadoresHistorialByIdURL = (id: number) =>
+    this.getURL({ path: `/api/SRTComercializadoresHistorial/${id}` }).toString();
+
+  getSRTComercializadoresHistorialById = async (id: number) =>
+    tokenizable
+      .get(this.getSRTComercializadoresHistorialByIdURL(id))
+      .then(({ data }) => data);
+
+  useGetSRTComercializadoresHistorialById = (id?: number) =>
+    useSWR(
+      id && token.getToken()
+        ? [this.getSRTComercializadoresHistorialByIdURL(id), token.getToken()]
+        : null,
+      () => this.getSRTComercializadoresHistorialById(id as number),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
+
+  //#region SRTComercializadoresHistorial POST
+  readonly postSRTComercializadoresHistorialURL = this.getURL({ path: "/api/SRTComercializadoresHistorial" }).toString();
+
+  postSRTComercializadoresHistorial = async (data: SRTComercializadoresHistorialPostRequest) =>
+    tokenizable.post(this.postSRTComercializadoresHistorialURL, data).then(({ data }) => data);
+
+  swrPostSRTComercializadoresHistorial: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: SRTComercializadoresHistorialPostRequest }) => Promise<unknown>;
+  } = Object.freeze({
+    key: [this.postSRTComercializadoresHistorialURL, token.getToken()],
+    fetcher: (_key: [string, string], { arg }: { arg: SRTComercializadoresHistorialPostRequest }) =>
+      this.postSRTComercializadoresHistorial(arg),
+  });
+
+  usePostSRTComercializadoresHistorial = () =>
+    useSWRMutation<unknown, Error, [url: string, token: string], SRTComercializadoresHistorialPostRequest>(
+      this.swrPostSRTComercializadoresHistorial.key,
+      this.swrPostSRTComercializadoresHistorial.fetcher
+    );
+  //#endregion
+
+  //#region SRTComercializadoresHistorial PUT
+  readonly putSRTComercializadoresHistorialBaseURL = this.getURL({ path: "/api/SRTComercializadoresHistorial" }).toString();
+
+  readonly putSRTComercializadoresHistorialURL = (id: number) =>
+    this.getURL({ path: `/api/SRTComercializadoresHistorial/${id}` }).toString();
+
+  putSRTComercializadoresHistorial = async (id: number, data: SRTComercializadoresHistorialPutRequest) =>
+    tokenizable.put(this.putSRTComercializadoresHistorialURL(id), data).then(({ data }) => data);
+
+  swrPutSRTComercializadoresHistorial: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number; data: SRTComercializadoresHistorialPutRequest } }) => Promise<unknown>;
+  } = Object.freeze({
+    key: [this.putSRTComercializadoresHistorialBaseURL, token.getToken()],
+    fetcher: (_key: [string, string], { arg }: { arg: { id: number; data: SRTComercializadoresHistorialPutRequest } }) =>
+      this.putSRTComercializadoresHistorial(arg.id, arg.data),
+  });
+
+  usePutSRTComercializadoresHistorial = () =>
+    useSWRMutation<unknown, Error, [url: string, token: string], { id: number; data: SRTComercializadoresHistorialPutRequest }>(
+      this.swrPutSRTComercializadoresHistorial.key,
+      this.swrPutSRTComercializadoresHistorial.fetcher
+    );
+  //#endregion
+
+  //#region SRTComercializadoresHistorial DELETE
+  readonly deleteSRTComercializadoresHistorialBaseURL = this.getURL({ path: "/api/SRTComercializadoresHistorial" }).toString();
+
+  readonly deleteSRTComercializadoresHistorialURL = (id: number) =>
+    this.getURL({ path: `/api/SRTComercializadoresHistorial/${id}` }).toString();
+
+  deleteSRTComercializadoresHistorial = async (id: number) =>
+    tokenizable.delete(this.deleteSRTComercializadoresHistorialURL(id)).then(({ data }) => data);
+
+  swrDeleteSRTComercializadoresHistorial: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number } }) => Promise<unknown>;
+  } = Object.freeze({
+    key: [this.deleteSRTComercializadoresHistorialBaseURL, token.getToken()],
+    fetcher: (_key: [string, string], { arg }: { arg: { id: number } }) =>
+      this.deleteSRTComercializadoresHistorial(arg.id),
+  });
+
+  useDeleteSRTComercializadoresHistorial = () =>
+    useSWRMutation<unknown, Error, [url: string, token: string], { id: number }>(
+      this.swrDeleteSRTComercializadoresHistorial.key,
+      this.swrDeleteSRTComercializadoresHistorial.fetcher
+    );
+  //#endregion
+
+  //#region SRTComercializadoresHistorial por PolizaId
+  readonly getSRTComercializadoresHistorialByPolizaIdURL = (polizaId: number) =>
+    this.getURL({ path: `/api/SRTComercializadoresHistorial/SRTPoliza/${polizaId}` }).toString();
+
+  getSRTComercializadoresHistorialByPolizaId = async (polizaId: number) =>
+    tokenizable
+      .get(this.getSRTComercializadoresHistorialByPolizaIdURL(polizaId))
+      .then(({ data }) => data);
+
+  useGetSRTComercializadoresHistorialByPolizaId = (polizaId?: number) =>
+    useSWR(
+      polizaId && token.getToken()
+        ? [this.getSRTComercializadoresHistorialByPolizaIdURL(polizaId), token.getToken()]
+        : null,
+      () => this.getSRTComercializadoresHistorialByPolizaId(polizaId as number),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+  //#endregion
+  // End Region crud SRTComercializadoresHistorial
 
   //#region SRTSiniestralidadCIUO88
   //#region SRTSiniestralidadCIUO88 - List

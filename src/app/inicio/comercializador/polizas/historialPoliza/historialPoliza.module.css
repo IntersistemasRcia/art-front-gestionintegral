@@ -1,0 +1,22 @@
+.emptyMessage {
+  padding: 16px;
+  color: var(--grisOscuro);
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.actionButtons {
+	display: flex;
+  justify-content: center;
+  align-items: center;
+	gap: 8px;
+  width: 100%;
+}
+
+.actionIcon {
+	font-size: 22px;
+}
