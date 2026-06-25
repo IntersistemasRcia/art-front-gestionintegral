@@ -48,7 +48,7 @@ export type SRTComercializadoresHistorialPostRequest = {
 export type SRTComercializadoresHistorialPutRequest = {
   srtPolizaInterno: number;
   srtComercializadorInterno: number;
-  srtComercializadorAsociadoInterno: number;
+  srtComercializadorAsociadoInterno: number | null;
   fechaHasta: string;
 };
 //#endregion Types SRTComercializadoresHistorial
@@ -686,7 +686,7 @@ export class SrtAPIClass extends ExternalAPI {
 
   //#region SRTComercializadoresHistorial por Id
   readonly getSRTComercializadoresHistorialByIdURL = (id: number) =>
-    this.getURL({ path: `/api/SRTComercializadoresHistorial/${id}` }).toString();
+    this.getURL({ path: `/api/SRTPolizasHistorial/${id}` }).toString();
 
   getSRTComercializadoresHistorialById = async (id: number) =>
     tokenizable
@@ -707,7 +707,7 @@ export class SrtAPIClass extends ExternalAPI {
   //#endregion
 
   //#region SRTComercializadoresHistorial POST
-  readonly postSRTComercializadoresHistorialURL = this.getURL({ path: "/api/SRTComercializadoresHistorial" }).toString();
+  readonly postSRTComercializadoresHistorialURL = this.getURL({ path: "/api/SRTPolizasHistorial" }).toString();
 
   postSRTComercializadoresHistorial = async (data: SRTComercializadoresHistorialPostRequest) =>
     tokenizable.post(this.postSRTComercializadoresHistorialURL, data).then(({ data }) => data);
@@ -729,10 +729,10 @@ export class SrtAPIClass extends ExternalAPI {
   //#endregion
 
   //#region SRTComercializadoresHistorial PUT
-  readonly putSRTComercializadoresHistorialBaseURL = this.getURL({ path: "/api/SRTComercializadoresHistorial" }).toString();
+  readonly putSRTComercializadoresHistorialBaseURL = this.getURL({ path: "/api/SRTPolizasHistorial" }).toString();
 
   readonly putSRTComercializadoresHistorialURL = (id: number) =>
-    this.getURL({ path: `/api/SRTComercializadoresHistorial/${id}` }).toString();
+    this.getURL({ path: `/api/SRTPolizasHistorial/${id}` }).toString();
 
   putSRTComercializadoresHistorial = async (id: number, data: SRTComercializadoresHistorialPutRequest) =>
     tokenizable.put(this.putSRTComercializadoresHistorialURL(id), data).then(({ data }) => data);
@@ -754,10 +754,10 @@ export class SrtAPIClass extends ExternalAPI {
   //#endregion
 
   //#region SRTComercializadoresHistorial DELETE
-  readonly deleteSRTComercializadoresHistorialBaseURL = this.getURL({ path: "/api/SRTComercializadoresHistorial" }).toString();
+  readonly deleteSRTComercializadoresHistorialBaseURL = this.getURL({ path: "/api/SRTPolizasHistorial" }).toString();
 
   readonly deleteSRTComercializadoresHistorialURL = (id: number) =>
-    this.getURL({ path: `/api/SRTComercializadoresHistorial/${id}` }).toString();
+    this.getURL({ path: `/api/SRTPolizasHistorial/${id}` }).toString();
 
   deleteSRTComercializadoresHistorial = async (id: number) =>
     tokenizable.delete(this.deleteSRTComercializadoresHistorialURL(id)).then(({ data }) => data);
@@ -780,7 +780,7 @@ export class SrtAPIClass extends ExternalAPI {
 
   //#region SRTComercializadoresHistorial por PolizaId
   readonly getSRTComercializadoresHistorialByPolizaIdURL = (polizaId: number) =>
-    this.getURL({ path: `/api/SRTComercializadoresHistorial/SRTPoliza/${polizaId}` }).toString();
+    this.getURL({ path: `/api/SRTPolizasHistorial/SRTPoliza/${polizaId}` }).toString();
 
   getSRTComercializadoresHistorialByPolizaId = async (polizaId: number) =>
     tokenizable

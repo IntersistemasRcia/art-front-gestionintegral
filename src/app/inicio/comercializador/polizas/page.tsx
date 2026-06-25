@@ -541,6 +541,7 @@ function PolizasPage() {
       hasSelection={!!selectedPoliza}
       empleadorCuit={selectedPoliza?.CUIT ?? ""}
       empleadorRazonSocial={selectedPoliza?.Empleador_Denominacion ?? ""}
+      polizaInterno={polizaInterno}
     />
   );
 
