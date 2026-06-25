@@ -423,9 +423,9 @@ export default function CoberturaPage() {
         }
         return {
             cuit: Formato.CUIP(polizaData.cuit) || "",
-            vigenciaDesde: Formato.Fecha(polizaData.vigencia_Desde) || "",
-            vigenciaHasta: Formato.Fecha(polizaData.vigencia_Hasta) || "",
-            empleadorDenominacion: polizaData.empleador_Denoominacion || "",
+            vigenciaDesde: Formato.Fecha(polizaData.vigenciaDesde) || "",
+            vigenciaHasta: Formato.Fecha(polizaData.vigenciaHasta) || "",
+            empleadorDenominacion: polizaData.empleadorDenominacion || "",
             numero: polizaData.numero || ""
         };
     }, [polizaData, isMounted]);
@@ -719,8 +719,8 @@ export default function CoberturaPage() {
                     poliza={polizaData}                     // pasa tu objeto poliza
                     dia={dia}                           // opcional
                     hora={hora}                         // opcional
-                    fechaDesde={polizaData?.vigencia_Desde}             // opcional
-                    fechaHasta={polizaData?.vigencia_Hasta}             // opcional
+                    fechaDesde={polizaData?.vigenciaDesde}             // opcional
+                    fechaHasta={polizaData?.vigenciaHasta}             // opcional
                     clausula={clausula}       // opcional
                     nominasSeleccionadas={selectedCubierto} // si aplicable
                 cuitEmpresa={Number.isFinite(cuitEmpresaActual) ? cuitEmpresaActual : undefined}

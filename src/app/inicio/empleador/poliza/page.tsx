@@ -147,6 +147,11 @@ const Poliza = () => {
     return formatted || "-----------";
   };
 
+  const formatEmpleadorValue = (value: unknown): string => {
+    const formatted = String(value ?? "").trim();
+    return formatted || "---";
+  };
+
   // Cargar parámetros de entidad (entidadId = 0) para Datos de la Aseguradora
   const { data: parametrosEntidadData } = AuthAPI.useGetParametrosEntidadURL({
     entidadId: 0,
@@ -336,9 +341,8 @@ const Poliza = () => {
         <TextField
           label="Localidad:"
           name="Localidad"
-          value={`${
-            polizaRawData?.empleadorDomicilioLocalidadDescripcion || "---"
-          } - CP:${polizaRawData?.empleadorDomicilioCP || "---"}`}
+          value={`${formatEmpleadorValue(polizaRawData?.empleadorDomicilioLocalidadDescripcion)
+          } - CP: ${formatEmpleadorValue(polizaRawData?.empleadorDomicilioCP ?? (polizaRawData as any)?.empleadorDomicilioCp)}`}
           fullWidth
           variant="standard"
         />
@@ -402,7 +406,7 @@ const Poliza = () => {
           name="Alicuota"
           value={
             polizaRawData
-              ? (Number(polizaRawData.alicuotaPagoILT) === 1
+              ? (Number(polizaRawData.alicuotaPagoIlt) === 1
                   ? `ILT: 1-El Empleador paga ILT por cuenta y orden de la ART - Valor Fijo: $${polizaRawData.alicuotaSumaFija}`
                   : '-----')
               : '---'
@@ -433,7 +437,7 @@ const Poliza = () => {
         <TextField
           label="Operación:"
           name="Operacion"
-          value={polizaRawData ? `${polizaRawData.codigoOperacion} - ${polizaRawData.operacionDescripcion}` : "---"}
+          value={polizaRawData ? `${polizaRawData.movimientoCodigoOperacion} - ${polizaRawData.movimientoDescripcionOperacion}` : "---"}
           fullWidth
           variant="standard"
         />
@@ -441,7 +445,7 @@ const Poliza = () => {
         <TextField
           label="Codigo Motivo Sorteo:"
           name="Sorteo"
-          value={polizaRawData?.codigoMotivoSorteo || "---"}
+          value={polizaRawData?.codigoMotivoSorteo || "0"}
           fullWidth
           variant="standard"
         />
@@ -492,7 +496,7 @@ const Poliza = () => {
         <TextField
           label="Unico Establecimiento"
           name="Establecimiento"
-          value={polizaRawData?.unicoEstablecimiento || "---"}
+          value={polizaRawData?.unicoEstablecimiento ? "Si" : "No"}
           fullWidth
           variant="standard"
         />
