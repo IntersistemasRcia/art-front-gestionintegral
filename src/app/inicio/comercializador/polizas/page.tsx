@@ -132,14 +132,32 @@ function digits(value: unknown) {
 
 type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
 
-function PolizasListado({ params, groupSelect, organizadorSelect, comercializadorSelect, emptyMessage, forceEmpty, onRowClick, selectedRowKey }: { params: any; groupSelect?: React.ReactNode; organizadorSelect?: React.ReactNode; comercializadorSelect?: React.ReactNode; emptyMessage?: string; forceEmpty?: boolean; onRowClick?: (row: PolizaRow) => void; selectedRowKey?: string; }) {
+function PolizasListado({
+  params = {},
+  groupSelect,
+  organizadorSelect,
+  comercializadorSelect,
+  emptyMessage,
+  isResolvingPolizas = false,
+  onRowClick,
+  selectedRowKey,
+}: {
+  params?: any | null;
+  groupSelect?: React.ReactNode;
+  organizadorSelect?: React.ReactNode;
+  comercializadorSelect?: React.ReactNode;
+  emptyMessage?: string;
+  isResolvingPolizas?: boolean;
+  onRowClick?: (row: PolizaRow) => void;
+  selectedRowKey?: string;
+}) {
   const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const seleccionAutomaticaRef = useRef(false);
 
-  const apiData = forceEmpty ? [] : (apiDataRaw ?? []);
-  const error = forceEmpty ? undefined : apiError;
-  const isLoading = forceEmpty ? false : apiIsLoading;
+  const apiData = isResolvingPolizas ? [] : apiDataRaw ?? [];
+  const error = isResolvingPolizas ? undefined : apiError;
+  const isLoading = isResolvingPolizas || apiIsLoading;
   const isComboLoading = isLoadingEmpresas || isLoading;
 
   const rows = useMemo(() => {
@@ -304,12 +322,13 @@ function PolizasPage() {
   );
 
   const { data: organizadorMeData } = ArtAPI.useGetOrganizadorURL(
-    isOrganizadorComercializador ? ({ CUIL: cuil } as any) : ({} as any)
+    isOrganizadorComercializador ? ({ CUIL: cuil } as any) : null
   );
 
   const { data: comercializadorMeData } = ArtAPI.useGetComercializadorURL(
-    isComercializador ? ({ CUIL: cuil } as any) : ({} as any)
+    isComercializador ? ({ CUIL: cuil } as any) : null
   );
+  const { data: polizasUsuarioLogueadoData, isLoading: isLoadingPolizasUsuarioLogueado } = ArtAPI.useGetPolizasUsuarioLogueadoURL();
 
 
   const comercializadorMe = useMemo(() => (comercializadorMeData?.[0] ?? null) as any, [comercializadorMeData]);
@@ -370,67 +389,92 @@ function PolizasPage() {
         ? organizadorFromComercializador
         : organizador;
 
-  const { data: organizadoresData } = ArtAPI.useGetOrganizadorURL(
+  const { data: organizadoresData, isLoading: isLoadingOrganizadores } = ArtAPI.useGetOrganizadorURL(
     grupoValue && !isOrganizadorComercializador && !isComercializador
       ? ({ SRTComercializadorGOrganizadorInterno: grupoInterno || 0 } as any)
       : ({} as any)
   );
 
-const organizadoresInternos = useMemo(() => {
-  const list = (organizadoresData ?? []) as any[];
-  return list.length ? list.map((x) => String(x.interno)).join(',') : undefined;
-}, [organizadoresData]);
-  const { data: comercializadoresData, isLoading: comercializadoresLoading } = ArtAPI.useGetComercializadorURL(
-    isComercializador
-      ? ({ CUIL: cuil } as any)
-      : (organizadorValue
-        ? ({ ComercializadoresOrganizadoresInternos: String((organizadorValue as any)?.interno ?? 0) } as any)
-        : (grupoValue
-          ? ({ ComercializadoresOrganizadoresInternos: organizadoresInternos || '0' } as any)
-          : ({} as any)))
-  );
+  const comercializadorValue = comercializador;
 
- const comercializadoresInternos = useMemo(() => {
-   const list = (comercializadoresData ?? []) as any[];
-   return list.length ? list.map((x) => String(x.interno)).join(',') : undefined;
- }, [comercializadoresData]);
-  
-  
-  const comercializadorValue = isComercializador ? comercializadorMe : comercializador;
+  const organizadoresInternos = useMemo(() => {
+    const list = (organizadoresData ?? []) as any[];
+    return list
+      .map((organizadorItem) => Number((organizadorItem as any)?.interno ?? 0))
+      .filter((interno) => Number.isFinite(interno) && interno > 0)
+      .map(String)
+      .join(',');
+  }, [organizadoresData]);
 
-  const hasAnyFiltro =
-    isGrupoOrganizador ||
-    isOrganizadorComercializador ||
-    isComercializador ||
-    !!grupoValue ||
-    !!organizadorValue ||
-    !!comercializadorValue;
+  const organizadorInterno = Number((organizadorValue as any)?.interno ?? 0);
+  const comercializadoresParams = organizadorInterno
+    ? ({ ComercializadoresOrganizadoresInternos: String(organizadorInterno) } as any)
+    : isLoadingOrganizadores
+    ? null
+    : ({ ComercializadoresOrganizadoresInternos: organizadoresInternos || '0' } as any);
 
-  const forceEmpty = hasAnyFiltro && !comercializadoresLoading && !comercializadoresInternos;
+  const { data: comercializadoresData, isLoading: isLoadingComercializadores } = ArtAPI.useGetComercializadorURL(comercializadoresParams);
 
-  const params = useMemo(() => {
-    const interno = Number((comercializadorValue as any)?.interno ?? 0);
-    if (interno) return { ComercializadoresInternos: String(interno), SoloActivas: true } as any;
-    const hasFiltro =
-      isGrupoOrganizador ||
-      isOrganizadorComercializador ||
-      isComercializador ||
-      !!grupoValue ||
-      !!organizadorValue ||
-      !!comercializadorValue;
-    if (hasFiltro && !comercializadoresInternos) return { ComercializadoresInternos: '0', SoloActivas: true } as any;
-    return comercializadoresInternos
-      ? ({ ComercializadoresInternos: comercializadoresInternos, SoloActivas: true } as any)
-      : ({ SoloActivas: true } as any);
-  }, [
-    comercializadorValue,
-    comercializadoresInternos,
-    grupoValue,
-    organizadorValue,
-    isGrupoOrganizador,
-    isOrganizadorComercializador,
-    isComercializador,
-  ]);
+  const comercializadoresInternos = useMemo(() => {
+    const list = (comercializadoresData ?? []) as any[];
+    return list.length ? list.map((x) => String(x.interno)).join(',') : undefined;
+  }, [comercializadoresData]);
+
+  const comercializadoresUsuarioLogueadoOptions = useMemo(() => {
+    const map = new Map<string, any>();
+    const addComercializadorOption = (internoValue: unknown, referenteValue: unknown) => {
+      const interno = Number(internoValue ?? 0);
+      const referenteRazonSocial = String(referenteValue ?? '').trim();
+      if (!interno || !referenteRazonSocial) return;
+      map.set(String(interno), {
+        interno,
+        referenteRazonSocial,
+      });
+    };
+
+    (polizasUsuarioLogueadoData ?? []).forEach((poliza: any) => {
+      addComercializadorOption(
+        poliza?.srtcomercializadorInterno ?? poliza?.srtComercializadorInterno,
+        poliza?.comercializadorReferenteRazonSocial
+      );
+    });
+
+    (comercializadoresData ?? []).forEach((comercializadorItem: any) => {
+      addComercializadorOption(
+        comercializadorItem?.interno,
+        comercializadorItem?.referenteRazonSocial ?? comercializadorItem?.razonSocial ?? comercializadorItem?.descripcion
+      );
+
+      const asociados = Array.isArray(comercializadorItem?.comercializadoresAsociados)
+        ? comercializadorItem.comercializadoresAsociados
+        : [];
+
+      asociados.forEach((asociado: any) => {
+        addComercializadorOption(
+          asociado?.interno ?? asociado?.srtComercializadorInterno ?? asociado?.asociadoId,
+          asociado?.referenteRazonSocial ?? asociado?.razonSocial ?? asociado?.descripcion
+        );
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      String(a.referenteRazonSocial).localeCompare(String(b.referenteRazonSocial))
+    );
+  }, [comercializadoresData, polizasUsuarioLogueadoData]);
+
+  const polizasParams = useMemo(() => {
+    const comercializadorInterno = Number((comercializadorValue as any)?.interno ?? 0);
+    if (comercializadorInterno) {
+      return { ComercializadoresInternos: String(comercializadorInterno), SoloActivas: true } as any;
+    }
+
+    if (organizadorValue) {
+      if (isLoadingComercializadores) return null;
+      return { ComercializadoresInternos: comercializadoresInternos || '0', SoloActivas: true } as any;
+    }
+
+    return { SoloActivas: true } as any;
+  }, [comercializadorValue, comercializadoresInternos, isLoadingComercializadores, organizadorValue]);
 
   const groupSelect = (
     <CustomSelectSearch<any>
@@ -463,17 +507,14 @@ const organizadoresInternos = useMemo(() => {
 
   const comercializadorSelect = (
     <CustomSelectSearch<any>
-      options={isComercializador ? (comercializadorValue ? [comercializadorValue] : []) : (comercializadoresData ?? [])}
-
-      getOptionLabel={(x) =>
-        isComercializador
-          ? String((x as any)?.referenteRazonSocial ?? '')
-          : String((x as any)?.referenteRazonSocial ?? (x as any)?.razonSocial ?? (x as any)?.descripcion ?? '')
-      }
+      options={comercializadoresUsuarioLogueadoOptions}
+      getOptionLabel={(x) => String((x as any)?.referenteRazonSocial ?? '')}
       value={comercializadorValue ?? null}
       onChange={(_e, v) => setComercializador(v)}
       label="Comercializador"
-      disabled={isComercializador || ((!grupoValue && !isOrganizadorComercializador) && !isAdminLevel)}
+      loading={isLoadingPolizasUsuarioLogueado}
+      loadingText="Cargando..."
+      disabled={isLoadingPolizasUsuarioLogueado || comercializadoresUsuarioLogueadoOptions.length === 0}
     />
   );
 
@@ -513,12 +554,12 @@ const organizadoresInternos = useMemo(() => {
           value: 0,
           content: (
             <PolizasListado
-              params={params}
+              params={polizasParams}
               groupSelect={groupSelect}
               organizadorSelect={organizadorSelect}
               comercializadorSelect={comercializadorSelect}
               emptyMessage={emptyMessage}
-              forceEmpty={forceEmpty}
+              isResolvingPolizas={polizasParams === null}
               onRowClick={setSelectedPoliza}
               selectedRowKey={selectedPoliza?.interno}
             />
