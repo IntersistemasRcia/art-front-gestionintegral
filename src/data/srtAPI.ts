@@ -207,6 +207,20 @@ export class SrtAPIClass extends ExternalAPI {
     }
   );
 
+  readonly getComercializadorUsuarioLogueadoURL = (params: ParametersComercializador = {}) => {
+    return this.getURL({ path: "/api/SRTComercializadores/UsuarioLogueado", search: toURLSearch(params) }).toString();
+  };
+  getComercializadorUsuarioLogueado = async (params: ParametersComercializador = {}) => tokenizable.get(
+    this.getComercializadorUsuarioLogueadoURL(params),
+  ).then(({ data }) => data);
+  useGetComercializadorUsuarioLogueadoURL = (params: ParametersComercializador | null = {}) => useSWR(
+    params === null ? null : [this.getComercializadorUsuarioLogueadoURL(params), token.getToken()], () => this.getComercializadorUsuarioLogueado(params ?? {}),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
+
   //POST
   readonly postComercializadorURL = this.getURL({ path: "/api/SRTComercializadores" }).toString();
 
