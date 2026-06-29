@@ -590,6 +590,7 @@ function PolizasPage() {
       <FormularioComercializador
         open={!!modalPoliza}
         onClose={() => setModalPoliza(null)}
+        onSuccess={mutateHistorial}
         empleadorCuit={modalPoliza?.CUIT ?? ""}
         empleadorRazonSocial={modalPoliza?.Empleador_Denominacion ?? ""}
         polizaInterno={modalPoliza ? Number(modalPoliza.interno) : undefined}

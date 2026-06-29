@@ -17,6 +17,7 @@ import styles from "./formularioComercializador.module.css";
 type Props = {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   empleadorCuit: string;
   empleadorRazonSocial: string;
   polizaInterno: number | undefined;
@@ -30,7 +31,7 @@ const asociadosColumns: ColumnDef<SRTComercializadorAsociado>[] = [
   { accessorKey: "razonSocial", header: "Comercializador", meta: { align: "left" } },
 ];
 
-export default function FormularioComercializador({ open, onClose, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow }: Props) {
+export default function FormularioComercializador({ open, onClose, onSuccess, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow }: Props) {
   const [comercializadorSeleccionado, setComercializadorSeleccionado] = useState<Comercializador | null>(null);
   const [asociadoSeleccionado, setAsociadoSeleccionado] = useState<SRTComercializadorAsociado | null>(null);
   const [seleccionarAsociados, setSeleccionarAsociados] = useState(false);
@@ -86,6 +87,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
         } as { srtComercializadorInterno: number });
       }
       setResultado("success");
+      onSuccess?.();
     } catch (e) {
       console.error("Error al guardar:", e);
       setResultado("error");
