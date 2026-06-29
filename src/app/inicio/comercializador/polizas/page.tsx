@@ -35,7 +35,7 @@ function digits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
-type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
+type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Comercializador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
 
 function PolizasListado({
   params = {},
@@ -47,6 +47,7 @@ function PolizasListado({
   onRowClick,
   selectedRowKey,
   onCambiarComercializador,
+  onRegisterMutate,
 }: {
   params?: Record<string, unknown> | null;
   groupSelect?: React.ReactNode;
@@ -57,6 +58,7 @@ function PolizasListado({
   onRowClick?: (row: PolizaRow) => void;
   selectedRowKey?: string;
   onCambiarComercializador?: (row: PolizaRow) => void;
+  onRegisterMutate?: (mutate: () => void) => void;
 }) {
   const { hasTask } = useAuth();
 const columns: ColumnDef<Poliza>[] = [
@@ -72,6 +74,7 @@ const columns: ColumnDef<Poliza>[] = [
     },
   },
   { accessorKey: 'Empleador_Denominacion', header: 'Empleador', meta: { align: 'left' } },
+  { accessorKey: 'Comercializador_Denominacion', header: 'Comercializador', meta: { align: 'left' } },
   {
     accessorKey: 'fecha',
     header: 'Fecha de suscripción',
@@ -161,9 +164,11 @@ const columns: ColumnDef<Poliza>[] = [
     enableHiding: true,
   },
 ];
-  const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
+  const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading, mutate: mutatePolizas } = ArtAPI.useGetPolizaComercializadorURL(params);
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const seleccionAutomaticaRef = useRef(false);
+
+  useEffect(() => { onRegisterMutate?.(mutatePolizas); }, [mutatePolizas]);
 
   const apiData = isResolvingPolizas ? [] : apiDataRaw ?? [];
   const error = isResolvingPolizas ? undefined : apiError;
@@ -178,6 +183,7 @@ const columns: ColumnDef<Poliza>[] = [
       NroPoliza: String(item.numero ?? ''),
       CUIT: String(item.cuit ?? ''),
       Empleador_Denominacion: String(item.empleadorDenominacion ?? ''),
+      Comercializador_Denominacion: String(item.srtComercializadorDenominacion ?? item.comercializadorReferenteRazonSocial ?? ''),
       Vigencia_Desde: String(item.vigenciaDesde ?? ''),
       Vigencia_Hasta: String(item.vigenciaHasta ?? ''),
       fecha: String(item.movimientoFecha ?? ''),
@@ -301,6 +307,7 @@ const columns: ColumnDef<Poliza>[] = [
         data={filteredRows}
         pageSizeOptions={[5, 10, 20]}
         isLoading={isLoading}
+        size="mid"
         onRowClick={onRowClick}
         selectedRowKeyProp={selectedRowKey}
       />
@@ -320,6 +327,8 @@ function PolizasPage() {
   const isOrganizadorComercializador = rol === 'organizadorcomercializador';
   const isComercializador = rol === 'comercializador';
   const isAdminLevel = isAdmin || isAdminComercializador || isAdministradorART;
+
+  const mutatePolizasRef = useRef<(() => void) | null>(null);
 
   const [grupo, setGrupo] = useState<any>(null);
   const [organizador, setOrganizador] = useState<any>(null);
@@ -576,7 +585,8 @@ function PolizasPage() {
               isResolvingPolizas={polizasParams === null}
               onRowClick={setSelectedPoliza}
               selectedRowKey={selectedPoliza?.interno}
-                onCambiarComercializador={setModalPoliza}
+              onCambiarComercializador={setModalPoliza}
+              onRegisterMutate={(fn) => { mutatePolizasRef.current = fn; }}
             />
           ),
         },
@@ -590,7 +600,7 @@ function PolizasPage() {
       <FormularioComercializador
         open={!!modalPoliza}
         onClose={() => setModalPoliza(null)}
-        onSuccess={mutateHistorial}
+        onSuccess={() => { mutateHistorial(); mutatePolizasRef.current?.(); }}
         empleadorCuit={modalPoliza?.CUIT ?? ""}
         empleadorRazonSocial={modalPoliza?.Empleador_Denominacion ?? ""}
         polizaInterno={modalPoliza ? Number(modalPoliza.interno) : undefined}

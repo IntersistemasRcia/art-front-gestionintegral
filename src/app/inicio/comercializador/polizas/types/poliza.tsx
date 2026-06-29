@@ -69,6 +69,7 @@ export type Poliza = {
     NroPoliza: string;
     CUIT: string;
     Empleador_Denominacion: string;
+    Comercializador_Denominacion: string;
     Vigencia_Desde: string;
     Vigencia_Hasta: string;
     fecha: string;
