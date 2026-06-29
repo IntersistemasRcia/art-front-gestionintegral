@@ -201,10 +201,10 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
             <div className={styles.pdfSection}>
               <div>
                 Por intermedio del presente <strong>CERTIFICAMOS</strong> que la empresa bajo la denominación de{' '}
-                <strong>{p.empleador_Denominacion ?? ''}</strong> con N° de CUIT:{' '}
+                <strong>{p.empleadorDenominacion ?? ''}</strong> con N° de CUIT:{' '}
                 <strong>{p.cuit ?? ''}</strong> ha contratado la cobertura de <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>,
                 según los términos de la Ley Nro. 24.557 por lo que el personal declarado oportunamente por el/la mencionado/a se encuentra <strong> cubierto a partir del{' '}
-                {Formato.Fecha(p?.vigencia_Desde) || ""} hasta el {Formato.Fecha(p?.vigencia_Hasta) || ""}.</strong>
+                {Formato.Fecha(p?.vigenciaDesde) || ""} hasta el {Formato.Fecha(p?.vigenciaHasta) || ""}.</strong>
               </div>
             </div>
 
@@ -216,7 +216,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
                   Consta por la presente que <strong>ART MUTUAL RURAL DE SEGUROS DE RIESGOS DEL TRABAJO</strong>, renuncia en forma expresa a reclamar o iniciar toda acción de
                   repetición o de regreso contra: {destinatarioEnClausula}, sus funcionarios, empleados u obreros; sea con fundamento en el art. 39, ap. 5, de la Ley
                   N° 24.557, sea en cualquier otra norma jurídica, con motivo de las prestaciones en especie o dinerarias que se vea obligada a abonar, contratar
-                  u otorgar al personal dependiente o ex dependiente de <strong>{p.empleador_Denominacion ?? ''}</strong>, amparados por la cobertura del Contrato de
+                  u otorgar al personal dependiente o ex dependiente de <strong>{p.empleadorDenominacion ?? ''}</strong>, amparados por la cobertura del Contrato de
                   Afiliación N° <strong>{p.numero ?? ''}</strong>, por accidentes del trabajo o enfermedades profesionales, ocurridos o contraídos por el hecho
                   o en ocasión del trabajo. Esta <strong>Cláusula de no repetición</strong> cesará en sus efectos si el empresario comitente a favor de quien
                   se emite, no cumple estrictamente con las medidas de prevención e higiene y seguridad en el trabajo, o de cualquier manera infringe la Ley

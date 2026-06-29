@@ -149,36 +149,14 @@ export default function AdminUserPage() {
   const mutateGrupoTable = isOrganizadorComercializador ? mutateGOrgById : mutateGOrg;
   const isLoadingGrupoTable = isOrganizadorComercializador ? isLoadingGOrgById : isLoadingGOrg;
 
-  const organizadorInternosCSV = useMemo(() => {
-    const internos = asArray(organizadorData)
-      .map((x: any) => Number(x?.interno ?? x?.Interno ?? NaN))
-      .filter((n: number) => Number.isFinite(n) && n >= 0);
-    const unique = Array.from(new Set(internos));
-    return unique.length ? unique.join(',') : undefined;
-  }, [organizadorData]);
+  const comercializadorParams = selectedOrganizadorInterno !== undefined
+    ? ({ SRTComercializadorOrganizadorInterno: selectedOrganizadorInterno } as any)
+    : ({} as any);
 
-  const comercializadorInternosCSV = selectedOrganizadorInterno !== undefined
-    ? String(selectedOrganizadorInterno)
-    : isAdminLevel
-      ? undefined
-      : organizadorInternosCSV;
-
-  const comercializadorKey = selectedOrganizadorInterno !== undefined
-    ? String(selectedOrganizadorInterno)
-    : isAdminLevel
-      ? 'ALL'
-      : comercializadorInternosCSV;
-
-  const { data: comercializadorData, isLoading: isLoadingComercializador, mutate: mutateComercializador } = useSWR(
-    canLoadComercializadores && comercializadorKey
-      ? ['SRTComercializadores', comercializadorKey]
-      : null,
-    () =>
-      isAdminLevel && selectedOrganizadorInterno === undefined
-        ? ArtAPI.getComercializador({} as any)
-        : ArtAPI.getComercializador({ ComercializadoresOrganizadoresInternos: comercializadorInternosCSV } as any),
-    { revalidateOnFocus: false, revalidateOnReconnect: false }
-  );
+  const { data: comercializadorData, isLoading: isLoadingComercializador, mutate: mutateComercializador } =
+    ArtAPI.useGetComercializadorUsuarioLogueadoURL(
+      canLoadComercializadores ? comercializadorParams : null
+    );
 
   const grupoRows: ComercializadoresGOrganizadoresRow[] = useMemo(() => {
     if (!isGrupoOrganizador && !isAdminLevel && !isOrganizadorComercializador) return [];

@@ -34,6 +34,7 @@ export type SRTPolizaAcotada = {
 export type ParametersComercializador = {
     CUIL?: number;
     ComercializadoresOrganizadoresInternos?: string;
+    SRTComercializadorOrganizadorInterno?: number;
 }
 
 export type OrganizadorComercializador = {
