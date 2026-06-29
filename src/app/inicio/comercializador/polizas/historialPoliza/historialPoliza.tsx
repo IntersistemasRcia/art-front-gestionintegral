@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Box, IconButton } from "@mui/material";
+import { useAuth } from "@/data/AuthContext";
 import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import { MdEdit, MdGroupRemove } from "react-icons/md";
 import { IoEyeSharp } from "react-icons/io5";
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export default function HistorialPoliza({ data, isLoading, hasSelection, empleadorCuit, empleadorRazonSocial, polizaInterno, onSuccess }: Props) {
+  const { hasTask } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editRow, setEditRow] = useState<HistorialRow | null>(null);
   const [bajaRow, setBajaRow] = useState<HistorialRow | null>(null);
@@ -64,12 +66,16 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
       meta: { align: "center", width: 200 },
       cell: ({ row }) => (
         <Box className={styles.actionButtons} sx={{ width: "100%" }}>
+          {hasTask("Comercializador_Polizas_Historial_Editar") && (
           <IconButton size="medium" aria-label="Editar" onClick={(event) => { event.stopPropagation(); setEditRow(row.original); }}>
             <MdEdit title="Editar" className={styles.actionIcon} />
           </IconButton>
+          )}
+          {hasTask("Comercializador_Polizas_Historial_Baja") && (
           <IconButton size="medium" aria-label="Quitar" onClick={(event) => { event.stopPropagation(); setBajaRow(row.original); }}>
             <MdGroupRemove title="Quitar" className={styles.actionIcon} />
           </IconButton>
+          )}
           <IconButton size="medium" aria-label="Ver Poliza Completa" onClick={(event) => { event.stopPropagation(); setVerPolizaId(row.original.interno); }}>
             <IoEyeSharp title="Ver Poliza Completa" className={styles.actionIcon} />
             </IconButton>

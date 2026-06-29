@@ -58,6 +58,7 @@ function PolizasListado({
   selectedRowKey?: string;
   onCambiarComercializador?: (row: PolizaRow) => void;
 }) {
+  const { hasTask } = useAuth();
 const columns: ColumnDef<Poliza>[] = [
   { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
   {
@@ -147,11 +148,13 @@ const columns: ColumnDef<Poliza>[] = [
           <BsCalendar2Plus title="Siniestros" className={styles.iconButton} />
           </Link>
 
+            {hasTask("Comercializador_Polizas_CambiarComercializador") && (
             <PiUserSwitchFill
               title="Cambiar comercializador o asociado"
               className={styles.iconButton}
               onClick={(e) => { e.stopPropagation(); onCambiarComercializador?.(row.original); }}
             />
+            )}
         </div>
       );
     },
