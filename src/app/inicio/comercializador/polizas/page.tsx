@@ -590,6 +590,7 @@ function PolizasPage() {
         empleadorCuit={modalPoliza?.CUIT ?? ""}
         empleadorRazonSocial={modalPoliza?.Empleador_Denominacion ?? ""}
         polizaInterno={modalPoliza ? Number(modalPoliza.interno) : undefined}
+        numeroPoliza={modalPoliza?.numero}
       />
     </>
   );

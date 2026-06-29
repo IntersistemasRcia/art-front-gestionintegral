@@ -11,6 +11,7 @@ import Formato from "@/utils/Formato";
 import type { Comercializador, HistorialRow } from "./types/historialPoliza";
 import type { SRTComercializadorAsociado } from "@/app/inicio/comercializador/polizas/types/poliza";
 import type { SRTComercializadoresHistorialPutRequest } from "@/data/srtAPI";
+import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import styles from "./formularioComercializador.module.css";
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
   empleadorCuit: string;
   empleadorRazonSocial: string;
   polizaInterno: number | undefined;
+  numeroPoliza?: string;
   editRow?: HistorialRow;
 };
 
@@ -28,12 +30,13 @@ const asociadosColumns: ColumnDef<SRTComercializadorAsociado>[] = [
   { accessorKey: "razonSocial", header: "Comercializador", meta: { align: "left" } },
 ];
 
-export default function FormularioComercializador({ open, onClose, empleadorCuit, empleadorRazonSocial, polizaInterno, editRow }: Props) {
+export default function FormularioComercializador({ open, onClose, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow }: Props) {
   const [comercializadorSeleccionado, setComercializadorSeleccionado] = useState<Comercializador | null>(null);
   const [asociadoSeleccionado, setAsociadoSeleccionado] = useState<SRTComercializadorAsociado | null>(null);
   const [seleccionarAsociados, setSeleccionarAsociados] = useState(false);
   const [fechaHasta, setFechaHasta] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resultado, setResultado] = useState<"success" | "error" | null>(null);
 
   const { data: comercializadoresRaw, isLoading } = SrtAPI.useGetComercializadorURL();
   const { data: asociadosRaw } = SrtAPI.useGetComercializadoresAsociadosURL(
@@ -41,7 +44,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
   );
 
   const comercializadores = ((comercializadoresRaw ?? []) as Comercializador[]).filter((c) => c.interno !== 0);
-  const asociados = (asociadosRaw ?? []) as SRTComercializadorAsociado[];
+  const asociados = comercializadorSeleccionado ? (asociadosRaw ?? []) as SRTComercializadorAsociado[] : [];
 
   useEffect(() => {
     if (!open) {
@@ -59,7 +62,9 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
   }, [open, editRow, comercializadores.length]);
 
   const cuitFormateado = Formato.CUIP(empleadorCuit.replace(/\D/g, "")) || empleadorCuit;
-  const titulo = editRow ? "Editar Historial Comercializador" : "Modificar Comercializador";
+  const titulo = editRow
+    ? `Editar el historial del comercializador${numeroPoliza ? ` - Póliza: ${numeroPoliza}` : ""}`
+    : `Modificar Comercializador${numeroPoliza ? ` - Póliza: ${numeroPoliza}` : ""}`;
 
   const handleGuardar = async () => {
     if (!comercializadorSeleccionado) return;
@@ -69,7 +74,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
         const body: SRTComercializadoresHistorialPutRequest = {
           srtPolizaInterno: editRow.srtPolizaInterno || (polizaInterno ?? 0),
           srtComercializadorInterno: comercializadorSeleccionado.interno,
-          srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.asociadoId : null,
+          srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.interno : null,
           fechaHasta: fechaHasta ? new Date(fechaHasta).toISOString() : editRow.fechaHasta,
         };
         await SrtAPI.putSRTComercializadoresHistorial(editRow.interno, body);
@@ -77,18 +82,34 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
         if (polizaInterno == null) return;
         await SrtAPI.putSRTPolizaComercializador(polizaInterno, {
           srtComercializadorInterno: comercializadorSeleccionado.interno,
-          srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.asociadoId : null,
+          srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.interno : null,
         } as { srtComercializadorInterno: number });
       }
-      onClose();
+      setResultado("success");
     } catch (e) {
       console.error("Error al guardar:", e);
+      setResultado("error");
     } finally {
       setSaving(false);
     }
   };
 
   return (
+    <>
+    <CustomModalMessage
+      open={resultado === "success"}
+      type="success"
+      title="Operación exitosa"
+      message={`Se modificó el comercializador a la póliza${numeroPoliza ? ` ${numeroPoliza}` : ""}`}
+      onClose={() => { setResultado(null); onClose(); }}
+    />
+    <CustomModalMessage
+      open={resultado === "error"}
+      type="error"
+      title="Hubo un inconveniente"
+      message="No se pudo completar la operación. Intente nuevamente."
+      onClose={() => setResultado(null)}
+    />
     <CustomModal open={open} onClose={onClose} title={titulo} size="large">
       <div className={styles.topRow}>
         <TextField
@@ -165,5 +186,6 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
         <CustomButton color="secondary" onClick={onClose}>Cancelar</CustomButton>
       </div>
     </CustomModal>
+    </>
   );
 }

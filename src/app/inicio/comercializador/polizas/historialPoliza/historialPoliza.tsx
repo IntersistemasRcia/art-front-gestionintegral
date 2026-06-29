@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Box, IconButton } from "@mui/material";
+import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import { MdEdit, MdGroupRemove } from "react-icons/md";
 import { IoEyeSharp } from "react-icons/io5";
 import DataTable from "@/utils/ui/table/DataTable";
@@ -31,6 +32,7 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
   const [bajaRow, setBajaRow] = useState<HistorialRow | null>(null);
   const [verPolizaId, setVerPolizaId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bajaResultado, setBajaResultado] = useState<"success" | "error" | null>(null);
 
   const columns: ColumnDef<HistorialRow>[] = [
     {
@@ -76,12 +78,9 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
     },
   ];
 
-  if (!hasSelection) {
-    return <p className={styles.emptyMessage}>Seleccione una póliza para ver el historial.</p>;
-  }
-
   return (
     <>
+      {!hasSelection && <p className={styles.emptyMessage}>Seleccione una póliza para ver el historial.</p>}
       <DataTable
         columns={columns}
         data={data}
@@ -94,6 +93,7 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
         empleadorCuit={empleadorCuit}
         empleadorRazonSocial={empleadorRazonSocial}
         polizaInterno={polizaInterno}
+        numeroPoliza={data[0]?.numeroPoliza}
       />
       <FormularioComercializador
         open={!!editRow}
@@ -101,9 +101,24 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
         empleadorCuit={empleadorCuit}
         empleadorRazonSocial={empleadorRazonSocial}
         polizaInterno={polizaInterno}
+        numeroPoliza={editRow?.numeroPoliza}
         editRow={editRow ?? undefined}
       />
       <ModalVerPoliza historialId={verPolizaId} onClose={() => setVerPolizaId(null)} />
+      <CustomModalMessage
+        open={bajaResultado === "success"}
+        type="success"
+        title="Operación exitosa"
+        message="Se eliminó la asociación del historial."
+        onClose={() => setBajaResultado(null)}
+      />
+      <CustomModalMessage
+        open={bajaResultado === "error"}
+        type="error"
+        title="Hubo un inconveniente"
+        message="No se pudo eliminar la asociación. Intente nuevamente."
+        onClose={() => setBajaResultado(null)}
+      />
       <CustomModal open={!!bajaRow} onClose={() => setBajaRow(null)} title="Confirmar baja" size="small">
         <p>¿Está seguro que quiere eliminar esta asociacion del historial?</p>
         <div className={styles.actions}>
@@ -116,8 +131,11 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
                 await SrtAPI.deleteSRTComercializadoresHistorial(bajaRow.interno);
                 setBajaRow(null);
                 onSuccess();
+                setBajaResultado("success");
               } catch (e) {
                 console.error(e);
+                setBajaRow(null);
+                setBajaResultado("error");
               } finally {
                 setDeleting(false);
               }
