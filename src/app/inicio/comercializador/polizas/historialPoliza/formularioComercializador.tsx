@@ -67,7 +67,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
     try {
       if (editRow) {
         const body: SRTComercializadoresHistorialPutRequest = {
-          srtPolizaInterno: editRow.srtPolizaInterno,
+          srtPolizaInterno: editRow.srtPolizaInterno || (polizaInterno ?? 0),
           srtComercializadorInterno: comercializadorSeleccionado.interno,
           srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.asociadoId : null,
           fechaHasta: fechaHasta ? new Date(fechaHasta).toISOString() : editRow.fechaHasta,
@@ -117,6 +117,16 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
           renderInput={(params) => <TextField {...params} label="Comercializador" />}
           className={styles.autocompleteField}
         />
+        {editRow && (
+          <TextField
+            label="Fecha Finalización"
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            className={styles.fechaField}
+          />
+        )}
       </div>
 
 

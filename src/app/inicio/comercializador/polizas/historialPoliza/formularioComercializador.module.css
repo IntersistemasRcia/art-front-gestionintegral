@@ -25,11 +25,18 @@
 
 .fechaField {
   width: 200px;
-  margin-bottom: 1.5rem;
+  flex-shrink: 0;
 }
 
 .checkbox {
+  display: block;
+  margin-top: 1rem;
   margin-bottom: 1rem;
+}
+
+.checkbox :global(.MuiFormControlLabel-label) {
+  font-size: 1.2rem;
+  font-weight: 500;
 }
 
 .tableDisabled {
