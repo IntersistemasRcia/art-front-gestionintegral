@@ -11,6 +11,8 @@ import Formato from '@/utils/Formato';
 import styles from './poliza.module.css';
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 'react-icons/bs';
+import { PiUserSwitchFill } from 'react-icons/pi';
+import FormularioComercializador from './historialPoliza/formularioComercializador';
 import Link from 'next/link';
 import type { Poliza } from "./types/poliza";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
@@ -28,6 +30,34 @@ const EMPRESA_OPCION_TODAS: Empresa = {
   provincia: '',
 };
 
+
+function digits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
+
+function PolizasListado({
+  params = {},
+  groupSelect,
+  organizadorSelect,
+  comercializadorSelect,
+  emptyMessage,
+  isResolvingPolizas = false,
+  onRowClick,
+  selectedRowKey,
+  onCambiarComercializador,
+}: {
+  params?: Record<string, unknown> | null;
+  groupSelect?: React.ReactNode;
+  organizadorSelect?: React.ReactNode;
+  comercializadorSelect?: React.ReactNode;
+  emptyMessage?: string;
+  isResolvingPolizas?: boolean;
+  onRowClick?: (row: PolizaRow) => void;
+  selectedRowKey?: string;
+  onCambiarComercializador?: (row: PolizaRow) => void;
+}) {
 const columns: ColumnDef<Poliza>[] = [
   { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
   {
@@ -77,7 +107,6 @@ const columns: ColumnDef<Poliza>[] = [
       );
     },
   },
-
   {
     id: 'accion',
     header: 'Acción',
@@ -118,39 +147,17 @@ const columns: ColumnDef<Poliza>[] = [
           <BsCalendar2Plus title="Siniestros" className={styles.iconButton} />
           </Link>
 
-
+            <PiUserSwitchFill
+              title="Cambiar comercializador o asociado"
+              className={styles.iconButton}
+              onClick={(e) => { e.stopPropagation(); onCambiarComercializador?.(row.original); }}
+            />
         </div>
       );
     },
     enableHiding: true,
   },
 ];
-
-function digits(value: unknown) {
-  return String(value ?? '').replace(/\D/g, '');
-}
-
-type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
-
-function PolizasListado({
-  params = {},
-  groupSelect,
-  organizadorSelect,
-  comercializadorSelect,
-  emptyMessage,
-  isResolvingPolizas = false,
-  onRowClick,
-  selectedRowKey,
-}: {
-  params?: any | null;
-  groupSelect?: React.ReactNode;
-  organizadorSelect?: React.ReactNode;
-  comercializadorSelect?: React.ReactNode;
-  emptyMessage?: string;
-  isResolvingPolizas?: boolean;
-  onRowClick?: (row: PolizaRow) => void;
-  selectedRowKey?: string;
-}) {
   const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const seleccionAutomaticaRef = useRef(false);
@@ -316,6 +323,7 @@ function PolizasPage() {
   const [comercializador, setComercializador] = useState<any>(null);
   const [tab, setTab] = useState(0);
   const [selectedPoliza, setSelectedPoliza] = useState<PolizaRow | null>(null);
+  const [modalPoliza, setModalPoliza] = useState<PolizaRow | null>(null);
 
   const { data: gOrgData } = ArtAPI.useGetGOrganizadorURL(
     isAdminLevel ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
@@ -547,6 +555,7 @@ function PolizasPage() {
   );
 
   return (
+    <>
     <CustomTabs
       currentTab={tab}
       onTabChange={(_e, v) => setTab(v)}
@@ -564,6 +573,7 @@ function PolizasPage() {
               isResolvingPolizas={polizasParams === null}
               onRowClick={setSelectedPoliza}
               selectedRowKey={selectedPoliza?.interno}
+                onCambiarComercializador={setModalPoliza}
             />
           ),
         },
@@ -574,6 +584,14 @@ function PolizasPage() {
         },
       ]}
     />
+      <FormularioComercializador
+        open={!!modalPoliza}
+        onClose={() => setModalPoliza(null)}
+        empleadorCuit={modalPoliza?.CUIT ?? ""}
+        empleadorRazonSocial={modalPoliza?.Empleador_Denominacion ?? ""}
+        polizaInterno={modalPoliza ? Number(modalPoliza.interno) : undefined}
+      />
+    </>
   );
 }
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Box, IconButton, Tooltip } from "@mui/material";
+import { Box, IconButton } from "@mui/material";
 import { MdEdit, MdGroupRemove } from "react-icons/md";
+import { IoEyeSharp } from "react-icons/io5";
 import DataTable from "@/utils/ui/table/DataTable";
 import type { ColumnDef } from "@tanstack/react-table";
 import Formato from "@/utils/Formato";
@@ -55,19 +56,18 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
     {
       id: "accion",
       header: "Acción",
-      meta: { align: "center", width: 150 },
+      meta: { align: "center", width: 200 },
       cell: ({ row }) => (
         <Box className={styles.actionButtons} sx={{ width: "100%" }}>
-          <Tooltip title="Editar" arrow>
-            <IconButton size="medium" aria-label="Editar" onClick={(event) => { event.stopPropagation(); setEditRow(row.original); }}>
-              <MdEdit className={styles.actionIcon} />
+          <IconButton size="medium" aria-label="Editar" onClick={(event) => { event.stopPropagation(); setEditRow(row.original); }}>
+            <MdEdit title="Editar" className={styles.actionIcon} />
+          </IconButton>
+          <IconButton size="medium" aria-label="Quitar" onClick={(event) => { event.stopPropagation(); setBajaRow(row.original); }}>
+            <MdGroupRemove title="Quitar" className={styles.actionIcon} />
+          </IconButton>
+          <IconButton size="medium" aria-label="Ver Poliza Completa" onClick={(event) => { event.stopPropagation(); }}>
+            <IoEyeSharp title="Ver Poliza Completa" className={styles.actionIcon} />
             </IconButton>
-          </Tooltip>
-          <Tooltip title="Quitar" arrow>
-            <IconButton size="medium" aria-label="Quitar" onClick={(event) => { event.stopPropagation(); setBajaRow(row.original); }}>
-              <MdGroupRemove className={styles.actionIcon} />
-            </IconButton>
-          </Tooltip>
         </Box>
       ),
     },
@@ -79,9 +79,6 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
 
   return (
     <>
-      <div className={styles.toolbar}>
-        <CustomButton onClick={() => setModalOpen(true)}>Modificar Comercializador</CustomButton>
-      </div>
       <DataTable
         columns={columns}
         data={data}

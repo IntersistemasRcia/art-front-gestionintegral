@@ -37,7 +37,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
 
   const { data: comercializadoresRaw, isLoading } = SrtAPI.useGetComercializadorURL();
   const { data: asociadosRaw } = SrtAPI.useGetComercializadoresAsociadosURL(
-    comercializadorSeleccionado ? { SRTComercializadorInterno: comercializadorSeleccionado.interno, IncluirInactivos: true } : {}
+    comercializadorSeleccionado ? { SRTComercializadorInterno: comercializadorSeleccionado.interno, IncluirInactivos: false } : {}
   );
 
   const comercializadores = ((comercializadoresRaw ?? []) as Comercializador[]).filter((c) => c.interno !== 0);
@@ -75,10 +75,10 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
         await SrtAPI.putSRTComercializadoresHistorial(editRow.interno, body);
       } else {
         if (polizaInterno == null) return;
-        await SrtAPI.putSRTPolizaComercializador(polizaInterno, { srtComercializadorInterno: comercializadorSeleccionado.interno });
-        if (seleccionarAsociados && asociadoSeleccionado) {
-          await SrtAPI.putSRTPolizaAsignarAsociado(polizaInterno, { srtComercializadorAsociadoInterno: asociadoSeleccionado.asociadoId });
-        }
+        await SrtAPI.putSRTPolizaComercializador(polizaInterno, {
+          srtComercializadorInterno: comercializadorSeleccionado.interno,
+          srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.asociadoId : null,
+        } as { srtComercializadorInterno: number });
       }
       onClose();
     } catch (e) {
