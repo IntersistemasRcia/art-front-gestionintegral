@@ -29,5 +29,6 @@ export type HistorialRow = {
   fechaHasta: string;
   comercializadorcuit?: number;
   comercializadorrazonsocial?: string;
+  srtComercializadorAsociadoDescripcion?: string | null;
   numeroPoliza: string;
 };

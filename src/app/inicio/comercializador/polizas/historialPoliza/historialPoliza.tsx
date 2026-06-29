@@ -10,6 +10,7 @@ import Formato from "@/utils/Formato";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import FormularioComercializador from "./formularioComercializador";
+import ModalVerPoliza from "./ModalVerPoliza";
 import type { HistorialRow } from "./types/historialPoliza";
 import SrtAPI from "@/data/srtAPI";
 import styles from "./historialPoliza.module.css";
@@ -28,6 +29,7 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
   const [modalOpen, setModalOpen] = useState(false);
   const [editRow, setEditRow] = useState<HistorialRow | null>(null);
   const [bajaRow, setBajaRow] = useState<HistorialRow | null>(null);
+  const [verPolizaId, setVerPolizaId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const columns: ColumnDef<HistorialRow>[] = [
@@ -38,12 +40,13 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
       cell: (info) => Formato.Numero(Number(String(info.getValue() ?? "").replace(/\D/g, ""))) || String(info.getValue() ?? ""),
     },
     {
-      accessorKey: "cuil",
+      accessorKey: "comercializadorCuil",
       header: "Cuil Comercializador",
       meta: { align: "center", width: 190 },
       cell: (info) => Formato.CUIP(String(info.getValue() ?? "")),
     },
-    { accessorKey: "razonSocial", header: "Comercializador", meta: { align: "left" } },
+    { accessorKey: "comercializadorReferenteRazonSocial", header: "Comercializador", meta: { align: "left" } },
+    { accessorKey: "srtComercializadorAsociadoDescripcion", header: "Asociado", meta: { align: "left" } },
     {
       accessorKey: "fechaHasta",
       header: "Fecha Finalizacion",
@@ -65,7 +68,7 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
           <IconButton size="medium" aria-label="Quitar" onClick={(event) => { event.stopPropagation(); setBajaRow(row.original); }}>
             <MdGroupRemove title="Quitar" className={styles.actionIcon} />
           </IconButton>
-          <IconButton size="medium" aria-label="Ver Poliza Completa" onClick={(event) => { event.stopPropagation(); }}>
+          <IconButton size="medium" aria-label="Ver Poliza Completa" onClick={(event) => { event.stopPropagation(); setVerPolizaId(row.original.interno); }}>
             <IoEyeSharp title="Ver Poliza Completa" className={styles.actionIcon} />
             </IconButton>
         </Box>
@@ -100,6 +103,7 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
         polizaInterno={polizaInterno}
         editRow={editRow ?? undefined}
       />
+      <ModalVerPoliza historialId={verPolizaId} onClose={() => setVerPolizaId(null)} />
       <CustomModal open={!!bajaRow} onClose={() => setBajaRow(null)} title="Confirmar baja" size="small">
         <p>¿Está seguro que quiere eliminar esta asociacion del historial?</p>
         <div className={styles.actions}>

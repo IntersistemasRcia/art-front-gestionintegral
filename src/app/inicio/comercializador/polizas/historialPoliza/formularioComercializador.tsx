@@ -119,16 +119,6 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
         />
       </div>
 
-      {editRow && (
-        <TextField
-          label="Fecha Finalización"
-          type="date"
-          value={fechaHasta}
-          onChange={(e) => setFechaHasta(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-          className={styles.fechaField}
-        />
-      )}
 
       <FormControlLabel
         control={
