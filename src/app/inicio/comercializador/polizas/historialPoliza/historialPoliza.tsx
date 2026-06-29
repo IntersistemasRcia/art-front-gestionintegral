@@ -20,9 +20,10 @@ type Props = {
   empleadorCuit: string;
   empleadorRazonSocial: string;
   polizaInterno: number | undefined;
+  onSuccess: () => void;
 };
 
-export default function HistorialPoliza({ data, isLoading, hasSelection, empleadorCuit, empleadorRazonSocial, polizaInterno }: Props) {
+export default function HistorialPoliza({ data, isLoading, hasSelection, empleadorCuit, empleadorRazonSocial, polizaInterno, onSuccess }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editRow, setEditRow] = useState<HistorialRow | null>(null);
   const [bajaRow, setBajaRow] = useState<HistorialRow | null>(null);
@@ -89,14 +90,14 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
       />
       <FormularioComercializador
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); onSuccess(); }}
         empleadorCuit={empleadorCuit}
         empleadorRazonSocial={empleadorRazonSocial}
         polizaInterno={polizaInterno}
       />
       <FormularioComercializador
         open={!!editRow}
-        onClose={() => setEditRow(null)}
+        onClose={() => { setEditRow(null); onSuccess(); }}
         empleadorCuit={empleadorCuit}
         empleadorRazonSocial={empleadorRazonSocial}
         polizaInterno={polizaInterno}
@@ -113,6 +114,7 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
               try {
                 await SrtAPI.deleteSRTComercializadoresHistorial(bajaRow.interno);
                 setBajaRow(null);
+                onSuccess();
               } catch (e) {
                 console.error(e);
               } finally {

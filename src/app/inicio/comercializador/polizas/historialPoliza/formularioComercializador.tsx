@@ -32,6 +32,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
   const [comercializadorSeleccionado, setComercializadorSeleccionado] = useState<Comercializador | null>(null);
   const [asociadoSeleccionado, setAsociadoSeleccionado] = useState<SRTComercializadorAsociado | null>(null);
   const [seleccionarAsociados, setSeleccionarAsociados] = useState(false);
+  const [fechaHasta, setFechaHasta] = useState("");
   const [saving, setSaving] = useState(false);
 
   const { data: comercializadoresRaw, isLoading } = SrtAPI.useGetComercializadorURL();
@@ -47,11 +48,13 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
       setComercializadorSeleccionado(null);
       setAsociadoSeleccionado(null);
       setSeleccionarAsociados(false);
+      setFechaHasta("");
       return;
     }
     if (editRow && comercializadores.length > 0) {
       const com = comercializadores.find((c) => c.interno === editRow.srtComercializadorInterno) ?? null;
       setComercializadorSeleccionado(com);
+      setFechaHasta(editRow.fechaHasta ? editRow.fechaHasta.slice(0, 10) : "");
     }
   }, [open, editRow, comercializadores.length]);
 
@@ -67,7 +70,7 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
           srtPolizaInterno: editRow.srtPolizaInterno,
           srtComercializadorInterno: comercializadorSeleccionado.interno,
           srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.asociadoId : null,
-          fechaHasta: editRow.fechaHasta,
+          fechaHasta: fechaHasta ? new Date(fechaHasta).toISOString() : editRow.fechaHasta,
         };
         await SrtAPI.putSRTComercializadoresHistorial(editRow.interno, body);
       } else {
@@ -115,6 +118,17 @@ export default function FormularioComercializador({ open, onClose, empleadorCuit
           className={styles.autocompleteField}
         />
       </div>
+
+      {editRow && (
+        <TextField
+          label="Fecha Finalización"
+          type="date"
+          value={fechaHasta}
+          onChange={(e) => setFechaHasta(e.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+          className={styles.fechaField}
+        />
+      )}
 
       <FormControlLabel
         control={

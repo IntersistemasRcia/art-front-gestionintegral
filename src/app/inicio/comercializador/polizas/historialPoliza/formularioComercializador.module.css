@@ -23,6 +23,11 @@
   opacity: 0.6;
 }
 
+.fechaField {
+  width: 200px;
+  margin-bottom: 1.5rem;
+}
+
 .checkbox {
   margin-bottom: 1rem;
 }

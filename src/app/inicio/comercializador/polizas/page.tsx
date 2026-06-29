@@ -524,7 +524,7 @@ function PolizasPage() {
       : undefined;
 
   const polizaInterno = selectedPoliza ? Number(selectedPoliza.interno) : undefined;
-  const { data: historialData, isLoading: historialLoading } = SrtAPI.useGetSRTComercializadoresHistorialByPolizaId(polizaInterno);
+  const { data: historialData, isLoading: historialLoading, mutate: mutateHistorial } = SrtAPI.useGetSRTComercializadoresHistorialByPolizaId(polizaInterno);
 
   const historialRows = useMemo(() => {
     if (!historialData) return [];
@@ -542,6 +542,7 @@ function PolizasPage() {
       empleadorCuit={selectedPoliza?.CUIT ?? ""}
       empleadorRazonSocial={selectedPoliza?.Empleador_Denominacion ?? ""}
       polizaInterno={polizaInterno}
+      onSuccess={mutateHistorial}
     />
   );
 
