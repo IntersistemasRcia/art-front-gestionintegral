@@ -121,7 +121,7 @@ export function SVCCPresentacionContextProvider({
   const [presentacionData, setPresentacionData] = useState<Data<PresentacionDTO>>({ index: presentacionInfo.index, size: presentacionInfo.size, count: 0, pages: 0, data: [] });
   
   useEffect(() => {
-    setPresentacionInfo((o) => ({ ...o, selected: undefined }));
+    setPresentacionInfo((o) => ({ ...o, index: 1, size: 10, selected: undefined }));
   }, [filtrosPresentacionesBase, empresaCUITUltima]);
 
   const presentacionTodasPaginated = useMemo((): SVCCPresentacionTodasParams | undefined => {
@@ -168,10 +168,25 @@ export function SVCCPresentacionContextProvider({
     }
   }});
 
-  const finaliza = useSVCCPresentacionFinaliza({ onSuccess() {
+  const finaliza = useSVCCPresentacionFinaliza({ onSuccess(data) {
+    const fechaConfirmacion = data?.presentacionFecha ?? new Date().toISOString();
+    const presentacionFinalizada = {
+      ...(presentacionInfo.selected ?? {}),
+      ...data,
+      presentacionFecha: fechaConfirmacion,
+    } as PresentacionDTO;
+
+    setPresentacionInfo((o) => ({ ...o, selected: presentacionFinalizada }));
+    setPresentacionData((current) => ({
+      ...current,
+      data: current.data.map((presentacion) =>
+        presentacion.interno === presentacionFinalizada.interno
+          ? { ...presentacion, ...presentacionFinalizada }
+          : presentacion
+      ),
+    }));
     presentacionTodas.mutate();
     ultima.mutate();
-    // constancia.mutate();
   }});
 
   const establecimientoList = useEstablecimientoList(

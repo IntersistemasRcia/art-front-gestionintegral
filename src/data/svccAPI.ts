@@ -258,21 +258,32 @@ export type SustanciaDTO = SustanciaBaseDTO & {
 export type ExamenMedicoDTO = {
   interno?: number;
   idExamen?: number;
+  fechaExamen?: string;
+  idConclusion?: number;
 }
 export type ActividadDTO = {
   interno?: number;
+  idActividad?: number;
+  idPuesto?: number;
+  idRamo?: number;
+  idCategoria?: number;
   puestoInterno?: number;
   sectorInterno?: number;
   sustanciaInterno?: number;
   permanente?: boolean;
   fechaInicioExposicion?: string;
   fechaFinExposicion?: string;
+  fechaIngreso?: string;
+  fechaEgreso?: string;
   examenesMedicos?: ExamenMedicoDTO[];
 }
 export type TrabajadorBaseDTO = {
+  presentacionInterno?: number;
+  empleadorCUIT?: number;
   cuil?: number;
   idEstablecimientoEmpresa?: number;
   fechaIngreso?: string;
+  fechaEgreso?: string;
   actividades?: ActividadDTO[];
 }
 export type TrabajadorCreateDTO = TrabajadorBaseDTO & {
@@ -501,6 +512,7 @@ export type SVCCSustanciaDeleteOptions = SWRMutationConfiguration<SustanciaDTO, 
 //#region Types SVCC/Trabajador - List
 export type SVCCTrabajadorListParams = {
   presentacionId: number;
+  PresentacionId?: number;
   cuil?: number;
   idEstablecimientoEmpresa?: number;
   PageIndex?: number;
@@ -565,19 +577,74 @@ function svccPresentacionTodasPostBody(
   };
 }
 
+function stringValue(row: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key];
+    if (value != null && value !== "" && String(value) !== "null") return String(value);
+  }
+  return "";
+}
+
+function numberValue(row: Record<string, unknown>, ...keys: string[]): number {
+  for (const key of keys) {
+    const value = row[key];
+    if (value == null || value === "") continue;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return 0;
+}
+
+function optionalNumberValue(row: Record<string, unknown>, ...keys: string[]): number | undefined {
+  const numeric = numberValue(row, ...keys);
+  return numeric > 0 ? numeric : undefined;
+}
+
+function svccTrabajadorListSearch(params?: SVCCTrabajadorListParams): URLSearchParams | undefined {
+  if (params == null) return undefined;
+  const { presentacionId, PresentacionId, ...rest } = params;
+  return toURLSearch({
+    ...rest,
+    PresentacionId: PresentacionId ?? presentacionId,
+  });
+}
+
 /** Fila devuelta por `/api/Presentaciones/Ultima` (y equivalentes con campos extra). */
 function mapSvccPresentacionApiRecordToDTO(row: Record<string, unknown>): PresentacionDTO {
-  const interno = Number(row.interno);
-  const pf = row.presentacionFecha;
-  const obs = row.observaciones;
+  const presentacionFecha = stringValue(row, "presentacionFecha", "PresentacionFecha");
+  const observaciones = stringValue(row, "observaciones", "Observaciones");
   return {
-    interno: Number.isFinite(interno) ? interno : 0,
-    idMotivo: row.idMotivo != null ? Number(row.idMotivo) : undefined,
-    observaciones: obs != null && obs !== '' ? String(obs) : undefined,
-    presentacionFecha:
-      pf != null && pf !== '' && String(pf) !== 'null' ? String(pf) : undefined,
-    empleadorCuit: row.empleadorCuit != null ? Number(row.empleadorCuit) : undefined,
-    empleadorRazonSocial: row.empleadorRazonSocial != null ? String(row.empleadorRazonSocial) : undefined,
+    interno: numberValue(row, "interno", "Interno", "id", "Id"),
+    idMotivo: optionalNumberValue(row, "idMotivo", "IdMotivo"),
+    observaciones: observaciones || undefined,
+    presentacionFecha: presentacionFecha || undefined,
+    empleadorCuit: optionalNumberValue(row, "empleadorCuit", "empleadorCUIT", "EmpleadorCuit", "EmpleadorCUIT"),
+    empleadorRazonSocial: stringValue(row, "empleadorRazonSocial", "EmpleadorRazonSocial") || undefined,
+  };
+}
+
+function mapSvccPresentacionUltimaApiRecordToDTO(raw: unknown): PresentacionUltimaDTO | null {
+  if (raw == null || typeof raw !== "object") return null;
+
+  const row = raw as Record<string, unknown>;
+  const interno = numberValue(row, "interno", "Interno", "id", "Id");
+  if (interno <= 0) return null;
+
+  return {
+    interno,
+    empleadorCuit: numberValue(row, "empleadorCuit", "empleadorCUIT", "EmpleadorCuit", "EmpleadorCUIT"),
+    empleadorRazonSocial: stringValue(row, "empleadorRazonSocial", "EmpleadorRazonSocial"),
+    idPresentacion: numberValue(row, "idPresentacion", "IdPresentacion"),
+    numeroDePoliza: numberValue(row, "numeroDePoliza", "NumeroDePoliza"),
+    idMotivo: numberValue(row, "idMotivo", "IdMotivo"),
+    idProgramaMuestra: numberValue(row, "idProgramaMuestra", "IdProgramaMuestra"),
+    version: numberValue(row, "version", "Version"),
+    presentacionFecha: stringValue(row, "presentacionFecha", "PresentacionFecha"),
+    consolidacionFecha: stringValue(row, "consolidacionFecha", "ConsolidacionFecha"),
+    observaciones: stringValue(row, "observaciones", "Observaciones"),
+    fechaInsert: stringValue(row, "fechaInsert", "FechaInsert"),
+    constanciaGUID: stringValue(row, "constanciaGUID", "constanciaGuid", "ConstanciaGUID", "ConstanciaGuid"),
+    constanciaArchivo: stringValue(row, "constanciaArchivo", "ConstanciaArchivo"),
   };
 }
 
@@ -664,7 +731,7 @@ export class SvccAPIClass extends ExternalAPI {
   readonly svccPresentacionObtenerURL = ({ id }: SVCCPresentacionObtenerParams) => this.getURL({ path: `/api/Presentaciones/${id}` }).toString();
   svccPresentacionObtener = async (params: SVCCPresentacionObtenerParams) => tokenizable.get<PresentacionDTO>(
     this.svccPresentacionObtenerURL(params)
-  ).then(({ data }) => data);
+  ).then(({ data }) => mapSvccPresentacionApiRecordToDTO(data as Record<string, unknown>));
   swrSVCCPresentacionObtener: {
     key: (params: SVCCPresentacionObtenerParams) => SVCCPresentacionObtenerSWRKey,
     fetcher: (key: SVCCPresentacionObtenerSWRKey) => Promise<PresentacionDTO>
@@ -683,9 +750,8 @@ export class SvccAPIClass extends ExternalAPI {
     const cuit = Number(params.empleadorCuit);
     if (!Number.isFinite(cuit) || cuit <= 0) return null;
     try {
-      const { data } = await tokenizable.get<PresentacionUltimaDTO>(this.svccPresentacionUltimaURL(cuit));
-      if (data == null) return null;
-      return Number(data.interno) > 0 ? data : null;
+      const { data } = await tokenizable.get<unknown>(this.svccPresentacionUltimaURL(cuit));
+      return mapSvccPresentacionUltimaApiRecordToDTO(data);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) return null;
       throw error;
@@ -707,7 +773,7 @@ export class SvccAPIClass extends ExternalAPI {
   readonly svccPresentacionNuevaURL = this.getURL({ path: "/api/Presentaciones/Nueva" }).toString();
   svccPresentacionNueva = async (presentacion: PresentacionCreateDTO) => tokenizable.post<PresentacionDTO>(
     this.svccPresentacionNuevaURL, presentacion
-  ).then(({ data }) => data);
+  ).then(({ data }) => mapSvccPresentacionApiRecordToDTO(data as Record<string, unknown>));
   swrSVCCPresentacionNueva: {
     key: SVCCPresentacionNuevaSWRKey,
     fetcher: (key: SVCCPresentacionNuevaSWRKey, options: { arg: PresentacionCreateDTO }) => Promise<PresentacionDTO>,
@@ -723,7 +789,7 @@ export class SvccAPIClass extends ExternalAPI {
   readonly svccPresentacionFinalizaURL = this.getURL({ path: "/api/Presentaciones/Finaliza" }).toString();
   svccPresentacionFinaliza = async (presentacion: PresentacionFinalizaDTO) => tokenizable.put<PresentacionDTO>(
     this.svccPresentacionFinalizaURL, presentacion
-  ).then(({ data }) => data);
+  ).then(({ data }) => mapSvccPresentacionApiRecordToDTO(data as Record<string, unknown>));
   swrSVCCPresentacionFinaliza: {
     key: SVCCPresentacionFinalizaSWRKey,
     fetcher: (key: SVCCPresentacionFinalizaSWRKey, options: { arg: PresentacionFinalizaDTO }) => Promise<PresentacionDTO>,
@@ -976,7 +1042,7 @@ export class SvccAPIClass extends ExternalAPI {
   //#region SVCC/Trabajador
   //#region SVCC/Trabajador - List
   readonly svccTrabajadorListURL = (params?: SVCCTrabajadorListParams) =>
-    this.getURL({ path: "/api/Trabajadores", search: toURLSearch(params) }).toString();
+    this.getURL({ path: "/api/Trabajadores", search: svccTrabajadorListSearch(params) }).toString();
   svccTrabajadorList = async (params?: SVCCTrabajadorListParams) => tokenizable.get<Pagination<TrabajadorDTO>>(
     this.svccTrabajadorListURL(params)
   ).then(({ data }) => data);

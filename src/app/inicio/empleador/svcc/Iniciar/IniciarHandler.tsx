@@ -4,8 +4,9 @@ import CustomModal from "@/utils/ui/form/CustomModal";
 import { useSVCCPresentacionContext } from "../context";
 import { Grid, Typography } from "@mui/material";
 import Formato from "@/utils/Formato";
+import SvccAPI from "@/data/svccAPI";
 import type { PresentacionCreateDTO, PresentacionDTO, PresentacionUltimaDTO } from "@/data/svccAPI";
-import { copyPresentacionDetalleFromOrigen } from "@/utils/svcc/copyPresentacionDetalle";
+import { copyTrabajadoresFromPresentacionOrigen } from "@/utils/svcc/copyPresentacionDetalle";
 import {
   canIniciarNuevaPresentacion,
   presentacionUltimaFormFromUltima,
@@ -14,7 +15,7 @@ import {
 import { IniciarPresentacionForm } from "./IniciarPresentacionForm";
 
 export default function IniciarHandler() {
-  const { ultima, nueva, empresaCUIT } = useSVCCPresentacionContext();
+  const { ultima, nueva, empresaCUIT, presentacion } = useSVCCPresentacionContext();
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState<PresentacionUltimaDTO | null>(null);
   const [isCopyingDetalle, setIsCopyingDetalle] = useState(false);
@@ -47,19 +48,27 @@ export default function IniciarHandler() {
     if (empresaCUIT == null || formData == null) return;
     setCopyDetalleError(null);
     try {
+      const ultimaAnterior = await SvccAPI.svccPresentacionUltima({ empleadorCuit: empresaCUIT });
       const created = await (nueva.trigger as (data: PresentacionCreateDTO) => Promise<PresentacionDTO>)(
         presentacionUltimaFormToCreate(formData, empresaCUIT)
       );
-      const origenInterno = formData.interno;
-      if (origenInterno > 0 && created?.interno != null && created.interno > 0) {
+      const createdInterno = created?.interno ?? 0;
+      if (ultima.data != null && createdInterno <= 0) {
+        setCopyDetalleError("No se pudo determinar el interno de la nueva presentación para copiar sus registros hijos.");
+        return;
+      }
+      if (createdInterno > 0) {
         setIsCopyingDetalle(true);
         try {
-          await copyPresentacionDetalleFromOrigen(origenInterno, created.interno);
+          if (ultimaAnterior?.interno != null && ultimaAnterior.interno > 0) {
+            await copyTrabajadoresFromPresentacionOrigen(ultimaAnterior.interno, createdInterno);
+          }
+          presentacion.setSelected(created);
         } catch (error) {
           const message =
             error instanceof Error
               ? error.message
-              : "Error copiando Portada, Anexo V o Nóminas de la presentación anterior";
+              : "Error copiando Nóminas de la presentación anterior";
           setCopyDetalleError(message);
           return;
         } finally {

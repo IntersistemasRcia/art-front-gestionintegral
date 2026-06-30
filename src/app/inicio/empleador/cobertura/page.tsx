@@ -40,7 +40,7 @@ export default function CoberturaPage() {
    
     // Obtener personal y póliza usando el CUIT de la empresa seleccionada o, si viene por query, ese CUIT
     const paramsCUIT = Number.isFinite(cuitEmpresaActual) && cuitEmpresaActual > 0
-        ? { CUIT: cuitEmpresaActual }
+        ? { CUIT: cuitEmpresaActual, VerIndependientes: true }
         : {};
 
     const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza(paramsCUIT);
