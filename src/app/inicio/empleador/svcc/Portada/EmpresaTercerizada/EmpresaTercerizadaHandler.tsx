@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import SvccAPI from "@/data/svccAPI";
 import type {
@@ -34,13 +34,17 @@ export default function EmpresaTercerizadaHandler() {
   const { presentacion: { selected: presentacion }, establecimientos, refCIIU } = useSVCCPresentacionContext();
   const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<EmpresaTercerizadaDTO>>({ index, size, count: 0, pages: 0, data: [] });
-  const { isLoading, isValidating, mutate } = useSVCCEmpresaTercerizadaList(
+  const { data: empresaTercerizadaList, isLoading, isValidating, mutate } = useSVCCEmpresaTercerizadaList(
     { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
     }
   );
+  useEffect(() => {
+    if (empresaTercerizadaList == null) return;
+    setData({ ...empresaTercerizadaList, index: empresaTercerizadaList.index - 1 });
+  }, [empresaTercerizadaList]);
   const { trigger: triggerCreate, isMutating: isCreating } = useSVCCEmpresaTercerizadaCreate({ onSuccess() { mutate(); } });
   const [updateParams, setUpdateParams] = useState<SVCCEmpresaTercerizadaUpdateParams | undefined>();
   const { trigger: triggerUpdate, isMutating: isUpdating } = useSVCCEmpresaTercerizadaUpdate(updateParams, { onSuccess() { mutate(); } });
