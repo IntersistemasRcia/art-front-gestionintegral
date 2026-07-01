@@ -316,7 +316,7 @@ const columns: ColumnDef<Poliza>[] = [
 }
 
 function PolizasPage() {
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   const rol = String((user as any)?.rol ?? '').toLowerCase();
   const cuil = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
 
@@ -590,11 +590,7 @@ function PolizasPage() {
             />
           ),
         },
-        {
-          label: "Historial",
-          value: 1,
-          content: historial,
-        },
+        ...(hasTask("Comercializador_Polizas_Historial") ? [{ label: "Historial", value: 1, content: historial }] : []),
       ]}
     />
       <FormularioComercializador
