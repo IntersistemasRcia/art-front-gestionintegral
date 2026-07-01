@@ -20,6 +20,12 @@
     margin-bottom: 20px;
 }
 
+.exportButtonContainer {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
 @media (max-width: 768px) {
     .empresaSelectorContainer {
         max-width: 100%;

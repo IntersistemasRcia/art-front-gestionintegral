@@ -4,12 +4,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import DataTable from '@/utils/ui/table/DataTable';
 import { ColumnDef } from '@tanstack/react-table';
 import styles from './cobertura.module.css';
+import CustomButton from '@/utils/ui/button/CustomButton';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
 import ArtAPI from '@/data/artAPI';
 import { HistItem } from './types/cobertura';
 import Formato from '@/utils/Formato';
+import { saveTable, type TableColumn } from '@/utils/excelUtils';
 
 export default function HistorialTable({ data, isLoading = false }: { data: HistItem[]; isLoading?: boolean }) {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
@@ -24,6 +26,7 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
     return String(empresa.razonSocial ?? '');
   };
   const columns: ColumnDef<HistItem>[] = useMemo(() => [
+    { header: 'Nro. Certificado', accessorKey: 'interno' },
     { header: 'CUIT Empleador', accessorKey: 'cuitEmpleador', cell: (info) => Formato.CUIP(info.getValue()) },
     { header: 'Póliza', accessorKey: 'poliza' },
     { header: 'Razón Social', accessorKey: 'razonSocial' },
@@ -36,13 +39,30 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!empresaSeleccionada) return;
     setLoading(true);
-    void ArtAPI.getCobertura({ cuit: empresaSeleccionada.cuit }).then((resp) => {
+    void ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit }).then((resp) => {
       setRows(resp as HistItem[]);
       setLoading(false);
     });
   }, [empresaSeleccionada]);
+
+  const handleExportExcel = async () => {
+    const columnsExcel: Record<string, TableColumn> = {
+      interno: { header: 'Nro. Certificado', key: 'interno' },
+      cuitEmpleador: { header: 'CUIT Empleador', key: 'cuitEmpleador' },
+      poliza: { header: 'Póliza', key: 'poliza' },
+      razonSocial: { header: 'Razón Social', key: 'razonSocial' },
+      destinatario: { header: 'Destinatario', key: 'destinatario' },
+      tipoCertificado: { header: 'Tipo Certificado', key: 'tipoCertificado' },
+      createdAt: { header: 'Fecha y Hora de Creación', key: 'createdAt' },
+    };
+    const rowsExcel = rows.map((row) => ({
+      ...row,
+      cuitEmpleador: Formato.CUIP(row.cuitEmpleador),
+      createdAt: Formato.FechaHora(row.createdAt),
+    }));
+    await saveTable(columnsExcel, rowsExcel, 'HistorialCertificadosCobertura.xlsx', { format: 'xlsx', sheet: { name: 'Historial' } });
+  };
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -56,6 +76,11 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
           placeholder="Buscar empresa..."
           loading={isLoadingEmpresas}
         />
+      </div>
+      <div className={styles.exportButtonContainer}>
+        <CustomButton onClick={handleExportExcel} disabled={loading || rows.length === 0}>
+          Exportar a Excel
+        </CustomButton>
       </div>
       <DataTable data={rows} columns={columns} size="mid" isLoading={isLoading || loading} />
     </div>
