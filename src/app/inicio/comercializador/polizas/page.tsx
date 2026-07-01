@@ -11,8 +11,13 @@ import Formato from '@/utils/Formato';
 import styles from './poliza.module.css';
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 'react-icons/bs';
+import { PiUserSwitchFill } from 'react-icons/pi';
+import FormularioComercializador from './historialPoliza/formularioComercializador';
 import Link from 'next/link';
 import type { ParametersPoliza, Poliza } from "./types/poliza";
+import CustomTabs from '@/utils/ui/tab/CustomTab';
+import HistorialPoliza from './historialPoliza/historialPoliza';
+import SrtAPI from '@/data/srtAPI';
 
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
 
@@ -25,6 +30,37 @@ const EMPRESA_OPCION_TODAS: Empresa = {
   provincia: '',
 };
 
+
+function digits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Comercializador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
+
+function PolizasListado({
+  params = {},
+  groupSelect,
+  organizadorSelect,
+  comercializadorSelect,
+  emptyMessage,
+  isResolvingPolizas = false,
+  onRowClick,
+  selectedRowKey,
+  onCambiarComercializador,
+  onRegisterMutate,
+}: {
+  params?: Record<string, unknown> | null;
+  groupSelect?: React.ReactNode;
+  organizadorSelect?: React.ReactNode;
+  comercializadorSelect?: React.ReactNode;
+  emptyMessage?: string;
+  isResolvingPolizas?: boolean;
+  onRowClick?: (row: PolizaRow) => void;
+  selectedRowKey?: string;
+  onCambiarComercializador?: (row: PolizaRow) => void;
+  onRegisterMutate?: (mutate: () => void) => void;
+}) {
+  const { hasTask } = useAuth();
 const columns: ColumnDef<Poliza>[] = [
   { accessorKey: 'numero', header: 'Nro. Póliza', meta: { align: 'left' } },
   {
@@ -38,6 +74,7 @@ const columns: ColumnDef<Poliza>[] = [
     },
   },
   { accessorKey: 'Empleador_Denominacion', header: 'Empleador', meta: { align: 'left' } },
+  { accessorKey: 'Comercializador_Denominacion', header: 'Comercializador', meta: { align: 'left' } },
   {
     accessorKey: 'fecha',
     header: 'Fecha de suscripción',
@@ -74,7 +111,6 @@ const columns: ColumnDef<Poliza>[] = [
       );
     },
   },
-
   {
     id: 'accion',
     header: 'Acción',
@@ -115,36 +151,24 @@ const columns: ColumnDef<Poliza>[] = [
           <BsCalendar2Plus title="Siniestros" className={styles.iconButton} />
           </Link>
 
-
+            {hasTask("Comercializador_Polizas_CambiarComercializador") && (
+            <PiUserSwitchFill
+              title="Cambiar comercializador o asociado"
+              className={styles.iconButton}
+              onClick={(e) => { e.stopPropagation(); onCambiarComercializador?.(row.original); }}
+            />
+            )}
         </div>
       );
     },
     enableHiding: true,
   },
 ];
-
-function digits(value: unknown) {
-  return String(value ?? '').replace(/\D/g, '');
-}
-
-function PolizasListado({
-  params = {},
-  groupSelect,
-  organizadorSelect,
-  comercializadorSelect,
-  emptyMessage,
-  isResolvingPolizas = false,
-}: {
-  params?: any | null;
-  groupSelect?: React.ReactNode;
-  organizadorSelect?: React.ReactNode;
-  comercializadorSelect?: React.ReactNode;
-  emptyMessage?: string;
-  isResolvingPolizas?: boolean;
-}) {
-  const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading } = ArtAPI.useGetPolizaComercializadorURL(params);
+  const { data: apiDataRaw, error: apiError, isLoading: apiIsLoading, mutate: mutatePolizas } = ArtAPI.useGetPolizaComercializadorURL(params);
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const seleccionAutomaticaRef = useRef(false);
+
+  useEffect(() => { onRegisterMutate?.(mutatePolizas); }, [mutatePolizas]);
 
   const apiData = isResolvingPolizas ? [] : apiDataRaw ?? [];
   const error = isResolvingPolizas ? undefined : apiError;
@@ -159,6 +183,7 @@ function PolizasListado({
       NroPoliza: String(item.numero ?? ''),
       CUIT: String(item.cuit ?? ''),
       Empleador_Denominacion: String(item.empleadorDenominacion ?? ''),
+      Comercializador_Denominacion: String(item.srtComercializadorDenominacion ?? item.comercializadorReferenteRazonSocial ?? ''),
       Vigencia_Desde: String(item.vigenciaDesde ?? ''),
       Vigencia_Hasta: String(item.vigenciaHasta ?? ''),
       fecha: String(item.movimientoFecha ?? ''),
@@ -282,6 +307,9 @@ function PolizasListado({
         data={filteredRows}
         pageSizeOptions={[5, 10, 20]}
         isLoading={isLoading}
+        size="mid"
+        onRowClick={onRowClick}
+        selectedRowKeyProp={selectedRowKey}
       />
     </div>
   );
@@ -300,9 +328,14 @@ function PolizasPage() {
   const isComercializador = rol === 'comercializador';
   const isAdminLevel = isAdmin || isAdminComercializador || isAdministradorART;
 
+  const mutatePolizasRef = useRef<(() => void) | null>(null);
+
   const [grupo, setGrupo] = useState<any>(null);
   const [organizador, setOrganizador] = useState<any>(null);
   const [comercializador, setComercializador] = useState<any>(null);
+  const [tab, setTab] = useState(0);
+  const [selectedPoliza, setSelectedPoliza] = useState<PolizaRow | null>(null);
+  const [modalPoliza, setModalPoliza] = useState<PolizaRow | null>(null);
 
   const { data: gOrgData } = ArtAPI.useGetGOrganizadorURL(
     isAdminLevel ? ({} as any) : isGrupoOrganizador ? ({ CUIL: cuil } as any) : ({} as any)
@@ -505,15 +538,70 @@ function PolizasPage() {
       ? 'No hay pólizas para el filtro seleccionado.'
       : undefined;
 
-  return (
-    <PolizasListado
-      params={polizasParams}
-      groupSelect={groupSelect}
-      organizadorSelect={organizadorSelect}
-      comercializadorSelect={comercializadorSelect}
-      emptyMessage={emptyMessage}
-      isResolvingPolizas={polizasParams === null}
+  const polizaInterno = selectedPoliza ? Number(selectedPoliza.interno) : undefined;
+  const { data: historialData, isLoading: historialLoading, mutate: mutateHistorial } = SrtAPI.useGetSRTComercializadoresHistorialByPolizaId(polizaInterno);
+
+  const historialRows = useMemo(() => {
+    if (!historialData) return [];
+    return (historialData as any[]).map((item) => ({
+      ...item,
+      numeroPoliza: selectedPoliza?.numero ?? String(item.srtPolizaInterno),
+    }));
+  }, [historialData, selectedPoliza]);
+
+  const historial = (
+    <HistorialPoliza
+      data={historialRows}
+      isLoading={historialLoading}
+      hasSelection={!!selectedPoliza}
+      empleadorCuit={selectedPoliza?.CUIT ?? ""}
+      empleadorRazonSocial={selectedPoliza?.Empleador_Denominacion ?? ""}
+      polizaInterno={polizaInterno}
+      onSuccess={mutateHistorial}
     />
+  );
+
+  return (
+    <>
+    <CustomTabs
+      currentTab={tab}
+      onTabChange={(_e, v) => setTab(v)}
+      tabs={[
+        {
+          label: "Polizas",
+          value: 0,
+          content: (
+            <PolizasListado
+              params={polizasParams}
+              groupSelect={groupSelect}
+              organizadorSelect={organizadorSelect}
+              comercializadorSelect={comercializadorSelect}
+              emptyMessage={emptyMessage}
+              isResolvingPolizas={polizasParams === null}
+              onRowClick={setSelectedPoliza}
+              selectedRowKey={selectedPoliza?.interno}
+              onCambiarComercializador={setModalPoliza}
+              onRegisterMutate={(fn) => { mutatePolizasRef.current = fn; }}
+            />
+          ),
+        },
+        {
+          label: "Historial",
+          value: 1,
+          content: historial,
+        },
+      ]}
+    />
+      <FormularioComercializador
+        open={!!modalPoliza}
+        onClose={() => setModalPoliza(null)}
+        onSuccess={() => { mutateHistorial(); mutatePolizasRef.current?.(); }}
+        empleadorCuit={modalPoliza?.CUIT ?? ""}
+        empleadorRazonSocial={modalPoliza?.Empleador_Denominacion ?? ""}
+        polizaInterno={modalPoliza ? Number(modalPoliza.interno) : undefined}
+        numeroPoliza={modalPoliza?.numero}
+      />
+    </>
   );
 }
 
