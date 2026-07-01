@@ -1,0 +1,26 @@
+---
+alwaysApply: true
+---
+# Roles Rules from InterSistemas
+
+Debes considerar siempre el ROL del usuarios logeado... respetando su gerarquia
+
+## Roles
+
+### 1. Administrador
+- Este es el ROL supremo por defecto, puede acceder absolutamente a todas las opciones del sistema, no necesita permiso alguno
+
+### 2. AdministradorART
+- Este rol está un escalor por debajo del rol Administrador, para algunas opciones del sistema requiere tareas especificas.
+
+### 3. AdministradorEmpleador
+- Este es un rol que contiene/agrupa roles hijos, ademas de esta agrupacion, este rol tambien administra todo el modulo de "Empleador"
+- **Empleador**: este es un ROL HIJO de "AdministradorEmpleador"... este usuario requiere tareas a nivel de usuario para acceder a las distintas opciones del modulo Empleador
+- **SeguridadEHigiene**: este es un ROL HIJO de "AdministradorEmpleador"... este usuario requiere tareas a nivel de usuario para acceder a las distintas opciones del modulo Empleador
+- **MedicinaLaboral**: este es un ROL HIJO de "AdministradorEmpleador"... este usuario requiere tareas a nivel de usuario para acceder a las distintas opciones del modulo Empleador
+
+### 4. AdministradorComercializador
+- Este es un rol que contiene/agrupa roles hijos, ademas de esta agrupacion, este rol tambien administra todo el modulo de "Comercializador"
+- **Comercializador**: este es un ROL HIJO de "AdministradorComercializador"... este usuario requiere tareas a nivel de usuario para acceder a las distintas opciones del modulo Comercializador
+- **GrupoOrganizador**: este es un ROL HIJO de "AdministradorComercializador"... este usuario requiere tareas a nivel de usuario para acceder a las distintas opciones del modulo Comercializador
+- **OrganizadorComercializador**: este es un ROL HIJO de "AdministradorComercializador"... este usuario requiere tareas a nivel de usuario para acceder a las distintas opciones del modulo Comercializador
