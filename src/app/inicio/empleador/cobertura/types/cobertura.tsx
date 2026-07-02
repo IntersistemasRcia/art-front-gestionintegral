@@ -10,6 +10,9 @@ export type CoberturaPostResponse = unknown;
 
 export type ParametersCobertura = {
     cuit?: number;
+    pageIndex?: number;
+    pageSize?: number;
+    orderBy?: string;
 }
 
 export type HistItem = {

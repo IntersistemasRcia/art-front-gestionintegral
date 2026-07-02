@@ -36,17 +36,24 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
   ], []);
 
   const [rows, setRows] = useState<HistItem[]>(data);
+  const [pageCount, setPageCount] = useState<number>(1);
+  const [page, setPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     setLoading(true);
-    void ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit }).then((resp) => {
-      setRows(resp as HistItem[]);
+    void ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit, pageIndex: page, pageSize: 10, orderBy: '-fechaHora' }).then((resp) => {
+      const { data, pages } = resp as { data: HistItem[]; pages: number };
+      setRows(data);
+      setPageCount(pages);
       setLoading(false);
     });
-  }, [empresaSeleccionada]);
+  }, [empresaSeleccionada, page]);
+
+  useEffect(() => { setPage(1); }, [empresaSeleccionada]);
 
   const handleExportExcel = async () => {
+    const { data: allRows } = (await ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit, orderBy: '-fechaHora' })) as { data: HistItem[] };
     const columnsExcel: Record<string, TableColumn> = {
       interno: { header: 'Nro. Certificado', key: 'interno' },
       cuitEmpleador: { header: 'CUIT Empleador', key: 'cuitEmpleador' },
@@ -56,7 +63,7 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
       tipoCertificado: { header: 'Tipo Certificado', key: 'tipoCertificado' },
       createdAt: { header: 'Fecha y Hora de Creación', key: 'createdAt' },
     };
-    const rowsExcel = rows.map((row) => ({
+    const rowsExcel = allRows.map((row) => ({
       ...row,
       cuitEmpleador: Formato.CUIP(row.cuitEmpleador),
       createdAt: Formato.FechaHora(row.createdAt),
@@ -82,7 +89,7 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
           Exportar a Excel
         </CustomButton>
       </div>
-      <DataTable data={rows} columns={columns} size="mid" isLoading={isLoading || loading} />
+      <DataTable data={rows} columns={columns} size="mid" isLoading={isLoading || loading} manualPagination pageIndex={page} pageSize={10} pageCount={pageCount} onPageChange={setPage} />
     </div>
   );
 }
