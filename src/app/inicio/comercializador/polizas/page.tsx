@@ -15,6 +15,7 @@ import { PiUserSwitchFill } from 'react-icons/pi';
 import FormularioComercializador from './historialPoliza/formularioComercializador';
 import Link from 'next/link';
 import type { ParametersPoliza, Poliza } from "./types/poliza";
+import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
 import HistorialPoliza from './historialPoliza/historialPoliza';
 import SrtAPI from '@/data/srtAPI';
@@ -463,24 +464,26 @@ function PolizasPage() {
   }, [polizasUsuarioLogueadoData]);
 
   const polizasParams = useMemo((): ParametersPoliza | null => {
+    const baseParams = applySRTPolizasVerIndependientes({ SoloActivas: true }, rol);
+
     const comercializadorInterno = Number((comercializador as any)?.interno ?? 0);
     if (comercializadorInterno > 0) {
-      return { ComercializadoresInternos: String(comercializadorInterno), SoloActivas: true };
+      return { ...baseParams, ComercializadoresInternos: String(comercializadorInterno) };
     }
 
     const organizadorInternoSeleccionado = Number((organizador as any)?.interno ?? 0);
     if (organizadorInternoSeleccionado > 0) {
       if (comercializadoresParams === null || isLoadingComercializadores) return null;
-      return { ComercializadoresInternos: comercializadoresInternos || '0', SoloActivas: true };
+      return { ...baseParams, ComercializadoresInternos: comercializadoresInternos || '0' };
     }
 
     const grupoInternoSeleccionado = Number((grupo as any)?.interno ?? 0);
     if (grupoInternoSeleccionado > 0 && isAdminLevel) {
       if (comercializadoresParams === null || isLoadingComercializadores) return null;
-      return { ComercializadoresInternos: comercializadoresInternos || '0', SoloActivas: true };
+      return { ...baseParams, ComercializadoresInternos: comercializadoresInternos || '0' };
     }
 
-    return { SoloActivas: true };
+    return baseParams;
   }, [
     comercializador,
     organizador,
@@ -489,6 +492,7 @@ function PolizasPage() {
     comercializadoresParams,
     isLoadingComercializadores,
     isAdminLevel,
+    rol,
   ]);
 
   const groupSelect = (

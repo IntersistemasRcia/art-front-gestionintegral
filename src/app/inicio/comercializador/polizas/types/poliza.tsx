@@ -2,6 +2,7 @@ export type ParametersPoliza = {
     CUIT?: number;
     ComercializadoresInternos?: string;
     SoloActivas?: boolean;
+    VerIndependientes?: boolean;
 }
 
 export type ParametersPolizaAcotada = {

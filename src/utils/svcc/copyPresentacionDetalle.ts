@@ -1,5 +1,4 @@
 import SvccAPI, {
-  type ActividadDTO,
   type EmpresaTercerizadaCreateDTO,
   type EmpresaTercerizadaDTO,
   type EstablecimientoDeclaradoCreateDTO,
@@ -52,18 +51,51 @@ function setReferenceMapValue(map: Map<number, number>, oldValue?: number, newVa
 }
 
 function mappedReference(value: number | undefined, map: Map<number, number>): number | undefined {
-  if (value == null) return value;
-  return map.get(value) ?? value;
+  if (value == null || value <= 0) return undefined;
+  return map.get(value);
 }
 
-function mapNestedInternos<T extends { interno?: number }>(
-  sourceRows: T[] | undefined,
-  clonedRows: T[] | undefined,
+function mapPuestosByIdentity(
+  sourcePuestos: { interno?: number; nombre?: string; ciuo?: number }[] | undefined,
+  createdPuestos: { interno?: number; nombre?: string; ciuo?: number }[] | undefined,
   map: Map<number, number>,
 ): void {
-  if (sourceRows == null || clonedRows == null) return;
-  sourceRows.forEach((sourceRow, index) => {
-    setReferenceMapValue(map, sourceRow.interno, clonedRows[index]?.interno);
+  if (sourcePuestos == null || createdPuestos == null) return;
+
+  sourcePuestos.forEach((sourcePuesto, index) => {
+    const sourceInterno = sourcePuesto.interno;
+    if (sourceInterno == null || sourceInterno <= 0) return;
+
+    const byIdentity = createdPuestos.find(
+      (createdPuesto) =>
+        String(createdPuesto.nombre ?? "").trim() === String(sourcePuesto.nombre ?? "").trim()
+        && Number(createdPuesto.ciuo ?? 0) === Number(sourcePuesto.ciuo ?? 0),
+    )?.interno;
+    const byIndex = createdPuestos[index]?.interno;
+
+    setReferenceMapValue(map, sourceInterno, byIdentity ?? byIndex);
+  });
+}
+
+function mapSectoresByIdentity(
+  sourceSectores: { interno?: number; nombre?: string; ciiu?: number }[] | undefined,
+  createdSectores: { interno?: number; nombre?: string; ciiu?: number }[] | undefined,
+  map: Map<number, number>,
+): void {
+  if (sourceSectores == null || createdSectores == null) return;
+
+  sourceSectores.forEach((sourceSector, index) => {
+    const sourceInterno = sourceSector.interno;
+    if (sourceInterno == null || sourceInterno <= 0) return;
+
+    const byIdentity = createdSectores.find(
+      (createdSector) =>
+        String(createdSector.nombre ?? "").trim() === String(sourceSector.nombre ?? "").trim()
+        && Number(createdSector.ciiu ?? 0) === Number(sourceSector.ciiu ?? 0),
+    )?.interno;
+    const byIndex = createdSectores[index]?.interno;
+
+    setReferenceMapValue(map, sourceInterno, byIdentity ?? byIndex);
   });
 }
 
@@ -78,6 +110,20 @@ async function fetchAllPaginated<T>(
     items.push(...page.data);
   }
   return items;
+}
+
+/** GET /api/Trabajadores?PresentacionId={id} de la presentación origen (antes de crear la nueva). */
+export async function fetchTrabajadoresByPresentacionId(presentacionId: number): Promise<TrabajadorDTO[]> {
+  if (presentacionId <= 0) return [];
+
+  return fetchAllPaginated((pageIndex) =>
+    SvccAPI.svccTrabajadorList({
+      presentacionId,
+      PresentacionId: presentacionId,
+      PageIndex: pageIndex,
+      PageSize: COPY_PAGE_SIZE,
+    })
+  );
 }
 
 function toEmpresaTercerizadaCreate(
@@ -116,52 +162,14 @@ function toSustanciaCreate(
   };
 }
 
-function toTrabajadorCreate(
-  row: TrabajadorDTO,
-  presentacionId: number,
-  maps?: CloneReferenceMaps,
-): TrabajadorCreateDTO {
+function toTrabajadorCreatePayload(row: TrabajadorDTO, presentacionId: number): TrabajadorCreateDTO {
   const clone = stripCloneFields(row);
   return {
     presentacionId,
     cuil: clone.cuil,
     idEstablecimientoEmpresa: clone.idEstablecimientoEmpresa,
     fechaIngreso: clone.fechaIngreso,
-    actividades: clone.actividades?.map((actividad) => toTrabajadorActividadCreate(actividad, maps)),
   };
-}
-
-function toTrabajadorActividadCreate(actividad: ActividadDTO, maps?: CloneReferenceMaps): ActividadDTO {
-  const clone = stripCloneFields(actividad);
-  const puestoInterno = maps
-    ? mappedReference(clone.puestoInterno ?? clone.idPuesto, maps.puestoInterno)
-    : clone.puestoInterno ?? clone.idPuesto;
-  const sectorInterno = maps
-    ? mappedReference(clone.sectorInterno, maps.sectorInterno)
-    : clone.sectorInterno;
-  const sustanciaInterno = maps
-    ? mappedReference(clone.sustanciaInterno, maps.sustanciaInterno)
-    : clone.sustanciaInterno;
-
-  return {
-    ...clone,
-    puestoInterno,
-    sectorInterno,
-    sustanciaInterno,
-    idPuesto: puestoInterno,
-    examenesMedicos: clone.examenesMedicos?.map((examen) => stripCloneFields(examen)),
-  };
-}
-
-async function fetchTrabajadoresByPresentacion(presentacionId: number): Promise<TrabajadorDTO[]> {
-  return fetchAllPaginated((pageIndex) =>
-    SvccAPI.svccTrabajadorList({
-      PresentacionId: presentacionId,
-      presentacionId,
-      PageIndex: pageIndex,
-      PageSize: COPY_PAGE_SIZE,
-    })
-  );
 }
 
 async function copyEmpresasTercerizadas(origenId: number, nuevoId: number): Promise<void> {
@@ -191,8 +199,8 @@ async function copyEstablecimientosDeclarados(
   );
   for (const row of rows) {
     const created = await SvccAPI.svccEstablecimientoDeclaradoCreate(toEstablecimientoDeclaradoCreate(row, nuevoId));
-    mapNestedInternos(row.puestos, created.puestos, maps.puestoInterno);
-    mapNestedInternos(row.sectores, created.sectores, maps.sectorInterno);
+    mapPuestosByIdentity(row.puestos, created.puestos, maps.puestoInterno);
+    mapSectoresByIdentity(row.sectores, created.sectores, maps.sectorInterno);
   }
 }
 
@@ -214,14 +222,33 @@ async function copySustancias(origenId: number, nuevoId: number, maps: CloneRefe
   }
 }
 
-async function copyTrabajadores(origenId: number, nuevoId: number, maps: CloneReferenceMaps): Promise<void> {
-  const rows = await fetchTrabajadoresByPresentacion(origenId);
-  for (const row of rows) {
-    const full =
-      row.interno > 0
-        ? await SvccAPI.svccTrabajadorRead({ id: row.interno })
-        : row;
-    await SvccAPI.svccTrabajadorCreate(toTrabajadorCreate(full, nuevoId, maps));
+/** Copia Portada y Anexo V desde la presentación origen a la nueva. */
+export async function copyPortadaYAnexoVFromOrigen(
+  presentacionOrigenInterno: number,
+  presentacionNuevaInterno: number,
+): Promise<void> {
+  if (presentacionOrigenInterno <= 0 || presentacionNuevaInterno <= 0) return;
+  if (presentacionOrigenInterno === presentacionNuevaInterno) return;
+
+  const maps = createReferenceMaps();
+
+  await copyEmpresasTercerizadas(presentacionOrigenInterno, presentacionNuevaInterno);
+  await copyEstablecimientosDeclarados(presentacionOrigenInterno, presentacionNuevaInterno, maps);
+  await copySustancias(presentacionOrigenInterno, presentacionNuevaInterno, maps);
+}
+
+/**
+ * POST /api/Trabajadores con el nuevo presentacionId.
+ * Las filas deben haberse obtenido antes de crear la nueva presentación.
+ */
+export async function copyNominasToPresentacion(
+  trabajadoresOrigen: TrabajadorDTO[],
+  presentacionNuevaInterno: number,
+): Promise<void> {
+  if (presentacionNuevaInterno <= 0 || trabajadoresOrigen.length === 0) return;
+
+  for (const row of trabajadoresOrigen) {
+    await SvccAPI.svccTrabajadorCreate(toTrabajadorCreatePayload(row, presentacionNuevaInterno));
   }
 }
 
@@ -229,26 +256,15 @@ async function copyTrabajadores(origenId: number, nuevoId: number, maps: CloneRe
 export async function copyPresentacionDetalleFromOrigen(
   presentacionOrigenInterno: number,
   presentacionNuevaInterno: number,
+  trabajadoresOrigen?: TrabajadorDTO[],
 ): Promise<void> {
   if (presentacionOrigenInterno <= 0 || presentacionNuevaInterno <= 0) return;
+  if (presentacionOrigenInterno === presentacionNuevaInterno) return;
 
-  const maps = createReferenceMaps();
+  const nominas =
+    trabajadoresOrigen
+    ?? await fetchTrabajadoresByPresentacionId(presentacionOrigenInterno);
 
-  await copyEmpresasTercerizadas(presentacionOrigenInterno, presentacionNuevaInterno);
-  await copyEstablecimientosDeclarados(presentacionOrigenInterno, presentacionNuevaInterno, maps);
-  await copySustancias(presentacionOrigenInterno, presentacionNuevaInterno, maps);
-  await copyTrabajadores(presentacionOrigenInterno, presentacionNuevaInterno, maps);
-}
-
-/** Copia solamente trabajadores/nómina desde una presentación origen a la nueva. */
-export async function copyTrabajadoresFromPresentacionOrigen(
-  presentacionOrigenInterno: number,
-  presentacionNuevaInterno: number,
-): Promise<void> {
-  if (presentacionOrigenInterno <= 0 || presentacionNuevaInterno <= 0) return;
-
-  const rows = await fetchTrabajadoresByPresentacion(presentacionOrigenInterno);
-  for (const row of rows) {
-    await SvccAPI.svccTrabajadorCreate(toTrabajadorCreate(row, presentacionNuevaInterno));
-  }
+  await copyPortadaYAnexoVFromOrigen(presentacionOrigenInterno, presentacionNuevaInterno);
+  await copyNominasToPresentacion(nominas, presentacionNuevaInterno);
 }
