@@ -36,7 +36,7 @@ function digits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
-type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Comercializador_Denominacion: string; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
+type PolizaRow = { interno: string; numero: string; NroPoliza: string; CUIT: string; Empleador_Denominacion: string; Comercializador_Denominacion: string; srtComercializadorInterno: number; Vigencia_Desde: string; Vigencia_Hasta: string; fecha: string; };
 
 function PolizasListado({
   params = {},
@@ -185,6 +185,7 @@ const columns: ColumnDef<Poliza>[] = [
       CUIT: String(item.cuit ?? ''),
       Empleador_Denominacion: String(item.empleadorDenominacion ?? ''),
       Comercializador_Denominacion: String(item.srtComercializadorDenominacion ?? item.comercializadorReferenteRazonSocial ?? ''),
+      srtComercializadorInterno: Number(item.srtcomercializadorInterno ?? item.srtComercializadorInterno ?? 0),
       Vigencia_Desde: String(item.vigenciaDesde ?? ''),
       Vigencia_Hasta: String(item.vigenciaHasta ?? ''),
       fecha: String(item.movimientoFecha ?? ''),
@@ -600,6 +601,7 @@ function PolizasPage() {
         empleadorRazonSocial={modalPoliza?.Empleador_Denominacion ?? ""}
         polizaInterno={modalPoliza ? Number(modalPoliza.interno) : undefined}
         numeroPoliza={modalPoliza?.numero}
+        comercializadorActualInterno={modalPoliza?.srtComercializadorInterno || undefined}
       />
     </>
   );

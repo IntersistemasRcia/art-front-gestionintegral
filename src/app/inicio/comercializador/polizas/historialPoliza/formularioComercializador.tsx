@@ -24,6 +24,7 @@ type Props = {
   numeroPoliza?: string;
   editRow?: HistorialRow;
   crearHistorial?: boolean;
+  comercializadorActualInterno?: number;
 };
 
 const asociadosColumns: ColumnDef<SRTComercializadorAsociado>[] = [
@@ -32,7 +33,7 @@ const asociadosColumns: ColumnDef<SRTComercializadorAsociado>[] = [
   { accessorKey: "razonSocial", header: "Comercializador", meta: { align: "left" } },
 ];
 
-export default function FormularioComercializador({ open, onClose, onSuccess, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow, crearHistorial }: Props) {
+export default function FormularioComercializador({ open, onClose, onSuccess, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow, crearHistorial, comercializadorActualInterno }: Props) {
   const [comercializadorSeleccionado, setComercializadorSeleccionado] = useState<Comercializador | null>(null);
   const [asociadoSeleccionado, setAsociadoSeleccionado] = useState<SRTComercializadorAsociado | null>(null);
   const [seleccionarAsociados, setSeleccionarAsociados] = useState(false);
@@ -60,8 +61,10 @@ export default function FormularioComercializador({ open, onClose, onSuccess, em
       const com = comercializadores.find((c) => c.interno === editRow.srtComercializadorInterno) ?? null;
       setComercializadorSeleccionado(com);
       setFechaHasta(editRow.fechaHasta ? editRow.fechaHasta.slice(0, 10) : "");
+    } else if (comercializadorActualInterno != null && comercializadores.length > 0) {
+      setComercializadorSeleccionado(comercializadores.find((c) => c.interno === comercializadorActualInterno) ?? null);
     }
-  }, [open, editRow, comercializadores.length]);
+  }, [open, editRow, comercializadorActualInterno, comercializadores.length]);
 
   const cuitFormateado = Formato.CUIP(empleadorCuit.replace(/\D/g, "")) || empleadorCuit;
   const titulo = editRow
