@@ -37,6 +37,19 @@ import {
 
 const tokenizable = token.configure();
 
+type SRTPolizasGetParams = {
+  VerIndependientes?: boolean;
+};
+
+const withVerIndependientes = <T extends SRTPolizasGetParams>(params: T): T => {
+  if (params.VerIndependientes === false) {
+    const { VerIndependientes: _omit, ...rest } = params;
+    return rest as T;
+  }
+
+  return { ...params, VerIndependientes: true };
+};
+
 export type SRTPolizaUsuarioLogueada = SRTPolizaAcotada;
 
 //#region Types SRTComercializadoresHistorial
@@ -148,7 +161,7 @@ export class SrtAPIClass extends ExternalAPI {
 
   //#region Polizas Comercializador
   readonly getpolizaComercializadorURL = (params: ParametersPoliza = {}) => {
-    return this.getURL({ path: "/api/SRTPolizas", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/SRTPolizas", search: toURLSearch(withVerIndependientes(params)) }).toString();
   };
   getPolizaComercializador = async (params: ParametersPoliza = {}) => tokenizable.get(
     this.getpolizaComercializadorURL(params),
@@ -163,7 +176,7 @@ export class SrtAPIClass extends ExternalAPI {
 
   //#region SRTPoliza
   readonly getPolizaURL = (params: Parameters = {}) => {
-    return this.getURL({ path: "/api/SRTPolizas", search: toURLSearch(params) }).toString();
+    return this.getURL({ path: "/api/SRTPolizas", search: toURLSearch(withVerIndependientes(params)) }).toString();
   };
 
   getPoliza = async (params: Parameters = {}) =>

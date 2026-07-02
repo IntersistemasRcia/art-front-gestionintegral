@@ -8,6 +8,7 @@ import ArtAPI from '@/data/artAPI';
 import SrtAPI from '@/data/srtAPI';
 import AuthAPI from '@/data/authAPI';
 import { useAuth } from '@/data/AuthContext';
+import { applySRTPolizasVerIndependientes } from '@/utils/srtPolizasParams';
 
 const NOTIFICACION_RGRL_ENTIDAD_TIPO = 'Activar_NotificacionRGRL';
 
@@ -39,7 +40,7 @@ export default function Notification({ empresaCUIT }: Props) {
         const [estsResult, formsResult, polizaResult] = await Promise.allSettled([
           ArtAPI.getEstablecimientosEmpresa(c, "true"),
           ArtAPI.getFormulariosRGRL({ CUIT: c }),
-          SrtAPI.getPoliza({ CUIT: c }),
+          SrtAPI.getPoliza(applySRTPolizasVerIndependientes({ CUIT: c }, user?.rol)),
         ]);
 
         const ests = estsResult.status === "fulfilled" ? estsResult.value : [];

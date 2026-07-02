@@ -14,7 +14,8 @@ import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 're
 import { PiUserSwitchFill } from 'react-icons/pi';
 import FormularioComercializador from './historialPoliza/formularioComercializador';
 import Link from 'next/link';
-import type { Poliza } from "./types/poliza";
+import type { ParametersPoliza, Poliza } from "./types/poliza";
+import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
 import HistorialPoliza from './historialPoliza/historialPoliza';
 import SrtAPI from '@/data/srtAPI';
@@ -426,12 +427,19 @@ function PolizasPage() {
       .join(',');
   }, [organizadoresData]);
 
-  const organizadorInterno = Number((organizadorValue as any)?.interno ?? 0);
-  const comercializadoresParams = organizadorInterno
-    ? ({ ComercializadoresOrganizadoresInternos: String(organizadorInterno) } as any)
-    : isLoadingOrganizadores
-    ? null
-    : ({ ComercializadoresOrganizadoresInternos: organizadoresInternos || '0' } as any);
+  const selectedOrganizadorInterno = Number((organizador as any)?.interno ?? 0);
+  const selectedGrupoInterno = Number((grupo as any)?.interno ?? 0);
+
+  const comercializadoresParams = useMemo(() => {
+    if (selectedOrganizadorInterno > 0) {
+      return { ComercializadoresOrganizadoresInternos: String(selectedOrganizadorInterno) } as any;
+    }
+    if (selectedGrupoInterno > 0 && isAdminLevel) {
+      if (isLoadingOrganizadores) return null;
+      return { ComercializadoresOrganizadoresInternos: organizadoresInternos || '0' } as any;
+    }
+    return null;
+  }, [selectedOrganizadorInterno, selectedGrupoInterno, isAdminLevel, isLoadingOrganizadores, organizadoresInternos]);
 
   const { data: comercializadoresData, isLoading: isLoadingComercializadores } = ArtAPI.useGetComercializadorURL(comercializadoresParams);
 
@@ -441,60 +449,51 @@ function PolizasPage() {
   }, [comercializadoresData]);
 
   const comercializadoresUsuarioLogueadoOptions = useMemo(() => {
-    const map = new Map<string, any>();
-    const addComercializadorOption = (internoValue: unknown, referenteValue: unknown) => {
-      const interno = Number(internoValue ?? 0);
-      const referenteRazonSocial = String(referenteValue ?? '').trim();
-      if (!interno || !referenteRazonSocial) return;
-      map.set(String(interno), {
-        interno,
-        referenteRazonSocial,
-      });
-    };
+    const map = new Map<string, { interno: number; referenteRazonSocial: string }>();
 
     (polizasUsuarioLogueadoData ?? []).forEach((poliza: any) => {
-      addComercializadorOption(
-        poliza?.srtcomercializadorInterno ?? poliza?.srtComercializadorInterno,
-        poliza?.comercializadorReferenteRazonSocial
-      );
-    });
-
-    (comercializadoresData ?? []).forEach((comercializadorItem: any) => {
-      addComercializadorOption(
-        comercializadorItem?.interno,
-        comercializadorItem?.referenteRazonSocial ?? comercializadorItem?.razonSocial ?? comercializadorItem?.descripcion
-      );
-
-      const asociados = Array.isArray(comercializadorItem?.comercializadoresAsociados)
-        ? comercializadorItem.comercializadoresAsociados
-        : [];
-
-      asociados.forEach((asociado: any) => {
-        addComercializadorOption(
-          asociado?.interno ?? asociado?.srtComercializadorInterno ?? asociado?.asociadoId,
-          asociado?.referenteRazonSocial ?? asociado?.razonSocial ?? asociado?.descripcion
-        );
-      });
+      const interno = Number(poliza?.srtcomercializadorInterno ?? poliza?.srtComercializadorInterno ?? 0);
+      const referenteRazonSocial = String(poliza?.comercializadorReferenteRazonSocial ?? '').trim();
+      if (!interno || !referenteRazonSocial) return;
+      map.set(String(interno), { interno, referenteRazonSocial });
     });
 
     return Array.from(map.values()).sort((a, b) =>
       String(a.referenteRazonSocial).localeCompare(String(b.referenteRazonSocial))
     );
-  }, [comercializadoresData, polizasUsuarioLogueadoData]);
+  }, [polizasUsuarioLogueadoData]);
 
-  const polizasParams = useMemo(() => {
-    const comercializadorInterno = Number((comercializadorValue as any)?.interno ?? 0);
-    if (comercializadorInterno) {
-      return { ComercializadoresInternos: String(comercializadorInterno), SoloActivas: true } as any;
+  const polizasParams = useMemo((): ParametersPoliza | null => {
+    const baseParams = applySRTPolizasVerIndependientes({ SoloActivas: true }, rol);
+
+    const comercializadorInterno = Number((comercializador as any)?.interno ?? 0);
+    if (comercializadorInterno > 0) {
+      return { ...baseParams, ComercializadoresInternos: String(comercializadorInterno) };
     }
 
-    if (organizadorValue) {
-      if (isLoadingComercializadores) return null;
-      return { ComercializadoresInternos: comercializadoresInternos || '0', SoloActivas: true } as any;
+    const organizadorInternoSeleccionado = Number((organizador as any)?.interno ?? 0);
+    if (organizadorInternoSeleccionado > 0) {
+      if (comercializadoresParams === null || isLoadingComercializadores) return null;
+      return { ...baseParams, ComercializadoresInternos: comercializadoresInternos || '0' };
     }
 
-    return { SoloActivas: true } as any;
-  }, [comercializadorValue, comercializadoresInternos, isLoadingComercializadores, organizadorValue]);
+    const grupoInternoSeleccionado = Number((grupo as any)?.interno ?? 0);
+    if (grupoInternoSeleccionado > 0 && isAdminLevel) {
+      if (comercializadoresParams === null || isLoadingComercializadores) return null;
+      return { ...baseParams, ComercializadoresInternos: comercializadoresInternos || '0' };
+    }
+
+    return baseParams;
+  }, [
+    comercializador,
+    organizador,
+    grupo,
+    comercializadoresInternos,
+    comercializadoresParams,
+    isLoadingComercializadores,
+    isAdminLevel,
+    rol,
+  ]);
 
   const groupSelect = (
     <CustomSelectSearch<any>
@@ -539,7 +538,7 @@ function PolizasPage() {
   );
 
   const emptyMessage =
-    (isGrupoOrganizador || isOrganizadorComercializador || isComercializador || !!grupoValue || !!organizadorValue || !!comercializadorValue)
+    comercializador || organizador || (isAdminLevel && grupo)
       ? 'No hay pólizas para el filtro seleccionado.'
       : undefined;
 

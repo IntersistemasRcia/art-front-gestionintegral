@@ -14,6 +14,7 @@ import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from 'next/navigation';
 import ArtAPI, { type VEmpleadorDDJJPostBody } from '@/data/artAPI';
 import { useAuth } from '@/data/AuthContext';
+import { applySRTPolizasVerIndependientes } from '@/utils/srtPolizasParams';
 
 
 
@@ -217,9 +218,12 @@ function CuentaCorrientePage() {
         };
     }, [bloquearBusquedaPorCuit, cuitDesdeQuery, ddjjPageIndex, empresaSeleccionada, empresas, isAdmin]);
 
-    const { data: polizaRawData } = SrtAPI.useGetPoliza(
-        cuitFinal ? { CUIT: cuitFinal } : {}
+    const polizaParams = useMemo(
+        () => (cuitFinal ? applySRTPolizasVerIndependientes({ CUIT: cuitFinal }, user?.rol) : {}),
+        [cuitFinal, user?.rol]
     );
+
+    const { data: polizaRawData } = SrtAPI.useGetPoliza(polizaParams);
     const { data: CtaCteRawData, isLoading: isCtaCteLoading } = ArtAPI.useVEmpleadorDDJJ(ddjjBody);
 
     const ddjjPageCount = useMemo(() => {
