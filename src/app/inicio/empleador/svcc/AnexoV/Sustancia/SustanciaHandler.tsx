@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Grid, Typography } from "@mui/material";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import type {
   SustanciaBaseDTO,
   SustanciaCreateDTO,
@@ -22,7 +22,7 @@ const {
   useSVCCSustanciaCreate,
   useSVCCSustanciaUpdate,
   useSVCCSustanciaDelete,
-} = ArtAPI;
+} = SvccAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<SustanciaDTO>, "onChange"> & {
@@ -35,13 +35,17 @@ export default function SustanciaHandler() {
   const presentacion = presentacionSeleccionada;
   const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<SustanciaDTO>>({ index, size, count: 0, pages: 0, data: [] });
-  const { isLoading, isValidating, mutate } = useSVCCSustanciaList(
+  const { data: sustanciaList, isLoading, isValidating, mutate } = useSVCCSustanciaList(
     { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
     }
   );
+  useEffect(() => {
+    if (sustanciaList == null) return;
+    setData({ ...sustanciaList, index: sustanciaList.index - 1 });
+  }, [sustanciaList]);
   const { trigger: triggerCreate, isMutating: isCreating } = useSVCCSustanciaCreate({ onSuccess() { mutate(); } });
   const [updateParams, setUpdateParams] = useState<SVCCSustanciaUpdateParams | undefined>();
   const { trigger: triggerUpdate, isMutating: isUpdating } = useSVCCSustanciaUpdate(updateParams, { onSuccess() { mutate(); } });

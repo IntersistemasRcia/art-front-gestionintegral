@@ -1,6 +1,8 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import gestionEmpleadorAPI, { PresentacionCreateDTO, PresentacionDTO, PresentacionFinalizaDTO, RefCIIU, SRTSiniestralidadCIUO88 } from '@/data/gestionEmpleadorAPI';
-import type { SVCCPresentacionTodasParams, SVCCPresentacionUltimaParams } from '@/data/artAPI';
+import gestionEmpleadorAPI, { PresentacionCreateDTO, PresentacionDTO, PresentacionFinalizaDTO, RefCIIU } from '@/data/gestionEmpleadorAPI';
+import SrtAPI, { type SRTSiniestralidadCIUO88 } from '@/data/srtAPI';
+import SvccAPI from '@/data/svccAPI';
+import type { PresentacionUltimaDTO, SVCCPresentacionTodasParams, SVCCPresentacionUltimaParams } from '@/data/svccAPI';
 import ArtAPI, { EstablecimientoVm, EstablecimientoVmDescripcion } from "@/data/artAPI";
 import { arrayToRecord } from "@/utils/utils";
 import { AxiosError } from "axios";
@@ -20,7 +22,7 @@ export type SVCCPresentacionContextType = {
   ultima: {
     isLoading: boolean;
     isValidating: boolean;
-    data?: PresentacionDTO;
+    data?: PresentacionUltimaDTO;
     error?: AxiosError
   };
   isMutating: boolean;
@@ -73,11 +75,15 @@ const {
   useSVCCPresentacionNueva,
   useSVCCPresentacionFinaliza,
   useSVCCPresentacionConstancia,
-  useEstablecimientoList,
-} = ArtAPI;
+} = SvccAPI;
+
+const { useEstablecimientoList } = ArtAPI;
 
 const {
   useSRTSiniestralidadCIUO88List,
+} = SrtAPI;
+
+const {
   useRefCIIUList,
 } = gestionEmpleadorAPI;
 
@@ -96,13 +102,14 @@ export type SVCCPresentacionFilterBase = Omit<SVCCPresentacionTodasParams, "Page
 export function SVCCPresentacionContextProvider({
   children,
   empresaCUITParaAcciones,
+  empresaCUITUltima,
   filtrosPresentacionesBase,
-  filtrosUltimaPresentacion,
 }: {
   children: ReactNode;
   empresaCUITParaAcciones?: number;
+  /** CUIT de la empresa seleccionada en el combo; dispara GET Ultima una sola vez. */
+  empresaCUITUltima?: number;
   filtrosPresentacionesBase?: SVCCPresentacionFilterBase;
-  filtrosUltimaPresentacion?: SVCCPresentacionUltimaParams;
 }) {
   const [presentacionInfo, setPresentacionInfo] = useState<
     {
@@ -114,8 +121,8 @@ export function SVCCPresentacionContextProvider({
   const [presentacionData, setPresentacionData] = useState<Data<PresentacionDTO>>({ index: presentacionInfo.index, size: presentacionInfo.size, count: 0, pages: 0, data: [] });
   
   useEffect(() => {
-    setPresentacionInfo((o) => ({ ...o, selected: undefined }));
-  }, [filtrosPresentacionesBase]);
+    setPresentacionInfo((o) => ({ ...o, index: 1, size: 10, selected: undefined }));
+  }, [filtrosPresentacionesBase, empresaCUITUltima]);
 
   const presentacionTodasPaginated = useMemo((): SVCCPresentacionTodasParams | undefined => {
     if (filtrosPresentacionesBase == null) return undefined;
@@ -131,42 +138,20 @@ export function SVCCPresentacionContextProvider({
     revalidateOnFocus: false,
   });
 
-  const ultimaPaginatedParams = useMemo((): SVCCPresentacionUltimaParams | undefined => {
-    if (filtrosUltimaPresentacion == null) return undefined;
-    return {
-      ...filtrosUltimaPresentacion,
-      PageIndex: pageIndexForSvccApi(presentacionInfo.index),
-      PageSize: 10,
-    };
-  }, [filtrosUltimaPresentacion, presentacionInfo.index]);
+  const ultimaParams = useMemo((): SVCCPresentacionUltimaParams | undefined => {
+    const cuit = Number(empresaCUITUltima);
+    if (!Number.isFinite(cuit) || cuit <= 0) return undefined;
+    return { empleadorCuit: cuit };
+  }, [empresaCUITUltima]);
 
-  const ultima = useSVCCPresentacionUltima(ultimaPaginatedParams, { revalidateOnFocus: false });
+  const ultima = useSVCCPresentacionUltima(ultimaParams, { revalidateOnFocus: false });
 
   useEffect(() => {
     const pag = presentacionTodas.data;
-    const ultPag = ultima.data;
-    if (pag != null && Array.isArray(pag.data) && pag.data.length > 0) {
-      setPresentacionData({ ...pag, index: pageIndexFromApiResponse(pag.index) });
-      return;
-    }
-    if (ultPag != null) {
-      setPresentacionData({
-        ...ultPag,
-        index: pageIndexFromApiResponse(ultPag.index),
-      });
-      return;
-    }
     if (pag != null) {
       setPresentacionData({ ...pag, index: pageIndexFromApiResponse(pag.index) });
     }
-  }, [presentacionTodas.data, ultima.data]);
-
-  const ultimaFilaSeleccionada = useMemo(() => {
-    const rows = ultima.data?.data ?? [];
-    const sel = presentacionInfo.selected;
-    if (sel == null) return undefined;
-    return rows.find((r) => r.interno === sel.interno);
-  }, [ultima.data?.data, presentacionInfo.selected]);
+  }, [presentacionTodas.data]);
 
   const constancia = useSVCCPresentacionConstancia(
     presentacionInfo.selected?.interno != null && presentacionInfo.selected.presentacionFecha != null
@@ -175,16 +160,33 @@ export function SVCCPresentacionContextProvider({
     , { revalidateOnFocus: false }
   );
 
-  const nueva = useSVCCPresentacionNueva({ onSuccess() {
+  const nueva = useSVCCPresentacionNueva({ onSuccess(data) {
     presentacionTodas.mutate();
     ultima.mutate();
-    // constancia.mutate();
+    if (data?.interno != null && data.interno > 0) {
+      setPresentacionInfo((o) => ({ ...o, selected: data }));
+    }
   }});
 
-  const finaliza = useSVCCPresentacionFinaliza({ onSuccess() {
+  const finaliza = useSVCCPresentacionFinaliza({ onSuccess(data) {
+    const fechaConfirmacion = data?.presentacionFecha ?? new Date().toISOString();
+    const presentacionFinalizada = {
+      ...(presentacionInfo.selected ?? {}),
+      ...data,
+      presentacionFecha: fechaConfirmacion,
+    } as PresentacionDTO;
+
+    setPresentacionInfo((o) => ({ ...o, selected: presentacionFinalizada }));
+    setPresentacionData((current) => ({
+      ...current,
+      data: current.data.map((presentacion) =>
+        presentacion.interno === presentacionFinalizada.interno
+          ? { ...presentacion, ...presentacionFinalizada }
+          : presentacion
+      ),
+    }));
     presentacionTodas.mutate();
     ultima.mutate();
-    // constancia.mutate();
   }});
 
   const establecimientoList = useEstablecimientoList(
@@ -236,7 +238,7 @@ export function SVCCPresentacionContextProvider({
         ultima: {
           isLoading: ultima.isLoading,
           isValidating: ultima.isValidating,
-          data: ultimaFilaSeleccionada,
+          data: ultima.data ?? undefined,
           error: ultima.error
         },
         isMutating: nueva.isMutating || finaliza.isMutating,

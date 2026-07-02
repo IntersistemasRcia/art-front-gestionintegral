@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'; 
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import SrtAPI from "@/data/srtAPI";
 import ArtAPI from '@/data/artAPI';
 import Persona from './types/persona';
 import DataTable from '@/utils/ui/table/DataTable';
@@ -22,10 +22,12 @@ import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
+import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
 
-const { useGetPoliza } = gestionEmpleadorAPI;
+const { useGetPoliza } = SrtAPI;
 
 export default function CoberturaPage() {
+    const { user } = useAuth();
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
@@ -40,7 +42,7 @@ export default function CoberturaPage() {
    
     // Obtener personal y póliza usando el CUIT de la empresa seleccionada o, si viene por query, ese CUIT
     const paramsCUIT = Number.isFinite(cuitEmpresaActual) && cuitEmpresaActual > 0
-        ? { CUIT: cuitEmpresaActual }
+        ? applySRTPolizasVerIndependientes({ CUIT: cuitEmpresaActual }, user?.rol)
         : {};
 
     const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza(paramsCUIT);
@@ -423,9 +425,9 @@ export default function CoberturaPage() {
         }
         return {
             cuit: Formato.CUIP(polizaData.cuit) || "",
-            vigenciaDesde: Formato.Fecha(polizaData.vigencia_Desde) || "",
-            vigenciaHasta: Formato.Fecha(polizaData.vigencia_Hasta) || "",
-            empleadorDenominacion: polizaData.empleador_Denoominacion || "",
+            vigenciaDesde: Formato.Fecha(polizaData.vigenciaDesde) || "",
+            vigenciaHasta: Formato.Fecha(polizaData.vigenciaHasta) || "",
+            empleadorDenominacion: polizaData.empleadorDenominacion || "",
             numero: polizaData.numero || ""
         };
     }, [polizaData, isMounted]);
@@ -719,8 +721,8 @@ export default function CoberturaPage() {
                     poliza={polizaData}                     // pasa tu objeto poliza
                     dia={dia}                           // opcional
                     hora={hora}                         // opcional
-                    fechaDesde={polizaData?.vigencia_Desde}             // opcional
-                    fechaHasta={polizaData?.vigencia_Hasta}             // opcional
+                    fechaDesde={polizaData?.vigenciaDesde}             // opcional
+                    fechaHasta={polizaData?.vigenciaHasta}             // opcional
                     clausula={clausula}       // opcional
                     nominasSeleccionadas={selectedCubierto} // si aplicable
                 cuitEmpresa={Number.isFinite(cuitEmpresaActual) ? cuitEmpresaActual : undefined}

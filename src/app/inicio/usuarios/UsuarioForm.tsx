@@ -79,7 +79,7 @@ export interface UsuarioFormFields {
   sectorId?: number;
 }
 
-const ROLES_EXCLUIDOS_USUARIOS = ["comercializador", "grupoorganizador", "organizadorcomercializador"];
+const ROLES_EXCLUIDOS_USUARIOS = ["comercializador", "grupoorganizador", "organizadorcomercializador", "administrador"];
 
 export interface Props {
   open: boolean;
@@ -97,6 +97,7 @@ export interface Props {
   /** Tras registrar usuario: forzar pestaña Empresas y al menos una relación antes de cerrar el modal. */
   awaitingEmpresaRelation?: boolean;
   onEmpresaRelationSatisfied?: () => void;
+  onEmpresaMutate?: () => Promise<void>;
 }
 
 const initialFormState: UsuarioFormFields = {
@@ -190,6 +191,9 @@ export interface TouchedFields {
 export const LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR =
   "Debe asociar al menos una empresa desde la solapa 'Empresas del usuario' antes de guardar los cambios.";
 
+// Título a mostrar cuando el usuario ya fue registrado pero necesita relacionar empresas
+export const TITULO_USUARIO_REGISTRADO = "Usuario Registrado";
+
 export default function UsuarioForm({
   open,
   onClose,
@@ -205,6 +209,7 @@ export default function UsuarioForm({
   isAdmin = false,
   awaitingEmpresaRelation = false,
   onEmpresaRelationSatisfied,
+  onEmpresaMutate,
 }: Props) {
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -230,6 +235,13 @@ export default function UsuarioForm({
   const hasEmpresasTab = true;
   const empresasTabDisabled = isCreating && !Boolean(form.id);
   const requiresTituloMatricula = form.rol === "MedicinaLaboral" || form.rol === "SeguridadEHigiene";
+
+  const rolRequiereEmpresa = useMemo(() => {
+    const rolObj = roles.find(r => r.nombre === form.rol || r.nombreNormalizado === form.rol);
+    const adminEmpleador = roles.find(r => r.nombreNormalizado?.toLowerCase() === "administradorempleador");
+    return rolObj?.nombreNormalizado?.toLowerCase() === "administradorempleador" ||
+      adminEmpleador?.rolesHijos.some(h => h.id === rolObj?.id) === true;
+  }, [roles, form.rol]);
 
   const roleOptions = useMemo(() => {
     const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
@@ -313,7 +325,7 @@ export default function UsuarioForm({
     setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
     setEmpresasRelMeta(null);
     setFichaTab(awaitingEmpresaRelation ? 1 : 0);
-  }, [initialData, open, isEditing, isCreating, awaitingEmpresaRelation]);
+  }, [initialData, open, isEditing, isCreating]);
 
   useEffect(() => {
     if (!awaitingEmpresaRelation) return;
@@ -560,10 +572,10 @@ export default function UsuarioForm({
         }
       }
     } else if (name === "matricula") {
-      const numericValue = value.replace(/\D/g, '');
+      const matriculaValue = form.rol === "SeguridadEHigiene" ? value : value.replace(/\D/g, '');
       setForm((prev: UsuarioFormFields) => ({
         ...prev,
-        [name]: numericValue,
+        [name]: matriculaValue,
       }));
     } else {
       setForm((prev: UsuarioFormFields) => ({
@@ -1026,25 +1038,24 @@ export default function UsuarioForm({
                   fullWidth
                   required={!isDisabled && requiresTituloMatricula}
                   disabled={isDisabled}
-                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                  inputProps={form.rol === "SeguridadEHigiene" ? undefined : { inputMode: 'numeric', pattern: '[0-9]*' }}
                 />
               </div>
 
             </div>
             {isAdmin && (
-              <div className={styles.formRow}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={isAdminUser}
-                      onChange={handleIsAdminUserChange}
-                      disabled={isDisabled}
-                      color="primary"
-                    />
-                  }
-                  label="Es Administrador"
-                />
-              </div>
+              <FormControlLabel
+                className={styles.checkboxInline}
+                control={
+                  <Checkbox
+                    checked={isAdminUser}
+                    onChange={handleIsAdminUserChange}
+                    disabled={isDisabled}
+                    color="primary"
+                  />
+                }
+                label="Es Administrador"
+              />
             )}
 
             {/* Credenciales de Acceso (Ocultas en View y Deleted)*/}
@@ -1148,7 +1159,9 @@ export default function UsuarioForm({
                                 usuarioId={String(form.id ?? "")}
                                 cuitForm={form.cuit}
                                 puedeEditar={isEditing}
+                                empresasIniciales={usuarios.find((u) => String(u.id) === String(form.id))?.empresas}
                                 onEmpresasRelacionadasMetaChange={handleEmpresasRelacionadasMetaChange}
+                                onMutate={onEmpresaMutate}
                               />
                             </>
                           ),
@@ -1212,10 +1225,12 @@ export default function UsuarioForm({
                   <li>La contraseña temporal deberá ser cambiada</li>
                   <li>Posteriormente se podrán configurar los permisos</li>
                   <li>Los campos marcados con * son obligatorios</li>
+                  {rolRequiereEmpresa && (
                   <li>
                     Tras registrar, use la solapa &quot;Empresas del Usuario&quot;: debe asociar al menos una
                     empresa antes de guardar cambios o cerrar el asistente.
                   </li>
+                  )}
                 </ul>
               </div>
 

@@ -13,9 +13,16 @@ import styles from './AvisoObra.module.css';
 
 // === IMPORTAMOS EL INIT CENTRALIZADO ===
 import { getDefaultAvisoObra } from "./data/defaultAvisoObra";
+import dayjs from "dayjs";
 
 type SelectConfig = Record<string, string | number>;
 type ControlType = "text" | "number" | "date" | "checkbox" | "select" | "textarea";
+
+function toApiDateOnly(value: unknown): string | null {
+    if (value == null || value === "") return null;
+    const parsed = dayjs(value as string | Date);
+    return parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
+}
 
 // 2. Props para el componente AvisoObraForm
 interface AvisoObraFormProps {
@@ -121,13 +128,10 @@ const AvisoObraForm: FC<AvisoObraFormProps> = ({
     // Funciones auxiliares (mantenerlas fuera de los handlers para evitar re-render innecesario o memoizarlas si fuera necesario)
     const confirmadoValor = (): string => {
         if (data.confirmacionFecha) {
-            if (typeof data.confirmacionFecha === 'string') return data.confirmacionFecha;
-            if ((data.confirmacionFecha as any) instanceof Date) {
-                return (data.confirmacionFecha as Date).toISOString().split(".")[0];
-            }
+            const soloFecha = toApiDateOnly(data.confirmacionFecha);
+            if (soloFecha) return soloFecha;
         }
-        const date = new Date();
-        return date.toISOString().split(".")[0];
+        return dayjs().format("YYYY-MM-DD");
     };
 
     const deshabilitaConfirmacionFecha = (d: AvisoObraRecord = data): boolean => {
@@ -204,6 +208,10 @@ const AvisoObraForm: FC<AvisoObraFormProps> = ({
 
             switch (field) {
                 case "recepcionFecha":
+                case "confirmacionFecha":
+                    (record as any)[field] = toApiDateOnly(value);
+                    break;
+
                 case "actividadInicioFecha":
                 case "actividadFinFecha":
                 case "suspensionFecha":
@@ -212,7 +220,6 @@ const AvisoObraForm: FC<AvisoObraFormProps> = ({
                 case "excavacionFinFecha":
                 case "demolicionInicioFecha":
                 case "demolicionFinFecha":
-                case "confirmacionFecha":
                     if (value === "") {
                         (record as any)[field] = null;
                     }

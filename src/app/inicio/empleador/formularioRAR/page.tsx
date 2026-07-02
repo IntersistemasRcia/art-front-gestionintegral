@@ -17,6 +17,7 @@ import ArtAPI from "@/data/artAPI";
 import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
+import { saveTable, type TableColumn } from '@/utils/excelUtils';
 
 // Hijos
 import FormularioRARGenerar from './generar/FormularioRARGenerar';
@@ -49,7 +50,7 @@ const EMPRESA_OPCION_TODAS: Empresa = {
 
 const FormulariosRAR: React.FC = () => {
   const { user } = useAuth();
-  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const isAdmin = user?.rol?.toLowerCase() === 'administrador' || user?.rol?.toLowerCase() === 'administradorart';
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT, cuit } = user as any;
 
@@ -86,6 +87,9 @@ const FormulariosRAR: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [editaId, setEditaId] = useState<number>(0);
   const [replicaDe, setReplicaDe] = useState<number | undefined>(undefined);
+
+  // Excel
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   // PDF
   const [modalPDFOpen, setModalPDFOpen] = useState<boolean>(false);
@@ -293,6 +297,46 @@ const FormulariosRAR: React.FC = () => {
     }
   }, []);
 
+
+  const handleExportExcel = async () => {
+    if (!canFetchFormularios) return;
+    try {
+      setExportingExcel(true);
+      const countResponse = await ArtAPI.getFormulariosRAR({
+        empresasId: empresaIdsFiltro,
+        PageIndex: 1,
+        PageSize: 1,
+      });
+      const totalCount = countResponse.count ?? 0;
+      const columns: Record<string, TableColumn> = {
+        cuit: { header: 'CUIT', key: 'cuit' },
+        empresaRazonSocial: { header: 'Razón Social', key: 'empresaRazonSocial' },
+        empresaDireccion: { header: 'Establecimiento', key: 'empresaDireccion' },
+        fechaCreacion: { header: 'Fecha Hora Creación', key: 'fechaCreacion' },
+        fechaPresentacion: { header: 'Fecha Hora Confirmado', key: 'fechaPresentacion' },
+        cantTrabajadoresExpuestos: { header: 'Trabajadores Expuestos', key: 'cantTrabajadoresExpuestos' },
+        cantTrabajadoresNoExpuestos: { header: 'Trabajadores No Expuestos', key: 'cantTrabajadoresNoExpuestos' },
+      };
+      if (totalCount === 0) {
+        await saveTable(columns, [], 'FormulariosRAR.xlsx', { format: 'xlsx', sheet: { name: 'Formularios RAR' } });
+        return;
+      }
+      const allResponse = await ArtAPI.getFormulariosRAR({
+        empresasId: empresaIdsFiltro,
+        PageIndex: 1,
+        PageSize: totalCount,
+      });
+      const formatFecha = (v: string) => Formato.Fecha(v);
+      const allData = (allResponse.data ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        fechaCreacion: formatFecha(row.fechaCreacion as string),
+        fechaPresentacion: formatFecha(row.fechaPresentacion as string),
+      }));
+      await saveTable(columns, allData, 'FormulariosRAR.xlsx', { format: 'xlsx', sheet: { name: 'Formularios RAR' } });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   /* Handlers de navegación */
   const handleClickNuevo = () => {
@@ -955,6 +999,9 @@ const FormulariosRAR: React.FC = () => {
             <CustomButton onClick={handleClickNuevo} disabled={disableGenera}>
               Generar formulario
             </CustomButton>
+            <CustomButton onClick={handleExportExcel} disabled={exportingExcel || !canFetchFormularios}>
+              {exportingExcel ? 'Exportando...' : 'Exportar a Excel'}
+            </CustomButton>
           </div>
 
           {/* Tabla principal de formularios */}
@@ -1088,12 +1135,12 @@ const FormulariosRAR: React.FC = () => {
         </div>
       ) : viewMode === 'crear' ? (
         <FormularioRARGenerar
-          cuit={empresaSeleccionada?.cuit ?? cuit}
+          cuit={replicaDe ? undefined : (empresaSeleccionada?.cuit ?? cuit)}
           internoEstablecimiento={internoEstablecimiento}
           finalizaCarga={handleFinalizaCarga}
           formulariosRAR={formulariosRAR}
           replicaDe={replicaDe}
-          razonSocial={empresaSeleccionada?.razonSocial}
+          razonSocial={replicaDe ? undefined : empresaSeleccionada?.razonSocial}
         />
       ) : (
         <FormularioRARGenerar

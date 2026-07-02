@@ -6,10 +6,8 @@ import styles from "./poliza.module.css";
 import { useAuth } from "@/data/AuthContext";
 import { TextField, Box } from "@mui/material";
 import Formato from "@/utils/Formato";
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
-import ArtAPI from '@/data/artAPI';
+import SrtAPI from "@/data/srtAPI";
 import AuthAPI from '@/data/authAPI';
-import type { ComercializadorById, VComercializadorRow } from '@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios';
 import CustomButton from "@/utils/ui/button/CustomButton";
 import { BsDownload } from "react-icons/bs";
 import { saveAs } from "file-saver";
@@ -18,10 +16,12 @@ import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
+import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
 
-const { useGetPoliza } = gestionEmpleadorAPI;
+const { useGetPoliza } = SrtAPI;
 
 const Poliza = () => {
+  const { user } = useAuth();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
@@ -33,7 +33,11 @@ const Poliza = () => {
   
   // Obtener la póliza priorizando el CUIT forzado por query param (viene desde comercializador)
   const { data: polizaRawData, isLoading: isPersonalLoading } = useGetPoliza(
-    Number.isFinite(cuitForzado) && cuitForzado > 0 ? { CUIT: cuitForzado } : empresaSeleccionada ? { CUIT: empresaSeleccionada.cuit }: {}
+    Number.isFinite(cuitForzado) && cuitForzado > 0
+      ? applySRTPolizasVerIndependientes({ CUIT: cuitForzado }, user?.rol)
+      : empresaSeleccionada
+      ? applySRTPolizasVerIndependientes({ CUIT: empresaSeleccionada.cuit }, user?.rol)
+      : {}
   );
 
   // Seleccionar automáticamente si solo hay una empresa
@@ -76,10 +80,10 @@ const Poliza = () => {
   useEffect(() => {
     if (!bloquearBusquedaPorCuit) return;
     if (empresaSeleccionada) return;
-    const razonSocial = polizaRawData?.empleador_Denominacion;
+    const razonSocial = polizaRawData?.empleadorDenominacion;
     if (!razonSocial) return;
     setEmpresaSeleccionada({ razonSocial: String(razonSocial) } as any);
-  }, [bloquearBusquedaPorCuit, empresaSeleccionada, polizaRawData?.empleador_Denominacion]);
+  }, [bloquearBusquedaPorCuit, empresaSeleccionada, polizaRawData?.empleadorDenominacion]);
 
   const handleDownloadPDF = async () => {
     if (!polizaRawData?.archivo) {
@@ -144,14 +148,22 @@ const Poliza = () => {
     return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
   };
 
-  const srtIdRawGlobal = polizaRawData?.srtComercializadorInterno ?? 0;
-  const srtIdGlobal = Number(String(srtIdRawGlobal ?? 0).replace(/\D/g, ""));
-  const { data: comercializadorByIdData } = ArtAPI.useGetComercializadorById(
-    Number.isFinite(srtIdGlobal) && srtIdGlobal > 0 ? ({ id: srtIdGlobal } as unknown as ComercializadorById) : undefined
-  );
+  const formatCanalComercialValue = (value: unknown): string => {
+    const formatted = String(value ?? "").trim();
+    return formatted || "-----------";
+  };
+
+  const formatEmpleadorValue = (value: unknown): string => {
+    const formatted = String(value ?? "").trim();
+    return formatted || "---";
+  };
 
   // Cargar parámetros de entidad (entidadId = 0) para Datos de la Aseguradora
-  const { data: parametrosEntidadData } = AuthAPI.useGetParametrosEntidadURL({ entidadId: 0 });
+  const { data: parametrosEntidadData } = AuthAPI.useGetParametrosEntidadURL({
+    entidadId: 0,
+    PageIndex: 1,
+    PageSize: 100,
+  });
   const parametrosMap: Record<string, string> = (parametrosEntidadData ?? []).reduce(
     (acc: Record<string, string>, p: any) => {
       if (p?.parametroNombre) acc[p.parametroNombre] = String(p?.valor ?? "");
@@ -200,7 +212,7 @@ const Poliza = () => {
       <div className={styles.sectionHeader}>
         <h2 className={styles.headerTitle}>Razón Social</h2>
         <p className={styles.headerData}>
-          {polizaRawData?.empleador_Denominacion ?? "---"}
+          {polizaRawData?.empleadorDenominacion ?? "---"}
         </p>
       </div>
 
@@ -277,65 +289,29 @@ const Poliza = () => {
 
       {/* Sección de Canal Comercial */}
       <h3 className={styles.sectionTitle}>Canal Comercial</h3>
-      {
-        (() => {
-          const comercializador = (comercializadorByIdData as VComercializadorRow) ?? null;
-
-          if (Number.isFinite(srtIdGlobal) && srtIdGlobal > 0) {
-            return (
-              <div className={styles.dataGrid}>
-                <TextField
-                  label="CUIT/CUIL:"
-                  name="cuitcuil"
-                  value={String(comercializador?.cuil ?? "-----------")}
-                  fullWidth
-                  variant="standard"
-                />
-                <TextField
-                  label="Matricula:"
-                  name="Matricula"
-                  value={String(comercializador?.matricula ?? "-----------")}
-                  fullWidth
-                  variant="standard"
-                />
-                <TextField
-                  label="Apellido y Nombre/Denominación:"
-                  name="apellidoynombre"
-                  value={String(comercializador?.referenteRazonSocial ?? "-----------")}
-                  fullWidth
-                  variant="standard"
-                />
-              </div>
-            );
-          }
-
-          return (
-            <div className={styles.dataGrid}>
-              <TextField
-                label="CUIT/CUIL:"
-                name="cuitcuil"
-                value="-----------"
-                fullWidth
-                variant="standard"
-              />
-              <TextField
-                label="Matricula:"
-                name="Matricula"
-                value="-----------"
-                fullWidth
-                variant="standard"
-              />
-              <TextField
-                label="Apellido y Nombre/Denominación:"
-                name="apellidoynombre"
-                value="-----------"
-                fullWidth
-                variant="standard"
-              />
-            </div>
-          );
-        })()
-      }
+      <div className={styles.dataGrid}>
+        <TextField
+          label="CUIT/CUIL:"
+          name="cuitcuil"
+          value={formatCanalComercialValue(polizaRawData?.comercializadorCuil)}
+          fullWidth
+          variant="standard"
+        />
+        <TextField
+          label="Matricula:"
+          name="Matricula"
+          value={formatCanalComercialValue(polizaRawData?.comercializadorMatricula)}
+          fullWidth
+          variant="standard"
+        />
+        <TextField
+          label="Apellido y Nombre/Denominación:"
+          name="apellidoynombre"
+          value={formatCanalComercialValue(polizaRawData?.comercializadorReferenteRazonSocial)}
+          fullWidth
+          variant="standard"
+        />
+      </div>
 
       {/* Sección de Datos del Empleador */}
       <h3 className={styles.sectionTitle}>Datos del Empleador</h3>
@@ -357,23 +333,22 @@ const Poliza = () => {
         <TextField
           label="Vigencia Desde:"
           name="desde"
-          value={Formato.Fecha(polizaRawData?.vigencia_Desde) || "---"}
+          value={Formato.Fecha(polizaRawData?.vigenciaDesde) || "---"}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Vigencia Hasta:"
           name="hasta"
-          value={Formato.Fecha(polizaRawData?.vigencia_Hasta) || "---"}
+          value={Formato.Fecha(polizaRawData?.vigenciaHasta) || "---"}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Localidad:"
           name="Localidad"
-          value={`${
-            polizaRawData?.empleador_Domicilio_Localidad_Descripcion || "---"
-          } - CP:${polizaRawData?.empleador_Domicilio_CP || "---"}`}
+          value={`${formatEmpleadorValue(polizaRawData?.empleadorDomicilioLocalidadDescripcion)
+          } - CP: ${formatEmpleadorValue(polizaRawData?.empleadorDomicilioCP ?? (polizaRawData as any)?.empleadorDomicilioCp)}`}
           fullWidth
           variant="standard"
         />
@@ -381,7 +356,7 @@ const Poliza = () => {
           label="Provincia:"
           name="Provincia"
           value={
-            polizaRawData?.empleador_Domicilio_Provincia_Descripcion || "---"
+            polizaRawData?.empleadorDomicilioProvinciaDescripcion || "---"
           }
           fullWidth
           variant="standard"
@@ -389,10 +364,10 @@ const Poliza = () => {
         <TextField
           label="Calle:"
           name="Calle"
-          value={`${polizaRawData?.empleador_Domicilio_Calle || "---"} ${
-            polizaRawData?.empleador_Domicilio_Altura || "---"
-          } ${polizaRawData?.empleador_Domicilio_Piso || ""} ${
-            polizaRawData?.empleador_Domicilio_Depto || ""
+          value={`${polizaRawData?.empleadorDomicilioCalle || "---"} ${
+            polizaRawData?.empleadorDomicilioAltura || "---"
+          } ${polizaRawData?.empleadorDomicilioPiso || ""} ${
+            polizaRawData?.empleadorDomicilioDepto || ""
           }`}
           fullWidth
           variant="standard"
@@ -400,21 +375,21 @@ const Poliza = () => {
         <TextField
           label="Email:"
           name="EmailEmpleador"
-          value={polizaRawData?.empleador_Email || "---"}
+          value={polizaRawData?.empleadorEmail || "---"}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Telefono:"
           name="TelefonoEmpleador"
-          value={polizaRawData?.empleador_Telefono || "---"}
+          value={polizaRawData?.empleadorTelefono || "---"}
           fullWidth
           variant="standard"
         />
         <TextField
           label="Movil:"
           name="MovilEmpleador"
-          value={polizaRawData?.empleador_Movil || "---"}
+          value={polizaRawData?.empleadorMovil || "---"}
           fullWidth
           variant="standard"
         />
@@ -437,8 +412,8 @@ const Poliza = () => {
           name="Alicuota"
           value={
             polizaRawData
-              ? (Number(polizaRawData.alicuota_PagoILT) === 1
-                  ? `ILT: 1-El Empleador paga ILT por cuenta y orden de la ART - Valor Fijo: $${polizaRawData.alicuota_SumaFija}`
+              ? (Number(polizaRawData.alicuotaPagoIlt) === 1
+                  ? `ILT: 1-El Empleador paga ILT por cuenta y orden de la ART - Valor Fijo: $${polizaRawData.alicuotaSumaFija}`
                   : '-----')
               : '---'
           }
@@ -449,9 +424,9 @@ const Poliza = () => {
           label="Alicuota:"
           name="Alicuota"
           value={`Valor Variable: %${
-            polizaRawData?.alicuota_CuotaVariable ?? 0
-          } - Nivel: ${polizaRawData?.alicuota_Nivel} - FFE: ${
-            polizaRawData?.alicuota_FFE
+            polizaRawData?.alicuotaCuotaVariable ?? 0
+          } - Nivel: ${polizaRawData?.alicuotaNivel} - FFE: ${
+            polizaRawData?.alicuotaFfe
           }`}
           fullWidth
           variant="standard"
@@ -468,7 +443,7 @@ const Poliza = () => {
         <TextField
           label="Operación:"
           name="Operacion"
-          value={polizaRawData ? `${polizaRawData.codigoOperacion} - ${polizaRawData.operacionDescripcion}` : "---"}
+          value={polizaRawData ? `${polizaRawData.movimientoCodigoOperacion} - ${polizaRawData.movimientoDescripcionOperacion}` : "---"}
           fullWidth
           variant="standard"
         />
@@ -476,7 +451,7 @@ const Poliza = () => {
         <TextField
           label="Codigo Motivo Sorteo:"
           name="Sorteo"
-          value={polizaRawData?.codigoMotivoSorteo || "---"}
+          value={polizaRawData?.codigoMotivoSorteo || "0"}
           fullWidth
           variant="standard"
         />
@@ -527,7 +502,7 @@ const Poliza = () => {
         <TextField
           label="Unico Establecimiento"
           name="Establecimiento"
-          value={polizaRawData?.unicoEstablecimiento || "---"}
+          value={polizaRawData?.unicoEstablecimiento ? "Si" : "No"}
           fullWidth
           variant="standard"
         />

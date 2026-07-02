@@ -14,24 +14,29 @@ import ConstanciaHandler from "../Constancia/ConstanciaHandler";
 export default function PresentacionesHandler() {
   const [currentTab, setCurrentTab] = useState(0);// Queremos que inicie en la primera pestaña (0)
   const { presentacion, ultima } = useSVCCPresentacionContext();
+  const presentacionSeleccionadaInterno = presentacion.selected?.interno ?? 0;
+  const presentacionSeleccionadaPendiente = presentacionSeleccionadaInterno > 0
+    && presentacion.selected?.presentacionFecha == null;
 
   const disabled = useMemo(() => ({
-    iniciaFinaliza: ultima.isLoading || ultima.isValidating || ultima.data?.interno !== presentacion.selected?.interno,
+    inicio: ultima.isLoading || ultima.isValidating || ultima.data?.interno !== presentacion.selected?.interno,
+    finaliza: !presentacionSeleccionadaPendiente,
     presentacion: presentacion.selected == null,
   }), [
     ultima.isLoading,
     ultima.isValidating,
     ultima.data,
     presentacion.selected,
+    presentacionSeleccionadaPendiente,
   ]);
 
   useEffect(() => {
-    if (disabled.iniciaFinaliza) {
-      setCurrentTab(1);
-    } else if (disabled.presentacion) {
+    if (disabled.presentacion) {
       setCurrentTab(0);
+    } else if ((currentTab === 0 && disabled.inicio) || (currentTab === 4 && disabled.finaliza)) {
+      setCurrentTab(1);
     }
-  }, [disabled]);
+  }, [currentTab, disabled]);
 
   return (
     <Grid size={12}>
@@ -66,7 +71,7 @@ export default function PresentacionesHandler() {
                   label: 'Inicio',
                   value: 0,
                   content: <IniciarHandler />,
-                  disabled: disabled.iniciaFinaliza,
+                  disabled: disabled.inicio,
                 },
                 {
                   label: 'Portada',
@@ -90,7 +95,7 @@ export default function PresentacionesHandler() {
                   label: 'Confirma',
                   value: 4,
                   content: <FinalizarHandler />,
-                  disabled: disabled.iniciaFinaliza,
+                  disabled: disabled.finaliza,
                 },
                 {
                   label: 'Constancia',

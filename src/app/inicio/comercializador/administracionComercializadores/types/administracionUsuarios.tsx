@@ -4,6 +4,7 @@ export type ComercializadoresGOrganizadoresRow = {
 	descripcion?: string;
 	email: string;
 	telefono: string;
+	matricula?: string | number;
 	razonSocial?: string;
 	fechaNacimiento?: string;
 	domocilioCalle?: string;
@@ -24,6 +25,7 @@ export type ComercializadoresOrganizadoresRow = {
 	observacion?: string;
 	email: string;
 	telefono: string;
+	matricula?: string | number;
 	srtComercializadorGOrganizadorInterno?: number;
 	observaciones?: string;
 	razonSocial?: string;
@@ -131,6 +133,7 @@ export type ComercializadorOrganizadoresPostRequest = {
   cuil: number,
   email: string,
   telefono: string,
+  matricula?: number | null,
   razonSocial: string,
   fechaNacimiento: string,
   domocilioCalle: string,
@@ -149,6 +152,7 @@ export type ComercializadorOrganizadoresPutRequest = {
   cuil: number,
   email: string,
   telefono: string,
+  matricula?: number | null,
   razonSocial: string,
   fechaNacimiento: string,
   domocilioCalle: string,
@@ -166,6 +170,7 @@ export type ComercializadorGOrganizadoresPostRequest = {
   cuil: number,
   email: string,
   telefono: string,
+  matricula?: number | null,
   razonSocial: string,
   fechaNacimiento: string,
   domocilioCalle: string,
@@ -183,6 +188,7 @@ export type ComercializadorGOrganizadoresPutRequest = {
   cuil: number,
   email: string,
   telefono: string,
+  matricula?: number | null,
   razonSocial: string,
   fechaNacimiento: string,
   domocilioCalle: string,

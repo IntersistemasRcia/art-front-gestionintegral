@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Grid, Typography } from "@mui/material";
 import { Data } from "@/utils/ui/table/Browse";
-import ArtAPI from "@/data/artAPI";
+import SvccAPI from "@/data/svccAPI";
 import type {
   EstablecimientoDeclaradoBaseDTO,
   EstablecimientoDeclaradoCreateDTO,
@@ -22,7 +22,7 @@ const {
   useSVCCEstablecimientoDeclaradoCreate,
   useSVCCEstablecimientoDeclaradoUpdate,
   useSVCCEstablecimientoDeclaradoDelete,
-} = ArtAPI;
+} = SvccAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<EstablecimientoDeclaradoDTO>, "onChange"> & {
@@ -34,13 +34,17 @@ export default function EstablecimientoDeclaradoHandler() {
   const { presentacion: { selected: presentacion }, establecimientos } = useSVCCPresentacionContext();
   const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<EstablecimientoDeclaradoDTO>>({ index, size, count: 0, pages: 0, data: [] });
-  const { isLoading, isValidating, mutate } = useSVCCEstablecimientoDeclaradoList(
+  const { data: establecimientoDeclaradoList, isLoading, isValidating, mutate } = useSVCCEstablecimientoDeclaradoList(
     { presentacionId: presentacion?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
     }
   );
+  useEffect(() => {
+    if (establecimientoDeclaradoList == null) return;
+    setData({ ...establecimientoDeclaradoList, index: establecimientoDeclaradoList.index - 1 });
+  }, [establecimientoDeclaradoList]);
   const { trigger: triggerCreate, isMutating: isCreating } = useSVCCEstablecimientoDeclaradoCreate({ onSuccess() { mutate(); } });
   const [updateParams, setUpdateParams] = useState<SVCCEstablecimientoDeclaradoUpdateParams | undefined>();
   const { trigger: triggerUpdate, isMutating: isUpdating } = useSVCCEstablecimientoDeclaradoUpdate(updateParams, { onSuccess() { mutate(); } });

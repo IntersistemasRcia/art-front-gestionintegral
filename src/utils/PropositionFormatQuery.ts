@@ -90,7 +90,7 @@ export const ruleProcessor: RuleProcessor = (rule, options, meta) => {
     }
     function getInputValue() {
       switch (typeof inputType === "string" ? inputType.toLowerCase() : "") {
-        case "date": return dayjs(v).format("YYYY-MM-DD");
+        case "date": return dayjs(v).format("DD/MM/YYYY");
         case "time": return dayjs(v).format("HH:mm:ss.SSS");
         case "number": return options?.parseNumbers ? parseNumber(v) ?? v : v;
         case "datetime":

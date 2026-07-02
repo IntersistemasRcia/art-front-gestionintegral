@@ -29,7 +29,6 @@ import {
 } from "@/data/authAPI";
 import { useSearchParams } from "next/navigation";
 import Formato from "@/utils/Formato";
-import { useEmpresasLoader } from "@/data/useEmpresasLoader";
 import styles from "./Usuario.module.css";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
@@ -37,6 +36,7 @@ import UsuarioRow from "./interfaces/UsuarioRow";
 import { useAuth } from "@/data/AuthContext";
 import IUsuarioDarDeBajaReactivar from "./interfaces/IUsuarioDarDeBajaReactivar";
 import CustomTabs from "@/utils/ui/tab/CustomTab";
+import { isAdministradorTodasEmpresasRole } from "@/utils/rolesUtils";
 
 /** Valor sentinela en `Empresa.empresaId` para la opción "Todas las Empresas" en el listado de usuarios. */
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
@@ -85,6 +85,7 @@ function buildUsuarioUpdatePayload(data: UsuarioFormFields): UsuarioUpdatePayloa
     ...(data.password ? { password: String(data.password) } : {}),
     ...(data.confirmPassword ? { confirmPassword: String(data.confirmPassword) } : {}),
     email: String(data.email ?? "").trim(),
+    rol: String(data.rol ?? ""),
   };
 }
 
@@ -94,7 +95,7 @@ export default function UsuariosPage() {
   
   // Determinar si el usuario es administrador
   const isAdmin = user?.rol?.toLowerCase() === "administrador";
-
+  const isAdminTodasEmpresas = isAdministradorTodasEmpresasRole(user?.rol);
   const initialForm: UsuarioFormFields = {
     cuit: "",
     email: "",
@@ -114,8 +115,6 @@ export default function UsuariosPage() {
     sectorId: undefined,
   };
 
-  // Cargar empresas y preparar selector
-  useEmpresasLoader();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
@@ -124,18 +123,20 @@ export default function UsuariosPage() {
   const cuitQuery = searchParams?.get("cuit") ?? searchParams?.get("cuil");
   const cuitForzado = cuitQuery ? Number(String(cuitQuery).replace(/\D/g, "")) : NaN;
 
-  const sessionEmpresaIds = useMemo(() => {
-    const fromSession = (user?.empresas ?? [])
-      .filter((e) => e?.fechaBaja == null)
-      .map((e) => e.empresaId)
-      .filter((id): id is number => typeof id === "number" && Number.isFinite(id));
-    const unique = Array.from(new Set(fromSession));
-    if (unique.length > 0) return unique;
-    return Array.from(new Set(empresas.map((e) => e.empresaId)));
-  }, [user?.empresas, empresas]);
+  const empresasIdsStore = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          empresas
+            .map((e) => Number(e.empresaId))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        )
+      ).sort((a, b) => a - b),
+    [empresas]
+  );
 
   const opcionesEmpresaSelector = useMemo(
-    () => [EMPRESA_OPCION_TODAS, ...empresas],
+    () => (empresas.length === 1 ? empresas : [EMPRESA_OPCION_TODAS, ...empresas]),
     [empresas]
   );
 
@@ -191,20 +192,20 @@ export default function UsuariosPage() {
   const porEmpresaIdsListado = useMemo(() => {
     if (!empresaSeleccionada) return [];
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
-      if (isAdmin) return [];
-      return sessionEmpresaIds;
+      if (isAdminTodasEmpresas) return [];
+      return empresasIdsStore;
     }
     return [empresaSeleccionada.empresaId];
-  }, [empresaSeleccionada, sessionEmpresaIds, isAdmin]);
+  }, [empresaSeleccionada, isAdminTodasEmpresas, empresasIdsStore]);
 
-  const allowEmptyEmpresasPostUsuarios =
-    isAdmin &&
+  const consultarGetAllSinEmpresaId =
+    isAdminTodasEmpresas &&
     empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID;
 
   const porEmpresaIdsListadoKey = useMemo(() => {
-    if (allowEmptyEmpresasPostUsuarios) return "admin:all";
+    if (consultarGetAllSinEmpresaId) return "todas";
     return porEmpresaIdsListado.slice().sort((a, b) => a - b).join(",");
-  }, [porEmpresaIdsListado, allowEmptyEmpresasPostUsuarios]);
+  }, [porEmpresaIdsListado, consultarGetAllSinEmpresaId]);
 
   const [usuariosPageIndex, setUsuariosPageIndex] = useState(1);
 
@@ -240,10 +241,11 @@ export default function UsuariosPage() {
     usuarioDarDeBaja,
     usuarioReactivar,
     usuarioReestablecer,
-    usuarioReenviarCorreo
+    usuarioReenviarCorreo,
+    mutateUsuarios,
   } = useUsuarios({
     porEmpresaIds: porEmpresaIdsListado,
-    allowEmptyEmpresasPost: allowEmptyEmpresasPostUsuarios,
+    allowEmptyEmpresasPost: consultarGetAllSinEmpresaId,
     pageIndex: usuariosPageIndex,
     pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
     ...filterCommitted,
@@ -277,6 +279,7 @@ export default function UsuariosPage() {
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
     secondaryMessage?: string;
+    title?: string;
   }>({
     open: false,
     message: '',
@@ -289,13 +292,15 @@ export default function UsuariosPage() {
   const showModalMessage = (
     message: string,
     type: 'success' | 'error' | 'warning' | 'info',
-    secondaryMessage?: string
+    secondaryMessage?: string,
+    title?: string
   ) => {
     setModalMessage({
       open: true,
       message,
       type,
       secondaryMessage: secondaryMessage ?? undefined,
+      title,
     });
   };
 
@@ -503,7 +508,11 @@ const handleSubmit = async (data: UsuarioFormFields) => {
     };
     if (createResult.success) {
       const createdUserId = createResult.data?.id;
-      if (createdUserId !== undefined && createdUserId !== null) {
+      const rolObj = roles.find(r => r.nombre === dataToSubmit.rol || r.nombreNormalizado === dataToSubmit.rol);
+      const rolRequiereEmpresa =
+        rolObj?.nombreNormalizado?.toLowerCase() === "administradorempleador" ||
+        roles.find(r => r.nombreNormalizado?.toLowerCase() === "administradorempleador")?.rolesHijos.some(h => h.id === rolObj?.id);
+      if (createdUserId !== undefined && createdUserId !== null && rolRequiereEmpresa) {
         setAwaitingEmpresaAfterCreate(true);
         successSecondaryMessage = LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR;
         setRequestState({
@@ -520,19 +529,32 @@ const handleSubmit = async (data: UsuarioFormFields) => {
   }
 
     if (result.success) {
-      const successMessages = {
+      const successTitles = {
         create: "Usuario creado exitosamente",
         edit: "Usuario actualizado exitosamente", 
         delete: "Usuario dado de baja exitosamente",
         activate: "Usuario reactivado exitosamente"
       };
-      
-      showModalMessage(
-        successMessages[method as keyof typeof successMessages] || "Operación completada exitosamente",
-        "success",
-        successSecondaryMessage
-      );
-      if (method !== "create") {
+
+      const successBodyMessages = {
+        create: "Usuario Registrado",
+        edit: "Usuario Actualizado",
+        delete: "Usuario dado de baja",
+        activate: "Usuario Reactivado"
+      };
+
+      const baseSuccessTitle = successTitles[method as keyof typeof successTitles] || "Operación completada exitosamente";
+      const defaultSuccessMessage =
+        successBodyMessages[method as keyof typeof successBodyMessages] ||
+        "Operación completada";
+      const modalTitleToShow = successSecondaryMessage
+        ? defaultSuccessMessage
+        : baseSuccessTitle;
+      const modalMessageToShow = successSecondaryMessage
+        ? successSecondaryMessage
+        : defaultSuccessMessage;
+      showModalMessage(modalMessageToShow, "success", undefined, modalTitleToShow);
+      if (method !== "create" || !successSecondaryMessage) {
         handleCloseModal();
       }
     } else {
@@ -652,7 +674,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
             onReenviarCorreo={handleReenviarCorreo}
             isLoading={loading}
             serverPagination={
-              porEmpresaIdsListado.length > 0 || allowEmptyEmpresasPostUsuarios
+              porEmpresaIdsListado.length > 0 || consultarGetAllSinEmpresaId
                 ? {
                     pageIndex: usuariosPageIndex,
                     pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
@@ -699,6 +721,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         isSubmitting={isSubmitting}
         awaitingEmpresaRelation={awaitingEmpresaAfterCreate}
         onEmpresaRelationSatisfied={handleEmpresaRelationSatisfied}
+        onEmpresaMutate={mutateUsuarios}
       />
 
       <Tareas
@@ -713,7 +736,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
         message={modalMessage.message}         
         type={modalMessage.type}         
         onClose={handleClose}        
-        title={modalMessage.type === "success" ? "Operación exitosa" : undefined}
+        title={modalMessage.title}
         secondaryMessage={modalMessage.secondaryMessage}
       />
     </Box>

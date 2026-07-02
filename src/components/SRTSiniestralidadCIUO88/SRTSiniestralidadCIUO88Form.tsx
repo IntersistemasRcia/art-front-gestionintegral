@@ -1,5 +1,5 @@
 import { Grid, TextField } from "@mui/material";
-import { SRTSiniestralidadCIUO88 } from "@/data/gestionEmpleadorAPI";
+import { SRTSiniestralidadCIUO88 } from "@/data/srtAPI";
 import { Form } from "@/utils/ui/form/Form";
 
 export const SRTSiniestralidadCIUO88Form: Form<SRTSiniestralidadCIUO88> = ({

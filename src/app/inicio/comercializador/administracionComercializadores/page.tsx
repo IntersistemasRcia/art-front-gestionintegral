@@ -10,6 +10,8 @@ import type { UsuarioFormFields } from '@/app/inicio/comercializador/administrac
 import useUsuarios from '@/app/inicio/usuarios/useUsuarios';
 import { useAuth } from "@/data/AuthContext";
 import ArtAPI from "@/data/artAPI";
+import AuthAPI from "@/data/authAPI";
+import CustomModalMessage from "@/utils/ui/message/CustomModalMessage";
 import type { VComercializadorRow, EditKind, FormMethod, ComercializadoresOrganizadoresRow, ComercializadoresGOrganizadoresRow, ComercializadorPutRequest, ComercializadorOrganizadoresPutRequest, ComercializadorGOrganizadoresPostRequest, ComercializadorGOrganizadoresPutRequest } from "@/app/inicio/comercializador/administracionComercializadores/types/administracionUsuarios";
 import AdministracionTable from "@/app/inicio/comercializador/administracionComercializadores/AdministracionTable";
 import styles from "./administracionUsuarios.module.css";
@@ -49,9 +51,7 @@ export default function AdminUserPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isDeletingGrupo, setIsDeletingGrupo] = useState<boolean>(false);
-  const [pendingComercializador, setPendingComercializador] = useState<UsuarioFormFields | null>(null);
-  const [pendingOrganizador, setPendingOrganizador] = useState<UsuarioFormFields | null>(null);
-  const [pendingGrupoOrganizador, setPendingGrupoOrganizador] = useState<UsuarioFormFields | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [editOrganizadorBase, setEditOrganizadorBase] = useState<ComercializadorOrganizadoresPutRequest | null>(null);
   const [editGrupoBase, setEditGrupoBase] = useState<ComercializadorGOrganizadoresPutRequest | null>(null);
   const [selectedGrupoRowKey, setSelectedGrupoRowKey] = useState<string | null>(null);
@@ -69,12 +69,16 @@ export default function AdminUserPage() {
   const { trigger: triggerPutComercializador } = ArtAPI.usePutComercializador();
   const { trigger: triggerDeleteComercializador, isMutating: isDeletingComercializador } = ArtAPI.useDeleteComercializador();
   const { trigger: triggerDeleteOrganizador, isMutating: isDeletingOrganizador } = ArtAPI.useDeleteComercializadoresOrganizadores();
+  const { trigger: triggerDeleteUsuario } = AuthAPI.useDeleteUsuario();
 
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
-  const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador';
+  const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador' || String((user as any)?.rol ?? '').toLowerCase() === 'administradorart';
+  const isAdminComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'administradorcomercializador';
+  const isAdministradorART = String((user as any)?.rol ?? '').toLowerCase() === 'administradorart';
   const isComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'comercializador';
-  const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdministrador;
+  const isAdminLevel = isAdministrador || isAdminComercializador || isAdministradorART;
+  const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdminLevel;
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
   const userCuitValid = Number.isFinite(userCuit) && userCuit > 0 ? userCuit : undefined;
 
@@ -91,10 +95,10 @@ export default function AdminUserPage() {
   };
 
   const { data: gOrgData, isLoading: isLoadingGOrg, mutate: mutateGOrg } = useSWR(
-    (isGrupoOrganizador && userCuitValid) || isAdministrador
-      ? ['SRTComercializadoresGOrganizadores', isAdministrador ? 'ALL' : userCuitValid]
+    (isGrupoOrganizador && userCuitValid) || isAdminLevel
+      ? ['SRTComercializadoresGOrganizadores', isAdminLevel ? 'ALL' : userCuitValid]
       : null,
-    () => (isAdministrador ? ArtAPI.getGOrganizador({} as any) : ArtAPI.getGOrganizador({ CUIL: userCuitValid } as any)),
+    () => (isAdminLevel ? ArtAPI.getGOrganizador({} as any) : ArtAPI.getGOrganizador({ CUIL: userCuitValid } as any)),
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   );
 
@@ -104,15 +108,15 @@ export default function AdminUserPage() {
     return Number.isFinite(interno) && interno >= 0 ? interno : undefined;
   }, [gOrgData]);
 
-  const organizadorKey = isGrupoOrganizador || isAdministrador
+  const organizadorKey = isGrupoOrganizador || isAdminLevel
     ? (selectedGrupoInterno ?? gOrganizadorInterno)
     : isOrganizadorComercializador
       ? userCuitValid
       : undefined;
 
   const { data: organizadorData, isLoading: isLoadingOrganizador, mutate: mutateOrganizador } = useSWR(
-    canLoadComercializadores && (isAdministrador || organizadorKey !== undefined)
-      ? ['SRTComercializadoresOrganizadores', isAdministrador ? 'ALL' : isGrupoOrganizador ? 'GO' : 'OC', organizadorKey ?? 'ALL']
+    canLoadComercializadores && (isAdminLevel || organizadorKey !== undefined)
+      ? ['SRTComercializadoresOrganizadores', isAdminLevel ? 'ALL' : isGrupoOrganizador ? 'GO' : 'OC', organizadorKey ?? 'ALL']
       : null,
     () =>
       isGrupoOrganizador
@@ -145,39 +149,17 @@ export default function AdminUserPage() {
   const mutateGrupoTable = isOrganizadorComercializador ? mutateGOrgById : mutateGOrg;
   const isLoadingGrupoTable = isOrganizadorComercializador ? isLoadingGOrgById : isLoadingGOrg;
 
-  const organizadorInternosCSV = useMemo(() => {
-    const internos = asArray(organizadorData)
-      .map((x: any) => Number(x?.interno ?? x?.Interno ?? NaN))
-      .filter((n: number) => Number.isFinite(n) && n >= 0);
-    const unique = Array.from(new Set(internos));
-    return unique.length ? unique.join(',') : undefined;
-  }, [organizadorData]);
+  const comercializadorParams = selectedOrganizadorInterno !== undefined
+    ? ({ SRTComercializadorOrganizadorInterno: selectedOrganizadorInterno } as any)
+    : ({} as any);
 
-  const comercializadorInternosCSV = selectedOrganizadorInterno !== undefined
-    ? String(selectedOrganizadorInterno)
-    : isAdministrador
-      ? undefined
-      : organizadorInternosCSV;
-
-  const comercializadorKey = selectedOrganizadorInterno !== undefined
-    ? String(selectedOrganizadorInterno)
-    : isAdministrador
-      ? 'ALL'
-      : comercializadorInternosCSV;
-
-  const { data: comercializadorData, isLoading: isLoadingComercializador, mutate: mutateComercializador } = useSWR(
-    canLoadComercializadores && comercializadorKey
-      ? ['SRTComercializadores', comercializadorKey]
-      : null,
-    () =>
-      isAdministrador && selectedOrganizadorInterno === undefined
-        ? ArtAPI.getComercializador({} as any)
-        : ArtAPI.getComercializador({ ComercializadoresOrganizadoresInternos: comercializadorInternosCSV } as any),
-    { revalidateOnFocus: false, revalidateOnReconnect: false }
-  );
+  const { data: comercializadorData, isLoading: isLoadingComercializador, mutate: mutateComercializador } =
+    ArtAPI.useGetComercializadorUsuarioLogueadoURL(
+      canLoadComercializadores ? comercializadorParams : null
+    );
 
   const grupoRows: ComercializadoresGOrganizadoresRow[] = useMemo(() => {
-    if (!isGrupoOrganizador && !isAdministrador && !isOrganizadorComercializador) return [];
+    if (!isGrupoOrganizador && !isAdminLevel && !isOrganizadorComercializador) return [];
 
     const source = isOrganizadorComercializador
       ? (gOrgByIdData ? [gOrgByIdData] : [])
@@ -189,6 +171,7 @@ export default function AdminUserPage() {
       descripcion: String(x?.descripcion ?? ''),
       email: String(x?.email ?? ''),
       telefono: String(x?.telefono ?? ''),
+      matricula: x?.matricula ?? null,
       razonSocial: String(x?.razonSocial ?? x?.descripcion ?? ''),
       fechaNacimiento: String(x?.fechaNacimiento ?? ''),
       domocilioCalle: String(x?.domocilioCalle ?? x?.domicilioCalle ?? ''),
@@ -201,7 +184,7 @@ export default function AdminUserPage() {
       estado: estadoFromDeletedAt(x?.deletedAt ?? x?.DeletedAt ?? null),
       accion: '',
     }));
-  }, [gOrgData, gOrgByIdData, isAdministrador, isGrupoOrganizador, isOrganizadorComercializador]);
+  }, [gOrgData, gOrgByIdData, isAdminLevel, isGrupoOrganizador, isOrganizadorComercializador]);
 
   useEffect(() => {
     if (selectedGrupoInterno === undefined) return;
@@ -226,6 +209,7 @@ export default function AdminUserPage() {
       observacion: String(x?.observaciones ?? x?.observacion ?? x?.razonSocial ?? ''),
       email: String(x?.email ?? ''),
       telefono: String(x?.telefono ?? ''),
+      matricula: x?.matricula ?? null,
       srtComercializadorGOrganizadorInterno: Number(x?.srtComercializadorGOrganizadorInterno ?? 0),
       observaciones: String(x?.observaciones ?? x?.observacion ?? ''),
       razonSocial: String(x?.razonSocial ?? x?.observaciones ?? x?.observacion ?? ''),
@@ -284,9 +268,6 @@ export default function AdminUserPage() {
 
   const openFormCreate = () => {
     setFormError(null);
-    setPendingComercializador(null);
-    setPendingOrganizador(null);
-    setPendingGrupoOrganizador(null);
     setFormMethod("create");
     setFormInitialData(undefined);
     setEditKind(null);
@@ -310,10 +291,13 @@ export default function AdminUserPage() {
   };
 
   const canCreateForTab = (tabIndex: number) => {
+    if (tabIndex === 0 && hasTask('Comercializador_Administracion_CrearGrupoOrganizador')) return true;
+    if (tabIndex === 1 && hasTask('Comercializador_Administracion_CrearOrganizadorComercializador')) return true;
+    if (tabIndex === 2 && hasTask('Comercializador_Administracion_CrearComercializador')) return true;
     if (isComercializador) return false;
     if (isOrganizadorComercializador) return tabIndex === 2; // solo Comercializador
     if (isGrupoOrganizador) return tabIndex === 1 || tabIndex === 2; // Organizador o Comercializador
-    if (isAdministrador) return true;
+    if (isAdminLevel) return true;
     return false;
   };
 
@@ -321,9 +305,6 @@ export default function AdminUserPage() {
     const interno = Number((row as any)?.interno ?? NaN);
 
     setFormError(null);
-    setPendingComercializador(null);
-    setPendingOrganizador(null);
-    setPendingGrupoOrganizador(null);
     setFormMethod("edit");
     setEditKind(kind);
 
@@ -403,6 +384,7 @@ export default function AdminUserPage() {
         cuil: Number(cuilDigits || 0),
         email,
         telefono: String(rowAny?.telefono ?? telefono ?? ""),
+        matricula: rowAny?.matricula ?? null,
         razonSocial: String(rowAny?.razonSocial ?? nombre ?? ""),
         fechaNacimiento: String(rowAny?.fechaNacimiento ?? ""),
         domocilioCalle: String(rowAny?.domocilioCalle ?? ""),
@@ -424,6 +406,7 @@ export default function AdminUserPage() {
         cuil: Number(cuilDigits || 0),
         email,
         telefono: String(rowAny?.telefono ?? telefono ?? ""),
+        matricula: rowAny?.matricula ?? null,
         razonSocial: String(rowAny?.razonSocial ?? rowAny?.descripcion ?? nombre ?? ""),
         fechaNacimiento: String(rowAny?.fechaNacimiento ?? ""),
         domocilioCalle: String(rowAny?.domocilioCalle ?? ""),
@@ -481,9 +464,6 @@ export default function AdminUserPage() {
 
   const openFormDeleteFromRow = async (row: ComercializadoresGOrganizadoresRow | ComercializadoresOrganizadoresRow | VComercializadorRow, kind: EditKind) => {
     setFormError(null);
-    setPendingComercializador(null);
-    setPendingOrganizador(null);
-    setPendingGrupoOrganizador(null);
     setFormMethod("delete");
     await openFormEditFromRow(row, kind);
     setFormMethod("delete");
@@ -745,6 +725,7 @@ export default function AdminUserPage() {
                   cuil: Number.isFinite(cuilNumber) ? cuilNumber : editOrganizadorBase.cuil,
                   email: String((data as any)?.email ?? editOrganizadorBase.email ?? ""),
                   telefono: String((data as any)?.phoneNumber ?? editOrganizadorBase.telefono ?? ""),
+                  matricula: (data as any)?.matricula ?? editOrganizadorBase.matricula ?? null,
                   razonSocial: String((data as any)?.nombre ?? editOrganizadorBase.razonSocial ?? ""),
                   fechaNacimiento: String((data as any)?.fechaNacimiento ?? editOrganizadorBase.fechaNacimiento ?? ""),
                   domocilioCalle: String((data as any)?.domicilioCalle ?? editOrganizadorBase.domocilioCalle ?? ""),
@@ -777,6 +758,7 @@ export default function AdminUserPage() {
                   cuil: Number.isFinite(cuilNumber) ? cuilNumber : editGrupoBase.cuil,
                   email: String((data as any)?.email ?? editGrupoBase.email ?? ""),
                   telefono: String((data as any)?.phoneNumber ?? editGrupoBase.telefono ?? ""),
+                  matricula: (data as any)?.matricula ?? editGrupoBase.matricula ?? null,
                   razonSocial: String((data as any)?.nombre ?? editGrupoBase.razonSocial ?? ""),
                   fechaNacimiento: String((data as any)?.fechaNacimiento ?? editGrupoBase.fechaNacimiento ?? ""),
                   domocilioCalle: String((data as any)?.domicilioCalle ?? editGrupoBase.domocilioCalle ?? ""),
@@ -808,27 +790,15 @@ export default function AdminUserPage() {
             const isOrganizador = rol.toLowerCase() === 'organizadorcomercializador';
             const isGrupoOrganizadorRol = rol.toLowerCase() === 'grupoorganizador';
 
-            // Si ya creamos el usuario pero falló el comercializador, permitimos reintentar
-            const isRetryOnlyComercializador =
-              !!pendingComercializador &&
-              String(pendingComercializador.cuit ?? '') === String(data.cuit ?? '');
-
-            const isRetryOnlyOrganizador =
-              !!pendingOrganizador &&
-              String(pendingOrganizador.cuit ?? '') === String(data.cuit ?? '');
-
-            const isRetryOnlyGrupoOrganizador =
-              !!pendingGrupoOrganizador &&
-              String(pendingGrupoOrganizador.cuit ?? '') === String(data.cuit ?? '');
-
-            if (!isRetryOnlyComercializador && !isRetryOnlyOrganizador && !isRetryOnlyGrupoOrganizador) {
-              const { matricula: _matricula, ...userPayload } = (data as any) ?? {};
-              const result = await registrarUsuario(userPayload);
-              if (!result?.success) {
-                setFormError(result?.error || 'Error al crear usuario');
-                return;
-              }
+            const { matricula: _matricula, ...userPayload } = (data as any) ?? {};
+            const result = await registrarUsuario(userPayload);
+            if (!result?.success) {
+              setModalError(result.error ?? 'Hubo un inconveniente. El usuario no se pudo registrar, por favor intente de nuevo.');
+              return;
             }
+            const createdUserId = String(result.data?.id ?? '');
+
+            const rollbackUsuario = () => triggerDeleteUsuario(createdUserId).catch(console.error);
 
             if (isComercializador) {
               const cleanCuit = digits((data as any)?.cuit ?? '');
@@ -860,7 +830,7 @@ export default function AdminUserPage() {
                   srtComercializadorOrganizadorInterno: Number.isFinite(organizadorInternoForPost) ? Number(organizadorInternoForPost) : 0,
 
                   razonSocial: String((data as any)?.nombre ?? ''),
-                  fechaNacimiento: String((data as any)?.fechaNacimiento ?? ''),
+                  fechaNacimiento: toISOFechaNacimiento(String((data as any)?.fechaNacimiento ?? '')),
                   domocilioCalle: String((data as any)?.domicilioCalle ?? ''),
                   domicilioNumero: String((data as any)?.domicilioNro ?? ''),
                   domicilioPiso: String((data as any)?.domicilioPiso ?? ''),
@@ -870,12 +840,12 @@ export default function AdminUserPage() {
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
                   ...(data.comercializadorAsociados?.length ? { comercializadorAsociados: data.comercializadorAsociados } : {}),
                 } as any);
-                setPendingComercializador(null);
                 await mutateComercializador();
               } catch (err) {
-                setPendingComercializador(data);
-                setFormError('El usuario se creó, pero falló la creación del comercializador. Reintentá el envío para crear el comercializador.');
                 console.error(err);
+                rollbackUsuario();
+                const msg = (err as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+                setModalError(msg ?? 'Hubo un inconveniente al registrar el comercializador, por favor intente de nuevo.');
                 return;
               }
             }
@@ -895,6 +865,7 @@ export default function AdminUserPage() {
                   cuil: Number.isFinite(cuilNumber) ? cuilNumber : 0,
                   email: String((data as any)?.email ?? ''),
                   telefono: String((data as any)?.phoneNumber ?? ''),
+                  matricula: (data as any)?.matricula ?? null,
                   razonSocial: String((data as any)?.nombre ?? ''),
                   fechaNacimiento: fechaNacimientoIso,
                   domocilioCalle: String((data as any)?.domicilioCalle ?? ''),
@@ -905,12 +876,12 @@ export default function AdminUserPage() {
                   codLocalidad: String((data as any)?.codLocalidad ?? ''),
                   codPostal: Number.isFinite(codPostalNumber) ? codPostalNumber : 0,
                 } as any);
-                setPendingOrganizador(null);
                 await mutateOrganizador();
               } catch (err) {
-                setPendingOrganizador(data);
-                setFormError('El usuario se creó, pero falló la creación del organizador. Reintentá el envío para crear el organizador.');
                 console.error(err);
+                rollbackUsuario();
+                const msg = (err as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+                setModalError(msg ?? 'Hubo un inconveniente al registrar el organizador, por favor intente de nuevo.');
                 return;
               }
             }
@@ -926,6 +897,7 @@ export default function AdminUserPage() {
                 cuil: Number.isFinite(cuilNumber) ? cuilNumber : 0,
                 email: String((data as any)?.email ?? ''),
                 telefono: String((data as any)?.phoneNumber ?? ''),
+                matricula: (data as any)?.matricula ?? null,
                 razonSocial: String((data as any)?.nombre ?? ''),
                 fechaNacimiento: fechaNacimientoIsoG,
                 domocilioCalle: String((data as any)?.domicilioCalle ?? ''),
@@ -939,12 +911,12 @@ export default function AdminUserPage() {
 
               try {
                 await triggerPostGrupoOrganizador(payload as any);
-                setPendingGrupoOrganizador(null);
                 await mutateGrupoTable();
               } catch (err) {
-                setPendingGrupoOrganizador(data);
-                setFormError('El usuario se creó, pero falló la creación del Grupo Organizador. Reintentá el envío para crear el Grupo Organizador.');
                 console.error(err);
+                rollbackUsuario();
+                const msg = (err as { response?: { data?: { Mensaje?: string } } })?.response?.data?.Mensaje;
+                setModalError(msg ?? 'Hubo un inconveniente al registrar el grupo organizador, por favor intente de nuevo.');
                 return;
               }
             }
@@ -961,7 +933,14 @@ export default function AdminUserPage() {
         initialData={formInitialData}
         isSubmitting={isSubmitting}
         errorMsg={formError}
-        isAdmin={isAdministrador}
+        isAdmin={isAdminLevel}
+      />
+
+      <CustomModalMessage
+        open={modalError !== null}
+        type="error"
+        message={modalError ?? ''}
+        onClose={() => setModalError(null)}
       />
 
     </div>

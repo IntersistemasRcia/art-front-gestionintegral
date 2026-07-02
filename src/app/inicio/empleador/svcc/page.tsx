@@ -6,9 +6,9 @@ import Formato from '@/utils/Formato';
 import { useEmpresasStore } from '@/data/empresasStore';
 import { Empresa } from '@/data/authAPI';
 import { useAuth } from '@/data/AuthContext';
+import { isAdministradorTodasEmpresasRole } from '@/utils/rolesUtils';
 import { SVCCPresentacionContextProvider } from './context';
 import type { SVCCPresentacionFilterBase } from './context';
-import type { SVCCPresentacionUltimaParams } from '@/data/artAPI';
 import PresentacionesHandler from './Presentaciones/PresentacionesHandler';
 
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
@@ -20,18 +20,18 @@ const EMPRESA_OPCION_TODAS: Empresa = {
   domicilio: '',
   localidad: '',
   provincia: '',
-};
+}; 
 
 type FiltrosSvccMemo = {
   empresaCUITParaAcciones?: number;
+  empresaCUITUltima?: number;
   filtrosPresentacionesBase: SVCCPresentacionFilterBase;
-  filtrosUltimaPresentacion: SVCCPresentacionUltimaParams;
 };
 
 export default function SVCCPage() {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const { user } = useAuth();
-  const isAdmin = user?.rol?.toLowerCase() === 'administrador';
+  const isAdmin = isAdministradorTodasEmpresasRole(user?.rol);
 
   const cuitsEmpresasRelacionadas = useMemo(
     () =>
@@ -89,28 +89,29 @@ export default function SVCCPage() {
   const filtrosMemo = useMemo((): FiltrosSvccMemo | null => {
     if (empresaSeleccionada == null) return null;
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
+      // Administrador / AdministradorART: array vacío = todas las presentaciones.
       const empleadorCuit = isAdmin ? [] : cuitsEmpresasRelacionadas;
       if (!isAdmin && empleadorCuit.length === 0) return null;
       return {
         empresaCUITParaAcciones: undefined,
+        empresaCUITUltima: undefined,
         filtrosPresentacionesBase: { empleadorCuit },
-        filtrosUltimaPresentacion: { empleadorCuit },
       };
     }
     const cuitNum = Number(empresaSeleccionada.cuit);
     if (!Number.isFinite(cuitNum) || cuitNum === 0) return null;
     return {
       empresaCUITParaAcciones: cuitNum,
-      filtrosPresentacionesBase: { empleadorCUIT: cuitNum },
-      filtrosUltimaPresentacion: { empleadorCuit: [cuitNum] },
+      empresaCUITUltima: cuitNum,
+      filtrosPresentacionesBase: { empleadorCuit: [cuitNum] },
     };
   }, [empresaSeleccionada, isAdmin, cuitsEmpresasRelacionadas]);
 
   return (
     <SVCCPresentacionContextProvider
       empresaCUITParaAcciones={filtrosMemo?.empresaCUITParaAcciones}
+      empresaCUITUltima={filtrosMemo?.empresaCUITUltima}
       filtrosPresentacionesBase={filtrosMemo?.filtrosPresentacionesBase}
-      filtrosUltimaPresentacion={filtrosMemo?.filtrosUltimaPresentacion}
     >
       <Box sx={{ maxWidth: 500, marginBottom: 2 }}>
         <CustomSelectSearch<Empresa>

@@ -1,0 +1,37 @@
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+}
+
+.grid > * {
+  flex: 1 1 150px;
+}
+
+/* ── Span helpers ── */
+.full { flex-basis: 100%; }
+.half { flex: 1 1 calc(2 * 150px + 1.5rem); }
+.col1 { flex: 1 1 150px; }
+.col2 { flex: 1 1 calc(2 * 150px + 1.5rem); }
+.col3 { flex: 1 1 calc(3 * 150px + 3rem); }
+
+/* ── Width overrides (aplica dentro de la celda) ── */
+.w100 { flex: 0 0 100px; width: 100px; }
+.w120 { flex: 0 0 120px; width: 120px; }
+.w150 { flex: 0 0 150px; width: 150px; }
+.w160 { flex: 0 0 200px; width: 160px; }
+.w240 { flex: 0 0 240px; width: 240px; }
+.w300 { flex: 0 0 300px; width: 300px; }
+.w100pct { width: 100%; }
+
+/* ── Sections ── */
+.section {
+  flex-basis: 100%;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 8px;
+  margin-top: 0.5rem;
+  margin-bottom: 20px;
+}

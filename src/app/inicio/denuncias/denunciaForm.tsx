@@ -44,7 +44,7 @@ export default function DenunciaForm({
   const lastFetchedEmpCuitRef = useRef<string>("");
   const lastAutoValuesRef = useRef<Record<string, string>>({});
   const { user, hasTask } = useAuth();
-  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const isAdmin = (String(user?.rol || '').toLowerCase() === 'administrador' || String(user?.rol || '').toLowerCase() === 'administradorart');
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
   // Índices y etiquetas dinámicas según permiso
   const confirmIndex = canRealizaDenuncias ? 5 : 4;

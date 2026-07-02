@@ -18,16 +18,17 @@ function normalizeAccesoRapidoHref(valor: string): string {
 
 /** Filtra parámetros cuyo nombre es AccesosRapidos_{Rol} y coincide con el rol del usuario. */
 export function filterAccesosRapidosByRol(
-  parametros: ParametroEntidad[],
+  parametros: ParametroEntidad[] | unknown,
   userRol: string | undefined | null
 ): AccesoRapido[] {
   if (!userRol?.trim()) {
     return [];
   }
 
+  const list = Array.isArray(parametros) ? parametros : [];
   const normalizedRol = userRol.trim().toLowerCase();
 
-  return parametros
+  return list
     .filter((parametro) => {
       const parametroNombre = (parametro.parametroNombre ?? "").trim();
       if (!parametroNombre.toLowerCase().startsWith(ACCESOS_RAPIDOS_PREFIX.toLowerCase())) {

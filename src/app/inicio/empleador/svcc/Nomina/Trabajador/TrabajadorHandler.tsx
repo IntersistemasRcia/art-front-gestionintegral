@@ -1,5 +1,5 @@
-import { useState } from "react";
-import ArtAPI from "@/data/artAPI";
+import { useEffect, useState } from "react";
+import SvccAPI from "@/data/svccAPI";
 import type {
   TrabajadorBaseDTO,
   TrabajadorCreateDTO,
@@ -22,7 +22,7 @@ const {
   useSVCCTrabajadorCreate,
   useSVCCTrabajadorUpdate,
   useSVCCTrabajadorDelete,
-} = ArtAPI;
+} = SvccAPI;
 
 type EditAction = "create" | "read" | "update" | "delete";
 type EditState = Omit<FormProps<TrabajadorDTO>, "onChange"> & {
@@ -35,13 +35,17 @@ export default function NominaHandler() {
   const presentacionActiva = presentacionSeleccionada ?? ultima.data;
   const [{ index, size }, setPage] = useState({ index: 0, size: 10 });
   const [data, setData] = useState<Data<TrabajadorDTO>>({ index, size, count: 0, pages: 0, data: [] });
-  const { isLoading, isValidating, mutate } = useSVCCTrabajadorList(
+  const { data: trabajadorList, isLoading, isValidating, mutate } = useSVCCTrabajadorList(
     { presentacionId: presentacionActiva?.interno ?? 0, PageIndex: index + 1, PageSize: 10 },
     {
       revalidateOnFocus: false,
       onSuccess(data) { setData({ ...data, index: data.index - 1 }) },
     }
   );
+  useEffect(() => {
+    if (trabajadorList == null) return;
+    setData({ ...trabajadorList, index: trabajadorList.index - 1 });
+  }, [trabajadorList]);
   const { trigger: triggerCreate, isMutating: isCreating } = useSVCCTrabajadorCreate({ onSuccess() { mutate(); } });
   const [updateParams, setUpdateParams] = useState<SVCCTrabajadorUpdateParams | undefined>();
   const { trigger: triggerUpdate, isMutating: isUpdating } = useSVCCTrabajadorUpdate(updateParams, { onSuccess() { mutate(); } });

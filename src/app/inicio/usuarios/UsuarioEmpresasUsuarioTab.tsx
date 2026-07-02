@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
-import useSWR from "swr";
 import { Box, Typography } from "@mui/material";
 import { ColumnDef } from "@tanstack/react-table";
 import axios, { AxiosError } from "axios";
-import AuthAPI, { token, type Empresa } from "@/data/authAPI";
+import AuthAPI, { type Empresa, type UsuarioEmpresasListadoEmpresaVm } from "@/data/authAPI";
 import { useAuth } from "@/data/AuthContext";
 import { useEmpresasStore } from "@/data/empresasStore";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
@@ -13,8 +12,9 @@ import DataTable from "@/utils/ui/table/DataTable";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
 import Formato from "@/utils/Formato";
+import { isAdministradorTodasEmpresasRole } from "@/utils/rolesUtils";
 
-export type UsuarioEmpresaPorCuitFila = Empresa & { id?: number };
+export type UsuarioEmpresaPorCuitFila = Empresa & { relacionId: number };
 type EmpresaComboOption = Pick<Empresa, "empresaId" | "cuit" | "razonSocial">;
 
 export type EmpresasRelacionadasMeta = {
@@ -27,8 +27,10 @@ type UsuarioEmpresasUsuarioTabProps = {
   usuarioId: string;
   cuitForm: string;
   puedeEditar: boolean;
+  empresasIniciales?: UsuarioEmpresasListadoEmpresaVm[];
   /** Notifica cantidad de empresas vinculadas y estado de carga (p. ej. bloqueo de cierre del modal tras alta). */
   onEmpresasRelacionadasMetaChange?: (meta: EmpresasRelacionadasMeta) => void;
+  onMutate?: () => Promise<void>;
 };
 
 export function UsuarioEmpresasUsuarioTab({
@@ -36,12 +38,15 @@ export function UsuarioEmpresasUsuarioTab({
   usuarioId,
   cuitForm,
   puedeEditar,
+  empresasIniciales,
   onEmpresasRelacionadasMetaChange,
+  onMutate,
 }: UsuarioEmpresasUsuarioTabProps) {
-  const { hasTask } = useAuth();
+  const { hasTask, user } = useAuth();
   const { empresas: empresasStore } = useEmpresasStore();
   const [empresaAAgregar, setEmpresaAAgregar] = useState<EmpresaComboOption | null>(null);
   const [isMutating, setIsMutating] = useState(false);
+  const [relacionByIdLocal, setRelacionByIdLocal] = useState<Map<number, number>>(new Map());
   const [modalMsg, setModalMsg] = useState<{
     open: boolean;
     message: string;
@@ -53,20 +58,34 @@ export function UsuarioEmpresasUsuarioTab({
     return Number.isFinite(n) && n > 0 ? n : null;
   }, [cuitForm]);
 
-  const swrKey =
-    open && usuarioId && cuitNum
-      ? ([AuthAPI.getEmpresasURL({ CUIT: cuitNum }), token.getToken(), usuarioId] as const)
-      : null;
-
-  const { data, error, isLoading, mutate } = useSWR(
-    swrKey,
-    () => AuthAPI.getEmpresas({ CUIT: cuitNum! })
+  const { data, error, isLoading, mutate } = AuthAPI.useGetEmpresas(
+    open && usuarioId && cuitNum ? { CUIT: cuitNum } : undefined
   );
 
-  const rows: UsuarioEmpresaPorCuitFila[] = useMemo(
-    () => (Array.isArray(data) ? (data as UsuarioEmpresaPorCuitFila[]) : []),
-    [data]
+  const esSinEmpresaAsociada = isAdministradorTodasEmpresasRole(user?.rol);
+
+  // Al cambiar de usuario, reinicializar desde props
+  useEffect(() => {
+    const map = new Map<number, number>();
+    (empresasIniciales ?? [])
+      .filter((e) => e.fechaBaja == null)
+      .forEach((e) => map.set(e.empresaId, e.id));
+    setRelacionByIdLocal(map);
+  }, [usuarioId]);
+
+  const relacionesActivas = new Set(relacionByIdLocal.keys());
+
+  const empresasLogueadoIds = useMemo(
+    () => new Set((empresasStore ?? []).map((e) => e.empresaId)),
+    [empresasStore]
   );
+
+  const rows = useMemo<UsuarioEmpresaPorCuitFila[]>(() => {
+    if (!Array.isArray(data)) return [];
+    return (data as Empresa[])
+      .filter((e) => relacionesActivas.has(e.empresaId) && (esSinEmpresaAsociada || empresasLogueadoIds.has(e.empresaId)))
+      .map((e) => ({ ...e, relacionId: relacionByIdLocal.get(e.empresaId) ?? 0 }));
+  }, [data, relacionByIdLocal, empresasLogueadoIds, esSinEmpresaAsociada]);
 
   useEffect(() => {
     if (!open || !onEmpresasRelacionadasMetaChange) return;
@@ -74,10 +93,7 @@ export function UsuarioEmpresasUsuarioTab({
       onEmpresasRelacionadasMetaChange({ count: 0, isLoading: false });
       return;
     }
-    onEmpresasRelacionadasMetaChange({
-      count: rows.length,
-      isLoading,
-    });
+    onEmpresasRelacionadasMetaChange({ count: rows.length, isLoading });
   }, [open, cuitNum, usuarioId, rows.length, isLoading, onEmpresasRelacionadasMetaChange]);
 
   const empresasSesionParaCombo = useMemo<EmpresaComboOption[]>(
@@ -107,18 +123,17 @@ export function UsuarioEmpresasUsuarioTab({
 
   const handleDarDeBaja = useCallback(
     async (row: UsuarioEmpresaPorCuitFila) => {
-      if (row.id == null) {
-        showModalMessage(
-          "No se puede dar de baja: el servicio no devolvió el identificador de la relación usuario–empresa (id).",
-          "error"
-        );
-        return;
-      }
       setIsMutating(true);
       try {
-        await AuthAPI.deleteUsuariosEmpresasBorrar(row.id);
-        showModalMessage("Empresa desvinculada correctamente.", "success");
+        await AuthAPI.deleteUsuariosEmpresasBorrar(row.relacionId);
+        setRelacionByIdLocal(prev => {
+          const next = new Map(prev);
+          next.delete(row.empresaId);
+          return next;
+        });
+        void onMutate?.();
         await mutate();
+        showModalMessage("Empresa desvinculada correctamente.", "success");
       } catch (err) {
         const msg =
           axios.isAxiosError(err)
@@ -134,7 +149,7 @@ export function UsuarioEmpresasUsuarioTab({
         setIsMutating(false);
       }
     },
-    [mutate, showModalMessage]
+    [mutate, onMutate, showModalMessage]
   );
 
   const handleAgregarEmpresa = useCallback(async () => {
@@ -149,9 +164,26 @@ export function UsuarioEmpresasUsuarioTab({
         empresaId: Number(empresaAAgregar.empresaId),
         vigencia: "2099-12-31T00:00:00.000Z",
       });
+
+      const parametros = await AuthAPI.getParamEntidadEmpresa({ CUIT: empresaAAgregar.cuit, PageIndex: 1, PageSize: 1 });
+      const parametrosData = (parametros as { data?: unknown[] })?.data ?? (Array.isArray(parametros) ? parametros : []);
+      if (parametrosData.length === 0) {
+        await AuthAPI.postParamEntidadEmpresaRAR({
+          entidadId: Number(empresaAAgregar.empresaId),
+          parametroId: 1,
+          parametroValor: "10",
+        });
+      }
+
+      setRelacionByIdLocal(prev => {
+        const next = new Map(prev);
+        next.set(Number(empresaAAgregar.empresaId), 0);
+        return next;
+      });
+      void onMutate?.();
+      await mutate();
       showModalMessage("Empresa agregada correctamente.", "success");
       setEmpresaAAgregar(null);
-      await mutate();
     } catch (err) {
       const msg =
         axios.isAxiosError(err)
@@ -161,12 +193,12 @@ export function UsuarioEmpresasUsuarioTab({
             err.message
           : err instanceof Error
             ? err.message
-            : "Error al agregar la empresa.";
+            : "Ocurrió un inconveniente al procesar la empresa. Por favor intente de nuevo.";
       showModalMessage(String(msg), "error");
     } finally {
       setIsMutating(false);
     }
-  }, [empresaAAgregar, mutate, showModalMessage, usuarioId]);
+  }, [empresaAAgregar, mutate, onMutate, showModalMessage, usuarioId]);
 
   const columns = useMemo<ColumnDef<UsuarioEmpresaPorCuitFila>[]>(
     () => [
@@ -187,7 +219,7 @@ export function UsuarioEmpresasUsuarioTab({
           <CustomButton
             type="button"
             color="secondary"
-            disabled={!puedeEditar || !canDarDeBajaEmpresa || row.original.id == null || isMutating}
+            disabled={!canDarDeBajaEmpresa || isMutating}
             onClick={() => void handleDarDeBaja(row.original)}
           >
             Dar de baja
@@ -195,7 +227,7 @@ export function UsuarioEmpresasUsuarioTab({
         ),
       },
     ],
-    [handleDarDeBaja, puedeEditar, canDarDeBajaEmpresa, isMutating]
+    [handleDarDeBaja, canDarDeBajaEmpresa, isMutating]
   );
 
   if (!cuitNum) {

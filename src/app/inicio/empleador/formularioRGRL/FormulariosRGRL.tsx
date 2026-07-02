@@ -305,7 +305,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const { user, hasTask } = useAuth();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
-  const isAdmin = user?.rol?.toLowerCase() === "administrador";
+  const isAdmin = user?.rol?.toLowerCase() === 'administrador' || user?.rol?.toLowerCase() === 'administradorart';
   const sessionEmpresaIds = useMemo(() => {
     const fromSession = (user?.empresas ?? [])
       .filter((e) => e?.fechaBaja == null)
@@ -933,7 +933,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
                     <CustomButton
                       key={n}
                       onClick={() => { setActiveTab('none'); setDetallePage(n); }}
-                      style={{ fontWeight: n === detallePage ? 700 : 400 }}
+                      color={activeTab === 'none' && n === detallePage ? 'secondary' : 'primary'}
                     >
                       {n}
                     </CustomButton>
@@ -953,7 +953,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
                   <CustomButton
                     key={t.key}
                     onClick={() => handleOpenTab(t.key as TabKey)}
-                    className={`${styles.pill} ${activeTab === (t.key as TabKey) ? styles.active : ''}`}
+                    color={activeTab === (t.key as TabKey) ? 'secondary' : 'primary'}
                     style={{ padding: '6px 12px' }}
                   >
                     {t.label}

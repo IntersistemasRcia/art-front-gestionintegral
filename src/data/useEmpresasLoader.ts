@@ -2,122 +2,140 @@
 
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import AuthAPI from "./authAPI";
+import AuthAPI, { type Empresa } from "./authAPI";
+import type { Usuario } from "@/data/usuarioAPI";
 import ArtAPI from "./artAPI";
+import SrtAPI from "./srtAPI";
 import { useEmpresasStore } from "./empresasStore";
-import { useRolesStore } from "./rolesStore";
-import { isAdministradorEmpleadorOrChild } from "@/utils/rolesUtils";
+import { fetchRolesForEmpresas } from "./useRolesLoader";
+import type RolesInterface from "@/app/inicio/usuarios/interfaces/RolesInterface";
+import type { SRTPolizaAcotada } from "@/app/inicio/comercializador/polizas/types/poliza";
+import {
+  VER_TODAS_LAS_EMPRESAS_TASK,
+  isAdministradorEmpleadorOrChild,
+  isAdministradorTodasEmpresasRole,
+  isComercializadorEmpresasRole,
+  isComercializadorEmpresasRoleFromSession,
+  needsRolesHierarchyForEmpresas,
+} from "@/utils/rolesUtils";
+import { userHasTask } from "@/utils/userTasksUtils";
 
-const ROLES_WAIT_INTERVAL_MS = 50;
-const ROLES_WAIT_TIMEOUT_MS = 10000;
-
-async function waitForRolesLoaded(): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < ROLES_WAIT_TIMEOUT_MS) {
-    const { isLoaded } = useRolesStore.getState();
-    if (isLoaded) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, ROLES_WAIT_INTERVAL_MS));
-  }
-}
+type SessionUser = {
+  rol?: string;
+  cuit?: number;
+  userName?: string;
+};
 
 export const useEmpresasLoader = () => {
   const { data: session, status } = useSession();
+  const accessToken = session?.accessToken;
   const {
     setEmpresas,
     setLoading,
     setError,
     setEmptyEmpresasMessage,
-    empresas,
-    isLoading,
     clearEmpresas,
   } = useEmpresasStore();
   const hasLoadedRef = useRef(false);
+  const loadStartedRef = useRef(false);
 
   useEffect(() => {
-    // Limpiar empresas cuando el usuario cierra sesión
     if (status === "unauthenticated") {
       clearEmpresas();
       hasLoadedRef.current = false;
+      loadStartedRef.current = false;
       return;
     }
 
-    // Solo cargar si el usuario está autenticado, hay sesión, no hay empresas cargadas y no se está cargando
     if (
-      status === "authenticated" &&
-      session?.accessToken &&
-      empresas.length === 0 &&
-      !isLoading &&
-      !hasLoadedRef.current
+      status !== "authenticated" ||
+      !accessToken ||
+      hasLoadedRef.current ||
+      loadStartedRef.current
     ) {
-      hasLoadedRef.current = true;
-
-      const loadEmpresas = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          setEmptyEmpresasMessage(null);
-
-          const userRole = String((session.user as { rol?: string })?.rol ?? "");
-          const isAdministrador = userRole.toLowerCase() === "administrador";
-
-          if (isAdministrador) {
-            // Para Administrador, cargar TODAS las empresas desde /api/Empresas.
-            const empresasRef = await ArtAPI.getRefEmpleadores();
-            const empresasData = (empresasRef ?? []).map((empresa) => ({
-              empresaId: Number(empresa.interno),
-              cuit: Number(empresa.cuit),
-              razonSocial: String(empresa.razonSocial ?? ""),
-              domicilio: "",
-              localidad: "",
-              provincia: "",
-            }));
-            setEmpresas(empresasData);
-            return;
-          }
-
-          // Para el resto de roles, mantener filtro por CUIT del usuario.
-          const userCuit = (session.user as { cuit?: number })?.cuit;
-          const empresasData = await AuthAPI.getEmpresas(
-            userCuit ? { CUIT: userCuit } : {}
-          );
-          const resolvedEmpresas = empresasData || [];
-          setEmpresas(resolvedEmpresas);
-
-          if (resolvedEmpresas.length === 0) {
-            await waitForRolesLoaded();
-            const { roles } = useRolesStore.getState();
-            if (isAdministradorEmpleadorOrChild(userRole, roles)) {
-              const userName = String(
-                (session.user as { userName?: string })?.userName ?? ""
-              ).trim();
-              const nombreUsuario = userName || "sin nombre";
-              setEmptyEmpresasMessage(
-                `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
-              );
-            }
-          }
-        } catch (error) {
-          console.error("Error al cargar empresas:", error);
-          setError(
-            error instanceof Error
-              ? error
-              : new Error("Error desconocido al cargar empresas")
-          );
-          hasLoadedRef.current = false; // Permitir reintento en caso de error
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      loadEmpresas();
+      return;
     }
+
+    loadStartedRef.current = true;
+    setLoading(true);
+    setError(null);
+    setEmptyEmpresasMessage(null);
+
+    const loadEmpresas = async () => {
+      try {
+        const sessionUser = (session?.user ?? {}) as SessionUser;
+        const userRole = String(sessionUser.rol ?? "");
+
+        if (isAdministradorTodasEmpresasRole(userRole)) {
+          setEmpresas(await loadAllEmpresasFromRef());
+          hasLoadedRef.current = true;
+          return;
+        }
+
+        const skipAuthEmpresas = isComercializadorEmpresasRoleFromSession(userRole);
+
+        const rolesPromise = needsRolesHierarchyForEmpresas(userRole)
+          ? fetchRolesForEmpresas()
+          : Promise.resolve([] as RolesInterface[]);
+
+        const [roles, empresasAuth] = await Promise.all([
+          rolesPromise,
+          skipAuthEmpresas
+            ? Promise.resolve([] as Empresa[])
+            : AuthAPI.getEmpresas(
+                sessionUser.cuit ? { CUIT: sessionUser.cuit } : {}
+              ),
+        ]);
+
+        if (isComercializadorEmpresasRole(userRole, roles)) {
+          setEmpresas(await loadEmpresasUsuarioLogueado());
+          hasLoadedRef.current = true;
+          return;
+        }
+
+        if (isAdministradorEmpleadorOrChild(userRole, roles)) {
+          const resolvedEmpresas = empresasAuth || [];
+          setEmpresas(resolvedEmpresas);
+          hasLoadedRef.current = true;
+          if (resolvedEmpresas.length === 0) {
+            const nombreUsuario =
+              String(sessionUser.userName ?? "").trim() || "sin nombre";
+            setEmptyEmpresasMessage(
+              `El Usuario (${nombreUsuario}) no tiene una Empresa relacionada, contacte con su Administrador.`
+            );
+          }
+          return;
+        }
+
+        if (
+          userHasTask(session?.user as Usuario | undefined, VER_TODAS_LAS_EMPRESAS_TASK)
+        ) {
+          setEmpresas(await loadAllEmpresasFromRef());
+          hasLoadedRef.current = true;
+          return;
+        }
+
+        setEmpresas(empresasAuth || []);
+        hasLoadedRef.current = true;
+      } catch (error) {
+        console.error("Error al cargar empresas:", error);
+        setError(
+          error instanceof Error
+            ? error
+            : new Error("Error desconocido al cargar empresas")
+        );
+        hasLoadedRef.current = false;
+        loadStartedRef.current = false;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadEmpresas();
   }, [
     status,
-    session,
-    empresas.length,
-    isLoading,
+    accessToken,
+    session?.user,
     setEmpresas,
     setLoading,
     setError,
@@ -125,3 +143,58 @@ export const useEmpresasLoader = () => {
     clearEmpresas,
   ]);
 };
+
+async function loadAllEmpresasFromRef(): Promise<Empresa[]> {
+  const empresasRef = await ArtAPI.getRefEmpleadores();
+  return mapRefEmpleadoresToEmpresas(empresasRef ?? []);
+}
+
+function mapRefEmpleadoresToEmpresas(
+  empresasRef: { interno: number; cuit: number; razonSocial?: string }[]
+): Empresa[] {
+  return empresasRef.map((empresa) => ({
+    empresaId: Number(empresa.interno),
+    cuit: Number(empresa.cuit),
+    razonSocial: String(empresa.razonSocial ?? ""),
+    domicilio: "",
+    localidad: "",
+    provincia: "",
+  }));
+}
+
+function mapPolizasUsuarioLogueadoToEmpresas(
+  polizas: SRTPolizaAcotada[]
+): Empresa[] {
+  const seen = new Set<string>();
+  const empresas: Empresa[] = [];
+
+  for (const poliza of polizas) {
+    const empresaId =
+      Number(poliza.interno) || Number(poliza.refEmpleadorInterno);
+    const cuit = Number(poliza.cuit);
+    if (!empresaId || !cuit) {
+      continue;
+    }
+    const key = `${empresaId}-${cuit}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    empresas.push({
+      empresaId,
+      cuit,
+      razonSocial: String(poliza.empleadorDenominacion ?? ""),
+      domicilio: "",
+      localidad: "",
+      provincia: "",
+    });
+  }
+
+  return empresas;
+}
+
+/** Roles comercializador (+ hijos): GET /api/SRTPolizas/UsuarioLogueado sin parámetros. */
+async function loadEmpresasUsuarioLogueado(): Promise<Empresa[]> {
+  const polizas = await SrtAPI.getPolizasUsuarioLogueado();
+  return mapPolizasUsuarioLogueadoToEmpresas(polizas ?? []);
+}

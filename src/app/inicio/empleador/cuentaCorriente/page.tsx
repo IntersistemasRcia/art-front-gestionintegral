@@ -5,7 +5,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { Box, Typography } from '@mui/material';
 import CustomTab from '@/utils/ui/tab/CustomTab';
 import Formato from '@/utils/Formato';
-import gestionEmpleadorAPI from "@/data/gestionEmpleadorAPI";
+import SrtAPI from "@/data/srtAPI";
 import type { CuentaCorrienteRegistro, DDJJRegistro } from './types/cuentaCorriente';
 import ExportButtons from './components/ExportButtons';
 import { useEmpresasStore } from "@/data/empresasStore";
@@ -14,6 +14,7 @@ import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from 'next/navigation';
 import ArtAPI, { type VEmpleadorDDJJPostBody } from '@/data/artAPI';
 import { useAuth } from '@/data/AuthContext';
+import { applySRTPolizasVerIndependientes } from '@/utils/srtPolizasParams';
 
 
 
@@ -80,7 +81,7 @@ function CuentaCorrientePage() {
     const searchParams = useSearchParams();
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
-    const isAdmin = String(user?.rol ?? '').trim().toLowerCase() === 'administrador';
+    const isAdmin = String(user?.rol ?? '').trim().toLowerCase() === 'administrador' || String(user?.rol ?? '').trim().toLowerCase() === 'administradorart';
 
     const opcionesEmpresaSelector = useMemo(
         () => [EMPRESA_OPCION_TODAS_CTA_CTE, ...empresas],
@@ -217,9 +218,12 @@ function CuentaCorrientePage() {
         };
     }, [bloquearBusquedaPorCuit, cuitDesdeQuery, ddjjPageIndex, empresaSeleccionada, empresas, isAdmin]);
 
-    const { data: polizaRawData } = gestionEmpleadorAPI.useGetPoliza(
-        cuitFinal ? { CUIT: cuitFinal } : {}
+    const polizaParams = useMemo(
+        () => (cuitFinal ? applySRTPolizasVerIndependientes({ CUIT: cuitFinal }, user?.rol) : {}),
+        [cuitFinal, user?.rol]
     );
+
+    const { data: polizaRawData } = SrtAPI.useGetPoliza(polizaParams);
     const { data: CtaCteRawData, isLoading: isCtaCteLoading } = ArtAPI.useVEmpleadorDDJJ(ddjjBody);
 
     const ddjjPageCount = useMemo(() => {

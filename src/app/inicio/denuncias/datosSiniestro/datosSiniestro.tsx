@@ -72,7 +72,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
 
   const { user, hasTask } = useAuth();
   const canRealizaDenuncias = hasTask("Denuncia_Formulario_RealizaDenuncias");
-  const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador');
+  const isUserAdmin = (String(user?.rol || '').toLowerCase() === 'administrador' || String(user?.rol || '').toLowerCase() === 'administradorart');
   const empresaId = Number((user as any)?.empresaId ?? 0);
   //const isEmpleador = empresaId > 0;
 
@@ -89,11 +89,12 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
   };
 
   const handleEstablecimientoEmpresaChange = (_ev: React.SyntheticEvent, val: Empresa | null) => {
-    const cuit = val ? String((val as any)?.cuit ?? '') : '';
-    const digits = cuit.replace(/\D/g, '');
+    const digits = val ? String(val.cuit).replace(/\D/g, '') : '';
     const formatted = digits.length === 11 ? Formato.CUIP(digits) : digits;
-    const synthetic = { target: { name: 'establecimientoCuit', value: formatted } } as any;
-    onTextFieldChange(synthetic);
+    const change = (name: string, value: string) =>
+      onTextFieldChange({ target: { name, value } } as React.ChangeEvent<HTMLInputElement>);
+    change('establecimientoCuit', formatted);
+    change('establecimientoNombre', val?.razonSocial ?? '');
   };
 
   // Establecimientos por CUIT

@@ -92,8 +92,8 @@ export default function DatosUsuarioSection({
         />
       </div>
 
-      {(isCreating || isEditing || isViewing) && (
-        <div className={styles.formRow}>
+      <div className={styles.formRow}>
+        {(isCreating || isEditing || isViewing) && (
           <TextField
             label="Email"
             name="email"
@@ -103,16 +103,11 @@ export default function DatosUsuarioSection({
             onBlur={() => onBlur("email")}
             error={touched.email && !!errors.email}
             helperText={touched.email && errors.email}
-            fullWidth
             required={!isDisabled}
             disabled={isDisabled}
             placeholder="ejemplo@empresa.com"
-            className={styles.fullRowField}
           />
-        </div>
-      )}
-
-      <div className={styles.formRow}>
+        )}
         <TextField
           label="CUIT/CUIL"
           name="cuit"
@@ -121,12 +116,12 @@ export default function DatosUsuarioSection({
           onBlur={() => onBlur("cuit")}
           error={touched.cuit && !!errors.cuit}
           helperText={touched.cuit && errors.cuit}
-          fullWidth
           required={!isDisabled}
           disabled={isDisabled}
           placeholder="Ingrese CUIT (11 dígitos)"
+          className={styles.fieldSmall}
         />
-        <div className={styles.phoneField}>
+        <div className={`${styles.phoneField} ${styles.phoneFieldWidth}`}>
           <PhoneInput
             country="ar"
             value={form.phoneNumber}
@@ -149,7 +144,7 @@ export default function DatosUsuarioSection({
             </Typography>
           )}
         </div>
-        {!hideFechaNacimientoInCreateEdit && (
+        {roleKey !== "comercializador" && !hideFechaNacimientoInCreateEdit && (
           <TextField
             label="Fecha Nacimiento"
             name="fechaNacimiento"
@@ -159,11 +154,24 @@ export default function DatosUsuarioSection({
             onBlur={() => onBlur("fechaNacimiento")}
             error={touched.fechaNacimiento && !!errors.fechaNacimiento}
             helperText={touched.fechaNacimiento && errors.fechaNacimiento}
-            fullWidth
             disabled={isDisabled}
             InputLabelProps={{ shrink: true }}
+            className={styles.fieldSmall}
           />
         )}
+        <TextField
+          label="Matrícula"
+          name="matricula"
+          type="number"
+          value={form.matricula ?? ""}
+          onChange={onTextFieldChange}
+          onBlur={() => onBlur("matricula")}
+          error={touched.matricula && !!errors.matricula}
+          helperText={touched.matricula && errors.matricula}
+          disabled={isDisabled}
+          placeholder="Ingrese matrícula"
+          className={styles.fieldNarrow}
+        />
       </div>
 
       {/* Rol removido: se determina desde el contexto donde se crea el usuario */}
@@ -173,16 +181,16 @@ export default function DatosUsuarioSection({
           <>
             <div className={styles.formRow}>
               <TextField
-                label="Matrícula"
-                name="matricula"
-                value={form.matricula ?? ""}
+                label="Fecha Nacimiento"
+                name="fechaNacimiento"
+                type="date"
+                value={form.fechaNacimiento ?? ""}
                 onChange={onTextFieldChange}
-                onBlur={() => onBlur("matricula")}
-                error={touched.matricula && !!errors.matricula}
-                helperText={touched.matricula && errors.matricula}
-                fullWidth
+                onBlur={() => onBlur("fechaNacimiento")}
+                error={touched.fechaNacimiento && !!errors.fechaNacimiento}
+                helperText={touched.fechaNacimiento && errors.fechaNacimiento}
                 disabled={isDisabled}
-                placeholder="Ingrese matrícula"
+                InputLabelProps={{ shrink: true }}
               />
 
               <FormControl fullWidth disabled={isDisabled}>

@@ -3,6 +3,8 @@ import useSWR from "swr";
 import { ExternalAPI } from "./api";
 import TokenConfigurator from "@/types/TokenConfigurator";
 import { toURLSearch } from "@/utils/utils";
+import { EmpresaParametroApiResponse, EmpresaParametroPostRequest, EmpresaParametroPUTRequest, EmpresaParametroPUTResponse, ParametersParamEntidadEmpresa } from "@/app/inicio/usuarios/types/empresa";
+import useSWRMutation from "swr/mutation";
 
 //#region Types
 export interface EmpresasParams {
@@ -12,16 +14,47 @@ export interface EmpresasParams {
 export interface ParametersParamEntidad {
   entidadId?: number;
   parametroId?: number;
+  EntidadTipo?: string;
+  PageIndex?: number;
+  PageSize?: number;
 }
 
 export type ParametroEntidad = {
   id: number;
   entidadId: number;
+  cuit?: number;
+  razonSocial?: string;
   entidadTipo: string;
   parametroId: number;
   parametroNombre: string;
   valor: string;
 };
+
+export type ParametrosEntidadPagedResponse = {
+  index: number;
+  size: number;
+  pages: number;
+  count: number;
+  data: ParametroEntidad[];
+};
+
+export const PARAMETROS_ENTIDAD_DEFAULT_PAGE_INDEX = 1;
+export const PARAMETROS_ENTIDAD_DEFAULT_PAGE_SIZE = 500;
+
+export function normalizeParametrosEntidadResponse(
+  payload: ParametroEntidad[] | ParametrosEntidadPagedResponse | null | undefined
+): ParametroEntidad[] {
+  if (!payload) {
+    return [];
+  }
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return [];
+}
 
 export interface Empresa {
   empresaId: number;
@@ -197,6 +230,34 @@ export class AuthAPIClass extends ExternalAPI {
     );
   //#endregion getEmpresas
 
+    //#region Usuario DELETE
+  readonly deleteUsuarioBaseURL = this.getURL({ path: "/api/Usuario" }).toString();
+
+  deleteUsuario = async (id: string) =>
+    tokenizable
+      .delete(`${this.deleteUsuarioBaseURL}/${encodeURIComponent(id)}`)
+      .then(async (response) => {
+        if (response.status === 200 || response.status === 204) return;
+        return Promise.reject(
+          new AxiosError(`Error en la petición: ${response.statusText}`)
+        );
+      });
+
+  swrDeleteUsuario: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: string }) => Promise<void>;
+  } = Object.freeze({
+    key: [this.deleteUsuarioBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.deleteUsuario(arg),
+  });
+
+  useDeleteUsuario = () =>
+    useSWRMutation<void, Error, [url: string, token: string], string>(
+      this.swrDeleteUsuario.key,
+      this.swrDeleteUsuario.fetcher
+    );
+  //#endregion Usuario DELETE
+
   //#region UsuariosEmpresas (asignación / baja)
   readonly deleteUsuariosEmpresasBorrarURL = (id: number | string) =>
     this.getURL({
@@ -205,7 +266,7 @@ export class AuthAPIClass extends ExternalAPI {
 
   deleteUsuariosEmpresasBorrar = async (id: number | string) =>
     tokenizable
-      .delete(this.deleteUsuariosEmpresasBorrarURL(id))
+      .patch(this.deleteUsuariosEmpresasBorrarURL(id), {})
       .then(async (response) => {
         if (response.status === 200 || response.status === 204) return;
         return Promise.reject(
@@ -275,14 +336,22 @@ export class AuthAPIClass extends ExternalAPI {
   //#endregion
 
 
-    //GET ParametrosEntidad
+  //GET ParametrosEntidad
   readonly getParametrosEntidadURL = (params: ParametersParamEntidad = {}) => {
     return this.getURL({ path: "/api/ParametrosEntidades", search: toURLSearch(params) }).toString();
   };
-  getParametrosEntidad = async (params: ParametersParamEntidad = {}) =>
-    tokenizable
-      .get<ParametroEntidad[]>(this.getParametrosEntidadURL(params))
-      .then(({ data }) => data);
+  getParametrosEntidad = async (params: ParametersParamEntidad = {}) => {
+    const query: ParametersParamEntidad = {
+      PageIndex: params.PageIndex ?? PARAMETROS_ENTIDAD_DEFAULT_PAGE_INDEX,
+      PageSize: params.PageSize ?? PARAMETROS_ENTIDAD_DEFAULT_PAGE_SIZE,
+      ...params,
+    };
+    return tokenizable
+      .get<ParametroEntidad[] | ParametrosEntidadPagedResponse>(
+        this.getParametrosEntidadURL(query)
+      )
+      .then(({ data }) => normalizeParametrosEntidadResponse(data));
+  };
   useGetParametrosEntidadURL = (params: ParametersParamEntidad | null = {}) =>
     useSWR(
       params === null ? null : [this.getParametrosEntidadURL(params), token.getToken()],
@@ -293,6 +362,81 @@ export class AuthAPIClass extends ExternalAPI {
       }
     );
   //endregion
+
+
+  // ----- REGION EMPRESAS -----
+
+  // #region Empresa parametroEntidad POST
+  readonly postFormularioRARURL = this.getURL({ path: "/api/ParametrosEntidades" }).toString();
+
+  postParamEntidadEmpresaRAR = async (payload: EmpresaParametroPostRequest) =>
+    tokenizable.post<EmpresaParametroApiResponse>(this.postFormularioRARURL, payload).then(({ data }) => data);
+
+  swrPostFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: EmpresaParametroPostRequest }) => Promise<EmpresaParametroApiResponse>;
+  } = Object.freeze({
+    key: [this.postFormularioRARURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.postParamEntidadEmpresaRAR(arg),
+  });
+
+  usePostFormularioRAR = () =>
+    useSWRMutation<EmpresaParametroApiResponse, Error, [url: string, token: string], EmpresaParametroPostRequest>(
+      this.swrPostFormularioRAR.key,
+      this.swrPostFormularioRAR.fetcher
+    );
+  //#endregion
+
+  // Empresa parametroEntidad GET {parametros: CUIT, RazonSocial}
+  readonly getParamEntidadEmpresaURL = (params: ParametersParamEntidadEmpresa) => {
+    return this.getURL({
+      path: "/api/ParametrosEntidades/Empresa",
+      search: toURLSearch(params),
+    }).toString();
+  };
+
+  getParamEntidadEmpresa = async (params: ParametersParamEntidadEmpresa) =>
+    tokenizable.get(this.getParamEntidadEmpresaURL(params)).then(({ data }) => data);
+
+  useGetParamEntidadEmpresa = (params: ParametersParamEntidadEmpresa) =>
+    useSWR(
+      params && params.Nombre
+        ? [this.getParamEntidadEmpresaURL(params), token.getToken()]
+        : null,
+      () => this.getParamEntidadEmpresa(params),
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+      }
+    );
+
+
+
+
+  //Empresa parametroEntidad PUT
+  readonly putFormularioRARBaseURL = this.getURL({ path: "/api/ParametrosEntidades" }).toString();
+
+  readonly putParamEntidadEmpresaURL = (id: number | string) =>
+    this.getURL({ path: `/api/ParametrosEntidades/${id}` }).toString();
+
+  putParamEntidadEmpresaRAR = async (id: number | string, data: EmpresaParametroPUTRequest) =>
+    tokenizable.put<EmpresaParametroPUTResponse>(this.putParamEntidadEmpresaURL(id), data).then(({ data }) => data);
+
+  swrPutFormularioRAR: {
+    key: [url: string, token: string];
+    fetcher: (key: [url: string, token: string], options: { arg: { id: number | string; data: EmpresaParametroPUTRequest } }) => Promise<EmpresaParametroPUTResponse>;
+  } = Object.freeze({
+    key: [this.putFormularioRARBaseURL, token.getToken()],
+    fetcher: (_key, { arg }) => this.putParamEntidadEmpresaRAR(arg.id, arg.data),
+  });
+
+  usePutFormularioRAR = () =>
+    useSWRMutation<EmpresaParametroPUTResponse, Error, [url: string, token: string], { id: number | string; data: EmpresaParametroPUTRequest }>(
+      this.swrPutFormularioRAR.key,
+      this.swrPutFormularioRAR.fetcher
+    );
+  //#endregion
+
 
   //#region UsuariosEmpresas / UsuarioLogueado
   readonly postUsuariosEmpresasUsuarioLogueadoURL = () =>
@@ -315,12 +459,12 @@ export class AuthAPIClass extends ExternalAPI {
     useSWR(
       body !== null
         ? [
-            this.postUsuariosEmpresasUsuarioLogueadoURL(),
-            token.getToken(),
-            JSON.stringify([...body.empresasId].sort((a, b) => a - b)),
-            String(body.pageIndex),
-            String(body.pageSize),
-          ]
+          this.postUsuariosEmpresasUsuarioLogueadoURL(),
+          token.getToken(),
+          JSON.stringify([...body.empresasId].sort((a, b) => a - b)),
+          String(body.pageIndex),
+          String(body.pageSize),
+        ]
         : null,
       () => this.postUsuariosEmpresasUsuarioLogueado(body!)
     );

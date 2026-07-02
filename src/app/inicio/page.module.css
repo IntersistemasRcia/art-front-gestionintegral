@@ -38,6 +38,7 @@
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 15px;
+  display: none; /*deseo ocultar esta seccion por el momento, ya que no tengo datos para mostrar*/
 }
 
 .activityTitle {
