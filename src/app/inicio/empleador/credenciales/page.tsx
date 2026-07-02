@@ -19,6 +19,7 @@ import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 import dayjs from "dayjs";
 import { TextField } from '@mui/material';
+import { applySRTPolizasVerIndependientes } from '@/utils/srtPolizasParams';
 
 const getPeriodo = (): string => dayjs().subtract(2, "month").format("YYYYMM");
 
@@ -156,7 +157,9 @@ function CredencialesPage() {
             title="Descargar credencial"
             onClick={async () => {
               const empresa = await ArtAPI.getEmpresaByCUIT({ CUIT: empresaCUIT });
-              const polizas = await ArtAPI.getPolizaComercializador({ CUIT: empresaCUIT }) as PolizaComercializador[];
+              const polizas = await ArtAPI.getPolizaComercializador(
+                applySRTPolizasVerIndependientes({ CUIT: empresaCUIT }, user?.rol)
+              ) as PolizaComercializador[];
               const numeroContrato = Array.isArray(polizas) ? (polizas[0]?.numero ?? '') : '';
               const pol = [
                 {

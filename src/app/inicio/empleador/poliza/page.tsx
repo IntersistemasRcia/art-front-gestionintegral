@@ -16,10 +16,12 @@ import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
+import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
 
 const { useGetPoliza } = SrtAPI;
 
 const Poliza = () => {
+  const { user } = useAuth();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
   const seleccionAutomaticaRef = useRef(false);
@@ -32,9 +34,9 @@ const Poliza = () => {
   // Obtener la póliza priorizando el CUIT forzado por query param (viene desde comercializador)
   const { data: polizaRawData, isLoading: isPersonalLoading } = useGetPoliza(
     Number.isFinite(cuitForzado) && cuitForzado > 0
-      ? { CUIT: cuitForzado, VerIndependientes: true }
+      ? applySRTPolizasVerIndependientes({ CUIT: cuitForzado }, user?.rol)
       : empresaSeleccionada
-      ? { CUIT: empresaSeleccionada.cuit, VerIndependientes: true }
+      ? applySRTPolizasVerIndependientes({ CUIT: empresaSeleccionada.cuit }, user?.rol)
       : {}
   );
 

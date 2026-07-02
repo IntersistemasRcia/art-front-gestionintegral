@@ -20,6 +20,7 @@ Siempre que el usuario pida realizar acciones de git, sugiere el uso de la CLI d
 - Hotfix: `git flow hotfix start <nombre>`
 - Bugfix: `git flow bugfix start <nombre>`
 - Release: `git flow release start <version>`
+- **Release sin upstream a develop:** nunca `git switch -c release/vX origin/develop`. Usar git-flow o `git switch -c release/vX --no-track` desde `develop` local. Publicar con `git push -u origin release/vX`.
 
 ## 3. Reglas de Pull Request (PR)
 - **Target para Features**: Siempre hacia `develop`.

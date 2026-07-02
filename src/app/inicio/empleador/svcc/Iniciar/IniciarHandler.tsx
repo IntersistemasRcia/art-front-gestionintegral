@@ -6,7 +6,11 @@ import { Grid, Typography } from "@mui/material";
 import Formato from "@/utils/Formato";
 import SvccAPI from "@/data/svccAPI";
 import type { PresentacionCreateDTO, PresentacionDTO, PresentacionUltimaDTO } from "@/data/svccAPI";
-import { copyTrabajadoresFromPresentacionOrigen } from "@/utils/svcc/copyPresentacionDetalle";
+import {
+  copyPortadaYAnexoVFromOrigen,
+  copyNominasToPresentacion,
+  fetchTrabajadoresByPresentacionId,
+} from "@/utils/svcc/copyPresentacionDetalle";
 import {
   canIniciarNuevaPresentacion,
   presentacionUltimaFormFromUltima,
@@ -49,6 +53,12 @@ export default function IniciarHandler() {
     setCopyDetalleError(null);
     try {
       const ultimaAnterior = await SvccAPI.svccPresentacionUltima({ empleadorCuit: empresaCUIT });
+      const presentacionOrigenInterno = Number(ultimaAnterior?.interno ?? formData.interno ?? 0);
+
+      const trabajadoresOrigen = presentacionOrigenInterno > 0
+        ? await fetchTrabajadoresByPresentacionId(presentacionOrigenInterno)
+        : [];
+
       const created = await (nueva.trigger as (data: PresentacionCreateDTO) => Promise<PresentacionDTO>)(
         presentacionUltimaFormToCreate(formData, empresaCUIT)
       );
@@ -60,15 +70,19 @@ export default function IniciarHandler() {
       if (createdInterno > 0) {
         setIsCopyingDetalle(true);
         try {
-          if (ultimaAnterior?.interno != null && ultimaAnterior.interno > 0) {
-            await copyTrabajadoresFromPresentacionOrigen(ultimaAnterior.interno, createdInterno);
+          if (
+            presentacionOrigenInterno > 0
+            && presentacionOrigenInterno !== createdInterno
+          ) {
+            await copyPortadaYAnexoVFromOrigen(presentacionOrigenInterno, createdInterno);
+            await copyNominasToPresentacion(trabajadoresOrigen, createdInterno);
           }
           presentacion.setSelected(created);
         } catch (error) {
           const message =
             error instanceof Error
               ? error.message
-              : "Error copiando Nóminas de la presentación anterior";
+              : "Error copiando Portada, Anexo V o Nóminas de la presentación anterior";
           setCopyDetalleError(message);
           return;
         } finally {

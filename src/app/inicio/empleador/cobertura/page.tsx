@@ -22,10 +22,12 @@ import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
+import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
 
 const { useGetPoliza } = SrtAPI;
 
 export default function CoberturaPage() {
+    const { user } = useAuth();
     const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
     const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
     const seleccionAutomaticaRef = useRef(false);
@@ -40,7 +42,7 @@ export default function CoberturaPage() {
    
     // Obtener personal y póliza usando el CUIT de la empresa seleccionada o, si viene por query, ese CUIT
     const paramsCUIT = Number.isFinite(cuitEmpresaActual) && cuitEmpresaActual > 0
-        ? { CUIT: cuitEmpresaActual, VerIndependientes: true }
+        ? applySRTPolizasVerIndependientes({ CUIT: cuitEmpresaActual }, user?.rol)
         : {};
 
     const { data: polizaData, isLoading: isPolizaLoading } = useGetPoliza(paramsCUIT);
