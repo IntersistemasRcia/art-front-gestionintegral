@@ -807,7 +807,7 @@ export class SrtAPIClass extends ExternalAPI {
 
   //#region SRTComercializadoresHistorial por PolizaId
   readonly getSRTComercializadoresHistorialByPolizaIdURL = (polizaId: number) =>
-    this.getURL({ path: `/api/SRTPolizasHistorial/SRTPoliza/${polizaId}` }).toString();
+    this.getURL({ path: `/api/SRTPolizasHistorial/SRTPoliza/${polizaId}`, search: toURLSearch({ orderBy: "-fechaHasta" }) }).toString();
 
   getSRTComercializadoresHistorialByPolizaId = async (polizaId: number) =>
     tokenizable

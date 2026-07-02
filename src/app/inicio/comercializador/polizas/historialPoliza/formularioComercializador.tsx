@@ -23,6 +23,8 @@ type Props = {
   polizaInterno: number | undefined;
   numeroPoliza?: string;
   editRow?: HistorialRow;
+  crearHistorial?: boolean;
+  comercializadorActualInterno?: number;
 };
 
 const asociadosColumns: ColumnDef<SRTComercializadorAsociado>[] = [
@@ -31,7 +33,7 @@ const asociadosColumns: ColumnDef<SRTComercializadorAsociado>[] = [
   { accessorKey: "razonSocial", header: "Comercializador", meta: { align: "left" } },
 ];
 
-export default function FormularioComercializador({ open, onClose, onSuccess, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow }: Props) {
+export default function FormularioComercializador({ open, onClose, onSuccess, empleadorCuit, empleadorRazonSocial, polizaInterno, numeroPoliza, editRow, crearHistorial, comercializadorActualInterno }: Props) {
   const [comercializadorSeleccionado, setComercializadorSeleccionado] = useState<Comercializador | null>(null);
   const [asociadoSeleccionado, setAsociadoSeleccionado] = useState<SRTComercializadorAsociado | null>(null);
   const [seleccionarAsociados, setSeleccionarAsociados] = useState(false);
@@ -59,19 +61,32 @@ export default function FormularioComercializador({ open, onClose, onSuccess, em
       const com = comercializadores.find((c) => c.interno === editRow.srtComercializadorInterno) ?? null;
       setComercializadorSeleccionado(com);
       setFechaHasta(editRow.fechaHasta ? editRow.fechaHasta.slice(0, 10) : "");
+    } else if (comercializadorActualInterno != null && comercializadores.length > 0) {
+      setComercializadorSeleccionado(comercializadores.find((c) => c.interno === comercializadorActualInterno) ?? null);
     }
-  }, [open, editRow, comercializadores.length]);
+  }, [open, editRow, comercializadorActualInterno, comercializadores.length]);
 
   const cuitFormateado = Formato.CUIP(empleadorCuit.replace(/\D/g, "")) || empleadorCuit;
   const titulo = editRow
     ? `Editar el historial del comercializador${numeroPoliza ? ` - Póliza: ${numeroPoliza}` : ""}`
+    : crearHistorial
+    ? `Nuevo registro de historial${numeroPoliza ? ` - Póliza: ${numeroPoliza}` : ""}`
     : `Modificar Comercializador${numeroPoliza ? ` - Póliza: ${numeroPoliza}` : ""}`;
 
   const handleGuardar = async () => {
     if (!comercializadorSeleccionado) return;
     setSaving(true);
     try {
-      if (editRow) {
+      if (crearHistorial) {
+        if (polizaInterno == null) return;
+        const body: SRTComercializadoresHistorialPutRequest = {
+          srtPolizaInterno: polizaInterno,
+          srtComercializadorInterno: comercializadorSeleccionado.interno,
+          srtComercializadorAsociadoInterno: seleccionarAsociados && asociadoSeleccionado ? asociadoSeleccionado.interno : null,
+          fechaHasta: fechaHasta ? new Date(fechaHasta).toISOString() : new Date().toISOString(),
+        };
+        await SrtAPI.postSRTComercializadoresHistorial(body);
+      } else if (editRow) {
         const body: SRTComercializadoresHistorialPutRequest = {
           srtPolizaInterno: editRow.srtPolizaInterno || (polizaInterno ?? 0),
           srtComercializadorInterno: comercializadorSeleccionado.interno,
@@ -102,7 +117,7 @@ export default function FormularioComercializador({ open, onClose, onSuccess, em
       open={resultado === "success"}
       type="success"
       title="Operación exitosa"
-      message={`Se modificó el comercializador a la póliza${numeroPoliza ? ` ${numeroPoliza}` : ""}`}
+      message={crearHistorial ? `Se creó el registro de historial${numeroPoliza ? ` para la póliza ${numeroPoliza}` : ""}` : `Se modificó el comercializador a la póliza${numeroPoliza ? ` ${numeroPoliza}` : ""}`}
       onClose={() => { setResultado(null); onClose(); }}
     />
     <CustomModalMessage
@@ -140,7 +155,7 @@ export default function FormularioComercializador({ open, onClose, onSuccess, em
           renderInput={(params) => <TextField {...params} label="Comercializador" />}
           className={styles.autocompleteField}
         />
-        {editRow && (
+        {(editRow || crearHistorial) && (
           <TextField
             label="Fecha Finalización"
             type="date"

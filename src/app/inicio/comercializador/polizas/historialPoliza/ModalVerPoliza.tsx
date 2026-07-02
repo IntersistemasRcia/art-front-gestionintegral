@@ -2,6 +2,7 @@
 
 import { TextField } from "@mui/material";
 import CustomModal from "@/utils/ui/form/CustomModal";
+import CustomButton from "@/utils/ui/button/CustomButton";
 import SrtAPI from "@/data/srtAPI";
 import Formato from "@/utils/Formato";
 import styles from "./modalVerPoliza.module.css";
@@ -19,26 +20,35 @@ export default function ModalVerPoliza({ historialId, onClose }: Props) {
       label={label}
       value={value ?? ""}
       disabled
-      size="small"
       className={className}
       slotProps={{ inputLabel: { shrink: true } }}
     />
   );
 
+  const titulo = poliza
+    ? `Histo: ${(poliza as any).numero} - Fecha: ${Formato.Fecha((poliza as any).vigenciaHasta)}`
+    : "Historial Poliza";
+
   return (
-    <CustomModal open={!!historialId} onClose={onClose} title="Ver Póliza Completa" size="large">
+    <CustomModal
+      open={!!historialId}
+      onClose={onClose}
+      title={titulo}
+      size="large"
+      actions={<CustomButton color="secondary" onClick={onClose}>Cerrar</CustomButton>}
+    >
       {isLoading || !poliza ? null : (
         <div className={styles.grid}>
           <span className={styles.section}>Póliza</span>
-          {field("Número", (poliza as any).numero)}
-          {field("CUIT", Formato.CUIP(String((poliza as any).cuit ?? "")))}
-          {field("Nro. Solicitud", (poliza as any).numeroSolicitud)}
-          {field("Vigencia Desde", Formato.Fecha((poliza as any).vigenciaDesde))}
-          {field("Vigencia Hasta", Formato.Fecha((poliza as any).vigenciaHasta))}
-          {field("Estado", (poliza as any).estadoCodigo)}
-          {field("Fecha Estado", Formato.Fecha((poliza as any).estadoFecha))}
-          {field("Días para Vencimiento", (poliza as any).diasParaVencimiento)}
-          {field("CIIU", (poliza as any).ciiu)}
+          {field("Número", (poliza as any).numero, styles.w100)}
+          {field("CUIT", Formato.CUIP(String((poliza as any).cuit ?? "")), styles.w150)}
+          {field("Nro. Solicitud", (poliza as any).numeroSolicitud, styles.w120)}
+          {field("Vigencia Desde", Formato.Fecha((poliza as any).vigenciaDesde), styles.w120)}
+          {field("Vigencia Hasta", Formato.Fecha((poliza as any).vigenciaHasta), styles.w120)}
+          {field("Estado", (poliza as any).estadoCodigo, styles.w100)}
+          {field("Fecha Estado", Formato.Fecha((poliza as any).estadoFecha), styles.w120)}
+          {field("Días para Vencimiento", (poliza as any).diasParaVencimiento, styles.w160)}
+          {field("CIIU", (poliza as any).ciiu, styles.w100)}
 
           <span className={styles.section}>Empleador</span>
           {field("Denominación", (poliza as any).empleadorDenominacion, styles.col2)}

@@ -30,6 +30,7 @@ type Props = {
 export default function HistorialPoliza({ data, isLoading, hasSelection, empleadorCuit, empleadorRazonSocial, polizaInterno, onSuccess }: Props) {
   const { hasTask } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
+  const [crearOpen, setCrearOpen] = useState(false);
   const [editRow, setEditRow] = useState<HistorialRow | null>(null);
   const [bajaRow, setBajaRow] = useState<HistorialRow | null>(null);
   const [verPolizaId, setVerPolizaId] = useState<number | null>(null);
@@ -87,6 +88,11 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
   return (
     <>
       {!hasSelection && <p className={styles.emptyMessage}>Seleccione una póliza para ver el historial.</p>}
+      {hasSelection && hasTask("Comercializador_Polizas_CrearHistorial") && (
+        <div className={styles.toolbar}>
+          <CustomButton onClick={() => setCrearOpen(true)}>Registrar historial de comercializador</CustomButton>
+        </div>
+      )}
       <DataTable
         columns={columns}
         data={data}
@@ -100,6 +106,15 @@ export default function HistorialPoliza({ data, isLoading, hasSelection, emplead
         empleadorRazonSocial={empleadorRazonSocial}
         polizaInterno={polizaInterno}
         numeroPoliza={data[0]?.numeroPoliza}
+      />
+      <FormularioComercializador
+        open={crearOpen}
+        onClose={() => { setCrearOpen(false); onSuccess(); }}
+        empleadorCuit={empleadorCuit}
+        empleadorRazonSocial={empleadorRazonSocial}
+        polizaInterno={polizaInterno}
+        numeroPoliza={data[0]?.numeroPoliza}
+        crearHistorial
       />
       <FormularioComercializador
         open={!!editRow}

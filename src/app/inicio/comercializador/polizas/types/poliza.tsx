@@ -71,6 +71,7 @@ export type Poliza = {
     CUIT: string;
     Empleador_Denominacion: string;
     Comercializador_Denominacion: string;
+    srtComercializadorInterno: number;
     Vigencia_Desde: string;
     Vigencia_Hasta: string;
     fecha: string;
