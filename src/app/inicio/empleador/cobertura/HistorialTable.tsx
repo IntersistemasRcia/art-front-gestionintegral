@@ -13,9 +13,13 @@ import { HistItem } from './types/cobertura';
 import Formato from '@/utils/Formato';
 import { saveTable, type TableColumn } from '@/utils/excelUtils';
 
+const TODAS_LAS_EMPRESAS: Empresa = { empresaId: 0, cuit: 0, razonSocial: 'Todas las Empresas', domicilio: '', localidad: '', provincia: '' };
+
 export default function HistorialTable({ data, isLoading = false }: { data: HistItem[]; isLoading?: boolean }) {
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
-  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(null);
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<Empresa | null>(TODAS_LAS_EMPRESAS);
+
+  const opciones = useMemo(() => [TODAS_LAS_EMPRESAS, ...empresas], [empresas]);
 
   const handleEmpresaChange = (_event: React.SyntheticEvent, newValue: Empresa | null) => {
     setEmpresaSeleccionada(newValue);
@@ -41,8 +45,13 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
+    if (!empresaSeleccionada) {
+      setRows([]);
+      setPageCount(1);
+      return;
+    }
     setLoading(true);
-    void ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit, pageIndex: page, pageSize: 10, orderBy: '-fechaHora' }).then((resp) => {
+    void ArtAPI.getCobertura({ cuit: empresaSeleccionada.cuit || undefined, pageIndex: page, pageSize: 10, orderBy: '-fechaHora' }).then((resp) => {
       const { data, pages } = resp as { data: HistItem[]; pages: number };
       setRows(data);
       setPageCount(pages);
@@ -53,7 +62,7 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
   useEffect(() => { setPage(1); }, [empresaSeleccionada]);
 
   const handleExportExcel = async () => {
-    const { data: allRows } = (await ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit, orderBy: '-fechaHora' })) as { data: HistItem[] };
+    const { data: allRows } = (await ArtAPI.getCobertura({ cuit: empresaSeleccionada?.cuit || undefined, orderBy: '-fechaHora' })) as { data: HistItem[] };
     const columnsExcel: Record<string, TableColumn> = {
       interno: { header: 'Nro. Certificado', key: 'interno' },
       cuitEmpleador: { header: 'CUIT Empleador', key: 'cuitEmpleador' },
@@ -75,7 +84,7 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
     <div style={{ marginTop: 12 }}>
       <div className={styles.empresaSelectorContainer}>
         <CustomSelectSearch<Empresa>
-          options={empresas}
+          options={opciones}
           getOptionLabel={getEmpresaLabel}
           value={empresaSeleccionada}
           onChange={handleEmpresaChange}
