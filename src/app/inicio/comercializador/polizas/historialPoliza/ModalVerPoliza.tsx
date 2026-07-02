@@ -26,7 +26,7 @@ export default function ModalVerPoliza({ historialId, onClose }: Props) {
   );
 
   const titulo = poliza
-    ? `Historial Poliza Número: ${(poliza as any).numero} - Fecha: ${Formato.Fecha((poliza as any).vigenciaHasta)}`
+    ? `Histo: ${(poliza as any).numero} - Fecha: ${Formato.Fecha((poliza as any).vigenciaHasta)}`
     : "Historial Poliza";
 
   return (
