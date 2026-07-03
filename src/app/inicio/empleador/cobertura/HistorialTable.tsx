@@ -27,7 +27,10 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
 
   const getEmpresaLabel = (empresa: Empresa | null): string => {
     if (!empresa) return '';
-    return String(empresa.razonSocial ?? '');
+    if (empresa.empresaId === TODAS_LAS_EMPRESAS.empresaId && empresa.cuit === TODAS_LAS_EMPRESAS.cuit) {
+      return String(empresa.razonSocial ?? '');
+    }
+    return `${empresa.razonSocial ?? ''} - ${Formato.CUIP(empresa.cuit)}`;
   };
   const columns: ColumnDef<HistItem>[] = useMemo(() => [
     { header: 'Nro. Certificado', accessorKey: 'interno' },
@@ -92,11 +95,11 @@ export default function HistorialTable({ data, isLoading = false }: { data: Hist
           placeholder="Buscar empresa..."
           loading={isLoadingEmpresas}
         />
-      </div>
-      <div className={styles.exportButtonContainer}>
-        <CustomButton onClick={handleExportExcel} disabled={loading || rows.length === 0}>
-          Exportar a Excel
-        </CustomButton>
+        <div className={styles.exportButtonContainer}>
+          <CustomButton onClick={handleExportExcel} disabled={loading || rows.length === 0}>
+            Exportar a Excel
+          </CustomButton>
+        </div>
       </div>
       <DataTable data={rows} columns={columns} size="mid" isLoading={isLoading || loading} manualPagination pageIndex={page} pageSize={10} pageCount={pageCount} onPageChange={setPage} />
     </div>
