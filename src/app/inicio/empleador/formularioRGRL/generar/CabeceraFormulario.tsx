@@ -88,7 +88,7 @@ const CabeceraFormulario: React.FC<CabeceraFormularioProps> = ({
 					<Autocomplete
 						options={establecimientos}
 						getOptionLabel={(opt) => {
-							const suc = String(opt.nroSucursal ?? '').trim();
+							const suc = String(opt.numero ?? '').trim();
 							const calle = String(opt.domicilioCalle ?? '').trim();
 							const nro = String(opt.domicilioNro ?? '').trim();
 							const dir = [calle, nro].filter(Boolean).join(' ').trim();
