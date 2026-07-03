@@ -22,8 +22,8 @@
 
 .exportButtonContainer {
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 12px;
+    justify-content: flex-start;
+    margin-top: 12px;
 }
 
 @media (max-width: 768px) {
