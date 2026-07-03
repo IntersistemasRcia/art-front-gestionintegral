@@ -4,6 +4,9 @@ import { redirect } from 'next/navigation';
 import ClientLayoutWrapper from './ClientLayoutWrapper';
 import { authOptions } from '../api/auth/[...nextauth]/auth';
 
+// getServerSession usa cookies/headers: no puede prerenderizarse en build.
+export const dynamic = 'force-dynamic';
+
 export default async function InicioLayout({
  children,
 }: {

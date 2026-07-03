@@ -16,7 +16,7 @@ module.exports = {
       error_file: "./_deploy_logs/pm2_err.log",
 
       env: {
-        NODE_ENV: "development",
+        NODE_ENV: "production",
         PORT: 8600,
       },
     },
