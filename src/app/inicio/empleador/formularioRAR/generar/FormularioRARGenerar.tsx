@@ -606,9 +606,9 @@ React.useEffect(() => {
         console.log(' Array procesado:', estArr);
 
         const opciones: OpcionEstablecimiento[] = estArr
-          .filter((est: any) => est && (est.nroSucursal || est.domicilioCalle || est.interno))
+          .filter((est: any) => est && (est.numero || est.domicilioCalle || est.interno))
           .map((est: any) => {
-            const nro = est.nroSucursal ?? est.interno ?? '';
+            const nro = est.numero ?? est.interno ?? '';
             const direccion = [est.domicilioCalle, est.domicilioNro].filter(Boolean).join(' ');
             return {
               interno: String(est.interno ?? ''),

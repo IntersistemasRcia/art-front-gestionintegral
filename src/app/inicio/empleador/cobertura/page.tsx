@@ -142,7 +142,7 @@ export default function CoberturaPage() {
 
     const getEmpresaLabel = (empresa: Empresa | null): string => {
         if (!empresa) return "";
-        return String(empresa.razonSocial ?? "");
+        return `${empresa.razonSocial ?? ""} - ${Formato.CUIP(empresa.cuit)}`;
     };
 
     // Estados para las selecciones de filas en cada tabla
