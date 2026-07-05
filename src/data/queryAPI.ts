@@ -237,7 +237,7 @@ function reject<T>(error: AxiosError) {
 }
 
 export class QueriesAPIClass extends ExternalAPI {
-  readonly basePath = process.env.NEXT_PUBLIC_QUERYAPI_URL!;
+  readonly basePath = process.env.NEXT_PUBLIC_QUERYAPI_URL || "http://fallback-prod.url";
 
   //#region queries
 
