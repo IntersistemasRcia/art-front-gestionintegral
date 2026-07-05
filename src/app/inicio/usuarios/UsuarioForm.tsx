@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Box,
   TextField,
@@ -181,7 +181,7 @@ export interface TouchedFields {
   empresaId?: boolean;
   id?: boolean;
   comision?: boolean;
-  serviciosAdicionales?: boolean;
+  serviciosAdicionales?: boolean; 
   aplicaIva?: boolean;
   maxUsuarios?: boolean;
   cantidadUsuarios?: boolean;
@@ -190,6 +190,10 @@ export interface TouchedFields {
 
 export const LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR =
   "Debe asociar al menos una empresa desde la solapa 'Empresas del usuario' antes de guardar los cambios.";
+
+const EMAIL_DUPLICADO_MSG = "Ya existe un usuario registrado con este email";
+const EMAIL_VERIFICACION_ERROR_MSG = "No se pudo verificar el email. Intente nuevamente.";
+const EMAIL_VERIFICANDO_MSG = "Verificando email...";
 
 // Título a mostrar cuando el usuario ya fue registrado pero necesita relacionar empresas
 export const TITULO_USUARIO_REGISTRADO = "Usuario Registrado";
@@ -222,6 +226,10 @@ export default function UsuarioForm({
   const [arcaCUIL, setArcaCUIL] = useState<number | undefined>(undefined);
   const [fichaTab, setFichaTab] = useState(0);
   const [empresasRelMeta, setEmpresasRelMeta] = useState<EmpresasRelacionadasMeta | null>(null);
+  const [isValidatingEmail, setIsValidatingEmail] = useState(false);
+
+  const originalEmailRef = useRef("");
+  const emailValidationSeqRef = useRef(0);
 
   const { user } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
@@ -320,6 +328,9 @@ export default function UsuarioForm({
 
     setErrors({});
     setTouched({});
+    setIsValidatingEmail(false);
+    emailValidationSeqRef.current += 1;
+    originalEmailRef.current = (initialData?.email ?? "").trim().toLowerCase();
     setIsAdminUser(false); // Resetear el checkbox cuando se abre el modal
     setShowPassword(false); // Resetear la visibilidad de contraseña
     setArcaCUIL(undefined); // Limpiar cualquier consulta ARCA previa al abrir el modal
@@ -398,6 +409,58 @@ export default function UsuarioForm({
     if (!emailRegex.test(email)) return "Formato de email inválido";
     return undefined;
   };
+
+  /** POST /api/Usuario/GetAll con filtro por email (specs). */
+  const checkEmailDisponible = useCallback(async (email: string): Promise<string | undefined> => {
+    const trimmed = email.trim();
+    const formatError = validateEmail(trimmed);
+    if (formatError) return formatError;
+
+    const normalized = trimmed.toLowerCase();
+    if (isEditing && normalized === originalEmailRef.current) {
+      return undefined;
+    }
+
+    const seq = ++emailValidationSeqRef.current;
+    setIsValidatingEmail(true);
+    try {
+      const result = await UsuarioAPI.getAll({
+        email: trimmed,
+        pageIndex: 1,
+        pageSize: 10,
+      });
+      if (seq !== emailValidationSeqRef.current) return undefined;
+
+      const usuariosEncontrados = result.data ?? [];
+      const otroUsuario = usuariosEncontrados.some(
+        (usuario) => String(usuario.id) !== String(form.id ?? ""),
+      );
+
+      if (isCreating) {
+        if (result.count > 0 || usuariosEncontrados.length > 0) {
+          return EMAIL_DUPLICADO_MSG;
+        }
+        return undefined;
+      }
+
+      if (otroUsuario) {
+        return EMAIL_DUPLICADO_MSG;
+      }
+
+      if (result.count > 0 && usuariosEncontrados.length === 0) {
+        return EMAIL_DUPLICADO_MSG;
+      }
+
+      return undefined;
+    } catch {
+      if (seq !== emailValidationSeqRef.current) return undefined;
+      return EMAIL_VERIFICACION_ERROR_MSG;
+    } finally {
+      if (seq === emailValidationSeqRef.current) {
+        setIsValidatingEmail(false);
+      }
+    }
+  }, [form.id, isCreating, isEditing]);
 
   const validatePassword = (password: string): string | undefined => {
     if (!password) return "Contraseña es requerida";
@@ -577,6 +640,20 @@ export default function UsuarioForm({
         ...prev,
         [name]: matriculaValue,
       }));
+    } else if (name === "email") {
+      emailValidationSeqRef.current += 1;
+      setIsValidatingEmail(false);
+      setForm((prev: UsuarioFormFields) => ({
+        ...prev,
+        email: value,
+      }));
+      if (touched.email) {
+        const formatError = validateEmail(value);
+        setErrors((prev) => ({
+          ...prev,
+          email: formatError,
+        }));
+      }
     } else {
       setForm((prev: UsuarioFormFields) => ({
         ...prev,
@@ -708,6 +785,27 @@ export default function UsuarioForm({
     }));
   };
 
+  const handleEmailBlur = async () => {
+    if (isDisabled || (!isCreating && !isEditing)) return;
+
+    setTouched((prev) => ({ ...prev, email: true }));
+    const emailError = await checkEmailDisponible(form.email);
+    setErrors((prev) => ({
+      ...prev,
+      email: emailError,
+    }));
+  };
+
+  const emailHelperText = useMemo(() => {
+    if (!touched.email) return undefined;
+    if (isValidatingEmail) return EMAIL_VERIFICANDO_MSG;
+    return errors.email;
+  }, [touched.email, isValidatingEmail, errors.email]);
+
+  const isEmailBlockingSubmit = Boolean(
+    (isCreating || isEditing) && (isValidatingEmail || errors.email),
+  );
+
   // Llamada ARCA: usar useSWR con key null hasta completar 11 dígitos
   const { data: arcaData, isValidating: isLoadingArca, error: arcaError } = useSWR(
     arcaCUIL ? ArtAPI.getARCAURL({ CUIL: arcaCUIL }) : null,
@@ -727,7 +825,7 @@ export default function UsuarioForm({
     }));
   }, [arcaData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Manejo directo para 'delete' (no requiere validación de formulario)
@@ -765,18 +863,25 @@ export default function UsuarioForm({
     }, {} as TouchedFields);
     setTouched(allTouched);
 
-    if (validateAllFields()) {
-      // console.log("Submitting form data:", formDataWithDefaults);
-      // Limpiamos los campos de password/confirmPassword si están vacíos al editar
-      const dataToSubmit = { ...formDataWithDefaults };
-      if (isEditing && !dataToSubmit.password) {
-        delete dataToSubmit.password;
-        delete dataToSubmit.confirmPassword;
-      }
-
-      console.log("Submitting form data:", dataToSubmit);
-      onSubmit(dataToSubmit);
+    if (!validateAllFields()) {
+      return;
     }
+
+    if (isCreating || isEditing) {
+      const emailError = await checkEmailDisponible(form.email);
+      if (emailError) {
+        setErrors((prev) => ({ ...prev, email: emailError }));
+        return;
+      }
+    }
+
+    const dataToSubmit = { ...formDataWithDefaults };
+    if (isEditing && !dataToSubmit.password) {
+      delete dataToSubmit.password;
+      delete dataToSubmit.confirmPassword;
+    }
+
+    onSubmit(dataToSubmit);
   };
 
   console.log("Form State:", form.empresaId);
@@ -852,12 +957,12 @@ export default function UsuarioForm({
                     type="email"
                     value={form.email}
                     onChange={handleTextFieldChange}
-                    onBlur={() => handleBlur("email")}
-                    error={touched.email && !!errors.email}
-                    helperText={touched.email && errors.email}
+                    onBlur={handleEmailBlur}
+                    error={touched.email && (!!errors.email || isValidatingEmail)}
+                    helperText={emailHelperText}
                     fullWidth
                     required={!isDisabled}
-                    disabled={isDisabled}
+                    disabled={isDisabled || isValidatingEmail}
                     placeholder="ejemplo@empresa.com"
                     className={styles.fullRowField}
                   />
@@ -1176,7 +1281,11 @@ export default function UsuarioForm({
               {!isViewing && (
                 <CustomButton
                   type="submit"
-                  disabled={isSubmitting || (isEditing && mustBlockModalClose)}
+                  disabled={
+                    isSubmitting
+                    || (isEditing && mustBlockModalClose)
+                    || isEmailBlockingSubmit
+                  }
                   style={{
                     opacity: isSubmitting ? 0.7 : 1,
                     cursor: isSubmitting ? 'not-allowed' : 'pointer'
