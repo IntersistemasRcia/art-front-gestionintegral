@@ -147,6 +147,7 @@ export default function EmpresaTable() {
 				data={tableData}
 				columns={columns}
 				isLoading={isLoading}
+				enableFiltering={false}
 				manualPagination
 				pageIndex={pageIndex}
 				pageSize={PAGE_SIZE}
