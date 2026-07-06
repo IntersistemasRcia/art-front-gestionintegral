@@ -263,15 +263,27 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
     NormaVigente: cat.norma,
   }));
 
-  const gremios = (data.respuestasGremio ?? []).map(g => ({
+  // Un valor identificatorio vacío, NULL o "0" indica un registro histórico incompleto que no debe mostrarse.
+  const esIdentificadorVacio = (v: unknown) => {
+    const s = String(v ?? '').trim();
+    return !s || Number(s) === 0;
+  };
+
+  const gremios = (data.respuestasGremio ?? [])
+    .filter(g => !esIdentificadorVacio(g.legajo))
+    .map(g => ({
     Legajo: String(g.legajo ?? ''),
     Nombre: g.nombre ?? ''
   }));
-  const contratistas = (data.respuestasContratista ?? []).map(c => ({
+  const contratistas = (data.respuestasContratista ?? [])
+    .filter(c => !esIdentificadorVacio(c.cuit))
+.map(c => ({
     CUIT: CUIP(c.cuit),
     Contratista: c.contratista ?? c.nombre ?? ''
   }));
-  const responsables = (data.respuestasResponsable ?? []).map(r => ({
+  const responsables = (data.respuestasResponsable ?? [])
+    .filter(r => !esIdentificadorVacio(r.cuit))
+.map(r => ({
     CUITCUIL: CUIP(r.cuit),
     NombreApellido: r.responsable ?? '',
     Cargo: normCargo(r.cargo),
