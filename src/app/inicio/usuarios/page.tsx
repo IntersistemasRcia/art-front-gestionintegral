@@ -141,26 +141,6 @@ export default function UsuariosPage() {
   );
 
   useEffect(() => {
-    if (Number.isFinite(cuitForzado) && cuitForzado > 0) return;
-    if (isLoadingEmpresas) return;
-    if (empresas.length === 1) {
-      setEmpresaSeleccionada(empresas[0]);
-      seleccionAutomaticaRef.current = true;
-      return;
-    }
-    if (empresas.length === 0) {
-      setEmpresaSeleccionada(null);
-      seleccionAutomaticaRef.current = false;
-      return;
-    }
-    setEmpresaSeleccionada((prev) => {
-      if (!seleccionAutomaticaRef.current && prev !== null) return prev;
-      return EMPRESA_OPCION_TODAS;
-    });
-    seleccionAutomaticaRef.current = true;
-  }, [empresas, isLoadingEmpresas, cuitForzado]);
-
-  useEffect(() => {
     if (isLoadingEmpresas) return;
     const hasCuitForzado = Number.isFinite(cuitForzado) && cuitForzado > 0;
     setBloquearBusquedaPorCuit(hasCuitForzado);
@@ -174,6 +154,24 @@ export default function UsuariosPage() {
       seleccionAutomaticaRef.current = true;
     }
   }, [cuitForzado, empresas, isLoadingEmpresas]);
+
+  const empresaSeleccionadaEsValida = useMemo(() => {
+    if (empresaSeleccionada == null) return false;
+    return opcionesEmpresaSelector.some(
+      (o) => o.empresaId === empresaSeleccionada.empresaId
+    );
+  }, [empresaSeleccionada, opcionesEmpresaSelector]);
+
+  useEffect(() => {
+    if (bloquearBusquedaPorCuit) return;
+    if (isLoadingEmpresas) return;
+    if (empresas.length === 0) return;
+    if (empresaSeleccionadaEsValida) return;
+
+    if (empresas.length === 1) setEmpresaSeleccionada(empresas[0]);
+    else setEmpresaSeleccionada(EMPRESA_OPCION_TODAS);
+    seleccionAutomaticaRef.current = true;
+  }, [bloquearBusquedaPorCuit, isLoadingEmpresas, empresas, empresaSeleccionadaEsValida]);
 
   const handleEmpresaChange = (_event: React.SyntheticEvent, newValue: Empresa | null) => {
     if (bloquearBusquedaPorCuit) return;
