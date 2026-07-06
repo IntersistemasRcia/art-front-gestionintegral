@@ -101,7 +101,7 @@ jobs:
 
           # Mirror current deployment to temp excluding backups and large folders
           $robolog = Join-Path (Get-Location) ("robocopy_backup_$timestamp.log")
-          robocopy $DEPLOY_DIR $temp /MIR /XD .git .github\workflows node_modules backups /LOG:$robolog /TEE
+          robocopy $DEPLOY_DIR $temp /MIR /XD .git .github\workflows node_modules backups certificados /LOG:$robolog /TEE
           $rc = $LASTEXITCODE
           # robocopy exit codes: 0=no files copied, 1=some files copied, 2=some files mismatched, 3=some files copied and mismatched
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
@@ -132,7 +132,7 @@ jobs:
           # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
           # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
           $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'          
-          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config /LOG:$robolog2 /TEE
+          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github certificados /XF .env .env.local .env.production .env.production.local web.config /LOG:$robolog2 /TEE
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
