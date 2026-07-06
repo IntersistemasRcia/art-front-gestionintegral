@@ -132,7 +132,7 @@ jobs:
           # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
           # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
           $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'          
-          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
+          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config /LOG:$robolog2 /TEE
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
