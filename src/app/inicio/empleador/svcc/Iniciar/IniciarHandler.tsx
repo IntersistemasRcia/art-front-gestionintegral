@@ -6,20 +6,25 @@ import { Grid, Typography } from "@mui/material";
 import Formato from "@/utils/Formato";
 import SvccAPI from "@/data/svccAPI";
 import type { PresentacionCreateDTO, PresentacionDTO, PresentacionUltimaDTO } from "@/data/svccAPI";
+import { useEmpresasStore } from "@/data/empresasStore";
+import { useParametrosEntidadesStore } from "@/data/ParametrosEntidadesStore";
+import { getParametroEntidadNumero } from "@/utils/parametrosEntidadesUtils";
 import {
   copyPortadaYAnexoVFromOrigen,
   copyNominasToPresentacion,
   fetchTrabajadoresByPresentacionId,
 } from "@/utils/svcc/copyPresentacionDetalle";
 import {
+  buildIniciarPresentacionForm,
   canIniciarNuevaPresentacion,
-  presentacionUltimaFormFromUltima,
   presentacionUltimaFormToCreate,
 } from "@/utils/svcc/presentacionUtils";
 import { IniciarPresentacionForm } from "./IniciarPresentacionForm";
 
 export default function IniciarHandler() {
   const { ultima, nueva, empresaCUIT, presentacion } = useSVCCPresentacionContext();
+  const { empresas } = useEmpresasStore();
+  const { parametrosEntidades } = useParametrosEntidadesStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState<PresentacionUltimaDTO | null>(null);
   const [isCopyingDetalle, setIsCopyingDetalle] = useState(false);
@@ -35,10 +40,29 @@ export default function IniciarHandler() {
   );
   const disabled = isWorking || !puedeIniciarNueva;
 
+  const empresaSeleccionada = useMemo(
+    () =>
+      empresaCUIT == null
+        ? null
+        : empresas.find((empresa) => Number(empresa.cuit) === empresaCUIT) ?? null,
+    [empresaCUIT, empresas],
+  );
+
   const handleOpenModal = () => {
     if (empresaCUIT == null) return;
     setCopyDetalleError(null);
-    setFormData(presentacionUltimaFormFromUltima(ultima.data, empresaCUIT));
+    const idProgramaMuestraParam = getParametroEntidadNumero(
+      parametrosEntidades,
+      "IdProgramaMuestra",
+    );
+    setFormData(
+      buildIniciarPresentacionForm({
+        ultima: ultima.data,
+        empleadorCUIT: empresaCUIT,
+        empresa: empresaSeleccionada,
+        idProgramaMuestraParam,
+      }),
+    );
     setModalOpen(true);
   };
 

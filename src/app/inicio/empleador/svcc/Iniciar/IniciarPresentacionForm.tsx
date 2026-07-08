@@ -13,10 +13,6 @@ function formatFecha(value?: string): string {
 }
 
 export function IniciarPresentacionForm({ data, onChange }: IniciarPresentacionFormProps) {
-  const numberOnChange = (field: keyof PresentacionUltimaDTO) =>
-    ({ target: { value } }: React.ChangeEvent<HTMLInputElement>) =>
-      onChange({ [field]: value === "" ? 0 : Number(value) });
-
   return (
     <Grid container spacing={2}>
       <Grid size={12}>
@@ -58,7 +54,7 @@ export function IniciarPresentacionForm({ data, onChange }: IniciarPresentacionF
           label="Número de póliza"
           type="number"
           value={data.numeroDePoliza ?? ""}
-          onChange={numberOnChange("numeroDePoliza")}
+          disabled
           fullWidth
         />
       </Grid>
@@ -67,7 +63,7 @@ export function IniciarPresentacionForm({ data, onChange }: IniciarPresentacionF
           label="ID motivo"
           type="number"
           value={data.idMotivo ?? ""}
-          onChange={numberOnChange("idMotivo")}
+          disabled
           fullWidth
         />
       </Grid>
@@ -76,7 +72,7 @@ export function IniciarPresentacionForm({ data, onChange }: IniciarPresentacionF
           label="ID programa muestra"
           type="number"
           value={data.idProgramaMuestra ?? ""}
-          onChange={numberOnChange("idProgramaMuestra")}
+          disabled
           fullWidth
         />
       </Grid>
@@ -85,7 +81,7 @@ export function IniciarPresentacionForm({ data, onChange }: IniciarPresentacionF
           label="Versión"
           type="number"
           value={data.version ?? ""}
-          onChange={numberOnChange("version")}
+          disabled
           fullWidth
         />
       </Grid>
