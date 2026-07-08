@@ -11,12 +11,6 @@ function toDateOnly(value?: string): string | undefined {
   return value.slice(0, 10);
 }
 
-function toIsoDateTime(value?: string): string | undefined {
-  const dateOnly = toDateOnly(value);
-  if (!dateOnly) return undefined;
-  return `${dateOnly}T00:00:00.000Z`;
-}
-
 /** Mapea examen médico del GET al modelo editable del formulario. */
 function normalizeExamenFromApi(examen: ExamenMedicoDTO): ExamenMedicoDTO {
   return {
@@ -109,7 +103,7 @@ export function toTrabajadorUpdatePayload(data: TrabajadorDTO): TrabajadorBaseDT
   return {
     cuil: data.cuil,
     idEstablecimientoEmpresa: data.idEstablecimientoEmpresa,
-    fechaIngreso: toIsoDateTime(data.fechaIngreso),
+    fechaIngreso: toDateOnly(data.fechaIngreso),
     actividades: (data.actividades ?? []).map(toActividadUpdatePayload),
   };
 }
