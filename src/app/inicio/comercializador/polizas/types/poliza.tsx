@@ -28,8 +28,9 @@ export type SRTPolizaAcotada = {
     comercializadorTelefono: string;
     comercializadorMovil: string;
     comercializadorReferenteRazonSocial: string;
-    srtComercializadorAsociadoInterno: number;
-    srtComercializadorAsociadoDescripcion: string;
+    srtComercializadorAsociadoInterno: number | null;
+    srtComercializadorAsociadoDescripcion: string | null;
+    srtComercializadorAsociadoTipo?: string | null;
 }
 
 export type ParametersComercializador = {
