@@ -65,6 +65,8 @@ export interface Empresa {
   provincia: string;
   polizaNro?: number;
   poliza?: number;
+  /** Número de póliza vigente del empleador; unificado desde `polizaNro`/`poliza` del API. */
+  numeroDePoliza?: number;
 }
 
 export type EnviarCorreoAttachment = {

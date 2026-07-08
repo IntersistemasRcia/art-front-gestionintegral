@@ -4,6 +4,7 @@ interface RefEmpleador {
   nombre1: string;
   nombre2: string;
   razonSocial: string;
+  polizaNro?: number;
   cantidadUsuariosMaxima?: number;
   cantidadUsuarios?: number;
       // Add other fields if needed
