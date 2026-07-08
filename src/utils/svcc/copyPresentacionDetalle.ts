@@ -6,9 +6,12 @@ import SvccAPI, {
   type Pagination,
   type SustanciaCreateDTO,
   type SustanciaDTO,
-  type TrabajadorCreateDTO,
   type TrabajadorDTO,
 } from "@/data/svccAPI";
+import {
+  normalizeTrabajadorFromApi,
+  toTrabajadorCreatePayload,
+} from "@/utils/svcc/trabajadorPayloadUtils";
 
 const COPY_PAGE_SIZE = 200;
 
@@ -162,14 +165,8 @@ function toSustanciaCreate(
   };
 }
 
-function toTrabajadorCreatePayload(row: TrabajadorDTO, presentacionId: number): TrabajadorCreateDTO {
-  const clone = stripCloneFields(row);
-  return {
-    presentacionId,
-    cuil: clone.cuil,
-    idEstablecimientoEmpresa: clone.idEstablecimientoEmpresa,
-    fechaIngreso: clone.fechaIngreso,
-  };
+function toTrabajadorCreatePayloadFromClone(row: TrabajadorDTO, presentacionId: number) {
+  return toTrabajadorCreatePayload(normalizeTrabajadorFromApi(stripCloneFields(row)), presentacionId);
 }
 
 async function copyEmpresasTercerizadas(origenId: number, nuevoId: number): Promise<void> {
@@ -248,7 +245,7 @@ export async function copyNominasToPresentacion(
   if (presentacionNuevaInterno <= 0 || trabajadoresOrigen.length === 0) return;
 
   for (const row of trabajadoresOrigen) {
-    await SvccAPI.svccTrabajadorCreate(toTrabajadorCreatePayload(row, presentacionNuevaInterno));
+    await SvccAPI.svccTrabajadorCreate(toTrabajadorCreatePayloadFromClone(row, presentacionNuevaInterno));
   }
 }
 

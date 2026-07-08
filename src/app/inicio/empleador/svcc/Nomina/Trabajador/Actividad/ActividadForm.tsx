@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Checkbox, FormControlLabel, Grid, IconButton, InputAdornment, TextField, Tooltip, Typography } from "@mui/material";
+import { Card, Checkbox, CircularProgress, FormControlLabel, Grid, IconButton, InputAdornment, TextField, Tooltip, Typography } from "@mui/material";
 import { MoreHoriz } from "@mui/icons-material";
 import { ActividadDTO, ExamenMedicoDTO } from "@/data/gestionEmpleadorAPI";
 import { Form, FormProps } from "@/utils/ui/form/Form";
@@ -32,7 +32,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
 }) => {
   const [editExamenMedico, setEditExamenMedico] = useState<EditState<ExamenMedicoDTO>>({ data: {} });
 
-  const { establecimientoDeclarado } = useTrabajadorContext();
+  const { establecimientoDeclarado, idEstablecimientoEmpresa } = useTrabajadorContext();
   const puestos = establecimientoDeclarado.data?.puestos ?? [];
   const puesto = puestos.find((p) => p.interno === data.puestoInterno);
 
@@ -47,6 +47,28 @@ export const ActividadForm: Form<ActividadDTO> = ({
   const sustancia = sustancias.data.find((s) => s.interno === data.sustanciaInterno);
 
   const [lookupSustancia, setLookupSustancia] = useState<boolean>(false);
+
+  const isExamenesDisabled = disabled.examenesMedicos != null;
+  const isDeclaradoLoading =
+    establecimientoDeclarado.isLoading || establecimientoDeclarado.isValidating;
+  const hasEstablecimientoEmpresa = (idEstablecimientoEmpresa ?? 0) > 0;
+  const hasDeclarado = Boolean(establecimientoDeclarado.data);
+  const canLookupDeclarado = hasEstablecimientoEmpresa && hasDeclarado && !isDeclaradoLoading;
+  const canLookupSustancia = !sustancias.isLoading && !sustancias.isValidating;
+
+  const lookupDeclaradoTooltip = !hasEstablecimientoEmpresa
+    ? "Seleccione primero el establecimiento del trabajador"
+    : isDeclaradoLoading
+      ? "Cargando establecimiento declarado..."
+      : !hasDeclarado
+        ? "No se encontró establecimiento declarado para la empresa seleccionada"
+        : "Buscar";
+
+  const lookupSustanciaTooltip = !canLookupSustancia
+    ? "Cargando sustancias declaradas..."
+    : sustancias.data.length === 0
+      ? "No hay sustancias declaradas en la presentación"
+      : "Buscar sustancia declarada";
 
   return (
     <Grid container size={12} spacing={2} maxHeight="fit-content">
@@ -66,7 +88,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
               endAdornment: (
                 <InputAdornment position="end">
                   <Tooltip
-                    title="Buscar puesto declarado"
+                    title={lookupDeclaradoTooltip}
                     arrow
                     slotProps={tooltip_SlotProps}
                   >
@@ -74,7 +96,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
                       <IconButton
                         color="primary"
                         size="large"
-                        disabled={disabled.puestoInterno}
+                        disabled={disabled.puestoInterno || !canLookupDeclarado}
                         onClick={() => setLookupPuesto(true)}
                       >
                         <MoreHoriz />
@@ -105,14 +127,25 @@ export const ActividadForm: Form<ActividadDTO> = ({
         >
           <Grid container spacing={2} justifyContent="center" minHeight="500px">
             <Grid size={12}>
-              <PuestoBrowse
-                isLoading={establecimientoDeclarado.isLoading || establecimientoDeclarado.isValidating}
-                data={{ data: puestos }}
-                onSelect={(select) => () => {
-                  onChange({ puestoInterno: select.interno });
-                  setLookupPuesto(false);
-                }}
-              />
+              {isDeclaradoLoading ? (
+                <Grid container justifyContent="center" padding={4}>
+                  <CircularProgress />
+                </Grid>
+              ) : puestos.length === 0 ? (
+                <Typography color="text.secondary" textAlign="center">
+                  No hay puestos declarados para el establecimiento seleccionado.
+                </Typography>
+              ) : (
+                <PuestoBrowse
+                  key={`puesto-lookup-${puestos.length}-${idEstablecimientoEmpresa ?? 0}`}
+                  isLoading={false}
+                  data={{ data: puestos }}
+                  onSelect={(select) => () => {
+                    onChange({ puestoInterno: select.interno });
+                    setLookupPuesto(false);
+                  }}
+                />
+              )}
             </Grid>
           </Grid>
         </CustomModal>
@@ -141,7 +174,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
               endAdornment: (
                 <InputAdornment position="end">
                   <Tooltip
-                    title="Buscar sector declarado"
+                    title={lookupDeclaradoTooltip}
                     arrow
                     slotProps={tooltip_SlotProps}
                   >
@@ -149,7 +182,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
                       <IconButton
                         color="primary"
                         size="large"
-                        disabled={disabled.sectorInterno}
+                        disabled={disabled.sectorInterno || !canLookupDeclarado}
                         onClick={() => setLookupSector(true)}
                       >
                         <MoreHoriz />
@@ -180,14 +213,25 @@ export const ActividadForm: Form<ActividadDTO> = ({
         >
           <Grid container spacing={2} justifyContent="center" minHeight="500px">
             <Grid size={12}>
-              <SectorBrowse
-                isLoading={establecimientoDeclarado.isLoading || establecimientoDeclarado.isValidating}
-                data={{ data: sectores }}
-                onSelect={(select) => () => {
-                  onChange({ sectorInterno: select.interno });
-                  setLookupSector(false);
-                }}
-              />
+              {isDeclaradoLoading ? (
+                <Grid container justifyContent="center" padding={4}>
+                  <CircularProgress />
+                </Grid>
+              ) : sectores.length === 0 ? (
+                <Typography color="text.secondary" textAlign="center">
+                  No hay sectores declarados para el establecimiento seleccionado.
+                </Typography>
+              ) : (
+                <SectorBrowse
+                  key={`sector-lookup-${sectores.length}-${idEstablecimientoEmpresa ?? 0}`}
+                  isLoading={false}
+                  data={{ data: sectores }}
+                  onSelect={(select) => () => {
+                    onChange({ sectorInterno: select.interno });
+                    setLookupSector(false);
+                  }}
+                />
+              )}
             </Grid>
           </Grid>
         </CustomModal>
@@ -200,7 +244,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
           fullWidth
         />
       </Grid>
-      <Grid size={3}>
+      <Grid size={3}> 
         <TextField
           name="sustanciaInterno"
           type="number"
@@ -216,7 +260,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
               endAdornment: (
                 <InputAdornment position="end">
                   <Tooltip
-                    title="Buscar sustancia declarada"
+                    title={lookupSustanciaTooltip}
                     arrow
                     slotProps={tooltip_SlotProps}
                   >
@@ -224,7 +268,7 @@ export const ActividadForm: Form<ActividadDTO> = ({
                       <IconButton
                         color="primary"
                         size="large"
-                        disabled={disabled.sustanciaInterno}
+                        disabled={disabled.sustanciaInterno || !canLookupSustancia || sustancias.data.length === 0}
                         onClick={() => setLookupSustancia(true)}
                       >
                         <MoreHoriz />
@@ -255,14 +299,25 @@ export const ActividadForm: Form<ActividadDTO> = ({
         >
           <Grid container spacing={2} justifyContent="center" minHeight="500px">
             <Grid size={12}>
-              <SustanciaBrowse
-                isLoading={sustancias.isLoading || sustancias.isValidating}
-                data={{ data: sustancias.data }}
-                onSelect={(select) => () => {
-                  onChange({ sustanciaInterno: select.interno });
-                  setLookupSustancia(false);
-                }}
-              />
+              {!canLookupSustancia ? (
+                <Grid container justifyContent="center" padding={4}>
+                  <CircularProgress />
+                </Grid>
+              ) : sustancias.data.length === 0 ? (
+                <Typography color="text.secondary" textAlign="center">
+                  No hay sustancias declaradas en la presentación.
+                </Typography>
+              ) : (
+                <SustanciaBrowse
+                  key={`sustancia-lookup-${sustancias.data.length}`}
+                  isLoading={false}
+                  data={{ data: sustancias.data }}
+                  onSelect={(select) => () => {
+                    onChange({ sustanciaInterno: select.interno });
+                    setLookupSustancia(false);
+                  }}
+                />
+              )}
             </Grid>
           </Grid>
         </CustomModal>
@@ -324,11 +379,11 @@ export const ActividadForm: Form<ActividadDTO> = ({
             <Grid size={12}><Typography fontWeight={700} color="#45661f" fontSize="smaller">Exámenes médicos</Typography></Grid>
             <Grid size={12}>
               <ExamenMedicoBrowse
-                data={{ data: data.examenesMedicos as ExamenMedicoDTO[] ?? [] }}
-                onCreate={disabled.examenesMedicos ? undefined : () => onExamenMedicoAction("create")}
-                onRead={(data, index) => () => onExamenMedicoAction("read", data, index)}
-                onUpdate={disabled.examenesMedicos ? undefined : (data, index) => () => onExamenMedicoAction("update", data, index)}
-                onDelete={disabled.examenesMedicos ? undefined : (data, index) => () => onExamenMedicoAction("delete", data, index)}
+                data={{ data: (data.examenesMedicos ?? []) as ExamenMedicoDTO[] }}
+                onCreate={isExamenesDisabled ? undefined : () => onExamenMedicoAction("create")}
+                onRead={(row, index) => () => onExamenMedicoAction("read", row, index)}
+                onUpdate={isExamenesDisabled ? undefined : (row, index) => () => onExamenMedicoAction("update", row, index)}
+                onDelete={isExamenesDisabled ? undefined : (row, index) => () => onExamenMedicoAction("delete", row, index)}
               />
               <CustomModal
                 open={!!editExamenMedico.action}
