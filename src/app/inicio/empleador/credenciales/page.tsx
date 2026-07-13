@@ -69,7 +69,7 @@ function CredencialesPage() {
           CUIL: selectedEmpresaCUIT,
           PageIndex,
           PageSize,
-          Perido: Number(getPeriodo()),
+          Periodos: Number(getPeriodo()),
         });
 
         if (canceled) return;
