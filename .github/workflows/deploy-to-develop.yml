@@ -35,6 +35,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Resolve target env file
+        shell: powershell
+        run: |
+          $selectedEnv = 'development'
+          
+          if ($selectedEnv -notin @('development', 'test', 'production')) {
+            throw "Invalid target_env '$selectedEnv'. Allowed values: development, test, production"
+          }
+
+          $sourceEnvFile = ".env.$selectedEnv"
+          if (-not (Test-Path $sourceEnvFile)) {
+            throw "Environment file not found: $sourceEnvFile"
+          }
+
+          Copy-Item $sourceEnvFile .env.production -Force
+          Write-Host "Using $sourceEnvFile for build (.env.production generated)."
+
       # - name: Notify Teams - Start
       #   if: ${{ env.TEAMS_WEBHOOK_URL != '' }}
       #   shell: powershell
