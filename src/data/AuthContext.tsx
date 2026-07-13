@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react';
 import { useRolesLoader } from '@/data/useRolesLoader';
 import { useAccesosRapidosLoader } from '@/data/useAccesosRapidosLoader';
 import { useEmpresasLoader } from '@/data/useEmpresasLoader';
+import { useParametrosEntidadesLoader } from '@/data/useParametrosEntidadesLoader';
 
 interface AuthContextType {
     session: any;
@@ -22,6 +23,7 @@ const SessionBootstrap = () => {
     useRolesLoader();
     useAccesosRapidosLoader();
     useEmpresasLoader();
+    useParametrosEntidadesLoader();
     return null;
 };
 

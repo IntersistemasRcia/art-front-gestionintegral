@@ -23,8 +23,11 @@ import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useSearchParams } from "next/navigation";
 import { applySRTPolizasVerIndependientes } from "@/utils/srtPolizasParams";
+import dayjs from "dayjs";
 
 const { useGetPoliza } = SrtAPI;
+
+const getPeriodos = (): number[] => Array.from({ length: 3 }, (_, i) => Number(dayjs().subtract(i, "month").format("YYYYMM")));
 
 export default function CoberturaPage() {
     const { user } = useAuth();
@@ -64,11 +67,13 @@ export default function CoberturaPage() {
     const [msgText, setMsgText] = useState<string>('');
     const [msgType, setMsgType] = useState<MessageType>('warning');
     const [msgTitle, setMsgTitle] = useState<string | undefined>(undefined);
+    const [msgSecondary, setMsgSecondary] = useState<string | undefined>(undefined);
 
-    const showMessage = useCallback((message: string, type: MessageType = 'warning', title?: string) => {
+    const showMessage = useCallback((message: string, type: MessageType = 'warning', title?: string, secondaryMessage?: string) => {
         setMsgText(message);
         setMsgType(type);
         setMsgTitle(title);
+        setMsgSecondary(secondaryMessage);
         setMsgOpen(true);
     }, []);
 
@@ -153,15 +158,25 @@ export default function CoberturaPage() {
     const [newCuil, setNewCuil] = useState<number | null>(null); 
     const [newNombre, setNewNombre] = useState<string>('');
 
-    const handleDownload = () => {
+    const puedeDescargarCertificado = personalCubierto.length > 0 && !!presentadoA.trim();
+
+    const handleDownloadClick = () => {
         if (isDownloading) return;
 
-        // Si no hay destinatario, poner foco en el campo "Para ser presentado a"
-        if (!presentadoA?.trim()) {
-            inputReference.current?.focus();
+        const faltantes: string[] = [];
+        if (personalCubierto.length === 0) faltantes.push('Debe existir al menos un trabajador cubierto.');
+        if (!presentadoA.trim()) faltantes.push('Debe completar el campo "Para ser presentado a".');
+
+        if (faltantes.length > 0) {
+            showMessage(faltantes[0], 'error', 'Faltan completar datos', faltantes[1]);
+            if (!presentadoA.trim()) inputReference.current?.focus();
             return;
         }
 
+        handleDownload();
+    };
+
+    const handleDownload = () => {
         const now = new Date();
         setDia(now.toLocaleDateString('es-AR'));
         setHora(now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }));
@@ -194,7 +209,7 @@ export default function CoberturaPage() {
         (async () => {
             try {
                 setIsPersonalLoading(true);
-                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, PageSize: 99999 });
+                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, PageSize: 99999, Periodos: getPeriodos() });
                 const arr = Array.isArray(raw) ? raw : (raw?.DATA ?? raw?.data ?? []);
                 const personas: Persona[] = (arr as unknown[])
                     .map((x) => {
@@ -603,18 +618,6 @@ export default function CoberturaPage() {
                 <>
             {/* -------------------- SECCIÓN DE CERTIFICADO DE COBERTURA -------------------- */}
             
-            <div className={styles.downloadButtonContainer}>
-                <CustomButton 
-                    onClick={handleDownload}
-                    variant="contained"
-                    color="primary"
-                    icon={isDownloading ? <CircularProgress size={18} color="inherit" /> : <BsDownload />}
-                    size="large"
-                    disabled={isDownloading}
-                >
-                    DESCARGAR CERTIFICADO DE COBERTURA
-                </CustomButton>
-            </div>
             <div className={styles.certificadoContainer}>
                 {/* Contenido del Certificado */}
                 <div className={styles.lugarFecha}>
@@ -712,6 +715,19 @@ export default function CoberturaPage() {
                     </div>
                 </div>
             </div>
+            <div className={styles.downloadButtonContainer}>
+                <span onClick={handleDownloadClick}>
+                    <CustomButton
+                        variant="contained"
+                        color="primary"
+                        icon={isDownloading ? <CircularProgress size={18} color="inherit" /> : <BsDownload />}
+                        size="large"
+                        disabled={isDownloading || !puedeDescargarCertificado}
+                    >
+                        DESCARGAR CERTIFICADO DE COBERTURA
+                    </CustomButton>
+                </span>
+            </div>
             <div>
                 {abrirPDF && presentadoA != "" ? (
                <Cobertura_PDF
@@ -738,6 +754,7 @@ export default function CoberturaPage() {
                         message={msgText}
                         type={msgType}
                         title={msgTitle}
+                        secondaryMessage={msgSecondary}
                 />
                 </div>
     );

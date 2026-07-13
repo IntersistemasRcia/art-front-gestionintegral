@@ -20,7 +20,7 @@ type EditState<T extends object> = Omit<FormProps<T>, "onChange"> & {
   index?: number,
   message?: string;
 };
-
+ 
 const tooltip_SlotProps = { tooltip: { sx: { fontSize: "1.2rem", fontWeight: 500 } } };
 const date_SlotProps = { inputLabel: { shrink: true } };
 const Contextualized: Form<TrabajadorDTO> = ({
@@ -147,7 +147,7 @@ const Contextualized: Form<TrabajadorDTO> = ({
             <Grid size={12}><Typography fontWeight={700} color="#45661f" fontSize="smaller">Actividades</Typography></Grid>
             <Grid size={12}>
               <ActividadBrowse
-                data={{ data: data.actividades as ActividadDTO[] ?? [] }}
+                data={{ data: (data.actividades ?? []) as ActividadDTO[] }}
                 onCreate={disabled.actividades ? undefined : () => onActividadAction("create")}
                 onRead={(data, index) => () => onActividadAction("read", data, index)}
                 onUpdate={disabled.actividades ? undefined : (data, index) => () => onActividadAction("update", data, index)}
@@ -287,7 +287,7 @@ const Contextualized: Form<TrabajadorDTO> = ({
     setEditActividad({
       action,
       index,
-      data: data ? JSON.parse(JSON.stringify(data)) : {},
+      data: data ? JSON.parse(JSON.stringify(data)) : { examenesMedicos: [] },
       disabled: ["read", "delete"].includes(action)
         ? {
           interno: true,

@@ -849,5 +849,5 @@ export type ParametersEmpleadorT = {
   CUIL?: number;
   PageIndex?: number;
   PageSize?: number;
-  Perido?: number;
+  Periodos?: number[];
 };

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import SvccAPI from "@/data/svccAPI";
 import type {
-  TrabajadorBaseDTO,
-  TrabajadorCreateDTO,
   TrabajadorDTO,
   SVCCTrabajadorDeleteParams,
   SVCCTrabajadorUpdateParams,
@@ -16,6 +14,11 @@ import { Grid, Typography } from "@mui/material";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import TrabajadorForm from "./TrabajadorForm";
+import {
+  normalizeTrabajadorFromApi,
+  toTrabajadorCreatePayload,
+  toTrabajadorUpdatePayload,
+} from "@/utils/svcc/trabajadorPayloadUtils";
 
 const {
   useSVCCTrabajadorList,
@@ -146,7 +149,9 @@ export default function NominaHandler() {
   function handleEditOnConfirm() {
     switch (edit.action) {
       case "create": {
-        triggerCreate({ presentacionId: presentacionActiva?.interno ?? 0, ...edit.data } as TrabajadorCreateDTO)
+        triggerCreate(
+          toTrabajadorCreatePayload(edit.data as TrabajadorDTO, presentacionActiva?.interno ?? 0),
+        )
           .then((data) => {
             console.info(data);
             handleEditOnClose();
@@ -157,7 +162,7 @@ export default function NominaHandler() {
         break;
       }
       case "update": {
-        triggerUpdate(edit.data as TrabajadorBaseDTO)
+        triggerUpdate(toTrabajadorUpdatePayload(edit.data as TrabajadorDTO))
           .then((data) => {
             console.info(data);
             handleEditOnClose();
@@ -197,7 +202,7 @@ export default function NominaHandler() {
     }
     setEdit({
       action,
-      data: data ? JSON.parse(JSON.stringify(data)) : {},
+      data: data ? normalizeTrabajadorFromApi(JSON.parse(JSON.stringify(data))) : { actividades: [] },
       disabled: ["read", "delete"].includes(action)
         ? {
           interno: true,

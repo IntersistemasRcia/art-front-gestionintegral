@@ -189,9 +189,19 @@ export function SVCCPresentacionContextProvider({
     ultima.mutate();
   }});
 
+  // Al seleccionar una presentación de la tabla principal, los establecimientos
+  // deben corresponder al empleador de ese registro (GET /api/Establecimientos/Empresa/{CUIT}).
+  // Fallback al CUIT de la empresa del combo (caso empresa puntual sin selección aún).
+  const establecimientoCuit = useMemo(() => {
+    const cuitSeleccionado = Number(presentacionInfo.selected?.empleadorCuit ?? 0);
+    if (Number.isFinite(cuitSeleccionado) && cuitSeleccionado > 0) return cuitSeleccionado;
+    const cuitAcciones = Number(empresaCUITParaAcciones ?? 0);
+    return Number.isFinite(cuitAcciones) && cuitAcciones > 0 ? cuitAcciones : 0;
+  }, [presentacionInfo.selected?.empleadorCuit, empresaCUITParaAcciones]);
+
   const establecimientoList = useEstablecimientoList(
-    empresaCUITParaAcciones && empresaCUITParaAcciones !== 0
-      ? { cuit: empresaCUITParaAcciones }
+    establecimientoCuit > 0
+      ? { cuit: establecimientoCuit }
       : undefined,
     { revalidateOnFocus: false }
   );

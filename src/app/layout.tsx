@@ -1,4 +1,5 @@
 // src/app/layout.tsx
+import type { Viewport } from 'next';
 import Providers from './Providers';
 import "./normalize.css";
 import "@/styles/globals.css";
@@ -9,6 +10,11 @@ export const metadata = {
   other: {
     google: "notranslate",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

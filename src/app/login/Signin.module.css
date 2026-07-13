@@ -159,3 +159,99 @@
   font-size: 1.2rem;
 }
 
+/* Responsive (celular/tablet): una sola card = branding (izquierda) + formulario */
+@media (max-width: 1024px) {
+  .loginContainer {
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    height: auto;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  /* El contenedor pasa a ser la "card única" con un solo borde */
+  .leftCard,
+  .rightCard {
+    width: 100%;
+    max-width: 480px;
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 0;
+    box-sizing: border-box;
+  }
+
+  /* Wrapper visual: una única card que envuelve branding + formulario */
+  .loginContainer > .leftCard {
+    border: 2px solid var(--verde);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .loginContainer > .rightCard {
+    border: 2px solid var(--verde);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+  }
+
+  /* Branding arriba (card izquierda), compacto */
+  .leftCard {
+    padding: 20px 20px 12px;
+    margin-bottom: 0;
+  }
+
+  .centeredBlock {
+    margin: 0 0 8px;
+  }
+
+  .mainTitle {
+    font-size: clamp(22px, 6vw, 34px);
+    padding-left: 0;
+    text-align: center;
+  }
+
+  .titleUnderline {
+    width: 40%;
+    margin: -6px auto 0;
+    justify-self: center;
+  }
+
+  .logoBlock {
+    margin-bottom: 0;
+  }
+
+  /* El logo escala con el ancho de pantalla */
+  .logo {
+    width: clamp(120px, 40vw, 220px);
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Ocultamos el footer de branding para priorizar el formulario */
+  .footerArea {
+    display: none;
+  }
+
+  /* Formulario abajo */
+  .rightCard {
+    padding: 20px 16px;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* El logo chico es redundante con el branding de arriba */
+  .smallLogoWrap {
+    display: none;
+  }
+
+  .rightCardContent {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .formTitle {
+    font-size: 30px;
+    margin-bottom: 20px;
+  }
+}
+

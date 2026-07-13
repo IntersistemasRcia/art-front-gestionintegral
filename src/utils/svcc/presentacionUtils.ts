@@ -1,4 +1,5 @@
 import type { PresentacionCreateDTO, PresentacionUltimaDTO } from "@/data/svccAPI";
+import type { Empresa } from "@/data/authAPI";
 
 export function clonePresentacionUltima(ultima: PresentacionUltimaDTO): PresentacionUltimaDTO {
   return { ...ultima };
@@ -13,7 +14,7 @@ export function emptyPresentacionUltimaForm(empleadorCUIT: number, empleadorRazo
     numeroDePoliza: 0,
     idMotivo: 1,
     idProgramaMuestra: 0,
-    version: 0,
+    version: 1,
     presentacionFecha: "",
     consolidacionFecha: "",
     observaciones: "",
@@ -29,6 +30,32 @@ export function presentacionUltimaFormFromUltima(
 ): PresentacionUltimaDTO {
   if (ultima != null) return clonePresentacionUltima(ultima);
   return emptyPresentacionUltimaForm(empleadorCUIT);
+}
+
+type BuildIniciarPresentacionFormOptions = {
+  ultima?: PresentacionUltimaDTO | null;
+  empleadorCUIT: number;
+  empresa?: Empresa | null;
+  idProgramaMuestraParam?: number;
+};
+
+/** Arma el formulario de nueva presentación con campos bloqueados pre-cargados. */
+export function buildIniciarPresentacionForm({
+  ultima,
+  empleadorCUIT,
+  empresa,
+  idProgramaMuestraParam,
+}: BuildIniciarPresentacionFormOptions): PresentacionUltimaDTO {
+  const base = presentacionUltimaFormFromUltima(ultima, empleadorCUIT);
+
+  return {
+    ...base,
+    empleadorRazonSocial: base.empleadorRazonSocial || empresa?.razonSocial || "",
+    numeroDePoliza: Number(empresa?.numeroDePoliza ?? 0) || 0,
+    idProgramaMuestra: Number(idProgramaMuestraParam ?? 0) || 0,
+    version: 1,
+    observaciones: "",
+  };
 }
 
 export function presentacionUltimaFormToCreate(

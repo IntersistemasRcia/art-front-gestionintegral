@@ -94,7 +94,7 @@ export const useEmpresasLoader = () => {
         }
 
         if (isAdministradorEmpleadorOrChild(userRole, roles)) {
-          const resolvedEmpresas = empresasAuth || [];
+          const resolvedEmpresas = mapAuthEmpresasConNumeroDePoliza(empresasAuth || []);
           setEmpresas(resolvedEmpresas);
           hasLoadedRef.current = true;
           if (resolvedEmpresas.length === 0) {
@@ -115,7 +115,7 @@ export const useEmpresasLoader = () => {
           return;
         }
 
-        setEmpresas(empresasAuth || []);
+        setEmpresas(mapAuthEmpresasConNumeroDePoliza(empresasAuth || []));
         hasLoadedRef.current = true;
       } catch (error) {
         console.error("Error al cargar empresas:", error);
@@ -150,16 +150,44 @@ async function loadAllEmpresasFromRef(): Promise<Empresa[]> {
 }
 
 function mapRefEmpleadoresToEmpresas(
-  empresasRef: { interno: number; cuit: number; razonSocial?: string }[]
+  empresasRef: { interno: number; cuit: number; razonSocial?: string; polizaNro?: number }[]
 ): Empresa[] {
-  return empresasRef.map((empresa) => ({
-    empresaId: Number(empresa.interno),
-    cuit: Number(empresa.cuit),
-    razonSocial: String(empresa.razonSocial ?? ""),
-    domicilio: "",
-    localidad: "",
-    provincia: "",
-  }));
+  return empresasRef.map((empresa) =>
+    normalizeEmpresaPoliza({
+      empresaId: Number(empresa.interno),
+      cuit: Number(empresa.cuit),
+      razonSocial: String(empresa.razonSocial ?? ""),
+      domicilio: "",
+      localidad: "",
+      provincia: "",
+      polizaNro: empresa.polizaNro,
+    }),
+  );
+}
+
+/** Normaliza el número de póliza al campo `numeroDePoliza` cuando la respuesta lo provee. */
+function resolveNumeroDePoliza(...candidatos: Array<number | undefined>): number | undefined {
+  for (const candidato of candidatos) {
+    const numero = Number(candidato);
+    if (Number.isFinite(numero) && numero > 0) return numero;
+  }
+  return undefined;
+}
+
+/** Unifica `polizaNro`/`poliza` del API en `numeroDePoliza` del store. */
+function normalizeEmpresaPoliza(empresa: Empresa): Empresa {
+  return {
+    ...empresa,
+    numeroDePoliza: resolveNumeroDePoliza(
+      empresa.numeroDePoliza,
+      empresa.polizaNro,
+      empresa.poliza,
+    ),
+  };
+}
+
+function mapAuthEmpresasConNumeroDePoliza(empresas: Empresa[]): Empresa[] {
+  return empresas.map(normalizeEmpresaPoliza);
 }
 
 function mapPolizasUsuarioLogueadoToEmpresas(
@@ -180,14 +208,17 @@ function mapPolizasUsuarioLogueadoToEmpresas(
       continue;
     }
     seen.add(key);
-    empresas.push({
-      empresaId,
-      cuit,
-      razonSocial: String(poliza.empleadorDenominacion ?? ""),
-      domicilio: "",
-      localidad: "",
-      provincia: "",
-    });
+    empresas.push(
+      normalizeEmpresaPoliza({
+        empresaId,
+        cuit,
+        razonSocial: String(poliza.empleadorDenominacion ?? ""),
+        domicilio: "",
+        localidad: "",
+        provincia: "",
+        numeroDePoliza: resolveNumeroDePoliza(Number(poliza.numero)),
+      }),
+    );
   }
 
   return empresas;
