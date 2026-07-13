@@ -72,6 +72,7 @@ export function toURLSearch(o: any, execute = false): URLSearchParams | undefine
     }
   }
   function load(k: string, v: any) {
+    if (Array.isArray(v)) return v.forEach(item => load(k, item));
     v = value(v);
     if (v === undefined) return;
     s.append(k, v);

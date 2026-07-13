@@ -27,7 +27,7 @@ import dayjs from "dayjs";
 
 const { useGetPoliza } = SrtAPI;
 
-const getPeriodo = (): string => dayjs().subtract(2, "month").format("YYYYMM");
+const getPeriodos = (): number[] => Array.from({ length: 3 }, (_, i) => Number(dayjs().subtract(i, "month").format("YYYYMM")));
 
 export default function CoberturaPage() {
     const { user } = useAuth();
@@ -209,7 +209,7 @@ export default function CoberturaPage() {
         (async () => {
             try {
                 setIsPersonalLoading(true);
-                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, PageSize: 99999, Periodos: Number(getPeriodo()) });
+                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, PageSize: 99999, Periodos: getPeriodos() });
                 const arr = Array.isArray(raw) ? raw : (raw?.DATA ?? raw?.data ?? []);
                 const personas: Persona[] = (arr as unknown[])
                     .map((x) => {
