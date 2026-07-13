@@ -22,18 +22,21 @@ Siempre que el usuario pida realizar acciones de git, sugiere el uso de la CLI d
 - Release: `git flow release start <version>`
 - **Release sin upstream a develop:** nunca `git switch -c release/vX origin/develop`. Usar git-flow o `git switch -c release/vX --no-track` desde `develop` local. Publicar con `git push -u origin release/vX`.
 
-### 2.1 Regla de `.env.production` en cada Release
-Cada rama `release/vX.Y.Z` debe partir de `origin/develop` y el **único cambio permitido** en el commit de release es actualizar `.env.production` para apuntar al entorno **TEST** (`arttest`), copiando los valores de `.env.test` (URLs/`NEXTAUTH_*` y `NEXT_PUBLIC_*`).
+### 2.1 Releases y archivos `.env`
+- Los archivos `.env`, `.env.*` (excepto `.env.example`) están en `.gitignore` y **no deben trackearse ni commitearse**.
+- Un release `release/vX.Y.Z` parte de `origin/develop` **sin modificar archivos `.env*`**.
+- El PR de un release hacia `master` **no debe agregar, borrar ni cambiar** `.env`, `.env.development`, `.env.test` ni `.env.production`.
+- Si algún `.env*` quedó trackeado por error: `git rm --cached .env.development .env.production .env.test` (o los que apliquen) y no volver a forzar su add.
+- Los entornos de build/deploy deben resolver las variables fuera del repo (archivos en el runner, secrets de GitHub Actions, etc.), no desde commits.
 
-Procedimiento obligatorio:
+Procedimiento obligatorio de release:
 1. `git fetch origin`
 2. Actualizar `develop` local: `git switch develop` + `git pull origin develop`
 3. Crear la rama: `git flow release start vX.Y.Z` **o** `git switch -c release/vX.Y.Z --no-track`
-4. Reemplazar en `.env.production` los hosts `artdesa` por los de `arttest` según `.env.test`. Conservar claves extras del template de production (p. ej. `NEXT_PUBLIC_API_SRT`, `NEXT_PUBLIC_API_SVCC`) remapeadas a `arttest`.
-5. Commit único: `chore(release): apuntar .env.production a entorno TEST para vX.Y.Z`
-6. Publicar: `git push -u origin release/vX.Y.Z`
+4. Verificar que el diff del release **no incluye** archivos `.env*`
+5. Publicar: `git push -u origin release/vX.Y.Z`
 
-**Prohibido** en el commit de release: features, fixes, refactor u otros archivos distintos de `.env.production`.
+**Prohibido** en el release / PR a `master`: commits que toquen `.env*`.
 
 ## 3. Reglas de Pull Request (PR)
 - **Target para Features**: Siempre hacia `develop`.

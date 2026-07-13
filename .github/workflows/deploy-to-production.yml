@@ -21,6 +21,7 @@ jobs:
       SITE_NAME: ${{ secrets.SITE_NAME }}
       BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
       MAX_BACKUPS: ${{ secrets.MAX_BACKUPS }}
+      ENV_TEMPLATES_PATH: ${{ secrets.ENV_TEMPLATES_PATH }}
       TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
       REPO: ${{ github.repository }}
       BRANCH: ${{ github.ref_name }}
@@ -35,14 +36,23 @@ jobs:
         shell: powershell
         run: |
           $selectedEnv = 'production'
-          
+
           if ($selectedEnv -notin @('development', 'test', 'production')) {
             throw "Invalid target_env '$selectedEnv'. Allowed values: development, test, production"
           }
 
-          $sourceEnvFile = ".env.$selectedEnv"
-          if (-not (Test-Path $sourceEnvFile)) {
-            throw "Environment file not found: $sourceEnvFile"
+          $candidates = @(".env.$selectedEnv")
+          if (-not [string]::IsNullOrWhiteSpace($env:ENV_TEMPLATES_PATH)) {
+            $candidates += (Join-Path $env:ENV_TEMPLATES_PATH ".env.$selectedEnv")
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:SITE_PATH)) {
+            $candidates += (Join-Path $env:SITE_PATH ".env.$selectedEnv")
+            $candidates += (Join-Path (Split-Path $env:SITE_PATH -Parent) "env-templates\.env.$selectedEnv")
+          }
+
+          $sourceEnvFile = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($sourceEnvFile)) {
+            throw "Environment file not found for '$selectedEnv'. Tried: $($candidates -join ', '). Configure repo-local file (not recommended), ENV_TEMPLATES_PATH, or SITE_PATH."
           }
 
           Copy-Item $sourceEnvFile .env.production -Force
