@@ -98,8 +98,8 @@ export default function IniciarHandler() {
             presentacionOrigenInterno > 0
             && presentacionOrigenInterno !== createdInterno
           ) {
-            await copyPortadaYAnexoVFromOrigen(presentacionOrigenInterno, createdInterno);
-            await copyNominasToPresentacion(trabajadoresOrigen, createdInterno);
+            const maps = await copyPortadaYAnexoVFromOrigen(presentacionOrigenInterno, createdInterno);
+            await copyNominasToPresentacion(trabajadoresOrigen, createdInterno, maps);
           }
           presentacion.setSelected(created);
         } catch (error) {
