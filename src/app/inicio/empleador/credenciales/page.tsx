@@ -21,7 +21,7 @@ import dayjs from "dayjs";
 import { TextField } from '@mui/material';
 import { applySRTPolizasVerIndependientes } from '@/utils/srtPolizasParams';
 
-const getPeriodo = (): string => dayjs().subtract(2, "month").format("YYYYMM");
+const getPeriodos = (): number[] => Array.from({ length: 3 }, (_, i) => Number(dayjs().subtract(i, "month").format("YYYYMM")));
 
 function CredencialesPage() {
   const { user } = useAuth();
@@ -69,7 +69,7 @@ function CredencialesPage() {
           CUIL: selectedEmpresaCUIT,
           PageIndex,
           PageSize,
-          Perido: Number(getPeriodo()),
+          Periodos: getPeriodos(),
         });
 
         if (canceled) return;
