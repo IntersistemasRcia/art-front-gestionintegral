@@ -14,7 +14,7 @@ export function emptyPresentacionUltimaForm(empleadorCUIT: number, empleadorRazo
     numeroDePoliza: 0,
     idMotivo: 1,
     idProgramaMuestra: 0,
-    version: 0,
+    version: 1,
     presentacionFecha: "",
     consolidacionFecha: "",
     observaciones: "",
@@ -53,6 +53,8 @@ export function buildIniciarPresentacionForm({
     empleadorRazonSocial: base.empleadorRazonSocial || empresa?.razonSocial || "",
     numeroDePoliza: Number(empresa?.numeroDePoliza ?? 0) || 0,
     idProgramaMuestra: Number(idProgramaMuestraParam ?? 0) || 0,
+    version: 1,
+    observaciones: "",
   };
 }
 
