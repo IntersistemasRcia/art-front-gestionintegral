@@ -36,7 +36,7 @@ function digits(value: unknown) {
 }
 
 function CuentaCorrienteComercializador() {
-    const { user } = useAuth();
+    const { user, hasTask } = useAuth();
 
     const rol = String((user as any)?.rol ?? '').toLowerCase();
     const cuil = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
@@ -47,7 +47,8 @@ function CuentaCorrienteComercializador() {
     const isGrupoOrganizador = rol === 'grupoorganizador';
     const isOrganizadorComercializador = rol === 'organizadorcomercializador';
     const isComercializador = rol === 'comercializador';
-    const isAdminLevel = isAdmin || isAdminComercializador || isAdministradorART;
+    const isAdminLevel = isAdmin || isAdminComercializador || isAdministradorART
+        || hasTask('Comercializador_CuentaCorriente_VerTodosLosFiltros');
 
     const [grupo, setGrupo] = useState<any>(null);
     const [organizador, setOrganizador] = useState<any>(null);
