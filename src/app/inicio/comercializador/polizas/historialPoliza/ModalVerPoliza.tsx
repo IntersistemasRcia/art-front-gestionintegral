@@ -5,6 +5,7 @@ import CustomModal from "@/utils/ui/form/CustomModal";
 import CustomButton from "@/utils/ui/button/CustomButton";
 import SrtAPI from "@/data/srtAPI";
 import Formato from "@/utils/Formato";
+import { getAsociadoDescripcionDisplay } from "@/utils/srt/srtComercializadorAsociadoUtils";
 import styles from "./modalVerPoliza.module.css";
 
 type Props = {
@@ -82,7 +83,7 @@ export default function ModalVerPoliza({ historialId, onClose }: Props) {
           {field("Email", (poliza as any).comercializadorEmail, styles.col2)}
           {field("Teléfono", (poliza as any).comercializadorTelefono)}
           {field("Móvil", (poliza as any).comercializadorMovil)}
-          {field("Asociado", (poliza as any).srtComercializadorAsociadoDescripcion, styles.col2)}
+          {field("Asociado", getAsociadoDescripcionDisplay(poliza as any), styles.col2)}
         </div>
       )}
     </CustomModal>

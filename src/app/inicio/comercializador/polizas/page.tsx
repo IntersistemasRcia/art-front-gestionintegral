@@ -14,11 +14,17 @@ import { BsFileText, BsCardChecklist, BsGraphUpArrow, BsCalendar2Plus } from 're
 import { PiUserSwitchFill } from 'react-icons/pi';
 import FormularioComercializador from './historialPoliza/formularioComercializador';
 import Link from 'next/link';
-import type { OrganizadorComercializador, Poliza, SRTPolizaAcotada } from "./types/poliza";
+import type { Poliza, SRTPolizaAcotada } from "./types/poliza";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
 import HistorialPoliza from './historialPoliza/historialPoliza';
 import SrtAPI from '@/data/srtAPI';
 import dayjs from 'dayjs';
+import {
+  getComercializadorDescripcion,
+  getComercializadorInterno,
+  polizaBelongsToAsociado,
+  walkAsociadoHierarchy,
+} from "@/utils/srt/srtComercializadorAsociadoUtils";
 
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
 const POLIZA_COMBO_TODOS_ID = -1;
@@ -300,48 +306,17 @@ function PolizasPage() {
   );
 
   const grupoInternoSeleccionado = isPolizaComboTodos(grupo) ? 0 : grupo.interno;
-
-  const { data: organizadoresApiData, isLoading: isLoadingOrganizadoresApi } =
-    ArtAPI.useGetOrganizadorURL(
-      grupoInternoSeleccionado > 0
-        ? ({ SRTComercializadorGOrganizadorInterno: grupoInternoSeleccionado } as OrganizadorComercializador)
-        : null,
-    );
-
-  const organizadoresApiInternos = useMemo(
-    () => extractInternosFromApiList(organizadoresApiData),
-    [organizadoresApiData],
-  );
-
   const organizadorInternoSeleccionado = isPolizaComboTodos(organizador) ? 0 : organizador.interno;
 
-  const comercializadoresApiParams = useMemo(() => {
-    if (organizadorInternoSeleccionado > 0) {
-      return { ComercializadoresOrganizadoresInternos: String(organizadorInternoSeleccionado) };
-    }
-    if (grupoInternoSeleccionado > 0) {
-      const internos = organizadoresApiInternos.join(",");
-      return internos ? { ComercializadoresOrganizadoresInternos: internos } : null;
-    }
-    return null;
-  }, [organizadorInternoSeleccionado, grupoInternoSeleccionado, organizadoresApiInternos]);
-
-  const { data: comercializadoresApiData, isLoading: isLoadingComercializadoresApi } =
-    ArtAPI.useGetComercializadorURL(comercializadoresApiParams);
-
-  const comercializadoresApiInternos = useMemo(
-    () => extractInternosFromApiList(comercializadoresApiData),
-    [comercializadoresApiData],
-  );
-
+  /** Combos se arman solo desde UsuarioLogueado (jerarquía nested), sin APIs auxiliares. */
   const grupoOptions = useMemo(
     () => buildGrupoComboOptions(polizasVigentes),
     [polizasVigentes],
   );
 
   const organizadorOptions = useMemo(
-    () => buildOrganizadorComboOptions(polizasVigentes, grupoInternoSeleccionado, organizadoresApiInternos),
-    [polizasVigentes, grupoInternoSeleccionado, organizadoresApiInternos],
+    () => buildOrganizadorComboOptions(polizasVigentes, grupoInternoSeleccionado),
+    [polizasVigentes, grupoInternoSeleccionado],
   );
 
   const comercializadorOptions = useMemo(
@@ -349,14 +324,8 @@ function PolizasPage() {
       polizasVigentes,
       grupoInternoSeleccionado,
       organizadorInternoSeleccionado,
-      comercializadoresApiInternos,
     ),
-    [
-      polizasVigentes,
-      grupoInternoSeleccionado,
-      organizadorInternoSeleccionado,
-      comercializadoresApiInternos,
-    ],
+    [polizasVigentes, grupoInternoSeleccionado, organizadorInternoSeleccionado],
   );
 
   useEffect(() => {
@@ -371,10 +340,7 @@ function PolizasPage() {
     }
   }, [comercializadorOptions, comercializador.interno]);
 
-  const isLoadingCombos =
-    isLoadingPolizasUsuarioLogueado
-    || (grupoInternoSeleccionado > 0 && isLoadingOrganizadoresApi)
-    || (comercializadoresApiParams !== null && isLoadingComercializadoresApi);
+  const isLoadingCombos = isLoadingPolizasUsuarioLogueado;
 
   const filteredPolizas = useMemo(
     () => filterPolizasByCombos(polizasVigentes, grupo, organizador, comercializador),
@@ -524,10 +490,6 @@ function PolizasPage() {
 
 export default PolizasPage;
 
-function normalizeTipo(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
-}
-
 function isPolizaVigente(poliza: SRTPolizaAcotada): boolean {
   const vigenciaHasta = String(poliza.vigenciaHasta ?? "").trim();
   if (!vigenciaHasta) return true;
@@ -538,19 +500,6 @@ function isPolizaVigente(poliza: SRTPolizaAcotada): boolean {
 
 function filterPolizasVigentes(polizas: SRTPolizaAcotada[]): SRTPolizaAcotada[] {
   return polizas.filter(isPolizaVigente);
-}
-
-function isPolizaTipoGrupo(poliza: SRTPolizaAcotada): boolean {
-  return normalizeTipo(poliza.srtComercializadorAsociadoTipo) === "grupo";
-}
-
-function isPolizaTipoOrganizador(poliza: SRTPolizaAcotada): boolean {
-  return normalizeTipo(poliza.srtComercializadorAsociadoTipo) === "organizador";
-}
-
-function isComercializadorIndependiente(poliza: SRTPolizaAcotada): boolean {
-  const tipo = poliza.srtComercializadorAsociadoTipo;
-  return tipo == null || normalizeTipo(tipo) === "";
 }
 
 function withTodosOption(options: PolizaComboOption[]): PolizaComboOption[] {
@@ -569,74 +518,56 @@ function uniqueComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
   );
 }
 
-function extractInternosFromApiList(data: unknown): number[] {
-  const list = Array.isArray(data) ? data : [];
-  return list
-    .map((item) => Number((item as { interno?: number })?.interno ?? 0))
-    .filter((interno) => interno > 0);
-}
-
 function buildGrupoComboOptions(polizas: SRTPolizaAcotada[]): PolizaComboOption[] {
-  const items = polizas
-    .filter(isPolizaTipoGrupo)
-    .map((poliza) => {
-      const interno = Number(poliza.srtComercializadorAsociadoInterno ?? 0);
-      const descripcion =
-        String(poliza.srtComercializadorAsociadoDescripcion ?? "").trim()
-        || `Grupo ${interno}`;
-      return { interno, descripcion };
-    });
+  const items = polizas.flatMap((poliza) =>
+    walkAsociadoHierarchy(poliza)
+      .filter((node) => node.tipo === "grupo")
+      .map((node) => ({ interno: node.interno, descripcion: node.descripcion })),
+  );
 
   return withTodosOption(items);
 }
 
+/** Organizadores presentes en las pólizas; si hay Grupo, solo los de ese Grupo. */
 function buildOrganizadorComboOptions(
   polizas: SRTPolizaAcotada[],
   grupoInternoSeleccionado: number,
-  organizadoresApiInternos: number[],
 ): PolizaComboOption[] {
-  const organizadoresPermitidos = grupoInternoSeleccionado > 0
-    ? new Set(organizadoresApiInternos)
-    : null;
+  const items = polizas.flatMap((poliza) => {
+    if (grupoInternoSeleccionado > 0 && !polizaBelongsToAsociado(poliza, grupoInternoSeleccionado, "grupo")) {
+      return [];
+    }
 
-  const items = polizas
-    .filter(isPolizaTipoOrganizador)
-    .filter((poliza) => {
-      const interno = Number(poliza.srtComercializadorAsociadoInterno ?? 0);
-      if (!organizadoresPermitidos) return interno > 0;
-      return organizadoresPermitidos.has(interno);
-    })
-    .map((poliza) => {
-      const interno = Number(poliza.srtComercializadorAsociadoInterno ?? 0);
-      const descripcion =
-        String(poliza.srtComercializadorAsociadoDescripcion ?? "").trim()
-        || `Organizador ${interno}`;
-      return { interno, descripcion };
-    });
+    return walkAsociadoHierarchy(poliza)
+      .filter((node) => node.tipo === "organizador")
+      .map((node) => ({ interno: node.interno, descripcion: node.descripcion }));
+  });
 
   return withTodosOption(items);
 }
 
+/**
+ * Comercializadores desde `srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`.
+ * Cascada: restringe por Grupo y/o Organizador según pertenencia en el árbol nested.
+ */
 function buildComercializadorComboOptions(
   polizas: SRTPolizaAcotada[],
   grupoInternoSeleccionado: number,
   organizadorInternoSeleccionado: number,
-  comercializadoresApiInternos: number[],
 ): PolizaComboOption[] {
-  const comercializadoresPermitidos = organizadorInternoSeleccionado > 0 || grupoInternoSeleccionado > 0
-    ? new Set(comercializadoresApiInternos)
-    : null;
-
   const items = polizas
-    .filter(isComercializadorIndependiente)
     .filter((poliza) => {
-      const interno = Number(poliza.srtcomercializadorInterno ?? 0);
-      if (!comercializadoresPermitidos) return interno > 0;
-      return comercializadoresPermitidos.has(interno);
+      if (organizadorInternoSeleccionado > 0) {
+        return polizaBelongsToAsociado(poliza, organizadorInternoSeleccionado, "organizador");
+      }
+      if (grupoInternoSeleccionado > 0) {
+        return polizaBelongsToAsociado(poliza, grupoInternoSeleccionado, "grupo");
+      }
+      return true;
     })
     .map((poliza) => ({
-      interno: Number(poliza.srtcomercializadorInterno ?? 0),
-      descripcion: String(poliza.comercializadorReferenteRazonSocial ?? "").trim(),
+      interno: getComercializadorInterno(poliza),
+      descripcion: getComercializadorDescripcion(poliza),
     }));
 
   return withTodosOption(items);
@@ -646,37 +577,31 @@ function isPolizaComboTodos(option: PolizaComboOption | null | undefined): boole
   return !option || option.interno === POLIZA_COMBO_TODOS_ID;
 }
 
+/** Filtro AND en cascada: Grupo ∩ Organizador ∩ Comercializador. */
 function filterPolizasByCombos(
   polizas: SRTPolizaAcotada[],
   grupo: PolizaComboOption,
   organizador: PolizaComboOption,
   comercializador: PolizaComboOption,
 ): SRTPolizaAcotada[] {
-  if (!isPolizaComboTodos(comercializador)) {
-    return polizas.filter(
-      (poliza) =>
-        isComercializadorIndependiente(poliza)
-        && Number(poliza.srtcomercializadorInterno ?? 0) === comercializador.interno,
-    );
-  }
-
-  if (!isPolizaComboTodos(organizador)) {
-    return polizas.filter(
-      (poliza) =>
-        isPolizaTipoOrganizador(poliza)
-        && Number(poliza.srtComercializadorAsociadoInterno ?? 0) === organizador.interno,
-    );
-  }
-
-  if (!isPolizaComboTodos(grupo)) {
-    return polizas.filter(
-      (poliza) =>
-        isPolizaTipoGrupo(poliza)
-        && Number(poliza.srtComercializadorAsociadoInterno ?? 0) === grupo.interno,
-    );
-  }
-
-  return polizas;
+  return polizas.filter((poliza) => {
+    if (!isPolizaComboTodos(grupo) && !polizaBelongsToAsociado(poliza, grupo.interno, "grupo")) {
+      return false;
+    }
+    if (
+      !isPolizaComboTodos(organizador)
+      && !polizaBelongsToAsociado(poliza, organizador.interno, "organizador")
+    ) {
+      return false;
+    }
+    if (
+      !isPolizaComboTodos(comercializador)
+      && getComercializadorInterno(poliza) !== comercializador.interno
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function mapPolizasToRows(polizas: SRTPolizaAcotada[]): PolizaRow[] {
@@ -686,12 +611,11 @@ function mapPolizasToRows(polizas: SRTPolizaAcotada[]): PolizaRow[] {
     NroPoliza: String(item.numero ?? ''),
     CUIT: String(item.cuit ?? ''),
     Empleador_Denominacion: String(item.empleadorDenominacion ?? ''),
-    Comercializador_Denominacion: String(
-      item.srtComercializadorDenominacion ?? item.comercializadorReferenteRazonSocial ?? '',
-    ),
-    srtComercializadorInterno: Number(item.srtcomercializadorInterno ?? 0),
+    Comercializador_Denominacion: getComercializadorDescripcion(item)
+      || String(item.srtComercializadorDenominacion ?? ''),
+    srtComercializadorInterno: getComercializadorInterno(item),
     Vigencia_Desde: String(item.vigenciaDesde ?? ''),
     Vigencia_Hasta: String(item.vigenciaHasta ?? ''),
-    fecha: String((item as SRTPolizaAcotada & { movimientoFecha?: string }).movimientoFecha ?? item.estadoFecha ?? ''),
+    fecha: String(item.movimientoFecha ?? item.estadoFecha ?? ''),
   }));
 }
