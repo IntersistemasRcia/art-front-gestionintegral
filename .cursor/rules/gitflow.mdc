@@ -35,7 +35,7 @@ Procedimiento obligatorio de release:
 4. Verificar que el diff del release **no incluye** archivos `.env*`
 5. Publicar: `git push -u origin release/vX.Y.Z`
 
-**Prohibido** en el commit de release: features, fixes, refactor u otros archivos distintos de `.env.production`.
+**Prohibido** en el release / PR a `master`: commits que toquen `.env*`.
 
 ## 3. Reglas de Pull Request (PR)
 - **Target para Features**: Siempre hacia `develop`.

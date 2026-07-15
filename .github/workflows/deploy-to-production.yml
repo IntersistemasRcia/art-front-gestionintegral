@@ -21,6 +21,7 @@ jobs:
       SITE_NAME: ${{ secrets.SITE_NAME }}
       BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
       MAX_BACKUPS: ${{ secrets.MAX_BACKUPS }}
+      ENV_TEMPLATES_PATH: ${{ secrets.ENV_TEMPLATES_PATH }}
       TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
       REPO: ${{ github.repository }}
       BRANCH: ${{ github.ref_name }}
@@ -35,14 +36,23 @@ jobs:
         shell: powershell
         run: |
           $selectedEnv = 'production'
-          
+
           if ($selectedEnv -notin @('development', 'test', 'production')) {
             throw "Invalid target_env '$selectedEnv'. Allowed values: development, test, production"
           }
 
-          $sourceEnvFile = ".env.$selectedEnv"
-          if (-not (Test-Path $sourceEnvFile)) {
-            throw "Environment file not found: $sourceEnvFile"
+          $candidates = @(".env.$selectedEnv")
+          if (-not [string]::IsNullOrWhiteSpace($env:ENV_TEMPLATES_PATH)) {
+            $candidates += (Join-Path $env:ENV_TEMPLATES_PATH ".env.$selectedEnv")
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:SITE_PATH)) {
+            $candidates += (Join-Path $env:SITE_PATH ".env.$selectedEnv")
+            $candidates += (Join-Path (Split-Path $env:SITE_PATH -Parent) "env-templates\.env.$selectedEnv")
+          }
+
+          $sourceEnvFile = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($sourceEnvFile)) {
+            throw "Environment file not found for '$selectedEnv'. Tried: $($candidates -join ', '). Configure repo-local file (not recommended), ENV_TEMPLATES_PATH, or SITE_PATH."
           }
 
           Copy-Item $sourceEnvFile .env.production -Force
@@ -118,7 +128,7 @@ jobs:
 
           # Mirror current deployment to temp excluding backups and large folders
           $robolog = Join-Path (Get-Location) ("robocopy_backup_$timestamp.log")
-          robocopy $DEPLOY_DIR $temp /MIR /XD .git .github\workflows node_modules backups /LOG:$robolog /TEE
+          robocopy $DEPLOY_DIR $temp /MIR /XD .git .github\workflows node_modules backups certificados /LOG:$robolog /TEE
           $rc = $LASTEXITCODE
           # robocopy exit codes: 0=no files copied, 1=some files copied, 2=some files mismatched, 3=some files copied and mismatched
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
@@ -149,7 +159,7 @@ jobs:
           # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
           # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
           $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'          
-          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
+          robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github certificados /XF .env .env.local .env.production .env.production.local web.config /LOG:$robolog2 /TEE
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
