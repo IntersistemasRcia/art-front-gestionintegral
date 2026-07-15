@@ -58,14 +58,22 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
     () => ArtAPI.getEmpresaByCUIT({ CUIT: cuitEmpresa })
   );
 
-  const cp = empresaByCuit?.codLocalidadPostal;
-  const { data: localidadesData } = useSWR(
+  const codLocalidadSrt = empresaByCuit?.codLocalidadSrt;
+  const { data: localidadSrtData, error: localidadSrtError } = useSWR(
+    codLocalidadSrt ? ['localidadSrtByCodigo', codLocalidadSrt] : null,
+    () => ArtAPI.getLocalidadById({ codigo: String(codLocalidadSrt) })
+  );
+
+  const cp = !codLocalidadSrt || localidadSrtError ? empresaByCuit?.codLocalidadPostal : undefined;
+  const { data: localidadesData, error: localidadesError } = useSWR(
     cp ? ['localidadesByCP', cp] : null,
     () => ArtAPI.getLocalidadesbyCP({ CodPostal: cp })
   );
-  const litProvincia = Array.isArray(localidadesData) && localidadesData.length > 0
-    ? localidadesData[0].litProvincia
-    : '';
+
+  const litProvincia = localidadSrtData?.nombreProvincia
+    || (Array.isArray(localidadesData) && localidadesData.length > 0 ? localidadesData[0].litProvincia : '');
+
+  const localidadResuelta = Boolean(localidadSrtData) || Boolean(localidadesData) || Boolean(localidadesError);
 
   // Acepta poliza como array o como objeto
   const p = Array.isArray(poliza) ? poliza[0] : poliza ?? {};
@@ -80,7 +88,8 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
     }
 
     if (!empresaByCuit) return;
-    if (cp && !localidadesData) return;
+    if (codLocalidadSrt && !localidadSrtData && !localidadSrtError) return;
+    if (cp && !localidadResuelta) return;
 
     if (generatedRef.current) return;
     generatedRef.current = true;
@@ -173,7 +182,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
 
     generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, empresaByCuit, localidadesData]);
+  }, [open, empresaByCuit, localidadSrtData, localidadSrtError, localidadesData]);
 
   return (
     // off-screen wrapper: dos bloques separados para forzar que la tabla quede en bloques distintos
@@ -284,7 +293,7 @@ export default function Cobertura_PDF(props: CoberturaPDFProps) {
               <div>CUIT: {empresaByCuit?.cuit ?? ''}</div>
               <div>Calle: {[empresaByCuit?.domicilioCalle, empresaByCuit?.domicilioNro].filter(Boolean).join(' ')}</div>
               <div>Localidad: {litProvincia} - CP: {empresaByCuit?.codLocalidadPostal ?? ''}</div>
-              <div>Nro.Contrato: {p.numero ?? ''}</div>
+              <div>Nro.Contrato: {empresaByCuit?.polizaNro ?? ''}</div>
               <div>Ciiu Rev. 4: {empresaByCuit?.ciiu ?? ''}</div>
             </div>
 
