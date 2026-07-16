@@ -522,25 +522,28 @@ function buildGrupoComboOptions(polizas: SRTPolizaAcotada[]): PolizaComboOption[
   const items = polizas.flatMap((poliza) =>
     walkAsociadoHierarchy(poliza)
       .filter((node) => node.tipo === "grupo")
-      .map((node) => ({ interno: node.interno, descripcion: node.descripcion })),
+      .map((node) => ({ interno: node.asociadoId, descripcion: node.descripcion })),
   );
 
   return withTodosOption(items);
 }
 
-/** Organizadores presentes en las pólizas; si hay Grupo, solo los de ese Grupo. */
+/** Organizadores presentes en las pólizas; si hay Grupo, solo los de ese Grupo (por asociadoId). */
 function buildOrganizadorComboOptions(
   polizas: SRTPolizaAcotada[],
-  grupoInternoSeleccionado: number,
+  grupoAsociadoIdSeleccionado: number,
 ): PolizaComboOption[] {
   const items = polizas.flatMap((poliza) => {
-    if (grupoInternoSeleccionado > 0 && !polizaBelongsToAsociado(poliza, grupoInternoSeleccionado, "grupo")) {
+    if (
+      grupoAsociadoIdSeleccionado > 0
+      && !polizaBelongsToAsociado(poliza, grupoAsociadoIdSeleccionado, "grupo")
+    ) {
       return [];
     }
 
     return walkAsociadoHierarchy(poliza)
       .filter((node) => node.tipo === "organizador")
-      .map((node) => ({ interno: node.interno, descripcion: node.descripcion }));
+      .map((node) => ({ interno: node.asociadoId, descripcion: node.descripcion }));
   });
 
   return withTodosOption(items);
@@ -548,20 +551,20 @@ function buildOrganizadorComboOptions(
 
 /**
  * Comercializadores desde `srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`.
- * Cascada: restringe por Grupo y/o Organizador según pertenencia en el árbol nested.
+ * Cascada por asociadoId de Grupo/Organizador en el árbol nested.
  */
 function buildComercializadorComboOptions(
   polizas: SRTPolizaAcotada[],
-  grupoInternoSeleccionado: number,
-  organizadorInternoSeleccionado: number,
+  grupoAsociadoIdSeleccionado: number,
+  organizadorAsociadoIdSeleccionado: number,
 ): PolizaComboOption[] {
   const items = polizas
     .filter((poliza) => {
-      if (organizadorInternoSeleccionado > 0) {
-        return polizaBelongsToAsociado(poliza, organizadorInternoSeleccionado, "organizador");
+      if (organizadorAsociadoIdSeleccionado > 0) {
+        return polizaBelongsToAsociado(poliza, organizadorAsociadoIdSeleccionado, "organizador");
       }
-      if (grupoInternoSeleccionado > 0) {
-        return polizaBelongsToAsociado(poliza, grupoInternoSeleccionado, "grupo");
+      if (grupoAsociadoIdSeleccionado > 0) {
+        return polizaBelongsToAsociado(poliza, grupoAsociadoIdSeleccionado, "grupo");
       }
       return true;
     })
