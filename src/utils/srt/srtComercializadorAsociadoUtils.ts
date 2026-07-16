@@ -1,17 +1,20 @@
-/** Nodo recursivo de la jerarquía Grupo → Organizador (API SRTPolizas). */
+/** Nodo recursivo Grupo → Organizador en SRTPolizas (contrato actual). */
 export type SRTComercializadorAsociadoNodo = {
+  interno?: number | null;
+  descripcion?: string | null;
+  tipo?: string | null;
+  asociadoId?: number | null;
+  srtComercializadorAsociadoPadre?: SRTComercializadorAsociadoNodo | string | null;
+  /** Campos legacy del contrato anterior. */
   srtComercializadorAsociadoInterno?: number | null;
   srtComercializadorAsociadoDescripcion?: string | null;
   srtComercializadorAsociadoTipo?: string | null;
-  /** Padre en la mamushka; misma estructura que el nodo actual. */
-  srtComercializadorAsociadoPadre?: SRTComercializadorAsociadoNodo | string | null;
 };
 
 export type SRTPolizaHierarchyFields = {
   srtcomercializadorInterno?: number | null;
   comercializadorReferenteRazonSocial?: string | null;
   srtComercializadorDenominacion?: string | null;
-  /** ID plano legado / resumen del asociado inmediato. */
   srtComercializadorAsociadoInterno?: number | null;
   srtComercializadorAsociadoDescripcion?: string | null;
   srtComercializadorAsociadoTipo?: string | null;
@@ -21,7 +24,8 @@ export type SRTPolizaHierarchyFields = {
 export type PolizaHierarchyTipo = "grupo" | "organizador";
 
 export type PolizaHierarchyNode = {
-  interno: number;
+  /** ID de negocio del Grupo/Organizador (clave de agrupación en combos). */
+  asociadoId: number;
   descripcion: string;
   tipo: PolizaHierarchyTipo;
 };
@@ -37,7 +41,21 @@ function asHierarchyTipo(value: unknown): PolizaHierarchyTipo | null {
   return null;
 }
 
-/** Normaliza el padre: el swagger a veces tipa string; en runtime es objeto recursivo. */
+function getNodeDescripcion(node: SRTComercializadorAsociadoNodo): string {
+  return String(node.descripcion ?? node.srtComercializadorAsociadoDescripcion ?? "").trim();
+}
+
+function getNodeTipoRaw(node: SRTComercializadorAsociadoNodo): string {
+  return String(node.tipo ?? node.srtComercializadorAsociadoTipo ?? "").trim();
+}
+
+function getNodeAsociadoId(node: SRTComercializadorAsociadoNodo): number {
+  const asociadoId = Number(node.asociadoId ?? 0);
+  if (asociadoId > 0) return asociadoId;
+  // Legacy: antes el ID de negocio venía en srtComercializadorAsociadoInterno.
+  return Number(node.srtComercializadorAsociadoInterno ?? 0);
+}
+
 function resolvePadre(
   padre: SRTComercializadorAsociadoNodo["srtComercializadorAsociadoPadre"],
 ): SRTComercializadorAsociadoNodo | null {
@@ -46,38 +64,47 @@ function resolvePadre(
   return padre;
 }
 
+function isIndependienteNode(node: SRTComercializadorAsociadoNodo): boolean {
+  const tipo = asHierarchyTipo(getNodeTipoRaw(node));
+  const asociadoId = getNodeAsociadoId(node);
+  const descripcion = getNodeDescripcion(node).toLowerCase();
+  if (tipo != null) return false;
+  if (asociadoId > 0) return false;
+  if (resolvePadre(node.srtComercializadorAsociadoPadre) != null) return false;
+  return descripcion === "independiente" || descripcion === "";
+}
+
+function hasHierarchyMeaning(node: SRTComercializadorAsociadoNodo): boolean {
+  if (isIndependienteNode(node)) return false;
+  const tipo = asHierarchyTipo(getNodeTipoRaw(node));
+  const asociadoId = getNodeAsociadoId(node);
+  if (tipo != null && asociadoId > 0) return true;
+  return resolvePadre(node.srtComercializadorAsociadoPadre) != null;
+}
+
 /**
- * Resuelve el nodo raíz de asociados desde el objeto nested
- * o, en fallback, desde los campos planos del response legado.
- * Nodos "Independiente" (interno 0 / tipo vacío / sin padre) no aportan jerarquía.
+ * Raíz del árbol asociativo desde el objeto nested o campos planos legacy.
  */
 export function getAsociadoRoot(
   poliza: SRTPolizaHierarchyFields,
 ): SRTComercializadorAsociadoNodo | null {
   const nested = poliza.srtComercializadorAsociado;
   if (nested != null) {
-    const nestedInterno = Number(nested.srtComercializadorAsociadoInterno ?? 0);
-    const nestedTipo = asHierarchyTipo(nested.srtComercializadorAsociadoTipo);
-    const hasPadre = resolvePadre(nested.srtComercializadorAsociadoPadre) != null;
-    if (nestedInterno > 0 || nestedTipo != null || hasPadre) {
-      return nested;
-    }
-    return null;
+    return hasHierarchyMeaning(nested) ? nested : null;
   }
 
-  const interno = Number(poliza.srtComercializadorAsociadoInterno ?? 0);
+  const asociadoId = Number(poliza.srtComercializadorAsociadoInterno ?? 0);
   const tipo = asHierarchyTipo(poliza.srtComercializadorAsociadoTipo);
-  if (interno <= 0 && !tipo) return null;
+  if (asociadoId <= 0 || !tipo) return null;
 
   return {
-    srtComercializadorAsociadoInterno: poliza.srtComercializadorAsociadoInterno,
-    srtComercializadorAsociadoDescripcion: poliza.srtComercializadorAsociadoDescripcion,
-    srtComercializadorAsociadoTipo: poliza.srtComercializadorAsociadoTipo,
-    srtComercializadorAsociadoPadre: null,
+    asociadoId,
+    descripcion: poliza.srtComercializadorAsociadoDescripcion,
+    tipo: poliza.srtComercializadorAsociadoTipo,
   };
 }
 
-/** Recorre la cadena asociado → padre → ... (Grupo encima de Organizador). */
+/** Recorre Organizador → Grupo (padre recursivo). Agrupa por `asociadoId`. */
 export function walkAsociadoHierarchy(
   poliza: SRTPolizaHierarchyFields,
 ): PolizaHierarchyNode[] {
@@ -86,14 +113,14 @@ export function walkAsociadoHierarchy(
   let current: SRTComercializadorAsociadoNodo | null = getAsociadoRoot(poliza);
 
   while (current != null) {
-    const interno = Number(current.srtComercializadorAsociadoInterno ?? 0);
-    const tipo = asHierarchyTipo(current.srtComercializadorAsociadoTipo);
-    if (interno > 0 && tipo && !seen.has(interno)) {
-      seen.add(interno);
+    const asociadoId = getNodeAsociadoId(current);
+    const tipo = asHierarchyTipo(getNodeTipoRaw(current));
+    if (asociadoId > 0 && tipo && !seen.has(asociadoId)) {
+      seen.add(asociadoId);
       const descripcion =
-        String(current.srtComercializadorAsociadoDescripcion ?? "").trim()
-        || `${tipo === "grupo" ? "Grupo" : "Organizador"} ${interno}`;
-      nodes.push({ interno, descripcion, tipo });
+        getNodeDescripcion(current)
+        || `${tipo === "grupo" ? "Grupo" : "Organizador"} ${asociadoId}`;
+      nodes.push({ asociadoId, descripcion, tipo });
     }
     current = resolvePadre(current.srtComercializadorAsociadoPadre);
   }
@@ -110,13 +137,13 @@ export function findHierarchyNodeByTipo(
 
 export function polizaBelongsToAsociado(
   poliza: SRTPolizaHierarchyFields,
-  asociadoInterno: number,
+  asociadoId: number,
   tipo?: PolizaHierarchyTipo,
 ): boolean {
-  if (asociadoInterno <= 0) return false;
+  if (asociadoId <= 0) return false;
   return walkAsociadoHierarchy(poliza).some(
     (node) =>
-      node.interno === asociadoInterno
+      node.asociadoId === asociadoId
       && (tipo == null || node.tipo === tipo),
   );
 }
@@ -134,8 +161,10 @@ export function getComercializadorDescripcion(poliza: SRTPolizaHierarchyFields):
 
 export function getAsociadoDescripcionDisplay(poliza: SRTPolizaHierarchyFields): string {
   const nodes = walkAsociadoHierarchy(poliza);
-  if (nodes.length === 0) {
-    return String(poliza.srtComercializadorAsociadoDescripcion ?? "").trim();
+  if (nodes.length > 0) {
+    return nodes.map((node) => node.descripcion).join(" / ");
   }
-  return nodes.map((node) => node.descripcion).join(" / ");
+  const root = getAsociadoRoot(poliza);
+  if (root) return getNodeDescripcion(root);
+  return String(poliza.srtComercializadorAsociadoDescripcion ?? "").trim();
 }
