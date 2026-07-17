@@ -83,7 +83,7 @@ export type SRTPolizaAcotada = {
     srtComercializadorAsociadoTipo?: string | null;
     /**
      * Jerarquía asociativa: Organizador/Grupo.
-     * `srtComercializadorAsociadoPadre` se anida recursivamente (Grupo arriba).
+     * Agrupar/filtrar por `asociadoId`; `interno` es el registro de relación.
      */
     srtComercializadorAsociado?: SRTComercializadorAsociadoNodo | null;
 }
