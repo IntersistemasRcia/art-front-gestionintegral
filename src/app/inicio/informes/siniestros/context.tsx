@@ -115,9 +115,9 @@ const optionsSelect = (options: any, formatter = valueOptionsFormatter, values =
 
 const SNOptions = { S: "Si", N: "No" };
 const tipoSiniestroOptions = {
-  AccidenteTrabajo: "Accidente Trabajo",
-  Enfermedad: "Enfermedad Profesional",
-  AccidenteInItinere: "Accidente In-Itinere",
+  AccidenteTrabajo: "AccidenteTrabajo",
+  Enfermedad: "P - Enfermedad Profesional",
+  AccidenteInItinere: "AccidenteinItinere",
   Reingreso: "Reingreso",
 };
 
