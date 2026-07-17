@@ -18,6 +18,7 @@ import {
   isComercializadorEmpresasRoleFromSession,
   needsRolesHierarchyForEmpresas,
 } from "@/utils/rolesUtils";
+import { isSRTPolizaVigente } from "@/utils/srt/srtPolizaVigenciaUtils";
 import { userHasTask } from "@/utils/userTasksUtils";
 
 type SessionUser = {
@@ -197,6 +198,10 @@ function mapPolizasUsuarioLogueadoToEmpresas(
   const empresas: Empresa[] = [];
 
   for (const poliza of polizas) {
+    if (!isSRTPolizaVigente(poliza)) {
+      continue;
+    }
+
     const empresaId =
       Number(poliza.interno) || Number(poliza.refEmpleadorInterno);
     const cuit = Number(poliza.cuit);

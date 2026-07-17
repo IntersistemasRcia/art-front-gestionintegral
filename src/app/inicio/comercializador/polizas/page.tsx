@@ -18,7 +18,6 @@ import type { Poliza, SRTPolizaAcotada } from "./types/poliza";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
 import HistorialPoliza from './historialPoliza/historialPoliza';
 import SrtAPI from '@/data/srtAPI';
-import dayjs from 'dayjs';
 import {
   getComercializadorDescripcion,
   getComercializadorInterno,
@@ -27,6 +26,7 @@ import {
   polizaBelongsToAsociado,
   walkAsociadoHierarchy,
 } from "@/utils/srt/srtComercializadorAsociadoUtils";
+import { isSRTPolizaVigente } from "@/utils/srt/srtPolizaVigenciaUtils";
 
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
 const POLIZA_COMBO_TODOS_ID = -1;
@@ -489,11 +489,7 @@ function PolizasPage() {
 export default PolizasPage;
 
 function isPolizaVigente(poliza: SRTPolizaAcotada): boolean {
-  const vigenciaHasta = String(poliza.vigenciaHasta ?? "").trim();
-  if (!vigenciaHasta) return true;
-  const hasta = dayjs(vigenciaHasta).startOf("day");
-  const hoy = dayjs().startOf("day");
-  return hasta.isValid() && (hasta.isSame(hoy) || hasta.isAfter(hoy));
+  return isSRTPolizaVigente(poliza);
 }
 
 function filterPolizasVigentes(polizas: SRTPolizaAcotada[]): SRTPolizaAcotada[] {
