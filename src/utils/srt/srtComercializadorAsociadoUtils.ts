@@ -109,14 +109,15 @@ export function walkAsociadoHierarchy(
   poliza: SRTPolizaHierarchyFields,
 ): PolizaHierarchyNode[] {
   const nodes: PolizaHierarchyNode[] = [];
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   let current: SRTComercializadorAsociadoNodo | null = getAsociadoRoot(poliza);
 
   while (current != null) {
     const asociadoId = getNodeAsociadoId(current);
     const tipo = asHierarchyTipo(getNodeTipoRaw(current));
-    if (asociadoId > 0 && tipo && !seen.has(asociadoId)) {
-      seen.add(asociadoId);
+    const hierarchyKey = tipo ? `${tipo}:${asociadoId}` : "";
+    if (asociadoId > 0 && tipo && !seen.has(hierarchyKey)) {
+      seen.add(hierarchyKey);
       const descripcion =
         getNodeDescripcion(current)
         || `${tipo === "grupo" ? "Grupo" : "Organizador"} ${asociadoId}`;
@@ -133,6 +134,60 @@ export function findHierarchyNodeByTipo(
   tipo: PolizaHierarchyTipo,
 ): PolizaHierarchyNode | null {
   return walkAsociadoHierarchy(poliza).find((node) => node.tipo === tipo) ?? null;
+}
+
+/**
+ * Devuelve únicamente el asociado asignado directamente a la póliza.
+ * El primer nodo es el asociado inmediato; sus padres solo representan jerarquía.
+ */
+export function getDirectAsociado(
+  poliza: SRTPolizaHierarchyFields,
+): PolizaHierarchyNode | null {
+  const root = getAsociadoRoot(poliza);
+  if (!root) return null;
+
+  const asociadoId = getNodeAsociadoId(root);
+  const tipo = asHierarchyTipo(getNodeTipoRaw(root));
+  if (asociadoId <= 0 || !tipo) return null;
+
+  const descripcion =
+    getNodeDescripcion(root)
+    || `${tipo === "grupo" ? "Grupo" : "Organizador"} ${asociadoId}`;
+
+  return { asociadoId, descripcion, tipo };
+}
+
+export function polizaBelongsDirectlyToAsociado(
+  poliza: SRTPolizaHierarchyFields,
+  asociadoId: number,
+  tipo: PolizaHierarchyTipo,
+): boolean {
+  if (asociadoId <= 0) return false;
+  const directAsociado = getDirectAsociado(poliza);
+  return directAsociado?.asociadoId === asociadoId && directAsociado.tipo === tipo;
+}
+
+/**
+ * Una póliza pertenece directamente al Comercializador cuando no tiene
+ * Grupo/Organizador asociado y el API informa el nodo "Independiente".
+ */
+export function isPolizaDirectlyAssignedToComercializador(
+  poliza: SRTPolizaHierarchyFields,
+): boolean {
+  const asociado = poliza.srtComercializadorAsociado;
+  if (asociado) {
+    return (
+      Number(asociado.asociadoId) === 0
+      && getNodeDescripcion(asociado).toLowerCase() === "independiente"
+    );
+  }
+
+  return (
+    Number(poliza.srtComercializadorAsociadoInterno ?? 0) === 0
+    && String(poliza.srtComercializadorAsociadoDescripcion ?? "")
+      .trim()
+      .toLowerCase() === "independiente"
+  );
 }
 
 export function polizaBelongsToAsociado(

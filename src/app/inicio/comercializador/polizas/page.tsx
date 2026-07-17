@@ -22,6 +22,8 @@ import dayjs from 'dayjs';
 import {
   getComercializadorDescripcion,
   getComercializadorInterno,
+  isPolizaDirectlyAssignedToComercializador,
+  polizaBelongsDirectlyToAsociado,
   polizaBelongsToAsociado,
   walkAsociadoHierarchy,
 } from "@/utils/srt/srtComercializadorAsociadoUtils";
@@ -305,8 +307,8 @@ function PolizasPage() {
     [polizasUsuarioLogueadoData],
   );
 
-  const grupoInternoSeleccionado = isPolizaComboTodos(grupo) ? 0 : grupo.interno;
-  const organizadorInternoSeleccionado = isPolizaComboTodos(organizador) ? 0 : organizador.interno;
+  const grupoAsociadoIdSeleccionado = isPolizaComboTodos(grupo) ? 0 : grupo.interno;
+  const organizadorAsociadoIdSeleccionado = isPolizaComboTodos(organizador) ? 0 : organizador.interno;
 
   /** Combos se arman solo desde UsuarioLogueado (jerarquía nested), sin APIs auxiliares. */
   const grupoOptions = useMemo(
@@ -315,17 +317,13 @@ function PolizasPage() {
   );
 
   const organizadorOptions = useMemo(
-    () => buildOrganizadorComboOptions(polizasVigentes, grupoInternoSeleccionado),
-    [polizasVigentes, grupoInternoSeleccionado],
+    () => buildOrganizadorComboOptions(polizasVigentes, grupoAsociadoIdSeleccionado),
+    [polizasVigentes, grupoAsociadoIdSeleccionado],
   );
 
   const comercializadorOptions = useMemo(
-    () => buildComercializadorComboOptions(
-      polizasVigentes,
-      grupoInternoSeleccionado,
-      organizadorInternoSeleccionado,
-    ),
-    [polizasVigentes, grupoInternoSeleccionado, organizadorInternoSeleccionado],
+    () => buildComercializadorComboOptions(polizasVigentes),
+    [polizasVigentes],
   );
 
   useEffect(() => {
@@ -551,23 +549,14 @@ function buildOrganizadorComboOptions(
 
 /**
  * Comercializadores desde `srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`.
- * Cascada por asociadoId de Grupo/Organizador en el árbol nested.
+ * Solo incluye pólizas directamente asignadas al Comercializador:
+ * asociadoId 0 y descripción "Independiente".
  */
 function buildComercializadorComboOptions(
   polizas: SRTPolizaAcotada[],
-  grupoAsociadoIdSeleccionado: number,
-  organizadorAsociadoIdSeleccionado: number,
 ): PolizaComboOption[] {
   const items = polizas
-    .filter((poliza) => {
-      if (organizadorAsociadoIdSeleccionado > 0) {
-        return polizaBelongsToAsociado(poliza, organizadorAsociadoIdSeleccionado, "organizador");
-      }
-      if (grupoAsociadoIdSeleccionado > 0) {
-        return polizaBelongsToAsociado(poliza, grupoAsociadoIdSeleccionado, "grupo");
-      }
-      return true;
-    })
+    .filter(isPolizaDirectlyAssignedToComercializador)
     .map((poliza) => ({
       interno: getComercializadorInterno(poliza),
       descripcion: getComercializadorDescripcion(poliza),
@@ -580,7 +569,12 @@ function isPolizaComboTodos(option: PolizaComboOption | null | undefined): boole
   return !option || option.interno === POLIZA_COMBO_TODOS_ID;
 }
 
-/** Filtro AND en cascada: Grupo ∩ Organizador ∩ Comercializador. */
+/**
+ * Filtra por la relación directa seleccionada.
+ * Prevalece el nivel más específico: Comercializador → Organizador → Grupo.
+ * Los padres de la jerarquía se usan para poblar la cascada, no para incluir
+ * pólizas indirectas en la tabla.
+ */
 function filterPolizasByCombos(
   polizas: SRTPolizaAcotada[],
   grupo: PolizaComboOption,
@@ -588,21 +582,25 @@ function filterPolizasByCombos(
   comercializador: PolizaComboOption,
 ): SRTPolizaAcotada[] {
   return polizas.filter((poliza) => {
-    if (!isPolizaComboTodos(grupo) && !polizaBelongsToAsociado(poliza, grupo.interno, "grupo")) {
-      return false;
+    if (!isPolizaComboTodos(comercializador)) {
+      return (
+        isPolizaDirectlyAssignedToComercializador(poliza)
+        && getComercializadorInterno(poliza) === comercializador.interno
+      );
     }
-    if (
-      !isPolizaComboTodos(organizador)
-      && !polizaBelongsToAsociado(poliza, organizador.interno, "organizador")
-    ) {
-      return false;
+
+    if (!isPolizaComboTodos(organizador)) {
+      return polizaBelongsDirectlyToAsociado(
+        poliza,
+        organizador.interno,
+        "organizador",
+      );
     }
-    if (
-      !isPolizaComboTodos(comercializador)
-      && getComercializadorInterno(poliza) !== comercializador.interno
-    ) {
-      return false;
+
+    if (!isPolizaComboTodos(grupo)) {
+      return polizaBelongsDirectlyToAsociado(poliza, grupo.interno, "grupo");
     }
+
     return true;
   });
 }
