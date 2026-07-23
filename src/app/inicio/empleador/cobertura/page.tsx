@@ -209,7 +209,7 @@ export default function CoberturaPage() {
         (async () => {
             try {
                 setIsPersonalLoading(true);
-                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, PageSize: 99999, Periodos: getPeriodos() });
+                const raw = await ArtAPI.getEmpleadorTrabajadores({ CUIL: cuilToQuery, Periodos: getPeriodos() });
                 const arr = Array.isArray(raw) ? raw : (raw?.DATA ?? raw?.data ?? []);
                 const personas: Persona[] = (arr as unknown[])
                     .map((x) => {
