@@ -208,7 +208,7 @@ function CredencialesPage() {
           <div className={styles.selectWrap}>
             <CustomSelectSearch<Empresa>
               options={empresas}
-              getOptionLabel={(e) => e ? String(e.razonSocial) : ''}
+              getOptionLabel={(e) => e ? `${e.razonSocial ?? ""} - ${Formato.CUIP(e.cuit)}` : ''}
               value={empresaSeleccionada}
               onChange={(_ev, newVal) => setEmpresaSeleccionada(newVal)}
               label="Seleccionar Empresa"
