@@ -22,7 +22,6 @@ import {
   getComercializadorDescripcion,
   getComercializadorInterno,
   isPolizaDirectlyAssignedToComercializador,
-  polizaBelongsDirectlyToAsociado,
   polizaBelongsToAsociado,
   walkAsociadoHierarchy,
 } from "@/utils/srt/srtComercializadorAsociadoUtils";
@@ -322,8 +321,12 @@ function PolizasPage() {
   );
 
   const comercializadorOptions = useMemo(
-    () => buildComercializadorComboOptions(polizasVigentes),
-    [polizasVigentes],
+    () => buildComercializadorComboOptions(
+      polizasVigentes,
+      grupoAsociadoIdSeleccionado,
+      organizadorAsociadoIdSeleccionado,
+    ),
+    [polizasVigentes, grupoAsociadoIdSeleccionado, organizadorAsociadoIdSeleccionado],
   );
 
   useEffect(() => {
@@ -400,6 +403,13 @@ function PolizasPage() {
     <CustomSelectSearch<PolizaComboOption>
       options={comercializadorOptions}
       getOptionLabel={getComboLabel}
+      isOptionEqualToValue={(option, value) =>
+        option.interno === value.interno
+        || (
+          normalizeComboDescripcion(option.descripcion)
+          === normalizeComboDescripcion(value.descripcion)
+        )
+      }
       value={comercializador}
       onChange={(_e, value) => setComercializador(value ?? POLIZA_COMBO_TODOS)}
       label="Comercializador"
@@ -500,6 +510,10 @@ function withTodosOption(options: PolizaComboOption[]): PolizaComboOption[] {
   return [POLIZA_COMBO_TODOS, ...uniqueComboOptions(options)];
 }
 
+function normalizeComboDescripcion(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 function uniqueComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
   const map = new Map<number, PolizaComboOption>();
   items.forEach((item) => {
@@ -509,6 +523,41 @@ function uniqueComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
   });
   return Array.from(map.values()).sort((a, b) =>
     a.descripcion.localeCompare(b.descripcion, "es"),
+  );
+}
+
+function uniqueComercializadorComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
+  const byInterno = new Map<number, PolizaComboOption>();
+  const byDescripcion = new Map<string, PolizaComboOption>();
+
+  items.forEach((item) => {
+    const descripcion = item.descripcion.trim();
+    if (!descripcion) return;
+
+    const descripcionKey = normalizeComboDescripcion(descripcion);
+    if (byDescripcion.has(descripcionKey)) return;
+    if (item.interno > 0 && byInterno.has(item.interno)) return;
+
+    const option = { interno: item.interno, descripcion };
+    if (item.interno > 0) byInterno.set(item.interno, option);
+    byDescripcion.set(descripcionKey, option);
+  });
+
+  return Array.from(byDescripcion.values()).sort((a, b) =>
+    a.descripcion.localeCompare(b.descripcion, "es"),
+  );
+}
+
+function polizaMatchesComercializador(
+  poliza: SRTPolizaAcotada,
+  comercializador: PolizaComboOption,
+): boolean {
+  const interno = getComercializadorInterno(poliza);
+  if (interno > 0 && interno === comercializador.interno) return true;
+
+  return (
+    normalizeComboDescripcion(getComercializadorDescripcion(poliza))
+    === normalizeComboDescripcion(comercializador.descripcion)
   );
 }
 
@@ -544,21 +593,38 @@ function buildOrganizadorComboOptions(
 }
 
 /**
- * Comercializadores desde `srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`.
- * Solo incluye pólizas directamente asignadas al Comercializador:
- * asociadoId 0 y descripción "Independiente".
+ * Comercializador:
+ * - Grupo y Organizador en Todos → solo Independientes.
+ * - Grupo seleccionado → comercializadores del grupo, sin Independientes.
+ * - Organizador seleccionado → comercializadores de ese organizador.
  */
 function buildComercializadorComboOptions(
   polizas: SRTPolizaAcotada[],
+  grupoAsociadoIdSeleccionado: number,
+  organizadorAsociadoIdSeleccionado: number,
 ): PolizaComboOption[] {
   const items = polizas
-    .filter(isPolizaDirectlyAssignedToComercializador)
+    .filter((poliza) => {
+      if (organizadorAsociadoIdSeleccionado > 0) {
+        return (
+          !isPolizaDirectlyAssignedToComercializador(poliza)
+          && polizaBelongsToAsociado(poliza, organizadorAsociadoIdSeleccionado, "organizador")
+        );
+      }
+      if (grupoAsociadoIdSeleccionado > 0) {
+        return (
+          !isPolizaDirectlyAssignedToComercializador(poliza)
+          && polizaBelongsToAsociado(poliza, grupoAsociadoIdSeleccionado, "grupo")
+        );
+      }
+      return isPolizaDirectlyAssignedToComercializador(poliza);
+    })
     .map((poliza) => ({
       interno: getComercializadorInterno(poliza),
       descripcion: getComercializadorDescripcion(poliza),
     }));
 
-  return withTodosOption(items);
+  return [POLIZA_COMBO_TODOS, ...uniqueComercializadorComboOptions(items)];
 }
 
 function isPolizaComboTodos(option: PolizaComboOption | null | undefined): boolean {
@@ -566,10 +632,10 @@ function isPolizaComboTodos(option: PolizaComboOption | null | undefined): boole
 }
 
 /**
- * Filtra por la relación directa seleccionada.
- * Prevalece el nivel más específico: Comercializador → Organizador → Grupo.
- * Los padres de la jerarquía se usan para poblar la cascada, no para incluir
- * pólizas indirectas en la tabla.
+ * Tabla:
+ * - Grupo y Organizador en Todos + Comercializador → Independientes de ese comercializador.
+ * - Organizador → pólizas de ese organizador (y comercializador si hay).
+ * - Solo Grupo → pólizas del grupo, sin Independientes (y comercializador si hay).
  */
 function filterPolizasByCombos(
   polizas: SRTPolizaAcotada[],
@@ -577,24 +643,38 @@ function filterPolizasByCombos(
   organizador: PolizaComboOption,
   comercializador: PolizaComboOption,
 ): SRTPolizaAcotada[] {
+  const hasGrupo = !isPolizaComboTodos(grupo);
+  const hasOrganizador = !isPolizaComboTodos(organizador);
+  const hasComercializador = !isPolizaComboTodos(comercializador);
+
   return polizas.filter((poliza) => {
-    if (!isPolizaComboTodos(comercializador)) {
+    if (!hasGrupo && !hasOrganizador) {
+      if (!hasComercializador) return true;
       return (
         isPolizaDirectlyAssignedToComercializador(poliza)
-        && getComercializadorInterno(poliza) === comercializador.interno
+        && polizaMatchesComercializador(poliza, comercializador)
       );
     }
 
-    if (!isPolizaComboTodos(organizador)) {
-      return polizaBelongsDirectlyToAsociado(
-        poliza,
-        organizador.interno,
-        "organizador",
-      );
+    if (isPolizaDirectlyAssignedToComercializador(poliza)) return false;
+
+    if (
+      hasOrganizador
+      && !polizaBelongsToAsociado(poliza, organizador.interno, "organizador")
+    ) {
+      return false;
     }
 
-    if (!isPolizaComboTodos(grupo)) {
-      return polizaBelongsDirectlyToAsociado(poliza, grupo.interno, "grupo");
+    if (
+      !hasOrganizador
+      && hasGrupo
+      && !polizaBelongsToAsociado(poliza, grupo.interno, "grupo")
+    ) {
+      return false;
+    }
+
+    if (hasComercializador && !polizaMatchesComercializador(poliza, comercializador)) {
+      return false;
     }
 
     return true;
