@@ -1,0 +1,23 @@
+---
+description: Jerarquía y combos de Comercializador → Pólizas
+globs: src/app/inicio/comercializador/polizas/**/*,src/utils/srt/srtComercializadorAsociadoUtils.ts
+alwaysApply: false
+---
+
+# Comercializador Pólizas — jerarquía de combos
+
+Toda póliza tiene un comercializador (`srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`). Puede ser:
+
+- **Independiente**: `srtComercializadorAsociado.asociadoId === 0` y `descripcion === "Independiente"`.
+- **Por Organizador**: asociado `tipo === "Organizador"`; agrupar por `asociadoId`. El organizador puede o no tener padre Grupo.
+- **Por Grupo**: asociado `tipo === "Grupo"` o padre del organizador; agrupar por `asociadoId`.
+
+## Combos
+
+- **Grupo y Organizador = Todos** + Comercializador: el combo lista comercializadores Independientes (sin duplicar por interno/nombre). La tabla muestra solo Independientes de ese comercializador.
+- **Grupo seleccionado**: Organizador y Comercializador se restringen a ese grupo. El combo de Comercializador **no** incluye Independientes.
+- **Organizador seleccionado**: Comercializador se restringe a ese organizador. El combo de Comercializador **no** incluye Independientes.
+- Grupo/Organizador se identifican por `asociadoId`, no por `interno` del nodo.
+
+## Roles
+- **Administrador**: ve todo, sin chequear tareas.
