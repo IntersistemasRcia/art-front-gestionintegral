@@ -22,6 +22,7 @@ import {
   getComercializadorDescripcion,
   getComercializadorInterno,
   isPolizaDirectlyAssignedToComercializador,
+  polizaBelongsDirectlyToAsociado,
   polizaBelongsToAsociado,
   walkAsociadoHierarchy,
 } from "@/utils/srt/srtComercializadorAsociadoUtils";
@@ -595,8 +596,9 @@ function buildOrganizadorComboOptions(
 /**
  * Comercializador:
  * - Grupo y Organizador en Todos → solo Independientes.
- * - Grupo seleccionado → comercializadores del grupo, sin Independientes.
- * - Organizador seleccionado → comercializadores de ese organizador.
+ * - Grupo seleccionado (Organizador Todos) → comercializadores de pólizas
+ *   **directas** del grupo (no las que pasan por organizador).
+ * - Organizador seleccionado → comercializadores de pólizas directas de ese organizador.
  */
 function buildComercializadorComboOptions(
   polizas: SRTPolizaAcotada[],
@@ -606,15 +608,17 @@ function buildComercializadorComboOptions(
   const items = polizas
     .filter((poliza) => {
       if (organizadorAsociadoIdSeleccionado > 0) {
-        return (
-          !isPolizaDirectlyAssignedToComercializador(poliza)
-          && polizaBelongsToAsociado(poliza, organizadorAsociadoIdSeleccionado, "organizador")
+        return polizaBelongsDirectlyToAsociado(
+          poliza,
+          organizadorAsociadoIdSeleccionado,
+          "organizador",
         );
       }
       if (grupoAsociadoIdSeleccionado > 0) {
-        return (
-          !isPolizaDirectlyAssignedToComercializador(poliza)
-          && polizaBelongsToAsociado(poliza, grupoAsociadoIdSeleccionado, "grupo")
+        return polizaBelongsDirectlyToAsociado(
+          poliza,
+          grupoAsociadoIdSeleccionado,
+          "grupo",
         );
       }
       return isPolizaDirectlyAssignedToComercializador(poliza);
@@ -634,8 +638,11 @@ function isPolizaComboTodos(option: PolizaComboOption | null | undefined): boole
 /**
  * Tabla:
  * - Grupo y Organizador en Todos + Comercializador → Independientes de ese comercializador.
- * - Organizador → pólizas de ese organizador (y comercializador si hay).
- * - Solo Grupo → pólizas del grupo, sin Independientes (y comercializador si hay).
+ * - Organizador → pólizas **directas** de ese organizador (y comercializador si hay).
+ * - Grupo + Organizador Todos + Comercializador Todos → **todas** las pólizas del grupo
+ *   (directas o vía organizador). Sin Independientes.
+ * - Grupo + Organizador Todos + Comercializador → solo pólizas **directas** del grupo
+ *   de ese comercializador (no las que pasan por organizador).
  */
 function filterPolizasByCombos(
   polizas: SRTPolizaAcotada[],
@@ -658,19 +665,20 @@ function filterPolizasByCombos(
 
     if (isPolizaDirectlyAssignedToComercializador(poliza)) return false;
 
-    if (
-      hasOrganizador
-      && !polizaBelongsToAsociado(poliza, organizador.interno, "organizador")
-    ) {
-      return false;
-    }
-
-    if (
-      !hasOrganizador
-      && hasGrupo
-      && !polizaBelongsToAsociado(poliza, grupo.interno, "grupo")
-    ) {
-      return false;
+    if (hasOrganizador) {
+      if (!polizaBelongsDirectlyToAsociado(poliza, organizador.interno, "organizador")) {
+        return false;
+      }
+    } else if (hasGrupo) {
+      if (hasComercializador) {
+        // Comercializador concreto: solo directas del grupo.
+        if (!polizaBelongsDirectlyToAsociado(poliza, grupo.interno, "grupo")) {
+          return false;
+        }
+      } else if (!polizaBelongsToAsociado(poliza, grupo.interno, "grupo")) {
+        // Comercializador Todos: todas las del grupo (directas o vía organizador).
+        return false;
+      }
     }
 
     if (hasComercializador && !polizaMatchesComercializador(poliza, comercializador)) {

@@ -9,15 +9,18 @@ alwaysApply: false
 Toda póliza tiene un comercializador (`srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`). Puede ser:
 
 - **Independiente**: `srtComercializadorAsociado.asociadoId === 0` y `descripcion === "Independiente"`.
-- **Por Organizador**: asociado `tipo === "Organizador"`; agrupar por `asociadoId`. El organizador puede o no tener padre Grupo.
-- **Por Grupo**: asociado `tipo === "Grupo"` o padre del organizador; agrupar por `asociadoId`.
+- **Por Organizador**: asociado inmediato `tipo === "Organizador"`; agrupar por `asociadoId`.
+- **Por Grupo**: asociado inmediato `tipo === "Grupo"`; agrupar por `asociadoId`.
 
-## Combos
+## Combos / tabla
 
-- **Grupo y Organizador = Todos** + Comercializador: el combo lista comercializadores Independientes (sin duplicar por interno/nombre). La tabla muestra solo Independientes de ese comercializador.
-- **Grupo seleccionado**: Organizador y Comercializador se restringen a ese grupo. El combo de Comercializador **no** incluye Independientes.
-- **Organizador seleccionado**: Comercializador se restringe a ese organizador. El combo de Comercializador **no** incluye Independientes.
+- **Grupo y Organizador = Todos** + Comercializador: Independientes de ese comercializador (sin duplicar).
+- **Grupo + Organizador Todos + Comercializador Todos**: **todas** las pólizas del grupo (directas o vía organizador). Sin Independientes.
+- **Grupo + Organizador Todos + Comercializador**: solo pólizas **directas** del grupo de ese comercializador. No las que pasan por un Organizador. Sin Independientes.
+- **Organizador** (+ Comercializador opcional): solo pólizas **directas** de ese organizador. Combo Comercializador sin Independientes.
+- Cascada de opciones: Organizador/Comercializador se restringen por el Grupo seleccionado.
 - Grupo/Organizador se identifican por `asociadoId`, no por `interno` del nodo.
 
 ## Roles
+
 - **Administrador**: ve todo, sin chequear tareas.
