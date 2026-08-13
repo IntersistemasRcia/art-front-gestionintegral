@@ -394,7 +394,10 @@ const GenerarFormularioRGRL: React.FC<{
           renglon: i,
         }));
 
-        const responsablesFull = (original.respuestasResponsable || []).map((r: any, i: number) => ({
+        const cambioEstablecimiento = establecimientoSel !== original.internoEstablecimiento;
+        const responsablesFull = cambioEstablecimiento
+          ? []
+          : (original.respuestasResponsable || []).map((r: any, i: number) => ({
           interno: 0,
           internoRespuestaFormulario: nuevoId,
           cuit: r?.cuit ?? 0,

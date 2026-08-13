@@ -84,7 +84,7 @@ const CabeceraFormulario: React.FC<CabeceraFormularioProps> = ({
 				/>
 			</Box>
 			<Box className={styles.establecimientoBox}>
-				<FormControl fullWidth disabled={esReplica || soloLectura} title={esReplica ? 'Tipo fijado por replicación' : undefined}>
+				<FormControl fullWidth disabled={soloLectura}>
 					<Autocomplete
 						options={establecimientos}
 						getOptionLabel={(opt) => {
@@ -98,7 +98,7 @@ const CabeceraFormulario: React.FC<CabeceraFormularioProps> = ({
 						onChange={(_e, newVal) => onEstablecimientoChange(newVal ? newVal.interno : undefined)}
 						isOptionEqualToValue={(option, value) => option.interno === value.interno}
 						renderInput={(params) => <TextField {...params} label="Establecimiento" />}
-						disabled={esReplica || soloLectura}
+						disabled={soloLectura}
 					/>
 				</FormControl>
 			</Box>
