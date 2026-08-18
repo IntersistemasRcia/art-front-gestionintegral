@@ -394,7 +394,10 @@ const GenerarFormularioRGRL: React.FC<{
           renglon: i,
         }));
 
-        const responsablesFull = (original.respuestasResponsable || []).map((r: any, i: number) => ({
+        const cambioEstablecimiento = establecimientoSel !== original.internoEstablecimiento;
+        const responsablesFull = cambioEstablecimiento
+          ? []
+          : (original.respuestasResponsable || []).map((r: any, i: number) => ({
           interno: 0,
           internoRespuestaFormulario: nuevoId,
           cuit: r?.cuit ?? 0,
@@ -863,7 +866,7 @@ const GenerarFormularioRGRL: React.FC<{
           setModalMsgOpen(true);
           return;
         }
-        if (typeof r.representacion !== 'number') {
+        if (typeof r.representacion !== 'number' || r.representacion === 0) {
           setError('');
           setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Representación.`);
           setModalMsgType('error');
@@ -882,7 +885,7 @@ const GenerarFormularioRGRL: React.FC<{
 
     if (completar) {
       // Requerir al menos un Responsable de Datos del Formulario con datos completos
-      const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && typeof r.esContratado === 'number');
+      const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && r.representacion !== 0 && typeof r.esContratado === 'number');
       if (!tieneRespDatos) {
         setError('');
         setModalMsg('Debe indicar al menos un Responsable de Datos del Formulario con CUIT, nombre, representación y Propio/Contratado.');
@@ -997,7 +1000,7 @@ const GenerarFormularioRGRL: React.FC<{
         cuit: Number(r.cuit ?? 0),
         responsable: r.responsable ?? '',
         cargo: r.cargo ?? '',
-        representacion: Number(r.representacion ?? 0),
+        representacion: Number(r.representacion),
         esContratado: Number(r.esContratado ?? 0),
         tituloHabilitante: r.tituloHabilitante ?? '',
         matricula: r.matricula ?? '',
@@ -1441,11 +1444,11 @@ const GenerarFormularioRGRL: React.FC<{
                       <MenuItem value=""><em>Seleccioná...</em></MenuItem>
                       <MenuItem value={1}>Representante Legal</MenuItem>
                       <MenuItem value={2}>Presidente</MenuItem>
-                      <MenuItem value={3}>VicePresidente</MenuItem>
-                      <MenuItem value={4}>Director General</MenuItem>
-                      <MenuItem value={5}>Gerente General</MenuItem>
-                      <MenuItem value={6}>Administrador General</MenuItem>
-                      <MenuItem value={0}>Otros</MenuItem>
+                      <MenuItem value={3}>Director General</MenuItem>
+                      <MenuItem value={4}>Administrador General</MenuItem>
+                      <MenuItem value={5}>Vicepresidente</MenuItem>
+                      <MenuItem value={6}>Gerente General</MenuItem>
+                      <MenuItem value={99}>Otros</MenuItem>
                     </Select>
                   </FormControl>
                   <FormControl fullWidth>

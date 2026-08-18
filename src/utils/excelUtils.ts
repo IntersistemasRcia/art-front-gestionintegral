@@ -379,7 +379,7 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     if (validacionInicio.valida && validacionIngreso.valida && validacionInicio.fecha < validacionIngreso.fecha) {
       erroresFila.push('La fecha inicio exposición debe ser mayor o igual a la fecha de ingreso');
     }
-    if (validacionExamen.valida && validacionIngreso.valida && validacionExamen.fecha <= validacionIngreso.fecha) {
+    if (validacionExamen.valida && validacionIngreso.valida && validacionExamen.fecha < validacionIngreso.fecha) {
       erroresFila.push('La fecha del último examen médico debe ser posterior a la fecha de ingreso');
     }
     if (fechaFinExposicionValidada && validacionInicio.valida && fechaFinExposicionValidada < validacionInicio.fecha) {
