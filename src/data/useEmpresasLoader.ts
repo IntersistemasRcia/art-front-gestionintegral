@@ -202,8 +202,7 @@ function mapPolizasUsuarioLogueadoToEmpresas(
       continue;
     }
 
-    const empresaId =
-      Number(poliza.interno) || Number(poliza.refEmpleadorInterno);
+    const empresaId = Number(poliza.referenteDatosInterno);
     const cuit = Number(poliza.cuit);
     if (!empresaId || !cuit) {
       continue;
