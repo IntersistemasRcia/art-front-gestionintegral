@@ -8,6 +8,13 @@ export const VER_TODAS_LAS_EMPRESAS_TASK = "VerTodasLasEmpresas";
 export const COMERCIALIZADOR_ROLE = "Comercializador";
 export const ORGANIZADOR_COMERCIALIZADOR_ROLE = "OrganizadorComercializador";
 export const GRUPO_ORGANIZADOR_ROLE = "GrupoOrganizador";
+/** Prefijo de la tarea que habilita a un rol a crear usuarios de otro rol sin depender de RolPadre (ver tabla Tareas: ADMROL_<NombreDelRol>). */
+export const ADMROL_TASK_PREFIX = "ADMROL_";
+
+/** Nombre de tarea que habilita al usuario a crear usuarios del rol indicado, sin depender de RolPadre. */
+export function admRolTaskName(roleName: string): string {
+  return `${ADMROL_TASK_PREFIX}${roleName}`;
+}
 
 function normalizeRoleName(roleName: string): string {
   return roleName.trim().toLowerCase();
