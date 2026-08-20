@@ -23,6 +23,7 @@ export type TipoFormulario = {
     tieneNoAplica: number;
     comentario?: string;
     cuestionarios?: Array<{
+      interno: number;
       internoSeccion: number;
       orden: number;
       codigo: number;

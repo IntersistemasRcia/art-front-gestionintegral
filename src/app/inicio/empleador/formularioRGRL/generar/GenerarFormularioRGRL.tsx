@@ -900,20 +900,18 @@ const GenerarFormularioRGRL: React.FC<{
           return !desc.includes('PLANILLA A') && !desc.includes('PLANILLA C') && !desc.includes('PLANILLA B');
         })
         .flatMap((s) => s.cuestionarios ?? [])
-        .map((q) => Number(q.codigo ?? 0))
-        .filter((codigo) => codigo > 0)
-        .filter((codigo, idx, arr) => arr.indexOf(codigo) === idx)
-        .sort((a, b) => a - b);
+        .filter((q) => Number(q.interno ?? 0) > 0)
+        .filter((q, idx, arr) => arr.findIndex((x) => x.interno === q.interno) === idx)
+        .sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
 
       const hoy = Number(dayjs().format('YYYYMMDD'));
-      for (const nro of preguntasObligatorias) {
-        const r = respuestas[nro] ?? {};
+      for (const q of preguntasObligatorias) {
+        const key = q.interno as number;
+        const nro = q.codigo;
+        const r = respuestas[key] ?? {};
         const respuesta = String(r.respuesta ?? '').toUpperCase();
         if (respuesta !== 'SI' && respuesta !== 'NO' && respuesta !== 'NA') {
-          const preguntaFaltante = secciones
-            .flatMap((s) => s.cuestionarios ?? [])
-            .find((q) => Number(q.codigo ?? 0) === nro);
-          const textoPregunta = String(preguntaFaltante?.pregunta ?? '').trim();
+          const textoPregunta = String(q.pregunta ?? '').trim();
           setError('');
           setModalMsg(
             textoPregunta
@@ -949,10 +947,10 @@ const GenerarFormularioRGRL: React.FC<{
     setError('');
     try {
       const fullCuest: any[] = [];
-      // Recolectar todas las preguntas y ordenar por 'codigo' (interno)
+      // Recolectar todas las preguntas y ordenar por 'codigo' (número visible), identificando por 'interno'
       const allQs = secciones.flatMap(s => (s.cuestionarios ?? [])).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
       for (const q of allQs) {
-        const key = q.codigo as number;
+        const key = q.interno as number;
         const r = respuestas[key] ?? {};
         fullCuest.push({
           interno: r.interno ?? 0,
@@ -1531,7 +1529,7 @@ const GenerarFormularioRGRL: React.FC<{
                       setRespuestas((prev) => {
                         const next = { ...prev };
                         for (const item of preguntasSeccion) {
-                          const key = item.codigo as number;
+                          const key = item.interno as number;
                           const base = next[key] ?? { internoCuestionario: key, respuesta: '' };
                           next[key] = { ...base, respuesta };
                         }
@@ -1572,7 +1570,7 @@ const GenerarFormularioRGRL: React.FC<{
                     );
                   })()}
                   {grouped[title].map((q) => {
-                    const key = q.codigo as number;
+                    const key = q.interno as number;
                     const rr = respuestas[key] ?? {};
                     const value = rr.respuesta ?? '';
                     const hoyIso = dayjs().format('YYYY-MM-DD');
