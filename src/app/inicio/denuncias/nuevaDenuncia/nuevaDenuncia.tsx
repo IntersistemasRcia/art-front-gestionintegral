@@ -9,6 +9,7 @@ import styles from "../denuncias.module.css";
 import localStyles from "./nuevaDenuncia.module.css";
 import { DenunciaFormData, TIPOS_TRASLADO } from "../types/tDenuncias";
 import ArtAPI, { EstablecimientoVmDescripcion } from '@/data/artAPI';
+import Formato from "@/utils/Formato";
 
 const SI_NO_IGNORA_OPTIONS = ["Si", "No", "Ignora"] as const;
 const ESTADO_COLOR_OPTIONS = [
@@ -55,7 +56,7 @@ export default function NuevaDenuncia({
 	const { data: localidadesByNombre, isValidating: isValidatingNombre } = ArtAPI.useGetLocalidadesbyNombre(nombreBuscado ? { Nombre: nombreBuscado } : {});
 	const isValidatingLocalidad = isValidatingCP || isValidatingNombre;
 
-	const codigoLocalidadDigits = String((form as any).establecimientoCodLocalidad || '').replace(/\D/g, '');
+	const codigoLocalidadDigits = String((form as any).ocurrenciaCodLocalidad || '').replace(/\D/g, '');
 	const codigoLocalidadNum = codigoLocalidadDigits ? Number(codigoLocalidadDigits) : 0;
 	const { data: localidadCodigoData } = ArtAPI.useGetLocalidadesbyCodigo(codigoLocalidadNum ? { Codigo: codigoLocalidadNum } : {});
 	const localidadCodigoItem = Array.isArray(localidadCodigoData) ? localidadCodigoData[0] : localidadCodigoData || null;
@@ -64,6 +65,20 @@ export default function NuevaDenuncia({
 	const [localEstCuit, setLocalEstCuit] = useState<string>('');
 	const estCuitDigits = String(localEstCuit || '').replace(/\D/g, '');
 	const hasEstCuitValido = estCuitDigits.length === 11;
+
+	// Al editar una denuncia existente, sincronizar el CUIT local (que controla
+	// esta sección) con el valor ya guardado en el formulario, para no depender
+	// de que el usuario lo tipee de nuevo.
+	const ocurrenciaCuitSyncedRef = useRef(false);
+	useEffect(() => {
+		if (ocurrenciaCuitSyncedRef.current) return;
+		const formCuitDigits = String((form as any).ocurrenciaCuit || '').replace(/\D/g, '');
+		if (formCuitDigits) {
+			setLocalEstCuit(formCuitDigits);
+			lastFetchedEstCuitRef.current = formCuitDigits;
+			ocurrenciaCuitSyncedRef.current = true;
+		}
+	}, [(form as any).ocurrenciaCuit]);
 
 	// Prestador traslado local state
 	const [prestadorLoading, setPrestadorLoading] = useState(false);
@@ -78,6 +93,33 @@ export default function NuevaDenuncia({
 	const { data: establecimientosList = [], isValidating: isLoadingEstablecimientos } = ArtAPI.useEstablecimientoList(
 		cuitForEstablecimientos ? { cuit: cuitForEstablecimientos } : undefined
 	);
+
+	// Al editar una denuncia existente, una vez cargada la lista de establecimientos
+	// del CUIT, preseleccionar en el Autocomplete el que coincide con los datos de
+	// Ocurrencia ya guardados en el formulario (por calle+número, o por nombre).
+	useEffect(() => {
+		if (selectedEstablecimiento) return;
+		if (!Array.isArray(establecimientosList) || establecimientosList.length === 0) return;
+
+		const onlyDigitsLocal = (v?: string) => (v ?? '').replace(/\D/g, '');
+		const formCalle = String((form as any).ocurrenciaCalle || '').trim().toLowerCase();
+		const formNumero = onlyDigitsLocal(String((form as any).ocurrenciaNumero || ''));
+		const formNombre = String((form as any).ocurrenciaRazonSocial || '').trim().toLowerCase();
+
+		const match = establecimientosList.find((est: any) => {
+			const estCalle = String(est.domicilioCalle || '').trim().toLowerCase();
+			const estNumero = onlyDigitsLocal(String(est.domicilioNro || ''));
+			if (formCalle && estCalle === formCalle && formNumero === estNumero) {
+				return true;
+			}
+			const estNombre = String(est.nombre || '').trim().toLowerCase();
+			return !!formNombre && estNombre === formNombre;
+		});
+
+		if (match) {
+			setSelectedEstablecimiento(match);
+		}
+	}, [establecimientosList, (form as any).ocurrenciaCalle, (form as any).ocurrenciaNumero, (form as any).ocurrenciaRazonSocial, selectedEstablecimiento]);
 
 	let localidadesOptions: any[] = [];
 	if (nombreBuscado) {
@@ -98,18 +140,18 @@ export default function NuevaDenuncia({
 				if (cancelled || !empresa) return;
 
 				const mappings: Record<string, any> = {
-					establecimientoNombre: String(empresa.razonSocial ?? empresa.RazonSocial ?? ''),
-					establecimientoCalle: String(empresa.domicilioCalle ?? empresa.domicilio ?? ''),
-					establecimientoNumero: String(empresa.domicilioNro ?? empresa.domicilioNumero ?? ''),
-					establecimientoPiso: String(empresa.domicilioPiso ?? ''),
-					establecimientoDpto: String(empresa.domicilioDpto ?? ''),
-					establecimientoEntreCalle1: String(empresa.domicilioEntreCalle1 ?? ''),
-					establecimientoEntreCalle2: String(empresa.domicilioEntreCalle2 ?? ''),
-					establecimientoEmail: String(empresa.email ?? empresa.mail ?? empresa.Email ?? ''),
-					establecimientoTelefonos: String(empresa.telefono ?? empresa.telefonos ?? empresa.telefono1 ?? ''),
-					establecimientoCiiu: String(empresa.ciiu ?? empresa.CIIU ?? empresa.clasificacionCiiu ?? empresa.actividadCIIU ?? ''),
-					establecimientoCodPostal: String(empresa.codLocalidadPostal ?? empresa.cp ?? ''),
-					establecimientoCodLocalidad: String(empresa.codLocalidad ?? ''),
+					ocurrenciaRazonSocial: String(empresa.razonSocial ?? empresa.RazonSocial ?? ''),
+					ocurrenciaCalle: String(empresa.domicilioCalle ?? empresa.domicilio ?? ''),
+					ocurrenciaNumero: String(empresa.domicilioNro ?? empresa.domicilioNumero ?? ''),
+					ocurrenciaPiso: String(empresa.domicilioPiso ?? ''),
+					ocurrenciaDpto: String(empresa.domicilioDpto ?? ''),
+					ocurrenciaEntreCalle1: String(empresa.domicilioEntreCalle1 ?? ''),
+					ocurrenciaEntreCalle2: String(empresa.domicilioEntreCalle2 ?? ''),
+					ocurrenciaEmail: String(empresa.email ?? empresa.mail ?? empresa.Email ?? ''),
+					ocurrenciaTelefonos: String(empresa.telefono ?? empresa.telefonos ?? empresa.telefono1 ?? ''),
+					ocurrenciaCiiu: String(empresa.ciiu ?? empresa.CIIU ?? empresa.clasificacionCiiu ?? empresa.actividadCIIU ?? ''),
+					ocurrenciaCodPostal: String(empresa.codLocalidadPostal ?? empresa.cp ?? ''),
+					ocurrenciaCodLocalidad: String(empresa.codLocalidad ?? ''),
 				};
 
 				Object.keys(mappings).forEach((k) => {
@@ -118,14 +160,14 @@ export default function NuevaDenuncia({
 				});
 
 				// If empresa returned a postal code for localidad, trigger localidad search by CP
-				const postal = mappings.establecimientoCodPostal;
+				const postal = mappings.ocurrenciaCodPostal;
 				if (postal) {
 					const cpNum = Number(String(postal).replace(/\D/g, ''));
 					if (cpNum) setCpBuscado(cpNum);
 				}
 
 				// also propagate the CUIT itself into the form
-				const evCuit = { target: { name: 'establecimientoCuit', value: raw } } as unknown as React.ChangeEvent<HTMLInputElement>;
+				const evCuit = { target: { name: 'ocurrenciaCuit', value: raw } } as unknown as React.ChangeEvent<HTMLInputElement>;
 				onTextFieldChange(evCuit);
 
 				lastFetchedEstCuitRef.current = raw;
@@ -144,16 +186,16 @@ export default function NuevaDenuncia({
 		const first = localidadesFromCpButton[0];
 		if (!first) return;
 		// Si el formulario ya tiene código, no sobreescribir
-		const existing = String((form as any).establecimientoCodLocalidad || '').replace(/\D/g, '');
+		const existing = String((form as any).ocurrenciaCodLocalidad || '').replace(/\D/g, '');
 		if (existing) return;
 		const codigo = String(first.codigo ?? first.Codigo ?? '');
 		const postal = String(first.codPostal ?? first.CodPostal ?? '');
 		if (codigo) {
-			const ev = { target: { name: 'establecimientoCodLocalidad', value: codigo } } as unknown as React.ChangeEvent<HTMLInputElement>;
+			const ev = { target: { name: 'ocurrenciaCodLocalidad', value: codigo } } as unknown as React.ChangeEvent<HTMLInputElement>;
 			onTextFieldChange(ev);
 		}
 		if (postal) {
-			const ev2 = { target: { name: 'establecimientoCodPostal', value: postal } } as unknown as React.ChangeEvent<HTMLInputElement>;
+			const ev2 = { target: { name: 'ocurrenciaCodPostal', value: postal } } as unknown as React.ChangeEvent<HTMLInputElement>;
 			onTextFieldChange(ev2);
 		}
 	}, [localidadesFromCpButton, hasEstCuitValido]);
@@ -166,23 +208,23 @@ export default function NuevaDenuncia({
 				<div className={`${styles.formRow} ${localStyles.gridThreeCols}`}> 
 					<TextField
 						label="CUIT Occurrence"
-						name="establecimientoCuit"
-						value={localEstCuit}
+						name="ocurrenciaCuit"
+						value={estCuitDigits.length === 11 ? Formato.CUIP(estCuitDigits) : localEstCuit}
 						onChange={(e) => {
 							const digits = String((e.target as HTMLInputElement).value || '').replace(/\D/g, '');
 							setLocalEstCuit(digits);
 						}}
 						onBlur={() => {
-							const ev = { target: { name: 'establecimientoCuit', value: localEstCuit } } as unknown as React.ChangeEvent<HTMLInputElement>;
+							const ev = { target: { name: 'ocurrenciaCuit', value: localEstCuit } } as unknown as React.ChangeEvent<HTMLInputElement>;
 							onTextFieldChange(ev);
-							onBlur('establecimientoCuit');
+							onBlur('ocurrenciaCuit');
 						}}
 						fullWidth
 						disabled={isDisabled}
 						inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
 					/>
 					{/* mostrados tras la busqueda */}
-					<TextField label="Razón Social" value={hasEstCuitValido ? ((form as any).establecimientoNombre || '') : ''} fullWidth disabled />
+					<TextField label="Razón Social" value={hasEstCuitValido ? ((form as any).ocurrenciaRazonSocial || '') : ''} fullWidth disabled />
 
 					{/* Autocomplete Establecimiento filtrado por CUIT */}
 					<Autocomplete
@@ -219,19 +261,19 @@ export default function NuevaDenuncia({
 			
 					{/* email / telefonos / ciiu */}
 					<div className={`${styles.formRow} ${localStyles.gridThreeRepeatWithMarginTop}`}>
-						<TextField label="Email" value={hasEstCuitValido ? ((form as any).establecimientoEmail || '') : ''} fullWidth disabled />
-						<TextField label="Teléfonos" value={hasEstCuitValido ? ((form as any).establecimientoTelefonos || '') : ''} fullWidth disabled />
-						<TextField label="CIIU" value={hasEstCuitValido ? ((form as any).establecimientoCiiu || '') : ''} fullWidth disabled />
+						<TextField label="Email" value={hasEstCuitValido ? ((form as any).ocurrenciaEmail || '') : ''} fullWidth disabled />
+						<TextField label="Teléfonos" value={hasEstCuitValido ? ((form as any).ocurrenciaTelefonos || '') : ''} fullWidth disabled />
+						<TextField label="CIIU" value={hasEstCuitValido ? ((form as any).ocurrenciaCiiu || '') : ''} fullWidth disabled />
 					</div>
 				<div className={`${styles.formRow} ${localStyles.gridThreeRepeat}`}>
-					<TextField label="Calle" value={hasEstCuitValido ? ((form as any).establecimientoCalle || '') : ''} fullWidth disabled />
-					<TextField label="Número" value={hasEstCuitValido ? ((form as any).establecimientoNumero || '') : ''} fullWidth disabled />
-					<TextField label="Piso" value={hasEstCuitValido ? ((form as any).establecimientoPiso || '') : ''} fullWidth disabled />
+					<TextField label="Calle" value={hasEstCuitValido ? ((form as any).ocurrenciaCalle || '') : ''} fullWidth disabled />
+					<TextField label="Número" value={hasEstCuitValido ? ((form as any).ocurrenciaNumero || '') : ''} fullWidth disabled />
+					<TextField label="Piso" value={hasEstCuitValido ? ((form as any).ocurrenciaPiso || '') : ''} fullWidth disabled />
 				</div>
 				<div className={`${styles.formRow} ${localStyles.gridThreeRepeat}`}>
-					<TextField label="Dpto" value={hasEstCuitValido ? ((form as any).establecimientoDpto || '') : ''} fullWidth disabled />
-					<TextField label="Entre Calle 1" value={hasEstCuitValido ? ((form as any).establecimientoEntreCalle1 || '') : ''} fullWidth disabled />
-					<TextField label="Entre Calle 2" value={hasEstCuitValido ? ((form as any).establecimientoEntreCalle2 || '') : ''} fullWidth disabled />
+					<TextField label="Dpto" value={hasEstCuitValido ? ((form as any).ocurrenciaDpto || '') : ''} fullWidth disabled />
+					<TextField label="Entre Calle 1" value={hasEstCuitValido ? ((form as any).ocurrenciaEntreCalle1 || '') : ''} fullWidth disabled />
+					<TextField label="Entre Calle 2" value={hasEstCuitValido ? ((form as any).ocurrenciaEntreCalle2 || '') : ''} fullWidth disabled />
 				</div>
 				{/* Buscador de Localidad (CP / nombre) */}
 				<div className={`${styles.formRow} ${localStyles.gridSearchLocalidad}`}>
@@ -263,7 +305,7 @@ export default function NuevaDenuncia({
 								}
 								return;
 							}
-							const cp = Number((form as any).establecimientoCodPostal ?? 0);
+							const cp = Number((form as any).ocurrenciaCodPostal ?? 0);
 							if (!cp || Number.isNaN(cp)) return;
 							setNombreBuscado(null);
 							setCpBuscado(cp);
@@ -277,13 +319,13 @@ export default function NuevaDenuncia({
 							options={localidadesOptions}
 							getOptionLabel={(opt: any) => String(opt?.nombreCompleto ?? opt?.nombre ?? "")}
 							isOptionEqualToValue={(opt: any, val: any) => String(opt?.codigo) === String(val?.codigo)}
-							value={hasEstCuitValido ? (localidadesOptions.find((loc) => String(loc.codigo) === String((form as any).establecimientoCodLocalidad)) ?? null) : null}
+							value={hasEstCuitValido ? (localidadesOptions.find((loc) => String(loc.codigo) === String((form as any).ocurrenciaCodLocalidad)) ?? null) : null}
 							onChange={(_e, newValue: any) => {
 								const codigo = newValue ? String(newValue.codigo ?? "") : "";
 								const nombre = newValue ? String(newValue.nombreCompleto ?? newValue.nombre ?? "") : "";
-								const syntheticCod = { target: { name: 'establecimientoCodLocalidad', value: codigo } } as any;
+								const syntheticCod = { target: { name: 'ocurrenciaCodLocalidad', value: codigo } } as any;
 								onTextFieldChange(syntheticCod);
-								const syntheticPostal = { target: { name: 'establecimientoCodPostal', value: String(newValue ? (newValue.codPostal ?? newValue.CodPostal ?? "") : "") } } as any;
+								const syntheticPostal = { target: { name: 'ocurrenciaCodPostal', value: String(newValue ? (newValue.codPostal ?? newValue.CodPostal ?? "") : "") } } as any;
 								onTextFieldChange(syntheticPostal);
 								// provincia -> no existe campo específico, omitimos
 							}}
@@ -292,12 +334,12 @@ export default function NuevaDenuncia({
 									{...params}
 									label="Localidad"
 									placeholder="Seleccione localidad"
-									onBlur={() => onBlur('establecimientoCodLocalidad')}
+									onBlur={() => onBlur('ocurrenciaCodLocalidad')}
 								/>
 							)}
 						/>
 					</div>
-					<TextField label="Cód. Postal" name="establecimientoCodPostal" value={hasEstCuitValido ? ((form as any).establecimientoCodPostal || '') : ''} fullWidth disabled />
+					<TextField label="Cód. Postal" name="ocurrenciaCodPostal" value={hasEstCuitValido ? ((form as any).ocurrenciaCodPostal || '') : ''} fullWidth disabled />
 				</div>
 			</div>
 
