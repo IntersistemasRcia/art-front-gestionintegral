@@ -39,7 +39,7 @@ export type UseUsuariosListFilter = {
   cuit?: string;
   nombre?: string;
   email?: string;
-  rol?: string;
+  rol?: string[];
   estado?: string;
 };
 
@@ -70,7 +70,7 @@ function buildGetAllBody(
   }
   if (listFilter.nombre?.trim()) body.nombre = listFilter.nombre.trim();
   if (listFilter.email?.trim()) body.email = listFilter.email.trim();
-  if (listFilter.rol?.trim()) body.rol = listFilter.rol.trim();
+  if (listFilter.rol?.length) body.rol = listFilter.rol;
   if (listFilter.estado?.trim()) body.estado = listFilter.estado.trim();
 
   return body;

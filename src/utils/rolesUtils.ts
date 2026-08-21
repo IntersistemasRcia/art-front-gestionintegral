@@ -16,6 +16,34 @@ export function admRolTaskName(roleName: string): string {
   return `${ADMROL_TASK_PREFIX}${roleName}`;
 }
 
+/**
+ * Roles que el usuario puede crear/ver: si tiene alguna tarea ADMROL_<Rol> asignada, son
+ * exactamente esos roles; si no tiene ninguna, son su rol y los roles hijos (o todos si su rol
+ * no tiene hijos configurados). Usado tanto por el combo de creación como por el filtro de rol.
+ */
+export function getRolesGestionablesPorUsuario(
+  userRole: string | undefined | null,
+  roles: RolesInterface[],
+  hasTask: (taskName: string) => boolean
+): RolesInterface[] {
+  const rolesPorTarea = roles.filter((r) => hasTask(admRolTaskName(r.nombre)));
+  if (rolesPorTarea.length > 0) return rolesPorTarea;
+
+  const userRoleEntry = roles.find((r) => r.nombreNormalizado?.toLowerCase() === userRole?.toLowerCase());
+  if (!userRoleEntry || userRoleEntry.rolesHijos.length === 0) return roles;
+
+  const hijoIds = new Set(userRoleEntry.rolesHijos.map((h) => h.id));
+  return roles.filter((r) => hijoIds.has(r.id));
+}
+
+/** Indica si el usuario tiene asignada al menos una tarea ADMROL_<Rol> (algún rol a cargo por tarea). */
+export function tieneAlgunRolACargoPorTarea(
+  roles: RolesInterface[],
+  hasTask: (taskName: string) => boolean
+): boolean {
+  return roles.some((r) => hasTask(admRolTaskName(r.nombre)));
+}
+
 function normalizeRoleName(roleName: string): string {
   return roleName.trim().toLowerCase();
 }

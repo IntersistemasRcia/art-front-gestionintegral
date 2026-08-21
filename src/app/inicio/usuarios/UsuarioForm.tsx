@@ -18,7 +18,7 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
 import { useAuth } from '@/data/AuthContext';
-import { admRolTaskName } from '@/utils/rolesUtils';
+import { getRolesGestionablesPorUsuario } from '@/utils/rolesUtils';
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import RefEmpleador from "./interfaces/RefEmpleador";
@@ -253,19 +253,7 @@ export default function UsuarioForm({
   }, [roles, form.rol]);
 
   const roleOptions = useMemo(() => {
-    // Si el usuario tiene alguna tarea ADMROL_<Rol>, esos roles reemplazan la lista (sin depender de RolPadre).
-    // Si no tiene ninguna, se mantiene el comportamiento vigente (rol padre -> roles hijos, o todos si no tiene hijos).
-    const rolesPorTarea = roles.filter((r) => hasTask(admRolTaskName(r.nombre)));
-
-    let baseRoles: RolesInterface[];
-    if (rolesPorTarea.length > 0) {
-      baseRoles = rolesPorTarea;
-    } else {
-      const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
-      baseRoles = (!userRole || userRole.rolesHijos.length === 0)
-        ? roles
-        : (() => { const hijoIds = new Set(userRole.rolesHijos.map(h => h.id)); return roles.filter(r => hijoIds.has(r.id)); })();
-    }
+    const baseRoles = getRolesGestionablesPorUsuario(user?.rol, roles, hasTask);
 
     const isExcludedRole = (rol: RolesInterface) =>
       ROLES_EXCLUIDOS_USUARIOS.includes(rol.nombreNormalizado.toLowerCase());
