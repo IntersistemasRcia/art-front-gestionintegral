@@ -703,9 +703,16 @@ const GenerarFormularioRGRL: React.FC<{
         setResponsablesUI([]);
       }
 
+      const respuestaTextoMap: Record<string, string> = { S: 'SI', N: 'NO', A: 'NA' };
       const dict: Record<number, RespuestaCuestionarioVm> = {};
       for (const r of frm.respuestasCuestionario || []) {
-        if (r.internoCuestionario != null) dict[r.internoCuestionario] = { ...r };
+        if (r.internoCuestionario != null) {
+          const respuestaOriginal = String(r.respuesta ?? '').toUpperCase();
+          dict[r.internoCuestionario] = {
+            ...r,
+            respuesta: respuestaTextoMap[respuestaOriginal] ?? r.respuesta,
+          };
+        }
       }
       setRespuestas(dict);
     } catch (e: any) {
@@ -949,14 +956,16 @@ const GenerarFormularioRGRL: React.FC<{
       const fullCuest: any[] = [];
       // Recolectar todas las preguntas y ordenar por 'codigo' (número visible), identificando por 'interno'
       const allQs = secciones.flatMap(s => (s.cuestionarios ?? [])).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
+      const respuestaLetraMap: Record<string, string> = { SI: 'S', NO: 'N', NA: 'A' };
       for (const q of allQs) {
         const key = q.interno as number;
         const r = respuestas[key] ?? {};
+        const respuestaOriginal = String(r.respuesta ?? '').toUpperCase();
         fullCuest.push({
           interno: r.interno ?? 0,
           internoCuestionario: key,
           internoRespuestaFormulario: r.internoRespuestaFormulario ?? form.interno ?? 0,
-          respuesta: r.respuesta ?? '',
+          respuesta: respuestaLetraMap[respuestaOriginal] ?? r.respuesta ?? '',
           fechaRegularizacion: r.fechaRegularizacion ?? 0,
           observaciones: r.observaciones ?? '',
           fechaRegularizacionNormal: (r as any).fechaRegularizacionNormal ?? null,

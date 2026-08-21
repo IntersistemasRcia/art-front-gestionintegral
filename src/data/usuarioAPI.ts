@@ -117,7 +117,7 @@ export type UsuarioGetAllBody = {
   cuit?: number;
   nombre?: string;
   email?: string;
-  rol?: string;
+  rol?: string[];
   estado?: string;
   sort?: string;
   pageIndex?: number;
@@ -551,7 +551,7 @@ function buildUsuarioGetAllBody(body: UsuarioGetAllBody = {}): UsuarioGetAllBody
 
   if (body.nombre?.trim()) payload.nombre = body.nombre.trim();
   if (body.email?.trim()) payload.email = body.email.trim();
-  if (body.rol?.trim()) payload.rol = body.rol.trim();
+  if (body.rol?.length) payload.rol = body.rol;
   if (body.estado?.trim()) payload.estado = body.estado.trim();
   if (body.sort?.trim()) payload.sort = body.sort.trim();
 
