@@ -68,6 +68,7 @@ export type ApiTiposFormularios = Array<{
     pagina: number;
     planilla?: string;
     cuestionarios: Array<{
+      interno: number;
       codigo: number;
       pregunta: string;
       comentario: string;

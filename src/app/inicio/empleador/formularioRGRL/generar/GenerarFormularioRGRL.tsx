@@ -578,7 +578,7 @@ const GenerarFormularioRGRL: React.FC<{
       accessorKey: 'esContratado',
       header: 'Propio/contratado',
       size: 110,
-      cell: ({ getValue }: any) => (Number(getValue()) === 1 ? 'Propio' : Number(getValue()) === 0 ? 'Contratado' : ''),
+      cell: ({ getValue }: any) => (Number(getValue()) === 0 ? 'Propio' : Number(getValue()) === 1 ? 'Contratado' : ''),
     },
     { accessorKey: 'tituloHabilitante', header: 'Título', size: 160 },
     { accessorKey: 'matricula', header: 'Matrícula', size: 120 },
@@ -1473,8 +1473,8 @@ const GenerarFormularioRGRL: React.FC<{
                       }}
                     >
                       <MenuItem value=""><em>Seleccioná...</em></MenuItem>
-                      <MenuItem value={0}>Contratado</MenuItem>
-                      <MenuItem value={1}>Propio</MenuItem>
+                      <MenuItem value={1}>Contratado</MenuItem>
+                      <MenuItem value={0}>Propio</MenuItem>
                     </Select>
                   </FormControl>
                   <TextField
