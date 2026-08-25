@@ -156,7 +156,7 @@ export interface DenunciaFormData {
   // Prestador Inicial
   prestadorInicialCuit: string;
   prestadorInicialRazonSocial: string;
-  // Establecimiento (datos del establecimiento)
+  // Establecimiento (datos del establecimiento, solapa "Datos del Siniestro" -> empEst)
   establecimientoCuit: string;
   establecimientoNombre: string;
   establecimientoCiiu: string;
@@ -168,6 +168,21 @@ export interface DenunciaFormData {
   establecimientoCodPostal: string;
   establecimientoTelefono: string;
   establecimientoEmail: string;
+
+  // Ocurrencia (solapa "Denuncia-Enfermedad Profesional" -> empOc)
+  ocurrenciaCuit: string;
+  ocurrenciaRazonSocial: string;
+  ocurrenciaCiiu: string;
+  ocurrenciaCalle: string;
+  ocurrenciaNumero: string;
+  ocurrenciaPiso: string;
+  ocurrenciaDpto: string;
+  ocurrenciaEntreCalle1: string;
+  ocurrenciaEntreCalle2: string;
+  ocurrenciaCodLocalidad: string;
+  ocurrenciaCodPostal: string;
+  ocurrenciaTelefonos: string;
+  ocurrenciaEmail: string;
 
   // Verificación de Contacto Inicial
   verificaContactoInicial: string;
@@ -340,6 +355,19 @@ export const initialDenunciaFormData: DenunciaFormData = {
   establecimientoCodPostal: '',
   establecimientoTelefono: '',
   establecimientoEmail: '',
+  ocurrenciaCuit: '',
+  ocurrenciaRazonSocial: '',
+  ocurrenciaCiiu: '',
+  ocurrenciaCalle: '',
+  ocurrenciaNumero: '',
+  ocurrenciaPiso: '',
+  ocurrenciaDpto: '',
+  ocurrenciaEntreCalle1: '',
+  ocurrenciaEntreCalle2: '',
+  ocurrenciaCodLocalidad: '',
+  ocurrenciaCodPostal: '',
+  ocurrenciaTelefonos: '',
+  ocurrenciaEmail: '',
   verificaContactoInicial: '',
   estTrabEstaConsciente: '',
   estTrabColor: '',

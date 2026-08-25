@@ -394,7 +394,10 @@ const GenerarFormularioRGRL: React.FC<{
           renglon: i,
         }));
 
-        const responsablesFull = (original.respuestasResponsable || []).map((r: any, i: number) => ({
+        const cambioEstablecimiento = establecimientoSel !== original.internoEstablecimiento;
+        const responsablesFull = cambioEstablecimiento
+          ? []
+          : (original.respuestasResponsable || []).map((r: any, i: number) => ({
           interno: 0,
           internoRespuestaFormulario: nuevoId,
           cuit: r?.cuit ?? 0,
@@ -575,7 +578,7 @@ const GenerarFormularioRGRL: React.FC<{
       accessorKey: 'esContratado',
       header: 'Propio/contratado',
       size: 110,
-      cell: ({ getValue }: any) => (Number(getValue()) === 1 ? 'Propio' : Number(getValue()) === 0 ? 'Contratado' : ''),
+      cell: ({ getValue }: any) => (Number(getValue()) === 0 ? 'Propio' : Number(getValue()) === 1 ? 'Contratado' : ''),
     },
     { accessorKey: 'tituloHabilitante', header: 'Título', size: 160 },
     { accessorKey: 'matricula', header: 'Matrícula', size: 120 },
@@ -700,9 +703,16 @@ const GenerarFormularioRGRL: React.FC<{
         setResponsablesUI([]);
       }
 
+      const respuestaTextoMap: Record<string, string> = { S: 'SI', N: 'NO', A: 'NA' };
       const dict: Record<number, RespuestaCuestionarioVm> = {};
       for (const r of frm.respuestasCuestionario || []) {
-        if (r.internoCuestionario != null) dict[r.internoCuestionario] = { ...r };
+        if (r.internoCuestionario != null) {
+          const respuestaOriginal = String(r.respuesta ?? '').toUpperCase();
+          dict[r.internoCuestionario] = {
+            ...r,
+            respuesta: respuestaTextoMap[respuestaOriginal] ?? r.respuesta,
+          };
+        }
       }
       setRespuestas(dict);
     } catch (e: any) {
@@ -863,7 +873,7 @@ const GenerarFormularioRGRL: React.FC<{
           setModalMsgOpen(true);
           return;
         }
-        if (typeof r.representacion !== 'number') {
+        if (typeof r.representacion !== 'number' || r.representacion === 0) {
           setError('');
           setModalMsg(`En Responsables, la fila ${i + 1} requiere completar Representación.`);
           setModalMsgType('error');
@@ -882,7 +892,7 @@ const GenerarFormularioRGRL: React.FC<{
 
     if (completar) {
       // Requerir al menos un Responsable de Datos del Formulario con datos completos
-      const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && typeof r.esContratado === 'number');
+      const tieneRespDatos = responsablesUI.some(r => r.cargo === 'R' && (r.cuit ?? '') && (r.responsable ?? '').toString().trim() !== '' && typeof r.representacion === 'number' && r.representacion !== 0 && typeof r.esContratado === 'number');
       if (!tieneRespDatos) {
         setError('');
         setModalMsg('Debe indicar al menos un Responsable de Datos del Formulario con CUIT, nombre, representación y Propio/Contratado.');
@@ -897,20 +907,18 @@ const GenerarFormularioRGRL: React.FC<{
           return !desc.includes('PLANILLA A') && !desc.includes('PLANILLA C') && !desc.includes('PLANILLA B');
         })
         .flatMap((s) => s.cuestionarios ?? [])
-        .map((q) => Number(q.codigo ?? 0))
-        .filter((codigo) => codigo > 0)
-        .filter((codigo, idx, arr) => arr.indexOf(codigo) === idx)
-        .sort((a, b) => a - b);
+        .filter((q) => Number(q.interno ?? 0) > 0)
+        .filter((q, idx, arr) => arr.findIndex((x) => x.interno === q.interno) === idx)
+        .sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
 
       const hoy = Number(dayjs().format('YYYYMMDD'));
-      for (const nro of preguntasObligatorias) {
-        const r = respuestas[nro] ?? {};
+      for (const q of preguntasObligatorias) {
+        const key = q.interno as number;
+        const nro = q.codigo;
+        const r = respuestas[key] ?? {};
         const respuesta = String(r.respuesta ?? '').toUpperCase();
         if (respuesta !== 'SI' && respuesta !== 'NO' && respuesta !== 'NA') {
-          const preguntaFaltante = secciones
-            .flatMap((s) => s.cuestionarios ?? [])
-            .find((q) => Number(q.codigo ?? 0) === nro);
-          const textoPregunta = String(preguntaFaltante?.pregunta ?? '').trim();
+          const textoPregunta = String(q.pregunta ?? '').trim();
           setError('');
           setModalMsg(
             textoPregunta
@@ -946,16 +954,18 @@ const GenerarFormularioRGRL: React.FC<{
     setError('');
     try {
       const fullCuest: any[] = [];
-      // Recolectar todas las preguntas y ordenar por 'codigo' (interno)
+      // Recolectar todas las preguntas y ordenar por 'codigo' (número visible), identificando por 'interno'
       const allQs = secciones.flatMap(s => (s.cuestionarios ?? [])).slice().sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
+      const respuestaLetraMap: Record<string, string> = { SI: 'S', NO: 'N', NA: 'A' };
       for (const q of allQs) {
-        const key = q.codigo as number;
+        const key = q.interno as number;
         const r = respuestas[key] ?? {};
+        const respuestaOriginal = String(r.respuesta ?? '').toUpperCase();
         fullCuest.push({
           interno: r.interno ?? 0,
           internoCuestionario: key,
           internoRespuestaFormulario: r.internoRespuestaFormulario ?? form.interno ?? 0,
-          respuesta: r.respuesta ?? '',
+          respuesta: respuestaLetraMap[respuestaOriginal] ?? r.respuesta ?? '',
           fechaRegularizacion: r.fechaRegularizacion ?? 0,
           observaciones: r.observaciones ?? '',
           fechaRegularizacionNormal: (r as any).fechaRegularizacionNormal ?? null,
@@ -997,7 +1007,7 @@ const GenerarFormularioRGRL: React.FC<{
         cuit: Number(r.cuit ?? 0),
         responsable: r.responsable ?? '',
         cargo: r.cargo ?? '',
-        representacion: Number(r.representacion ?? 0),
+        representacion: Number(r.representacion),
         esContratado: Number(r.esContratado ?? 0),
         tituloHabilitante: r.tituloHabilitante ?? '',
         matricula: r.matricula ?? '',
@@ -1441,11 +1451,11 @@ const GenerarFormularioRGRL: React.FC<{
                       <MenuItem value=""><em>Seleccioná...</em></MenuItem>
                       <MenuItem value={1}>Representante Legal</MenuItem>
                       <MenuItem value={2}>Presidente</MenuItem>
-                      <MenuItem value={3}>VicePresidente</MenuItem>
-                      <MenuItem value={4}>Director General</MenuItem>
-                      <MenuItem value={5}>Gerente General</MenuItem>
-                      <MenuItem value={6}>Administrador General</MenuItem>
-                      <MenuItem value={0}>Otros</MenuItem>
+                      <MenuItem value={3}>Director General</MenuItem>
+                      <MenuItem value={4}>Administrador General</MenuItem>
+                      <MenuItem value={5}>Vicepresidente</MenuItem>
+                      <MenuItem value={6}>Gerente General</MenuItem>
+                      <MenuItem value={99}>Otros</MenuItem>
                     </Select>
                   </FormControl>
                   <FormControl fullWidth>
@@ -1463,8 +1473,8 @@ const GenerarFormularioRGRL: React.FC<{
                       }}
                     >
                       <MenuItem value=""><em>Seleccioná...</em></MenuItem>
-                      <MenuItem value={0}>Contratado</MenuItem>
-                      <MenuItem value={1}>Propio</MenuItem>
+                      <MenuItem value={1}>Contratado</MenuItem>
+                      <MenuItem value={0}>Propio</MenuItem>
                     </Select>
                   </FormControl>
                   <TextField
@@ -1528,7 +1538,7 @@ const GenerarFormularioRGRL: React.FC<{
                       setRespuestas((prev) => {
                         const next = { ...prev };
                         for (const item of preguntasSeccion) {
-                          const key = item.codigo as number;
+                          const key = item.interno as number;
                           const base = next[key] ?? { internoCuestionario: key, respuesta: '' };
                           next[key] = { ...base, respuesta };
                         }
@@ -1569,7 +1579,7 @@ const GenerarFormularioRGRL: React.FC<{
                     );
                   })()}
                   {grouped[title].map((q) => {
-                    const key = q.codigo as number;
+                    const key = q.interno as number;
                     const rr = respuestas[key] ?? {};
                     const value = rr.respuesta ?? '';
                     const hoyIso = dayjs().format('YYYY-MM-DD');

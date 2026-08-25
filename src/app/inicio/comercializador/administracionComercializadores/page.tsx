@@ -73,11 +73,8 @@ export default function AdminUserPage() {
 
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
-  const isAdministrador = String((user as any)?.rol ?? '').toLowerCase() === 'administrador' || String((user as any)?.rol ?? '').toLowerCase() === 'administradorart';
-  const isAdminComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'administradorcomercializador';
-  const isAdministradorART = String((user as any)?.rol ?? '').toLowerCase() === 'administradorart';
   const isComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'comercializador';
-  const isAdminLevel = isAdministrador || isAdminComercializador || isAdministradorART;
+  const isAdminLevel = hasTask('Comercializador_Administracion_VerUsuarios');
   const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdminLevel;
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
   const userCuitValid = Number.isFinite(userCuit) && userCuit > 0 ? userCuit : undefined;
@@ -150,13 +147,12 @@ export default function AdminUserPage() {
   const isLoadingGrupoTable = isOrganizadorComercializador ? isLoadingGOrgById : isLoadingGOrg;
 
   const comercializadorParams = selectedOrganizadorInterno !== undefined
-    ? ({ SRTComercializadorOrganizadorInterno: selectedOrganizadorInterno } as any)
+    ? ({ SRTComercializadorOrganizadorInterno: selectedOrganizadorInterno, ComercializadoresOrganizadoresInternos: String(selectedOrganizadorInterno) } as any)
     : ({} as any);
 
-  const { data: comercializadorData, isLoading: isLoadingComercializador, mutate: mutateComercializador } =
-    ArtAPI.useGetComercializadorUsuarioLogueadoURL(
-      canLoadComercializadores ? comercializadorParams : null
-    );
+  const usuarioLogueadoResult = ArtAPI.useGetComercializadorUsuarioLogueadoURL(canLoadComercializadores && !isAdminLevel ? comercializadorParams : null);
+  const todosResult = ArtAPI.useGetComercializadorURL(isAdminLevel ? comercializadorParams : null);
+  const { data: comercializadorData, isLoading: isLoadingComercializador, mutate: mutateComercializador } = isAdminLevel ? todosResult : usuarioLogueadoResult;
 
   const grupoRows: ComercializadoresGOrganizadoresRow[] = useMemo(() => {
     if (!isGrupoOrganizador && !isAdminLevel && !isOrganizadorComercializador) return [];

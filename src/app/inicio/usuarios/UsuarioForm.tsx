@@ -18,6 +18,7 @@ import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/material.css";
 import RolesInterface from "./interfaces/RolesInterface";
 import { useAuth } from '@/data/AuthContext';
+import { getRolesGestionablesPorUsuario } from '@/utils/rolesUtils';
 import styles from "./Usuario.module.css";
 import { SelectChangeEvent } from "@mui/material/Select";
 import RefEmpleador from "./interfaces/RefEmpleador";
@@ -231,7 +232,7 @@ export default function UsuarioForm({
   const originalEmailRef = useRef("");
   const emailValidationSeqRef = useRef(0);
 
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
@@ -252,10 +253,8 @@ export default function UsuarioForm({
   }, [roles, form.rol]);
 
   const roleOptions = useMemo(() => {
-    const userRole = roles.find(r => r.nombreNormalizado.toLowerCase() === user?.rol?.toLowerCase());
-    const baseRoles = (!userRole || userRole.rolesHijos.length === 0)
-      ? roles
-      : (() => { const hijoIds = new Set(userRole.rolesHijos.map(h => h.id)); return roles.filter(r => hijoIds.has(r.id)); })();
+    const baseRoles = getRolesGestionablesPorUsuario(user?.rol, roles, hasTask);
+
     const isExcludedRole = (rol: RolesInterface) =>
       ROLES_EXCLUIDOS_USUARIOS.includes(rol.nombreNormalizado.toLowerCase());
     const currentRole = roles.find(r => r.nombre === form.rol);
@@ -270,7 +269,7 @@ export default function UsuarioForm({
     }
 
     return allowed;
-  }, [roles, user?.rol, isEditing, isViewing, form.rol]);
+  }, [roles, user?.rol, hasTask, isEditing, isViewing, form.rol]);
 
   const isRolSelectDisabled = isDisabled || isAdminUser || (isEditing && roleOptions.length === 1 && roleOptions[0].disabled);
 

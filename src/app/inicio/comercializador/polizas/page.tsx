@@ -18,13 +18,15 @@ import type { Poliza, SRTPolizaAcotada } from "./types/poliza";
 import CustomTabs from '@/utils/ui/tab/CustomTab';
 import HistorialPoliza from './historialPoliza/historialPoliza';
 import SrtAPI from '@/data/srtAPI';
-import dayjs from 'dayjs';
 import {
   getComercializadorDescripcion,
   getComercializadorInterno,
+  isPolizaDirectlyAssignedToComercializador,
+  polizaBelongsDirectlyToAsociado,
   polizaBelongsToAsociado,
   walkAsociadoHierarchy,
 } from "@/utils/srt/srtComercializadorAsociadoUtils";
+import { isSRTPolizaVigente } from "@/utils/srt/srtPolizaVigenciaUtils";
 
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
 const POLIZA_COMBO_TODOS_ID = -1;
@@ -305,8 +307,8 @@ function PolizasPage() {
     [polizasUsuarioLogueadoData],
   );
 
-  const grupoInternoSeleccionado = isPolizaComboTodos(grupo) ? 0 : grupo.interno;
-  const organizadorInternoSeleccionado = isPolizaComboTodos(organizador) ? 0 : organizador.interno;
+  const grupoAsociadoIdSeleccionado = isPolizaComboTodos(grupo) ? 0 : grupo.interno;
+  const organizadorAsociadoIdSeleccionado = isPolizaComboTodos(organizador) ? 0 : organizador.interno;
 
   /** Combos se arman solo desde UsuarioLogueado (jerarquía nested), sin APIs auxiliares. */
   const grupoOptions = useMemo(
@@ -315,17 +317,17 @@ function PolizasPage() {
   );
 
   const organizadorOptions = useMemo(
-    () => buildOrganizadorComboOptions(polizasVigentes, grupoInternoSeleccionado),
-    [polizasVigentes, grupoInternoSeleccionado],
+    () => buildOrganizadorComboOptions(polizasVigentes, grupoAsociadoIdSeleccionado),
+    [polizasVigentes, grupoAsociadoIdSeleccionado],
   );
 
   const comercializadorOptions = useMemo(
     () => buildComercializadorComboOptions(
       polizasVigentes,
-      grupoInternoSeleccionado,
-      organizadorInternoSeleccionado,
+      grupoAsociadoIdSeleccionado,
+      organizadorAsociadoIdSeleccionado,
     ),
-    [polizasVigentes, grupoInternoSeleccionado, organizadorInternoSeleccionado],
+    [polizasVigentes, grupoAsociadoIdSeleccionado, organizadorAsociadoIdSeleccionado],
   );
 
   useEffect(() => {
@@ -402,6 +404,13 @@ function PolizasPage() {
     <CustomSelectSearch<PolizaComboOption>
       options={comercializadorOptions}
       getOptionLabel={getComboLabel}
+      isOptionEqualToValue={(option, value) =>
+        option.interno === value.interno
+        || (
+          normalizeComboDescripcion(option.descripcion)
+          === normalizeComboDescripcion(value.descripcion)
+        )
+      }
       value={comercializador}
       onChange={(_e, value) => setComercializador(value ?? POLIZA_COMBO_TODOS)}
       label="Comercializador"
@@ -491,11 +500,7 @@ function PolizasPage() {
 export default PolizasPage;
 
 function isPolizaVigente(poliza: SRTPolizaAcotada): boolean {
-  const vigenciaHasta = String(poliza.vigenciaHasta ?? "").trim();
-  if (!vigenciaHasta) return true;
-  const hasta = dayjs(vigenciaHasta).startOf("day");
-  const hoy = dayjs().startOf("day");
-  return hasta.isValid() && (hasta.isSame(hoy) || hasta.isAfter(hoy));
+  return isSRTPolizaVigente(poliza);
 }
 
 function filterPolizasVigentes(polizas: SRTPolizaAcotada[]): SRTPolizaAcotada[] {
@@ -504,6 +509,10 @@ function filterPolizasVigentes(polizas: SRTPolizaAcotada[]): SRTPolizaAcotada[] 
 
 function withTodosOption(options: PolizaComboOption[]): PolizaComboOption[] {
   return [POLIZA_COMBO_TODOS, ...uniqueComboOptions(options)];
+}
+
+function normalizeComboDescripcion(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function uniqueComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
@@ -515,6 +524,41 @@ function uniqueComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
   });
   return Array.from(map.values()).sort((a, b) =>
     a.descripcion.localeCompare(b.descripcion, "es"),
+  );
+}
+
+function uniqueComercializadorComboOptions(items: PolizaComboOption[]): PolizaComboOption[] {
+  const byInterno = new Map<number, PolizaComboOption>();
+  const byDescripcion = new Map<string, PolizaComboOption>();
+
+  items.forEach((item) => {
+    const descripcion = item.descripcion.trim();
+    if (!descripcion) return;
+
+    const descripcionKey = normalizeComboDescripcion(descripcion);
+    if (byDescripcion.has(descripcionKey)) return;
+    if (item.interno > 0 && byInterno.has(item.interno)) return;
+
+    const option = { interno: item.interno, descripcion };
+    if (item.interno > 0) byInterno.set(item.interno, option);
+    byDescripcion.set(descripcionKey, option);
+  });
+
+  return Array.from(byDescripcion.values()).sort((a, b) =>
+    a.descripcion.localeCompare(b.descripcion, "es"),
+  );
+}
+
+function polizaMatchesComercializador(
+  poliza: SRTPolizaAcotada,
+  comercializador: PolizaComboOption,
+): boolean {
+  const interno = getComercializadorInterno(poliza);
+  if (interno > 0 && interno === comercializador.interno) return true;
+
+  return (
+    normalizeComboDescripcion(getComercializadorDescripcion(poliza))
+    === normalizeComboDescripcion(comercializador.descripcion)
   );
 }
 
@@ -550,8 +594,11 @@ function buildOrganizadorComboOptions(
 }
 
 /**
- * Comercializadores desde `srtcomercializadorInterno` + `comercializadorReferenteRazonSocial`.
- * Cascada por asociadoId de Grupo/Organizador en el árbol nested.
+ * Comercializador:
+ * - Grupo y Organizador en Todos → solo Independientes.
+ * - Grupo seleccionado (Organizador Todos) → comercializadores de pólizas
+ *   **directas** del grupo (no las que pasan por organizador).
+ * - Organizador seleccionado → comercializadores de pólizas directas de ese organizador.
  */
 function buildComercializadorComboOptions(
   polizas: SRTPolizaAcotada[],
@@ -561,48 +608,83 @@ function buildComercializadorComboOptions(
   const items = polizas
     .filter((poliza) => {
       if (organizadorAsociadoIdSeleccionado > 0) {
-        return polizaBelongsToAsociado(poliza, organizadorAsociadoIdSeleccionado, "organizador");
+        return polizaBelongsDirectlyToAsociado(
+          poliza,
+          organizadorAsociadoIdSeleccionado,
+          "organizador",
+        );
       }
       if (grupoAsociadoIdSeleccionado > 0) {
-        return polizaBelongsToAsociado(poliza, grupoAsociadoIdSeleccionado, "grupo");
+        return polizaBelongsDirectlyToAsociado(
+          poliza,
+          grupoAsociadoIdSeleccionado,
+          "grupo",
+        );
       }
-      return true;
+      return isPolizaDirectlyAssignedToComercializador(poliza);
     })
     .map((poliza) => ({
       interno: getComercializadorInterno(poliza),
       descripcion: getComercializadorDescripcion(poliza),
     }));
 
-  return withTodosOption(items);
+  return [POLIZA_COMBO_TODOS, ...uniqueComercializadorComboOptions(items)];
 }
 
 function isPolizaComboTodos(option: PolizaComboOption | null | undefined): boolean {
   return !option || option.interno === POLIZA_COMBO_TODOS_ID;
 }
 
-/** Filtro AND en cascada: Grupo ∩ Organizador ∩ Comercializador. */
+/**
+ * Tabla:
+ * - Grupo y Organizador en Todos + Comercializador → Independientes de ese comercializador.
+ * - Organizador → pólizas **directas** de ese organizador (y comercializador si hay).
+ * - Grupo + Organizador Todos + Comercializador Todos → **todas** las pólizas del grupo
+ *   (directas o vía organizador). Sin Independientes.
+ * - Grupo + Organizador Todos + Comercializador → solo pólizas **directas** del grupo
+ *   de ese comercializador (no las que pasan por organizador).
+ */
 function filterPolizasByCombos(
   polizas: SRTPolizaAcotada[],
   grupo: PolizaComboOption,
   organizador: PolizaComboOption,
   comercializador: PolizaComboOption,
 ): SRTPolizaAcotada[] {
+  const hasGrupo = !isPolizaComboTodos(grupo);
+  const hasOrganizador = !isPolizaComboTodos(organizador);
+  const hasComercializador = !isPolizaComboTodos(comercializador);
+
   return polizas.filter((poliza) => {
-    if (!isPolizaComboTodos(grupo) && !polizaBelongsToAsociado(poliza, grupo.interno, "grupo")) {
+    if (!hasGrupo && !hasOrganizador) {
+      if (!hasComercializador) return true;
+      return (
+        isPolizaDirectlyAssignedToComercializador(poliza)
+        && polizaMatchesComercializador(poliza, comercializador)
+      );
+    }
+
+    if (isPolizaDirectlyAssignedToComercializador(poliza)) return false;
+
+    if (hasOrganizador) {
+      if (!polizaBelongsDirectlyToAsociado(poliza, organizador.interno, "organizador")) {
+        return false;
+      }
+    } else if (hasGrupo) {
+      if (hasComercializador) {
+        // Comercializador concreto: solo directas del grupo.
+        if (!polizaBelongsDirectlyToAsociado(poliza, grupo.interno, "grupo")) {
+          return false;
+        }
+      } else if (!polizaBelongsToAsociado(poliza, grupo.interno, "grupo")) {
+        // Comercializador Todos: todas las del grupo (directas o vía organizador).
+        return false;
+      }
+    }
+
+    if (hasComercializador && !polizaMatchesComercializador(poliza, comercializador)) {
       return false;
     }
-    if (
-      !isPolizaComboTodos(organizador)
-      && !polizaBelongsToAsociado(poliza, organizador.interno, "organizador")
-    ) {
-      return false;
-    }
-    if (
-      !isPolizaComboTodos(comercializador)
-      && getComercializadorInterno(poliza) !== comercializador.interno
-    ) {
-      return false;
-    }
+
     return true;
   });
 }

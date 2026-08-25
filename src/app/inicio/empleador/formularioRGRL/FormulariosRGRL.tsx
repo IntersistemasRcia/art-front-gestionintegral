@@ -177,7 +177,7 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
 
   type Seccion = ApiTiposFormularios[0]['secciones'][0];
   type Cuestionario = Seccion['cuestionarios'][0];
-  type CatItem = { codigo: number; seccion: string; seccionOrden: number; pregunta: string; norma: string; planilla: string };
+  type CatItem = { interno: number; codigo: number; seccion: string; seccionOrden: number; pregunta: string; norma: string; planilla: string };
 
   const tiposAll2 = await cargarTipos();
   const tipoForm2 = tiposAll2.find(f => f.secciones?.some(s => s.internoFormulario === Number(data.internoFormulario ?? 1)));
@@ -192,7 +192,7 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
     const planilla = (s.planilla ?? '').trim().toUpperCase();
     const cuests = (s.cuestionarios ?? []).slice().sort((a: Cuestionario, b: Cuestionario) => (a.codigo ?? 0) - (b.codigo ?? 0));
     for (const q of cuests) {
-      const item: CatItem = { codigo: Number(q.codigo ?? 0), seccion: s.descripcion ?? '', seccionOrden: s.orden ?? 0, pregunta: q.pregunta ?? '', norma: q.comentario ?? '', planilla };
+      const item: CatItem = { interno: Number(q.interno ?? 0), codigo: Number(q.codigo ?? 0), seccion: s.descripcion ?? '', seccionOrden: s.orden ?? 0, pregunta: q.pregunta ?? '', norma: q.comentario ?? '', planilla };
       if (planilla === 'A') catalogoPlanillaA.push(item);
       else if (planilla === 'B') catalogoPlanillaB.push(item);
       else if (planilla === 'C') catalogoPlanillaC.push(item);
@@ -202,24 +202,25 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
 
   type RespCuest = ApiFormularioDetalle['respuestasCuestionario'][0];
 
-  const respOrdenadas = (data.respuestasCuestionario ?? []).slice()
-    .sort((a: RespCuest, b: RespCuest) => (a.internoCuestionario ?? 0) - (b.internoCuestionario ?? 0));
+  const respPorInterno = new Map<number, RespCuest>();
+  for (const r of (data.respuestasCuestionario ?? [])) {
+    respPorInterno.set(Number(r.internoCuestionario ?? 0), r);
+  }
 
-  const nNormal = catalogoNormal.length;
-  const respNormal = respOrdenadas.slice(0, nNormal);
-  const respPlanillas = respOrdenadas.slice(nNormal);
-
-  const items: FormularioRGRLDetalle[] = catalogoNormal.map((cat, i) => ({
+  const items: FormularioRGRLDetalle[] = catalogoNormal.map((cat) => {
+    const r = respPorInterno.get(cat.interno);
+    return {
     Nro: cat.codigo,
     Categoria: cat.seccion,
     CategoriaOrden: cat.seccionOrden,
     Pregunta: cat.pregunta,
-    Respuesta: respNormal[i] ? mapRespuesta(respNormal[i].respuesta) : '',
-    FechaRegularizacion: respNormal[i]
-      ? ((respNormal[i].fechaRegularizacionNormal ?? '').toString().trim() || formatFechaAAAAMMDD(respNormal[i].fechaRegularizacion))
+      Respuesta: r ? mapRespuesta(r.respuesta) : '',
+      FechaRegularizacion: r
+        ? ((r.fechaRegularizacionNormal ?? '').toString().trim() || formatFechaAAAAMMDD(r.fechaRegularizacion))
       : '',
     NormaVigente: cat.norma,
-  }));
+    };
+  });
 
   const cleaned = items.filter(it => (it.Pregunta && it.Pregunta.trim()));
   cleaned.sort((a, b) => {
@@ -228,38 +229,22 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
     return (a.Nro ?? 0) - (b.Nro ?? 0);
   });
 
-  // Planillas
-  const bloques: RespCuest[][] = [];
-  {
-    let actual: RespCuest[] = [];
-    for (let i = 0; i < respPlanillas.length; i++) {
-      if (i === 0) { actual.push(respPlanillas[i]); continue; }
-      const gap = (respPlanillas[i].internoCuestionario ?? 0) - (respPlanillas[i - 1].internoCuestionario ?? 0);
-      if (gap > 10) { bloques.push(actual); actual = [respPlanillas[i]]; }
-      else actual.push(respPlanillas[i]);
-    }
-    if (actual.length > 0) bloques.push(actual);
-  }
-  const bloquePA = bloques.find(b => b.length === catalogoPlanillaA.length) ?? respPlanillas.slice(0, catalogoPlanillaA.length);
-  const bloquePB = bloques.find(b => b.length === catalogoPlanillaB.length && b !== bloquePA) ?? [];
-  const bloquePC = bloques.find(b => b.length === catalogoPlanillaC.length && b !== bloquePA && b !== bloquePB) ?? [];
-
-  const planillaA: PlanillaAItem[] = catalogoPlanillaA.map((cat, i) => ({
+  const planillaA: PlanillaAItem[] = catalogoPlanillaA.map((cat) => ({
     Codigo: String(cat.codigo),
     Sustancia: cat.pregunta,
-    SiNo: mapRespuesta(bloquePA[i]?.respuesta) as PlanillaAItem['SiNo'],
+    SiNo: mapRespuesta(respPorInterno.get(cat.interno)?.respuesta) as PlanillaAItem['SiNo'],
   }));
 
-  const planillaB: PlanillaBItem[] = catalogoPlanillaB.map((cat, i) => ({
+  const planillaB: PlanillaBItem[] = catalogoPlanillaB.map((cat) => ({
     Codigo: String(cat.codigo),
     Sustancia: cat.pregunta,
-    SiNo: mapRespuesta(bloquePB[i]?.respuesta) as PlanillaBItem['SiNo'],
+    SiNo: mapRespuesta(respPorInterno.get(cat.interno)?.respuesta) as PlanillaBItem['SiNo'],
   }));
 
-  const planillaC: PlanillaCItem[] = catalogoPlanillaC.map((cat, i) => ({
+  const planillaC: PlanillaCItem[] = catalogoPlanillaC.map((cat) => ({
     Codigo: String(cat.codigo),
     Sustancia: cat.pregunta,
-    SiNo: mapRespuesta(bloquePC[i]?.respuesta) as PlanillaCItem['SiNo'],
+    SiNo: mapRespuesta(respPorInterno.get(cat.interno)?.respuesta) as PlanillaCItem['SiNo'],
     NormaVigente: cat.norma,
   }));
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   TextField,
   Typography,
@@ -13,7 +13,6 @@ import {
 } from "../types/tDenuncias";
 import Formato from "@/utils/Formato";
 import { useAuth } from '@/data/AuthContext';
-import ArtAPI from "@/data/artAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
@@ -39,6 +38,10 @@ type DatosSiniestroProps = {
   onTextFieldChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectChange: (e: SelectChangeEvent<string>) => void;
   onBlur: (fieldName: keyof DenunciaFormData) => void;
+  establecimientos: ApiEstablecimientoEmpresa[];
+  establecimientosLoading: boolean;
+  selectedEstablecimiento: ApiEstablecimientoEmpresa | null;
+  onSelectedEstablecimientoChange: (est: ApiEstablecimientoEmpresa | null) => void;
 };
 
 const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
@@ -48,6 +51,10 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
   isDisabled,
   onTextFieldChange,
   onBlur,
+  establecimientos,
+  establecimientosLoading,
+  selectedEstablecimiento,
+  onSelectedEstablecimientoChange,
 }) => {
 
   const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
@@ -97,10 +104,6 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
     change('establecimientoNombre', val?.razonSocial ?? '');
   };
 
-  // Establecimientos por CUIT
-  const [establecimientos, setEstablecimientos] = useState<ApiEstablecimientoEmpresa[]>([]);
-  const [establecimientosLoading, setEstablecimientosLoading] = useState(false);
-  const [selectedEstablecimiento, setSelectedEstablecimiento] = useState<ApiEstablecimientoEmpresa | null>(null);
   // Generador de handlers para campos numéricos.
   const numericChange = (
     name: string,
@@ -127,45 +130,6 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
       // Ignorar errores de formateo
     }
   };
-
-  // Buscar establecimientos al ingresar 11 dígitos de CUIT de establecimiento
-  useEffect(() => {
-    const digits = onlyDigits(String(form.establecimientoCuit || ""));
-    if (isDisabled) return;
-
-    if (digits.length !== 11) {
-      setEstablecimientos([]);
-      setSelectedEstablecimiento(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchEstablecimientos = async () => {
-      try {
-        setEstablecimientosLoading(true);
-        const cuitNumber = Number(digits);
-        if (!cuitNumber) return;
-        const list = await ArtAPI.getEstablecimientosEmpresa(cuitNumber);
-        if (cancelled) return;
-        setEstablecimientos(Array.isArray(list) ? list : []);
-      } catch {
-        if (!cancelled) {
-          setEstablecimientos([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setEstablecimientosLoading(false);
-        }
-      }
-    };
-
-    fetchEstablecimientos();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [form.establecimientoCuit, isDisabled]);
 
   // Si el usuario no es administrador, fijar CUIT de establecimiento al CUIT de la empresa del usuario (no editable)
   useEffect(() => {
@@ -228,7 +192,7 @@ const DatosSiniestro: React.FC<DatosSiniestroProps> = ({
               }
               value={selectedEstablecimiento}
               onChange={(_e, newValue: ApiEstablecimientoEmpresa | null) => {
-                setSelectedEstablecimiento(newValue);
+                onSelectedEstablecimientoChange(newValue);
                 const nombre = newValue?.nombre ?? "";
                 const ciiu = newValue?.ciiu != null ? String(newValue.ciiu) : "";
                 const calle = newValue?.domicilioCalle ?? "";

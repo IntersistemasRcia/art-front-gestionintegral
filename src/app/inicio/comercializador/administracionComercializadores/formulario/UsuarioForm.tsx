@@ -26,6 +26,7 @@ import DatosReferenteSection from "./DatosReferenteSection";
 import Asociados, { AsociadosHandle } from "./Asociados";
 import ArtAPI from "@/data/artAPI";
 import { CUIP } from "@/utils/Formato";
+import { admRolTaskName } from "@/utils/rolesUtils";
 
 function digits(value: unknown) {
   return String(value ?? "").replace(/\D/g, "");
@@ -86,7 +87,7 @@ export default function UsuarioForm({
   const [form, setForm] = useState<UsuarioFormFields>(initialFormState);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<TouchedFields>({});
-  const { user } = useAuth();
+  const { user, hasTask } = useAuth();
   const isOrganizadorComercializador = String((user as any)?.rol ?? "").toLowerCase() === 'organizadorcomercializador';
   const isGrupoOrganizador = String((user as any)?.rol ?? "").toLowerCase() === 'grupoorganizador';
   const isAdministradorComercializador = String((user as any)?.rol ?? "").toLowerCase() === 'administradorcomercializador';
@@ -505,6 +506,13 @@ export default function UsuarioForm({
   );
 
   const displayedRoles = useMemo(() => {
+    // Si el usuario tiene alguna tarea ADMROL_<Rol>, esos roles reemplazan la lista.
+    // Si no tiene ninguna, se mantiene el filtro vigente por perfil (Organizador/GrupoOrganizador/Admin/todos).
+    const rolesPorTarea = roles.filter((r) => hasTask(admRolTaskName(r.nombre)));
+    if (rolesPorTarea.length > 0) {
+      return rolesPorTarea;
+    }
+
     if (isOrganizadorComercializador) {
       return roles.filter((r) => String(r.nombre) === "Comercializador");
     }
@@ -515,7 +523,7 @@ export default function UsuarioForm({
       return roles.filter((r) => allowedAdminRoles.includes(r.nombre));
     }
     return roles;
-  }, [roles, isAdmin, allowedAdminRoles, isOrganizadorComercializador, isGrupoOrganizador]);
+  }, [roles, isAdmin, allowedAdminRoles, isOrganizadorComercializador, isGrupoOrganizador, hasTask]);
 
   useEffect(() => {
     // If parent provided a creationRole (context of the table), use it

@@ -8,6 +8,41 @@ export const VER_TODAS_LAS_EMPRESAS_TASK = "VerTodasLasEmpresas";
 export const COMERCIALIZADOR_ROLE = "Comercializador";
 export const ORGANIZADOR_COMERCIALIZADOR_ROLE = "OrganizadorComercializador";
 export const GRUPO_ORGANIZADOR_ROLE = "GrupoOrganizador";
+/** Prefijo de la tarea que habilita a un rol a crear usuarios de otro rol sin depender de RolPadre (ver tabla Tareas: ADMROL_<NombreDelRol>). */
+export const ADMROL_TASK_PREFIX = "ADMROL_";
+
+/** Nombre de tarea que habilita al usuario a crear usuarios del rol indicado, sin depender de RolPadre. */
+export function admRolTaskName(roleName: string): string {
+  return `${ADMROL_TASK_PREFIX}${roleName}`;
+}
+
+/**
+ * Roles que el usuario puede crear/ver: si tiene alguna tarea ADMROL_<Rol> asignada, son
+ * exactamente esos roles; si no tiene ninguna, son su rol y los roles hijos (o todos si su rol
+ * no tiene hijos configurados). Usado tanto por el combo de creación como por el filtro de rol.
+ */
+export function getRolesGestionablesPorUsuario(
+  userRole: string | undefined | null,
+  roles: RolesInterface[],
+  hasTask: (taskName: string) => boolean
+): RolesInterface[] {
+  const rolesPorTarea = roles.filter((r) => hasTask(admRolTaskName(r.nombre)));
+  if (rolesPorTarea.length > 0) return rolesPorTarea;
+
+  const userRoleEntry = roles.find((r) => r.nombreNormalizado?.toLowerCase() === userRole?.toLowerCase());
+  if (!userRoleEntry || userRoleEntry.rolesHijos.length === 0) return roles;
+
+  const hijoIds = new Set(userRoleEntry.rolesHijos.map((h) => h.id));
+  return roles.filter((r) => hijoIds.has(r.id));
+}
+
+/** Indica si el usuario tiene asignada al menos una tarea ADMROL_<Rol> (algún rol a cargo por tarea). */
+export function tieneAlgunRolACargoPorTarea(
+  roles: RolesInterface[],
+  hasTask: (taskName: string) => boolean
+): boolean {
+  return roles.some((r) => hasTask(admRolTaskName(r.nombre)));
+}
 
 function normalizeRoleName(roleName: string): string {
   return roleName.trim().toLowerCase();

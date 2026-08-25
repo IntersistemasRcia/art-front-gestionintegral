@@ -22,6 +22,7 @@ import DatosEmpleador from "./datosEmpleador/datosEmpleador";
 import CustomTab from "@/utils/ui/tab/CustomTab";
 import ArtAPI from "@/data/artAPI";
 import CustomModalMessage, { MessageType } from "@/utils/ui/message/CustomModalMessage";
+import type { ApiEstablecimientoEmpresa } from "@/app/inicio/empleador/formularioRGRL/types/rgrl";
 
 
 export default function DenunciaForm({
@@ -58,6 +59,9 @@ export default function DenunciaForm({
   const lastFetchedPrestadorCuitRef = useRef<string>("");
   const lastFetchedLocalidadAccRef = useRef<string>("");
   const lastFetchedLocalidadTrabRef = useRef<string>("");
+  const [establecimientos, setEstablecimientos] = useState<ApiEstablecimientoEmpresa[]>([]);
+  const [establecimientosLoading, setEstablecimientosLoading] = useState(false);
+  const [selectedEstablecimiento, setSelectedEstablecimiento] = useState<ApiEstablecimientoEmpresa | null>(null);
 
   // Lógica de Modos y Estado
   const isViewing = method === "view";
@@ -76,7 +80,7 @@ export default function DenunciaForm({
         "cuil", "docNumero", "domicilioNro", "domicilioPiso", "codLocalidadTrabajador", "codPostalTrabajador",
         // Dat Siniestros
         "prestadorInicialCuit",
-        "establecimientoCuit", "establecimientoNumero", "establecimientoCodLocalidad", "establecimientoCodPostal",
+        "establecimientoCuit", "establecimientoCodLocalidad", "establecimientoCodPostal",
         // (Empleador)
         "empCuit", "empPoliza", "empDomicilioNro", "empDomicilioPiso", "empCodLocalidad", "empCodPostal",
       ];
@@ -105,6 +109,8 @@ export default function DenunciaForm({
 
     lastFetchedEmpCuitRef.current = "";
     lastAutoValuesRef.current = {};
+    setEstablecimientos([]);
+    setSelectedEstablecimiento(null);
     // Pre-cargar adjuntos existentes sólo si los proveen (modo edición)
     if (Array.isArray(initialFiles) && initialFiles.length > 0 && method === "edit") {
       setUploadedFiles(initialFiles);
@@ -166,6 +172,19 @@ export default function DenunciaForm({
       establecimientoCodPostal: '',
       establecimientoTelefono: '',
       establecimientoEmail: '',
+      ocurrenciaCuit: '',
+      ocurrenciaRazonSocial: '',
+      ocurrenciaCiiu: '',
+      ocurrenciaCalle: '',
+      ocurrenciaNumero: '',
+      ocurrenciaPiso: '',
+      ocurrenciaDpto: '',
+      ocurrenciaEntreCalle1: '',
+      ocurrenciaEntreCalle2: '',
+      ocurrenciaCodLocalidad: '',
+      ocurrenciaCodPostal: '',
+      ocurrenciaTelefonos: '',
+      ocurrenciaEmail: '',
     }));
   }, [open, isCreating, canRealizaDenuncias]);
 
@@ -217,11 +236,11 @@ export default function DenunciaForm({
       case "create":
         return canRealizaDenuncias ? "Registro Denuncia" : "Registro de Pre-Denuncia";
       case "edit":
-        return "Editar Pre-Denuncia";
+        return canRealizaDenuncias ? "Editar Denuncia" : "Editar Pre-Denuncia";
       case "view":
-        return "Ver Pre-Denuncia";
+        return canRealizaDenuncias ? "Ver Denuncia" : "Ver Pre-Denuncia";
       case "delete":
-        return "Eliminar Pre-Denuncia";
+        return canRealizaDenuncias ? "Eliminar Denuncia" : "Eliminar Pre-Denuncia";
       default:
         return "Formulario de Pre-Denuncia";
     }
@@ -305,6 +324,74 @@ export default function DenunciaForm({
       cancelled = true;
     };
   }, [form.empCuit]);
+
+  // Buscar establecimientos al ingresar 11 dígitos de CUIT de establecimiento.
+  // Se hace acá (y no dentro de DatosSiniestro) para que arranque apenas se
+  // abre el modal, sin esperar a que el usuario navegue a esa pestaña.
+  useEffect(() => {
+    const digits = String(form.establecimientoCuit || "").replace(/\D/g, "");
+    if (isDisabled) return;
+
+    if (digits.length !== 11) {
+      setEstablecimientos([]);
+      setSelectedEstablecimiento(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchEstablecimientos = async () => {
+      try {
+        setEstablecimientosLoading(true);
+        const cuitNumber = Number(digits);
+        if (!cuitNumber) return;
+        const list = await ArtAPI.getEstablecimientosEmpresa(cuitNumber);
+        if (cancelled) return;
+        setEstablecimientos(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) {
+          setEstablecimientos([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setEstablecimientosLoading(false);
+        }
+      }
+    };
+
+    fetchEstablecimientos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.establecimientoCuit, isDisabled]);
+
+  // Al editar una denuncia existente, una vez cargada la lista de establecimientos
+  // del CUIT, preseleccionar el que coincide con los datos de establecimiento
+  // ya guardados en el formulario (por calle+número, o por nombre).
+  useEffect(() => {
+    if (selectedEstablecimiento) return;
+    if (establecimientos.length === 0) return;
+
+    const onlyDigits = (v?: string) => (v ?? "").replace(/\D/g, "");
+    const formCalle = String(form.establecimientoCalle || "").trim().toLowerCase();
+    const formNumero = onlyDigits(String(form.establecimientoNumero || ""));
+    const formNombre = String(form.establecimientoNombre || "").trim().toLowerCase();
+
+    const match = establecimientos.find((est) => {
+      const estCalle = String(est.domicilioCalle || "").trim().toLowerCase();
+      const estNumero = onlyDigits(String(est.domicilioNro || ""));
+      if (formCalle && estCalle === formCalle && formNumero === estNumero) {
+        return true;
+      }
+      const estNombre = String(est.nombre || "").trim().toLowerCase();
+      return !!formNombre && estNombre === formNombre;
+    });
+
+    if (match) {
+      setSelectedEstablecimiento(match);
+    }
+  }, [establecimientos, form.establecimientoCalle, form.establecimientoNumero, form.establecimientoNombre, selectedEstablecimiento]);
 
   // Funciones de Validación
   const validateRequired = (value: string, fieldName: string): string | undefined => {
@@ -833,6 +920,10 @@ export default function DenunciaForm({
                       onTextFieldChange={handleTextFieldChange}
                       onSelectChange={handleSelectChange}
                       onBlur={handleBlur}
+                      establecimientos={establecimientos}
+                      establecimientosLoading={establecimientosLoading}
+                      selectedEstablecimiento={selectedEstablecimiento}
+                      onSelectedEstablecimientoChange={setSelectedEstablecimiento}
                     />
                   ),
                 },

@@ -32,6 +32,7 @@ export type SRTPolizaAcotada = {
     unicoEstablecimiento?: number;
     esPrestadorMedico?: number;
     refEmpleadorInterno: number;
+    referenteDatosInterno?: number;
     srtcomercializadorInterno: number;
     srtComercializadorDenominacion: string;
     firmanteEmpleadorInterno?: number;

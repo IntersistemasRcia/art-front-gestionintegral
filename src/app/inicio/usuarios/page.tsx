@@ -20,7 +20,7 @@ import UsuarioTable from "./UsuarioTable";
 import EmpresaTable from "./EmpresaTable";
 import Tareas from "./Tareas";
 import useUsuarios from "./useUsuarios";
-import { type UsuarioUpdatePayload } from "@/data/usuarioAPI";
+import UsuarioAPI, { type UsuarioUpdatePayload } from "@/data/usuarioAPI";
 import { useEmpresasStore } from "@/data/empresasStore";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import {
@@ -36,7 +36,7 @@ import UsuarioRow from "./interfaces/UsuarioRow";
 import { useAuth } from "@/data/AuthContext";
 import IUsuarioDarDeBajaReactivar from "./interfaces/IUsuarioDarDeBajaReactivar";
 import CustomTabs from "@/utils/ui/tab/CustomTab";
-import { isAdministradorTodasEmpresasRole } from "@/utils/rolesUtils";
+import { isAdministradorTodasEmpresasRole, getRolesGestionablesPorUsuario, tieneAlgunRolACargoPorTarea } from "@/utils/rolesUtils";
 
 /** Valor sentinela en `Empresa.empresaId` para la opción "Todas las Empresas" en el listado de usuarios. */
 const EMPRESA_TODAS_EMPRESAS_ID = -1;
@@ -187,18 +187,31 @@ export default function UsuariosPage() {
     return `${(empresa as any)?.razonSocial ?? ""} - ${cuitFormateado}`;
   };
 
+  // Roles visibles en el filtro y detección de "rol a cargo por tarea" (ADMROL_<Rol>).
+  const { data: rolesParaFiltro } = UsuarioAPI.useGetRoles();
+  const rolesFiltro = useMemo(
+    () => getRolesGestionablesPorUsuario(user?.rol, rolesParaFiltro ?? [], hasTask),
+    [rolesParaFiltro, user?.rol, hasTask]
+  );
+  const tieneRolACargoPorTarea = useMemo(
+    () => tieneAlgunRolACargoPorTarea(rolesParaFiltro ?? [], hasTask),
+    [rolesParaFiltro, hasTask]
+  );
+
   const porEmpresaIdsListado = useMemo(() => {
+    if (tieneRolACargoPorTarea) return [];
     if (!empresaSeleccionada) return [];
     if (empresaSeleccionada.empresaId === EMPRESA_TODAS_EMPRESAS_ID) {
       if (isAdminTodasEmpresas) return [];
       return empresasIdsStore;
     }
     return [empresaSeleccionada.empresaId];
-  }, [empresaSeleccionada, isAdminTodasEmpresas, empresasIdsStore]);
+  }, [empresaSeleccionada, isAdminTodasEmpresas, empresasIdsStore, tieneRolACargoPorTarea]);
 
   const consultarGetAllSinEmpresaId =
-    isAdminTodasEmpresas &&
-    empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID;
+    tieneRolACargoPorTarea ||
+    (isAdminTodasEmpresas &&
+      empresaSeleccionada?.empresaId === EMPRESA_TODAS_EMPRESAS_ID);
 
   const porEmpresaIdsListadoKey = useMemo(() => {
     if (consultarGetAllSinEmpresaId) return "todas";
@@ -247,7 +260,9 @@ export default function UsuariosPage() {
     pageIndex: usuariosPageIndex,
     pageSize: USUARIOS_EMPRESAS_USUARIO_LOGUEADO_PAGE_SIZE,
     ...filterCommitted,
+    rol: filterCommitted.rol ? [filterCommitted.rol] : rolesFiltro.map(r => r.nombre),
   });
+
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   /** Tras alta exitosa con id: el modal exige al menos una empresa antes de cerrar. */
@@ -648,7 +663,7 @@ const handleSubmit = async (data: UsuarioFormFields) => {
                 <TextField label="Email" value={filterDraft.email} onChange={e => setFilterDraft(p => ({ ...p, email: e.target.value }))} className={styles.filterFieldEmail} />
                 <TextField select label="Rol" value={filterDraft.rol} onChange={e => setFilterDraft(p => ({ ...p, rol: e.target.value }))} className={styles.filterFieldCombo}>
                   <MenuItem value="">Todos</MenuItem>
-                  {(roles ?? []).map(r => <MenuItem key={r.id} value={r.nombre}>{r.nombre}</MenuItem>)}
+                  {(rolesFiltro ?? []).map(r => <MenuItem key={r.id} value={r.nombre}>{r.nombre}</MenuItem>)}
                 </TextField>
                 <TextField select label="Estado" value={filterDraft.estado} onChange={e => setFilterDraft(p => ({ ...p, estado: e.target.value }))} className={styles.filterFieldCombo}>
                   <MenuItem value="">Todos</MenuItem>
