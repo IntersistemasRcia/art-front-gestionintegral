@@ -565,11 +565,11 @@ const GenerarFormularioRGRL: React.FC<{
         switch (v) {
           case 1: return 'Representante Legal';
           case 2: return 'Presidente';
-          case 3: return 'VicePresidente';
-          case 4: return 'Director General';
-          case 5: return 'Gerente General';
-          case 6: return 'Administrador General';
-          case 0: return 'Otros';
+          case 3: return 'Director General';
+          case 4: return 'Administrador General';
+          case 5: return 'Vicepresidente';
+          case 6: return 'Gerente General';
+          case 99: return 'Otros';
           default: return '';
         }
       }
