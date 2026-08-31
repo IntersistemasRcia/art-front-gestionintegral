@@ -67,8 +67,15 @@
 }
 .compactTable :global(th),
 .compactTable :global(td) {
-  padding: 6px 8px;
+  padding: 4px 6px;
   line-height: 1.1;
+}
+/* Anula el font-size grande de DataTable (size "mid") sólo dentro de esta tabla,
+   para que entre sin desplazamiento horizontal a 1080p / zoom 100%. */
+.compactTable :global(table thead th),
+.compactTable :global(table thead th) > div,
+.compactTable :global(table tbody td) {
+  font-size: 12px !important;
 }
 .compactTable :global(thead th) {
   font-weight: 600;
@@ -79,6 +86,17 @@
   text-overflow: ellipsis;
   overflow: hidden;
   max-width: 320px;
+}
+/* Establecimiento completo en la solapa Formularios, sin truncar por ancho (RN-007) */
+.establecimientoCompleto {
+  white-space: normal;
+  word-break: break-word;
+}
+.compactTable :global(tbody td):has(.establecimientoCompleto) {
+  white-space: normal;
+  text-overflow: clip;
+  overflow: visible;
+  max-width: none;
 }
 /* Ocultar buscadores del datatable */
 .compactTable :global(input[type="search"]),
@@ -341,6 +359,14 @@
   padding: 10px;
   background-color: var(--verdeClaroClaro);
   border-radius: 6px;
+}
+
+/* Acciones de la solapa Detalles (Exportar a Excel): renglón por encima del
+   buscador de la tabla, alineado a la izquierda. */
+.detalleAcciones {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 0;
 }
 
 .trabajadoresCount {
