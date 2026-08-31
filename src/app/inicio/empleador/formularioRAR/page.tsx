@@ -12,12 +12,13 @@ import { Text, View, Image, StyleSheet } from '@react-pdf/renderer';
 import CustomTab from '@/utils/ui/tab/CustomTab';
 import styles from './FormulariosRAR.module.css';
 import { BsFileEarmarkPdfFill, BsPencilFill, BsFront } from "react-icons/bs";
-import FormularioRAR from './types/TformularioRar';
+import FormularioRAR, { type FormularioRARDetalleItem, type DetalleTrabajador } from './types/TformularioRar';
 import ArtAPI from "@/data/artAPI";
 import { useEmpresasStore } from "@/data/empresasStore";
 import { Empresa } from "@/data/authAPI";
 import CustomSelectSearch from "@/utils/ui/form/CustomSelectSearch";
 import { saveTable, type TableColumn } from '@/utils/excelUtils';
+import { exportarDetalleRARExcel } from './formularioRARExcel';
 
 // Hijos
 import FormularioRARGenerar from './generar/FormularioRARGenerar';
@@ -29,6 +30,18 @@ const pdfLogoSrc = '/icons/LogoTexto.png';
 const fechaFormatter = (v: any) => Formato.Fecha(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
 const formatearFecha = (f: any) => fechaFormatter(f);
+
+/* Agente Causante como "Código - Descripción" sin ceros a la izquierda (RN-004, RN-006).
+   Código y descripción provienen del propio detalle del RAR (/api/FormulariosRAR/{id}). */
+const formatearAgenteCausante = (
+  codigoAgente: FormularioRARDetalleItem['codigoAgente'],
+  descripcionAgente: FormularioRARDetalleItem['descripcionAgente'],
+): string => {
+  const codigo = Number(codigoAgente);
+  if (!codigo) return '—';
+  const descripcion = (descripcionAgente ?? '').trim();
+  return descripcion ? `${codigo} - ${descripcion}` : String(codigo);
+};
 
 /* Spinner simple */
 const Spinner: React.FC = () => (
@@ -96,10 +109,12 @@ const FormulariosRAR: React.FC = () => {
   const [datosPDF, setDatosPDF] = useState<any>(null);
 
   // Detalles del interno
-  const [detallesInterno, setDetallesInterno] = useState<any[]>([]);
+  const [detallesInterno, setDetallesInterno] = useState<DetalleTrabajador[]>([]);
   const [loadingDetalles, setLoadingDetalles] = useState<boolean>(false);
   const [errorDetalles, setErrorDetalles] = useState<string>('');
   const [registroSeleccionado, setRegistroSeleccionado] = useState<any>(null);
+  const [filaSeleccionadaKey, setFilaSeleccionadaKey] = useState<string | null>(null);
+  const [exportingDetallesExcel, setExportingDetallesExcel] = useState<boolean>(false);
 
   // Estado para controlar el tab activo (correcto)
   const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
@@ -134,6 +149,7 @@ const FormulariosRAR: React.FC = () => {
     setFormulariosRAR([]);
     setIdFormularioSeleccionado(0);
     setRegistroSeleccionado(null);
+    setFilaSeleccionadaKey(null);
     setDetallesInterno([]);
     setErrorDetalles('');
     setPageIndex(0);
@@ -272,16 +288,16 @@ const FormulariosRAR: React.FC = () => {
       const data = await ArtAPI.getFormularioRARById(internoId);
 
       if (data?.formularioRARDetalle && Array.isArray(data.formularioRARDetalle)) {
-        const detallesFormateados = data.formularioRARDetalle.map((detalle: any, index: number) => ({
+        const detallesFormateados: DetalleTrabajador[] = (data.formularioRARDetalle as FormularioRARDetalleItem[]).map((detalle, index) => ({
           id: index + 1,
-          cuil: detalle.cuil || '',
+          cuil: detalle.cuil != null ? String(detalle.cuil) : '',
           nombre: detalle.nombre || '',
           sectorTarea: detalle.sectorTarea || '',
           fechaIngreso: detalle.fechaIngreso ? formatearFecha(detalle.fechaIngreso) : '',
           fechaInicioExposicion: detalle.fechaInicioExposicion ? formatearFecha(detalle.fechaInicioExposicion) : '',
           fechaFinExposicion: detalle.fechaFinExposicion ? formatearFecha(detalle.fechaFinExposicion) : '',
-          horasExposicion: detalle.horasExposicion ?? 0,
-          codigoAgente: detalle.codigoAgente || '',
+          horasExposicion: Number(detalle.horasExposicion ?? 0),
+          agenteCausante: formatearAgenteCausante(detalle.codigoAgente, detalle.descripcionAgente),
           fechaUltimoExamenMedico: detalle.fechaUltimoExamenMedico ? formatearFecha(detalle.fechaUltimoExamenMedico) : '',
         }));
         setDetallesInterno(detallesFormateados);
@@ -338,6 +354,17 @@ const FormulariosRAR: React.FC = () => {
     }
   };
 
+  /* Exportar a Excel el detalle del RAR seleccionado (RN-001, RN-002, RN-003) */
+  const handleExportDetallesExcel = async () => {
+    const internoRAR = registroSeleccionado?.interno || registroSeleccionado?.InternoFormularioRAR || '';
+    try {
+      setExportingDetallesExcel(true);
+      await exportarDetalleRARExcel(detallesInterno, internoRAR);
+    } finally {
+      setExportingDetallesExcel(false);
+    }
+  };
+
   /* Handlers de navegación */
   const handleClickNuevo = () => {
     setReplicaDe(undefined);
@@ -386,26 +413,11 @@ const FormulariosRAR: React.FC = () => {
       try {
         const detallesFormulario = await ArtAPI.getFormularioRARById(Number(idFormulario));
 
-          let mapaAgentes = new Map<number, string>();
-          try {
-            const agentesResp = await ArtAPI.getAgentesCausantes();
-            const arr = Array.isArray(agentesResp) ? agentesResp : [];
-            arr.forEach((a: any) => {
-              const codigo = Number(a?.codigo ?? 0);
-              const nombre = String(a?.agenteCausante ?? '').trim();
-              if (codigo && nombre) mapaAgentes.set(codigo, nombre);
-            });
-          } catch (e) {
-            console.warn('No se pudo cargar el catálogo de agentes para PDF', e);
-          }
-
           const detalles = detallesFormulario.formularioRARDetalle || [];
           const detallesConNombre = Array.isArray(detalles)
-            ? detalles.map((d: any) => ({
+            ? (detalles as FormularioRARDetalleItem[]).map((d) => ({
                 ...d,
-                agenteNombre: d?.codigoAgente === 1
-                  ? 'No Expuesto'
-                  : (mapaAgentes.get(Number(d?.codigoAgente)) || '—'),
+                agenteNombre: formatearAgenteCausante(d?.codigoAgente, d?.descripcionAgente),
               }))
             : [];
 
@@ -540,7 +552,13 @@ const FormulariosRAR: React.FC = () => {
     // { accessorKey: 'interno', header: 'Interno'},
     { accessorKey: 'cuit', header: 'CUIT', cell: (info: any) => Formato.CUIP(info.getValue()) },
     { accessorKey: 'empresaRazonSocial', header: 'Razón Social' },
-    { accessorKey: 'empresaDireccion', header: 'Nro. Establecimiento' },
+    {
+      accessorKey: 'empresaDireccion',
+      header: 'Nro. Establecimiento',
+      cell: (info: any) => (
+        <span className={styles.establecimientoCompleto}>{info.getValue() ?? ''}</span>
+      ),
+    },
     { accessorKey: 'estado', header: 'Estado' },
     { accessorKey: 'fechaCreacion', header: 'Fecha Creación', cell: (info: any) => fechaFormatter(info.getValue()), meta: { align: "center" } },
     { accessorKey: 'fechaPresentacion', header: 'Fecha Presentación', cell: (info: any) => fechaFormatter(info.getValue()), meta: { align: "center" } },
@@ -667,7 +685,7 @@ const FormulariosRAR: React.FC = () => {
     },
     {
       accessorKey: 'nombre',
-      header: 'Nombre',
+      header: 'Apellido y Nombre',
       cell: (info: any) => info.getValue() || '—'
     },
     {
@@ -701,10 +719,10 @@ const FormulariosRAR: React.FC = () => {
       size: 80
     },
     {
-      accessorKey: 'codigoAgente',
-      header: 'Cod. Agente',
+      accessorKey: 'agenteCausante',
+      header: 'Agente Causante',
       cell: (info: any) => info.getValue() || '—',
-      size: 100
+      size: 160
     },
     {
       accessorKey: 'fechaUltimoExamenMedico',
@@ -724,6 +742,7 @@ const FormulariosRAR: React.FC = () => {
     seleccionaRegistro(internoForm, internoEstab, est);
     setIdFormularioSeleccionado(idFormulario);
     setRegistroSeleccionado(row);
+    setFilaSeleccionadaKey(row?.interno != null ? String(row.interno) : null);
 
 
     if (internoForm > 0) {
@@ -1017,6 +1036,7 @@ const FormulariosRAR: React.FC = () => {
               pageCount={pageCount}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
+              selectedRowKeyProp={filaSeleccionadaKey}
             />
           </div>
         </div>
@@ -1045,13 +1065,12 @@ const FormulariosRAR: React.FC = () => {
                   <h3 className={styles.formularioTitle}>
                     📄 Formulario RAR #{registroSeleccionado.interno || registroSeleccionado.InternoFormularioRAR}
                   </h3>
-
                 </div>
                 <div className={styles.formularioGrid}>
                   <p><strong>Razón Social:</strong> {registroSeleccionado.empresaRazonSocial || registroSeleccionado.razonSocial || registroSeleccionado.RazonSocial || '—'}</p>
                   <p><strong>CUIT:</strong> {cuipFormatter(registroSeleccionado.cuit) || '—'}</p>
                   <p><strong>Estado:</strong> {registroSeleccionado.estado || '—'}</p>
-                  <p><strong>Dirección:</strong> {registroSeleccionado.empresaDireccion || registroSeleccionado.direccion || registroSeleccionado.Direccion || '—'}</p>
+                  <p><strong>Establecimiento:</strong> {registroSeleccionado.empresaDireccion || registroSeleccionado.direccion || registroSeleccionado.Direccion || '—'}</p>
                 </div>
               </div>
 
@@ -1068,31 +1087,40 @@ const FormulariosRAR: React.FC = () => {
                 </div>
               )}
 
-              {!loadingDetalles && !errorDetalles && detallesInterno.length === 0 && (
-                <div className={styles.noDataMessage}>
-                  <span>📝 No se encontraron trabajadores registrados para este formulario.</span>
-                </div>
-              )}
+              {!loadingDetalles && !errorDetalles && (
+                <>
+                  {detallesInterno.length > 0 && (
+                    <div className={styles.trabajadoresHeader}>
+                      <p className={`${styles.detallesInfo} ${styles.trabajadoresCount}`}>
+                        <strong>👥 Trabajadores registrados: {new Set(detallesInterno.map((detalle) => detalle.cuil)).size}</strong>
+                      </p>
+                    </div>
+                  )}
 
-              {/*  MODIFICACIÓN: Tabla de trabajadores usando DataTable */}
-              {!loadingDetalles && !errorDetalles && detallesInterno.length > 0 && (
-                <div>
-                  <div className={styles.trabajadoresHeader}>
-                    <p className={`${styles.detallesInfo} ${styles.trabajadoresCount}`}>
-                      <strong>👥 Trabajadores registrados: {new Set(detallesInterno.map((detalle) => detalle.cuil)).size}</strong>
-                    </p>
+                  <div className={styles.detalleAcciones}>
+                    <CustomButton
+                      onClick={handleExportDetallesExcel}
+                      disabled={exportingDetallesExcel || loadingDetalles}
+                    >
+                      {exportingDetallesExcel ? 'Exportando...' : 'Exportar a Excel'}
+                    </CustomButton>
                   </div>
 
-                  {/* Usando el mismo componente DataTable*/}
-                  <div className={styles.compactTable}>
-                    <DataTable
-                      columns={detalleColumns}
-                      data={detallesInterno}
-                      size="small"
-                      isLoading={loadingDetalles}
-                    />
-                  </div>
-                </div>
+                  {detallesInterno.length === 0 ? (
+                    <div className={styles.noDataMessage}>
+                      <span>📝 No se encontraron trabajadores registrados para este formulario.</span>
+                    </div>
+                  ) : (
+                    <div className={styles.compactTable}>
+                      <DataTable
+                        columns={detalleColumns}
+                        data={detallesInterno}
+                        size="small"
+                        isLoading={loadingDetalles}
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
