@@ -10,6 +10,7 @@ import CustomButton from '@/utils/ui/button/CustomButton';
 import dayjs from 'dayjs';
 import styles from './GenerarFormularioRGRL.module.css';
 import { CUIP } from '@/utils/Formato';
+import { isoToClarion, clarionToIso } from '@/utils/clarionDate';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import CustomModalMessage, { MessageType } from '@/utils/ui/message/CustomModalMessage';
 import EditIcon from '@mui/icons-material/Edit';
@@ -356,19 +357,24 @@ const GenerarFormularioRGRL: React.FC<{
 
       if (original) {
         // Copia respuestas y listas del original con nuevo ID
-        const fullCuest = (original.respuestasCuestionario || []).map((r) => ({
+        const fullCuest = (original.respuestasCuestionario || []).map((r) => {
+          const esNo = String(r.respuesta ?? '').toUpperCase() === 'N' || String(r.respuesta ?? '').toUpperCase() === 'NO';
+          const fechaIso = esNo ? (r.fechaRegularizacionNormal ?? clarionToIso(r.fechaRegularizacion)) : null;
+          return {
           interno: 0,
           internoCuestionario: r.internoCuestionario ?? 0,
           internoRespuestaFormulario: nuevoId,
           respuesta: r.respuesta ?? '',
-          fechaRegularizacion: r.fechaRegularizacion ?? 0,
+          fechaRegularizacion: fechaIso ? (isoToClarion(fechaIso) ?? 0) : 0,
+          fechaRegularizacionNormal: fechaIso,
           observaciones: r.observaciones ?? '',
 
           estadoAccion: 'A',
           estadoFecha: 0,
           estadoSituacion: '',
           bajaMotivo: 0,
-        }));
+          };
+        });
 
         const gremiosFull = (original.respuestasGremio || []).map((g: any, i: number) => ({
           interno: 0,
@@ -737,7 +743,13 @@ const GenerarFormularioRGRL: React.FC<{
   const onCambiarRespuesta = (internoCuestionario: number, cambios: Partial<RespuestaCuestionarioVm>) => {
     setRespuestas((prev) => {
       const base = prev[internoCuestionario] ?? { internoCuestionario, respuesta: '' };
-      return { ...prev, [internoCuestionario]: { ...base, ...cambios } };
+      const merged = { ...base, ...cambios };
+      // Si la respuesta deja de ser NO, la fecha de regularización asociada se limpia.
+      if ('respuesta' in cambios && String(cambios.respuesta ?? '').toUpperCase() !== 'NO') {
+        merged.fechaRegularizacion = 0;
+        merged.fechaRegularizacionNormal = null;
+      }
+      return { ...prev, [internoCuestionario]: merged };
     });
   };
 
@@ -911,7 +923,7 @@ const GenerarFormularioRGRL: React.FC<{
         .filter((q, idx, arr) => arr.findIndex((x) => x.interno === q.interno) === idx)
         .sort((a, b) => Number(a.codigo ?? 0) - Number(b.codigo ?? 0));
 
-      const hoy = Number(dayjs().format('YYYYMMDD'));
+      const hoyIso = dayjs().format('YYYY-MM-DD');
       for (const q of preguntasObligatorias) {
         const key = q.interno as number;
         const nro = q.codigo;
@@ -930,17 +942,15 @@ const GenerarFormularioRGRL: React.FC<{
           return;
         }
         if (respuesta === 'NO') {
-          const fecha = Number(
-            (r.fechaRegularizacionNormal ? String(r.fechaRegularizacionNormal).replace(/-/g, '') : r.fechaRegularizacion) ?? 0
-          );
-          if (!fecha) {
+          const fechaIso = r.fechaRegularizacionNormal ?? clarionToIso(r.fechaRegularizacion) ?? '';
+          if (!fechaIso) {
             setError('');
             setModalMsg(`La pregunta ${nro} con respuesta NO, requiere fecha de regularización.`);
             setModalMsgType('error');
             setModalMsgOpen(true);
             return;
           }
-          if (fecha <= hoy) {
+          if (fechaIso <= hoyIso) {
             setError('');
             setModalMsg(`La pregunta ${nro} con respuesta NO requiere una fecha posterior a hoy.`);
             setModalMsgType('error');
@@ -961,14 +971,18 @@ const GenerarFormularioRGRL: React.FC<{
         const key = q.interno as number;
         const r = respuestas[key] ?? {};
         const respuestaOriginal = String(r.respuesta ?? '').toUpperCase();
+        // La fecha se persiste como serial Clarion; el ISO acompaña en fechaRegularizacionNormal.
+        const fechaIso = respuestaOriginal === 'NO'
+          ? (r.fechaRegularizacionNormal ?? clarionToIso(r.fechaRegularizacion))
+          : null;
         fullCuest.push({
           interno: r.interno ?? 0,
           internoCuestionario: key,
           internoRespuestaFormulario: r.internoRespuestaFormulario ?? form.interno ?? 0,
           respuesta: respuestaLetraMap[respuestaOriginal] ?? r.respuesta ?? '',
-          fechaRegularizacion: r.fechaRegularizacion ?? 0,
+          fechaRegularizacion: fechaIso ? (isoToClarion(fechaIso) ?? 0) : 0,
           observaciones: r.observaciones ?? '',
-          fechaRegularizacionNormal: (r as any).fechaRegularizacionNormal ?? null,
+          fechaRegularizacionNormal: fechaIso,
           estadoAccion: r.estadoAccion ?? 'A',
           estadoFecha: r.estadoFecha ?? 0,
           estadoSituacion: r.estadoSituacion ?? '',
@@ -1583,7 +1597,7 @@ const GenerarFormularioRGRL: React.FC<{
                     const rr = respuestas[key] ?? {};
                     const value = rr.respuesta ?? '';
                     const hoyIso = dayjs().format('YYYY-MM-DD');
-                    const fechaIso = rr.fechaRegularizacionNormal ?? (rr.fechaRegularizacion ? `${String(rr.fechaRegularizacion).slice(0,4)}-${String(rr.fechaRegularizacion).slice(4,6)}-${String(rr.fechaRegularizacion).slice(6,8)}` : '');
+                    const fechaIso = rr.fechaRegularizacionNormal ?? clarionToIso(rr.fechaRegularizacion) ?? '';
                     const fechaVisible = fechaIso && fechaIso > hoyIso ? fechaIso : '';
                     return (
                       <div
@@ -1646,9 +1660,8 @@ const GenerarFormularioRGRL: React.FC<{
                               onChange={(e) => {
                                 const iso = e.target.value || '';
                                 if (iso && iso <= hoyIso) return;
-                                const digits = iso ? iso.replace(/-/g, '') : '';
                                 onCambiarRespuesta(key, {
-                                  fechaRegularizacion: digits ? Number(digits) : 0,
+                                  fechaRegularizacion: iso ? (isoToClarion(iso) ?? 0) : 0,
                                   fechaRegularizacionNormal: iso ? iso : null,
                                 });
                               }}
