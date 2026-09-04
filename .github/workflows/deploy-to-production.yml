@@ -55,8 +55,14 @@ jobs:
             throw "Environment file not found for '$selectedEnv'. Tried: $($candidates -join ', '). Configure repo-local file (not recommended), ENV_TEMPLATES_PATH, or SITE_PATH."
           }
 
-          Copy-Item $sourceEnvFile .env.production -Force
-          Write-Host "Using $sourceEnvFile for build (.env.production generated)."
+          $sourceFull = [System.IO.Path]::GetFullPath($sourceEnvFile)
+          $destFull = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) '.env.production'))
+          if ($sourceFull -ieq $destFull) {
+            Write-Host "Using existing .env.production (source matches destination; skip copy)."
+          } else {
+            Copy-Item $sourceEnvFile .env.production -Force
+            Write-Host "Using $sourceEnvFile for build (.env.production generated)."
+          }
 
       - name: Notify Teams - Start
         if: ${{ env.TEAMS_WEBHOOK_URL != '' }}
