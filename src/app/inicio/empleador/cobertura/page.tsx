@@ -363,62 +363,87 @@ export default function CoberturaPage() {
             const workbook = new ExcelJS.Workbook();
             const arrayBuffer = await file.arrayBuffer();
             await workbook.xlsx.load(arrayBuffer);
-            
+
             const worksheet = workbook.worksheets[0];
             if (!worksheet) {
                 showMessage('El archivo Excel está vacío.', 'warning', 'Importación de Excel');
                 return;
             }
 
-            const importedData: Persona[] = [];
-            const duplicados: number[] = [];
+            // Personal Cubierto tiene prioridad: un CUIL ya presente allí no se duplica ni se sobrescribe.
+            const cubiertoPorCuil = new Set<number>(personalCubierto.map(p => p.cuil));
+            // Personal Pendiente sólo se consulta para decidir si un CUIL importado debe quitarse de esa lista.
+            const pendientePorCuil = new Set<number>(personalPendiente.map(p => p.cuil));
 
-            // Empezar desde la fila 2 para saltar encabezados
+            const importados: Persona[] = [];
+            const cuilsAQuitarDePendiente = new Set<number>();
+            const cuilsYaCubiertosEnCorrida = new Set<number>(cubiertoPorCuil);
+            const errores: string[] = [];
+
             worksheet.eachRow((row, rowNumber) => {
                 if (rowNumber === 1) return; // Saltar encabezado
 
                 const cuilValue = row.getCell(1).value;
                 const nombreValue = row.getCell(2).value;
 
-                // Validar que haya datos
-                if (!cuilValue || !nombreValue) return;
+                const nombre = nombreValue == null ? '' : String(nombreValue).trim().toUpperCase();
+                const cuilRaw = cuilValue == null ? '' : String(cuilValue).trim();
 
-                const cuil = typeof cuilValue === 'number' ? cuilValue : parseInt(String(cuilValue).replace(/\D/g, ''), 10);
-                const nombre = String(nombreValue).trim().toUpperCase();
-
-                if (isNaN(cuil) || !nombre) return;
-
-                // Verificar duplicados
-                const isDuplicate = personalCubierto.some(p => p.cuil === cuil) || 
-                                  personalPendiente.some(p => p.cuil === cuil) ||
-                                  importedData.some(p => p.cuil === cuil);
-                
-                if (isDuplicate) {
-                    duplicados.push(cuil);
+                // Fila sin datos obligatorios
+                if (!cuilRaw || !nombre) {
+                    errores.push(`Fila ${rowNumber}: no se pudo procesar porque el CUIL y el Nombre deben estar completos.`);
                     return;
                 }
 
-                importedData.push({
-                    cuil,
-                    nombreEmpleador: nombre,
-                });
+                // Normalización vigente del CUIL: quitar no numéricos y convertir a número
+                const cuil = parseInt(cuilRaw.replace(/\D/g, ''), 10);
+                if (isNaN(cuil) || String(cuil).length !== 11) {
+                    errores.push(`Fila ${rowNumber}: el CUIL informado no tiene un formato válido.`);
+                    return;
+                }
+
+                // Prioridad: si ya está en Personal Cubierto (o ya se importó en esta corrida), se conserva el primero.
+                if (cuilsYaCubiertosEnCorrida.has(cuil)) {
+                    errores.push(`Fila ${rowNumber}: el CUIL ya se encuentra en Personal Cubierto; se conservó el primer registro.`);
+                    return;
+                }
+
+                // Fila válida y sin prioridad previa: se agrega a Personal Cubierto con el CUIL y Nombre del Excel
+                importados.push({ cuil, nombreEmpleador: nombre });
+                cuilsYaCubiertosEnCorrida.add(cuil);
+
+                // Si además existía en Personal Pendiente (o hay un estado inconsistente previo), se quita de allí
+                if (pendientePorCuil.has(cuil)) {
+                    cuilsAQuitarDePendiente.add(cuil);
+                }
             });
 
-            if (importedData.length > 0) {
-                setPersonalCubierto(prev => [...prev, ...importedData]);
-                showMessage(`Se importaron ${importedData.length} registros exitosamente.${duplicados.length > 0 ? `\n${duplicados.length} duplicados omitidos.` : ''}`, 'success', 'Importación exitosa');
-            } else {
-                showMessage('No se encontraron datos válidos en el archivo.', 'warning', 'Importación de Excel');
+            if (importados.length > 0) {
+                setPersonalCubierto(prev => [...prev, ...importados]);
             }
+            if (cuilsAQuitarDePendiente.size > 0) {
+                setPersonalPendiente(prev => prev.filter(p => !cuilsAQuitarDePendiente.has(p.cuil)));
+            }
+
+            const resumen = importados.length > 0
+                ? `Se importaron ${importados.length} trabajador${importados.length === 1 ? '' : 'es'} a Personal Cubierto.`
+                : 'No se importó ningún trabajador.';
+            const detalleErrores = errores.length > 0 ? `\n\n${errores.join('\n')}` : '';
+
+            showMessage(
+                `${resumen}${detalleErrores}`,
+                importados.length > 0 && errores.length === 0 ? 'success' : 'warning',
+                importados.length > 0 ? 'Importación de Excel' : 'No se pudo importar',
+            );
 
         } catch (error) {
             console.error('Error al importar Excel:', error);
-            showMessage('Error al leer el archivo Excel. Asegúrese de que tenga el formato correcto (Columna 1: CUIL, Columna 2: Nombre).', 'error', 'Error de importación');
-        }
-
-        // Limpiar el input para permitir reimportar el mismo archivo
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            showMessage('No se pudo leer el archivo. Verifique que sea un Excel con el formato esperado (columna A: CUIL, columna B: Nombre).', 'error', 'Error de importación');
+        } finally {
+            // Limpiar el selector para permitir volver a elegir el mismo archivo
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
     };
 

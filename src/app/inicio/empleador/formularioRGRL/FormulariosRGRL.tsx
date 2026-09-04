@@ -14,6 +14,7 @@ import type { CabeceraData } from './impresionFormulario/types/impresion';
 import CustomModal from '@/utils/ui/form/CustomModal';
 import GenerarFormularioRGRL from './generar/GenerarFormularioRGRL';
 import Formato, { CUIP, Fecha, FechaHora } from '@/utils/Formato';
+import { clarionToIso } from '@/utils/clarionDate';
 import { useAuth } from '@/data/AuthContext';
 import dayjs from 'dayjs';
 import styles from './FormulariosRGRL.module.css';
@@ -160,14 +161,10 @@ const normRepresentacion = (v?: string | number | null): string => {
   }
 };
 
-const formatFechaAAAAMMDD = (v?: number | string | null): string => {
-  if (v == null) return '';
-  const s = String(v).replace(/\D/g, '');
-  if (s.length !== 8) return '';
-  const yyyy = s.slice(0, 4);
-  const mm = s.slice(4, 6);
-  const dd = s.slice(6, 8);
-  return `${dd}/${mm}/${yyyy}`;
+// Muestra la fecha de regularización (serial Clarion) como DD/MM/AAAA.
+const formatFechaRegularizacion = (serial?: number | string | null): string => {
+  const iso = clarionToIso(serial == null ? null : Number(serial));
+  return iso ? Fecha(iso) : '';
 };
 
 const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
@@ -216,7 +213,9 @@ const CargarDetalleRGRL = async (id: number): Promise<DetallePayload> => {
     Pregunta: cat.pregunta,
       Respuesta: r ? mapRespuesta(r.respuesta) : '',
       FechaRegularizacion: r
-        ? ((r.fechaRegularizacionNormal ?? '').toString().trim() || formatFechaAAAAMMDD(r.fechaRegularizacion))
+        ? (((r.fechaRegularizacionNormal ?? '').toString().trim()
+            ? Fecha((r.fechaRegularizacionNormal ?? '').toString().trim())
+            : formatFechaRegularizacion(r.fechaRegularizacion)))
       : '',
     NormaVigente: cat.norma,
     };
