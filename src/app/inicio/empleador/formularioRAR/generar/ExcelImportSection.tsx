@@ -281,6 +281,24 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
               </div>
             )}
 
+            {/* AUTOCORRECCIONES */}
+            {resultadoImportacion.autocorrecciones.length > 0 && (
+              <div className={styles.seccionAutocorrecciones}>
+                <h4 className={styles.seccionAutocorreccionesTitle}>
+                  ⚠ Valores Autocorregidos
+                </h4>
+                <div className={styles.listaAutocorrecciones}>
+                  <ul className={styles.listaAutocorreccionesItems}>
+                    {resultadoImportacion.autocorrecciones.map((ac, i) => (
+                      <li key={i} className={styles.itemAutocorreccion}>
+                        Fila {ac.fila} — {ac.campo}: &quot;{ac.valorOriginal}&quot; → Valor agregado: &quot;{ac.valorResultante}&quot;
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             {/* ERRORES */}
             {resultadoImportacion.errores.length > 0 && (
               <div style={{ marginBottom: '20px' }}>
