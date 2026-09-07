@@ -23,6 +23,12 @@ export interface ResultadoImportacion {
     cuil: string;
     errores: string[];
   }>;
+  autocorrecciones: Array<{
+    fila: number;
+    campo: string;
+    valorOriginal: string;
+    valorResultante: string;
+  }>;
   total: number;
 }
 //#endregion import types
@@ -247,6 +253,7 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
   const resultado: ResultadoImportacion = {
     exitosos: [],
     errores: [],
+    autocorrecciones: [],
     total: 0
   };
 
@@ -275,21 +282,59 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
     const ingreso = convertirFechaExcel(row.getCell(4).value);
     const fechaInicio = convertirFechaExcel(row.getCell(5).value);
     
-    let exposicion = String(row.getCell(6).value || '').trim();
-    const horasExposicion = Number(String(exposicion || '').replace(/[^0-9]/g, '') || 0);
-    
+    // Excel puede entregar "HH:MM" como Date (fracción de día); lo normalizamos a texto "HH:MM".
+    // No aplicamos trim(): un valor con espacios debe rechazarse, no autocorregirse.
+    const exposicionCell = row.getCell(6).value;
+    const exposicionOriginal = exposicionCell instanceof Date
+      ? `${exposicionCell.getUTCHours()}:${String(exposicionCell.getUTCMinutes()).padStart(2, '0')}`
+      : String(exposicionCell ?? '');
+
     // Convertir fecha fin exposición
     const fechaFinExposicion = convertirFechaExcel(row.getCell(7).value);
-    
+
     // Convertir último examen médico
     const ultimoExamenMedico = convertirFechaExcel(row.getCell(8).value);
-    
+
+    let exposicion = exposicionOriginal;
+    let errorExposicion = '';
+
+    const exposicionVacia = exposicionOriginal === '';
+    if (exposicionVacia) {
+      exposicion = exposicionOriginal;
+    } else if (/^\d+$/.test(exposicionOriginal)) {
+      exposicion = String(parseInt(exposicionOriginal, 10));
+    } else if (/^\d+[.,]\d+$/.test(exposicionOriginal)) {
+      exposicion = String(parseInt(exposicionOriginal, 10));
+    } else if (/^\d{1,2}:\d{2}$/.test(exposicionOriginal)) {
+      exposicion = String(parseInt(exposicionOriginal.split(':')[0], 10));
+    } else if (/^-\d+([.,]\d+)?$/.test(exposicionOriginal)) {
+      errorExposicion = `Fila ${rowNumber} — Horas de exposición: "${exposicionOriginal}". El valor debe ser un número mayor o igual a 0.`;
+    } else {
+      errorExposicion = `Fila ${rowNumber} — Horas de exposición: "${exposicionOriginal}". El valor ingresado no es válido. Ingresá un número entero, decimal o una hora con formato HH:MM.`;
+    }
+
+    // Horas normalizadas hasta el momento (0 si está vacía o es inválida).
+    const horasNormalizadas = errorExposicion || exposicionVacia ? 0 : Number(exposicion);
+
     const codigoAgenteRaw = row.getCell(9).value;
-    const codigoAgente = codigoAgenteRaw instanceof Date && Number(exposicion) === 0
+    // Excel a veces interpreta el código de agente como fecha: si además las horas
+    // normalizadas son 0 (celda vacía o "0" explícito), corresponde el código '1'.
+    const codigoAgente = codigoAgenteRaw instanceof Date && !errorExposicion && horasNormalizadas === 0
       ? '1'
       : String(codigoAgenteRaw || '').trim();
 
-    if (!exposicion && codigoAgente === '1') exposicion = '0';
+    // Resolver el caso de exposición vacía ahora que conocemos el código de agente.
+    if (exposicionVacia) {
+      if (codigoAgente === '1') {
+        exposicion = '0';
+      } else {
+        errorExposicion = `Fila ${rowNumber} — Horas de exposición: no ingresaste un valor. Ingresá un valor para este campo.`;
+      }
+    }
+
+    const exposicionAutocorregida =
+      !errorExposicion && !exposicionVacia && exposicion !== exposicionOriginal;
+    const horasExposicion = errorExposicion ? 0 : Number(exposicion || 0);
 
     // Si la fila está completamente vacía, no la contamos ni la procesamos
     const filaVacia = [cuil, nombre, sectorTareas, ingreso, fechaInicio, exposicion, fechaFinExposicion, ultimoExamenMedico, codigoAgente]
@@ -332,11 +377,9 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
       }
     }
 
-    // Validar Exposición
-    if (!exposicion) {
-      erroresFila.push('Nivel de Exposición es requerido');
-    } else if (isNaN(Number(exposicion)) || Number(exposicion) < 0) {
-      erroresFila.push('Nivel de Exposición debe ser un número >= 0');
+    // Validar Exposición (formato ya interpretado/truncado arriba)
+    if (errorExposicion) {
+      erroresFila.push(errorExposicion);
     }
 
     // Validar Último Examen Médico
@@ -354,7 +397,7 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
       erroresFila.push('Código Agente es requerido');
     } else if (isNaN(Number(codigoAgente))) {
       erroresFila.push('Código Agente debe ser un número válido');
-    } else if (Number(codigoAgente) === 1 && Number(exposicion) !== 0) {
+    } else if (!errorExposicion && Number(codigoAgente) === 1 && horasExposicion !== 0) {
       erroresFila.push('Código Agente 1 solo es válido si Horas Exposición es 0');
     }
 
@@ -408,6 +451,14 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
           CodigoAgente: codigoAgente,
           AgenteCausanteDisplay: codigoAgente // Se actualiza después con la descripción
         });
+        if (exposicionAutocorregida) {
+          resultado.autocorrecciones.push({
+            fila: numFila,
+            campo: 'Horas de exposición',
+            valorOriginal: exposicionOriginal,
+            valorResultante: exposicion
+          });
+        }
         contadorExitosos++;
       }
     }
