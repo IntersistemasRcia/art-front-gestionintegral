@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
@@ -18,12 +18,14 @@ import { Empresa } from '@/data/authAPI';
 import { useAuth } from '@/data/AuthContext';
 import CustomSelectSearch from '@/utils/ui/form/CustomSelectSearch';
 import CustomButton from '@/utils/ui/button/CustomButton';
+import CustomModalMessage from '@/utils/ui/message/CustomModalMessage';
 import Formato from '@/utils/Formato';
 import styles from './siniestros.module.css';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { EmpleadorSiniestrosContextProvider, useEmpleadorSiniestrosContext } from './context';
 import useSWR from 'swr';
 import QueriesAPI, { type Pagination, type FiltroVm } from '@/data/queryAPI';
+import { saveTable, type TableColumn, type AddTableOptions } from '@/utils/excelUtils';
 
 
 const fmtDateTime = (v?: string | null) => {
@@ -37,47 +39,49 @@ const fmtDate = (v?: string | null) => {
   return d.isValid() ? d.format('DD-MM-YYYY') : '';
 };
 
-const cols: ColumnDef<SiniestroItem>[] = [
-  { header: 'CUIL', accessorKey: 'trabCUIL' },
-  {
-    header: 'Apellido y Nombre',
-    accessorKey: 'trabNombre',
-    cell: ({ getValue }) => String(getValue() ?? '').trim(),
-  },
-  { header: 'Establecimiento', accessorKey: 'establecimiento' },
-  { header: 'Nº Siniestro', accessorKey: 'siniestroNro' },
-  {
-    header: 'Tipo',
-    accessorKey: 'tipoSiniestro',
-    cell: ({ getValue }) => String(getValue() ?? '').trim(),
-  },
-  {
-    header: 'Fecha y Hora Siniestro',
-    accessorKey: 'siniestroFechaHora',
-    cell: ({ getValue }) => fmtDateTime(getValue() as string | null),
-    meta: { align: 'center' },
-  },
-  { header: 'Diagnóstico', accessorKey: 'diagnostico', meta: { align: 'center' }, },
-  
-  {
-    header: 'Categoría',
-    accessorKey: 'siniestroCategoria',
-    cell: ({ getValue }) => String(getValue() ?? '').trim(),
-  },
-  {
-    header: 'Próx. Control Médico',
-    accessorKey: 'proximoControlMedicoFechaHora',
-    cell: ({ getValue }) => fmtDateTime(getValue() as string | null),
-    meta: { align: 'center' },
-  },
-  { header: 'Prestador inicial', accessorKey: 'prestador' },
-  {
-    header: 'Alta Médica',
-    accessorKey: 'altaMedicaFecha',
-    cell: ({ getValue }) => fmtDate(getValue() as string | null),
-    meta: { align: 'center' },
-  },
+type SiniestroColumnConfig = {
+  key: keyof SiniestroItem;
+  header: string;
+  align?: 'left' | 'center' | 'right';
+  formatter?: (v: unknown) => string;
+};
+
+const trim = (v: unknown) => String(v ?? '').trim();
+
+// Fuente única: UI (`cols`) y Excel (`exportColumns`/`exportOptions`) se derivan de esta tabla,
+// para que grilla y export no puedan divergir (RN-003/RN-004).
+const SINIESTROS_COLUMNS: SiniestroColumnConfig[] = [
+  { key: 'trabCUIL', header: 'CUIL' },
+  { key: 'trabNombre', header: 'Apellido y Nombre', formatter: trim },
+  { key: 'establecimiento', header: 'Establecimiento' },
+  { key: 'siniestroNro', header: 'Nº Siniestro' },
+  { key: 'tipoSiniestro', header: 'Tipo', formatter: trim },
+  { key: 'siniestroFechaHora', header: 'Fecha y Hora Siniestro', align: 'center', formatter: (v) => fmtDateTime(v as string | null) },
+  { key: 'diagnostico', header: 'Diagnóstico', align: 'center' },
+  { key: 'siniestroCategoria', header: 'Categoría', formatter: trim },
+  { key: 'proximoControlMedicoFechaHora', header: 'Próx. Control Médico', align: 'center', formatter: (v) => fmtDateTime(v as string | null) },
+  { key: 'prestador', header: 'Prestador inicial' },
+  { key: 'altaMedicaFecha', header: 'Alta Médica', align: 'center', formatter: (v) => fmtDate(v as string | null) },
 ];
+
+const cols: ColumnDef<SiniestroItem>[] = SINIESTROS_COLUMNS.map(({ key, header, align, formatter }) => ({
+  header,
+  accessorKey: key,
+  ...(formatter ? { cell: ({ getValue }: { getValue: () => unknown }) => formatter(getValue()) } : {}),
+  ...(align ? { meta: { align } } : {}),
+}));
+
+const EXPORT_FILE_NAME = 'Siniestros.xlsx';
+const exportColumns: Record<string, TableColumn> = Object.fromEntries(
+  SINIESTROS_COLUMNS.map(({ key, header }) => [key, { key, header }])
+);
+const exportOptions: AddTableOptions = {
+  formatters: {
+    row: Object.fromEntries(
+      SINIESTROS_COLUMNS.filter((c) => c.formatter).map(({ key, formatter }) => [key, formatter!])
+    ),
+  },
+};
 
 const normalizeDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
 const EMPRESA_TODAS_ID = -1;
@@ -319,6 +323,8 @@ function TablaSiniestrosPadre({
   onRowClick,
 }: TablaSiniestrosPadreProps) {
   const { rows, isLoading, error, razonSocialFromQuery } = useEmpleadorSiniestrosContext();
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFallo, setExportFallo] = useState(false);
 
   useEffect(() => {
     if (!cuitDesdeQuery) return;
@@ -326,6 +332,21 @@ function TablaSiniestrosPadre({
     if (!razonSocialFromQuery) return;
     setEmpresaSeleccionada({ razonSocial: razonSocialFromQuery } as Empresa);
   }, [cuitDesdeQuery, empresaSeleccionada, razonSocialFromQuery, setEmpresaSeleccionada]);
+
+  const handleExportExcel = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      await saveTable(exportColumns, rows, EXPORT_FILE_NAME, {
+        format: 'xlsx',
+        sheet: { name: 'Siniestros' },
+        table: exportOptions,
+      });
+    } catch {
+      setExportFallo(true);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [rows]);
 
   return (
     <>
@@ -340,6 +361,21 @@ function TablaSiniestrosPadre({
         isLoading={isLoading}
         size="mid"
         onRowClick={onRowClick}
+        toolbarActions={
+          <CustomButton
+            onClick={handleExportExcel}
+            isLoading={isExporting}
+            disabled={isLoading || Boolean(error)}
+          >
+            Descarga Excel
+          </CustomButton>
+        }
+      />
+      <CustomModalMessage
+        open={exportFallo}
+        type="error"
+        message="Operación fallida. Intente nuevamente."
+        onClose={() => setExportFallo(false)}
       />
     </>
   );
