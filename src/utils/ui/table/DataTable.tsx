@@ -67,6 +67,7 @@ export function DataTable<TData extends object>({
   initialSelectedRowKey = null,
   onSelectedRowChange,
   persistSelectedRowKey = null,
+  toolbarActions,
 }: DataTableProps<TData>) {
 
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -235,14 +236,19 @@ export function DataTable<TData extends object>({
   // -------------------------
   return (
     <Box className={styles.tableContainer}>
-      {enableFiltering && (
-        <TextField
-          label="Buscar en la tabla:"
-          variant="outlined"
-          value={globalFilter}
-          onChange={e => setGlobalFilter(e.target.value)}
-          className={styles.filterInput}
-        />
+      {(enableFiltering || toolbarActions) && (
+        <Box className={styles.toolbarRow}>
+          {enableFiltering && (
+            <TextField
+              label="Buscar en la tabla:"
+              variant="outlined"
+              value={globalFilter}
+              onChange={e => setGlobalFilter(e.target.value)}
+              className={styles.filterInput}
+            />
+          )}
+          {toolbarActions}
+        </Box>
       )}
       <TableContainer component={Paper} className={styles.paper}>
         <Table size={size === "small" ? "small" : undefined} className={styles.table}>

@@ -52,4 +52,7 @@ export interface DataTableProps<TData extends object> {
   initialSelectedRowKey?: string | null;
   onSelectedRowChange?: (selectedKey: string | null, row?: TData) => void;
   persistSelectedRowKey?: string | null;
+
+  /** Contenido opcional (botones, acciones) renderizado junto al campo "Buscar en la tabla:". */
+  toolbarActions?: React.ReactNode;
 }
