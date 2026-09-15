@@ -206,6 +206,9 @@ export function SiniestrosContextProvider({ children }: { children: ReactNode })
       { name: "FechaDictamen", label: "Fecha Dictamen", type: "date", formatter: fechaFormatter },
       { name: "TipoIncapacidad", label: "Tipo Incapacidad" },
       { name: "PorcentajeIncapacidad", label: "% Incapacidad", type: "number", formatter: numeroFormatter },
+
+      { name: "PosibleRecupero", label: "Posible Recupero", ...optionsSelect(SNOptions) },
+      { name: "ObservacionPosibleRecupero", label: "Observación Recupero" },
     ],
   });
 
