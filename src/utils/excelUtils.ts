@@ -399,6 +399,8 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
       erroresFila.push('Código Agente debe ser un número válido');
     } else if (!errorExposicion && Number(codigoAgente) === 1 && horasExposicion !== 0) {
       erroresFila.push('Código Agente 1 solo es válido si Horas Exposición es 0');
+    } else if (!errorExposicion && !exposicionVacia && Number(codigoAgente) !== 1 && horasExposicion === 0) {
+      erroresFila.push('Nivel de Exposición es requerido');
     }
 
     // Validar Fecha Fin Exposición (es opcional, pero si se proporciona debe ser válida)
