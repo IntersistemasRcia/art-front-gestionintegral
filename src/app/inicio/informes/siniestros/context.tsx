@@ -114,6 +114,7 @@ const optionsSelect = (options: any, formatter = valueOptionsFormatter, values =
 });
 
 const SNOptions = { S: "Si", N: "No" };
+const posibleRecuperoOptions = { Si: "Si", No: "No" };
 const tipoSiniestroOptions = {
   AccidenteTrabajo: "AccidenteTrabajo",
   Enfermedad: "P - Enfermedad Profesional",
@@ -207,7 +208,7 @@ export function SiniestrosContextProvider({ children }: { children: ReactNode })
       { name: "TipoIncapacidad", label: "Tipo Incapacidad" },
       { name: "PorcentajeIncapacidad", label: "% Incapacidad", type: "number", formatter: numeroFormatter },
 
-      { name: "PosibleRecupero", label: "Posible Recupero", ...optionsSelect(SNOptions) },
+      { name: "PosibleRecupero", label: "Posible Recupero", ...optionsSelect(posibleRecuperoOptions) },
       { name: "ObservacionPosibleRecupero", label: "Observación Recupero" },
     ],
   });
