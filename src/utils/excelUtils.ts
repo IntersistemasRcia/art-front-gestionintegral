@@ -31,6 +31,12 @@ export interface ResultadoImportacion {
   }>;
   total: number;
 }
+
+export type OpcionesImportacionTrabajadores = {
+  maxTrabajadores?: number;
+  fechaCargaFormulario?: string;
+  codigosAgenteValidos: ReadonlySet<number>;
+};
 //#endregion import types
 
 //#region helper functions
@@ -239,10 +245,15 @@ export async function saveTable(
 /**
  * Lee un archivo Excel y extrae los datos de los trabajadores
  * @param file - Archivo Excel cargado por el usuario
- * @param maxTrabajadores - Cantidad máxima de trabajadores a importar (basado en cantExpuestos + cantNoExpuestos)
+ * @param opciones.maxTrabajadores - Cantidad máxima de trabajadores a importar
+ * @param opciones.fechaCargaFormulario - Fecha de carga del formulario RAR (YYYY-MM-DD)
+ * @param opciones.codigosAgenteValidos - Códigos de RefAgenteCausante; un código distinto de 1 que no esté aquí se rechaza
  * @returns Promesa con el resultado de la importación
  */
-export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores?: number, fechaCargaFormulario?: string): Promise<ResultadoImportacion> {
+export async function importarTrabajadoresDesdeExcel(
+  file: File,
+  { maxTrabajadores, fechaCargaFormulario, codigosAgenteValidos }: OpcionesImportacionTrabajadores,
+): Promise<ResultadoImportacion> {
   const workbook = new ExcelJS.Workbook();
   
   // Leer el archivo
@@ -397,6 +408,9 @@ export async function importarTrabajadoresDesdeExcel(file: File, maxTrabajadores
       erroresFila.push('Código Agente es requerido');
     } else if (isNaN(Number(codigoAgente))) {
       erroresFila.push('Código Agente debe ser un número válido');
+    } else if (Number(codigoAgente) !== 1 && !codigosAgenteValidos.has(Number(codigoAgente))) {
+      // El código 1 (Sin exposición) no está en el catálogo y conserva sus reglas vigentes
+      erroresFila.push(`Código Agente ${codigoAgente} no es válido`);
     } else if (!errorExposicion && Number(codigoAgente) === 1 && horasExposicion !== 0) {
       erroresFila.push('Código Agente 1 solo es válido si Horas Exposición es 0');
     } else if (!errorExposicion && !exposicionVacia && Number(codigoAgente) !== 1 && horasExposicion === 0) {
