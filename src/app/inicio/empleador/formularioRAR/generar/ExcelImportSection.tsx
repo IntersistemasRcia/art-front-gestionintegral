@@ -42,12 +42,27 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Sin catálogo de agentes no se puede validar el Código Agente: se informa y no se lee el Excel
+    if (agentesCausantes.length === 0) {
+      onMensajeError('No se pudo obtener el listado de agentes causantes.');
+      event.target.value = '';
+      return;
+    }
+
+    const codigosAgenteValidos = new Set(
+      agentesCausantes.map((a) => Number(a.codigo)).filter(Number.isFinite)
+    );
+
     // No limitamos por cantidad ingresada, traemos todo el Excel
     const maxAImportar = 10000;
 
     setCargandoExcel(true);
     try {
-      const resultado = await importarTrabajadoresDesdeExcel(file, maxAImportar, fechaCargaFormulario);
+      const resultado = await importarTrabajadoresDesdeExcel(file, {
+        maxTrabajadores: maxAImportar,
+        fechaCargaFormulario,
+        codigosAgenteValidos,
+      });
       
       // Calcular estadísticas del Excel
       const cuilsExpuestos = new Set<string>();
