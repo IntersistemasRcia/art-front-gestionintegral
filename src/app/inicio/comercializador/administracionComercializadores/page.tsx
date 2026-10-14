@@ -73,7 +73,6 @@ export default function AdminUserPage() {
 
   const isGrupoOrganizador = String((user as any)?.rol ?? '').toLowerCase() === 'grupoorganizador';
   const isOrganizadorComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'organizadorcomercializador';
-  const isComercializador = String((user as any)?.rol ?? '').toLowerCase() === 'comercializador';
   const isAdminLevel = hasTask('Comercializador_Administracion_VerUsuarios');
   const canLoadComercializadores = isGrupoOrganizador || isOrganizadorComercializador || isAdminLevel;
   const userCuit = Number(digits((user as any)?.cuit ?? (user as any)?.CUIL ?? (user as any)?.cuil ?? 0));
@@ -287,13 +286,9 @@ export default function AdminUserPage() {
   };
 
   const canCreateForTab = (tabIndex: number) => {
-    if (tabIndex === 0 && hasTask('Comercializador_Administracion_CrearGrupoOrganizador')) return true;
-    if (tabIndex === 1 && hasTask('Comercializador_Administracion_CrearOrganizadorComercializador')) return true;
-    if (tabIndex === 2 && hasTask('Comercializador_Administracion_CrearComercializador')) return true;
-    if (isComercializador) return false;
-    if (isOrganizadorComercializador) return tabIndex === 2; // solo Comercializador
-    if (isGrupoOrganizador) return tabIndex === 1 || tabIndex === 2; // Organizador o Comercializador
-    if (isAdminLevel) return true;
+    if (tabIndex === 0) return hasTask('Comercializador_Administracion_CrearGrupoOrganizador');
+    if (tabIndex === 1) return hasTask('Comercializador_Administracion_CrearOrganizadorComercializador');
+    if (tabIndex === 2) return hasTask('Comercializador_Administracion_CrearComercializador');
     return false;
   };
 
@@ -555,17 +550,18 @@ export default function AdminUserPage() {
   return (
     <div>
 
+      {canCreateForTab(currentTab) && (
       <Box className={styles.createButtonWrapper}>
         <CustomButton
           variant="contained"
           color="primary"
           icon={<IoPersonAddSharp />}
           onClick={openFormCreate}
-          disabled={!canCreateForTab(currentTab)}
         >
           {creationRoleForTab(currentTab).label}
         </CustomButton>
       </Box>
+      )}
 
       <AdministracionTable
         currentTab={currentTab}
