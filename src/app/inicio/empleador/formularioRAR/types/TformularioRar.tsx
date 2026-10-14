@@ -90,7 +90,8 @@ export type DetalleTrabajador = {
   fechaInicioExposicion: string;
   fechaFinExposicion: string;
   horasExposicion: number;
-  agenteCausante: string;
+  codigoAgenteCausante: string;
+  descripcionAgenteCausante: string;
   fechaUltimoExamenMedico: string;
 };
 //#endregion Types Formularios RAR (GET por interno)
