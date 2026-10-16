@@ -96,6 +96,7 @@ const FormulariosRAR: React.FC = () => {
   // PAGINACIÓN controlada por componente
   const [PageIndex, setPageIndex] = useState<number>(0);
   const [PageSize, setPageSize] = useState<number>(10);
+  const [soloVigentes, setSoloVigentes] = useState(true);
   const [pageCount, setPageCount] = useState<number>(0);
 
   // modos
@@ -191,7 +192,7 @@ const FormulariosRAR: React.FC = () => {
   // SWR detectará automáticamente cuando cambia el CUIT porque está en la clave
   const apiPageIndex = PageIndex;
   const paramsFormularios = canFetchFormularios
-    ? { empresasId: empresaIdsFiltro, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' }
+    ? { empresasId: empresaIdsFiltro, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno', SoloVigentes: soloVigentes }
     : undefined;
   
   const { data: formulariosData, error: formulariosError, isLoading: isLoadingSWR, isValidating, mutate: mutateFormularios } =
@@ -323,6 +324,7 @@ const FormulariosRAR: React.FC = () => {
       setExportingExcel(true);
       const countResponse = await ArtAPI.getFormulariosRAR({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: 1,
         PageSize: 1,
       });
@@ -342,6 +344,7 @@ const FormulariosRAR: React.FC = () => {
       }
       const allResponse = await ArtAPI.getFormulariosRAR({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: 1,
         PageSize: totalCount,
       });
@@ -1165,6 +1168,9 @@ const FormulariosRAR: React.FC = () => {
               }
               disabled={isLoadingEmpresas}
             />
+            <label style={{ display: 'block', marginTop: 8 }}>
+              <input type="checkbox" checked={soloVigentes} onChange={(event) => { setSoloVigentes(event.target.checked); setPageIndex(0); }} /> Vigentes
+            </label>
           </Box>
 
           <CustomTab

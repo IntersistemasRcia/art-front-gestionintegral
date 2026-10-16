@@ -16,6 +16,7 @@ export type ParametersFormularioRar = {
   FechaPresentacion?: string;
   RefEstablecimientoId?: number;
   PageIndex?: number;
+  SoloVigentes?: boolean;
   PageSize?: number;
   OrderBy?: string;
 };
