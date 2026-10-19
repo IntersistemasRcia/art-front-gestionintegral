@@ -20,11 +20,8 @@ export default function EnvironmentBanner({ location }: EnvironmentBannerProps) 
 
   if (location === "login") {
     return (
-      <div className={styles.loginNotice} aria-label="Contacto del ambiente TEST">
-        <span className={styles.loginNoticeTitle}>Contacto</span>
-        <span className={styles.loginNoticeDescription}>
-          UATRETEST.INTERSISTEMAS.NET
-        </span>
+      <div className={styles.loginNotice} aria-label="Ambiente actual: TEST">
+        <span className={styles.loginNoticeDescription}>AMBIENTE TEST</span>
       </div>
     );
   }

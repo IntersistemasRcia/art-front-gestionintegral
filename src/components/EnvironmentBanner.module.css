@@ -9,18 +9,11 @@
   text-align: center;
 }
 
-.loginNoticeTitle {
-  color: #0356b6;
-  font-size: 1.45rem;
-  font-weight: 600;
-  text-decoration: underline;
-}
-
 .loginNoticeDescription {
   color: var(--grisOscuro);
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.035em;
 }
 
 .navigationTag {
