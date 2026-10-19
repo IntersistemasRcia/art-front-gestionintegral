@@ -24,6 +24,10 @@
 
   --rojo: #c02727;
   --rojoOscuro: #862c2c; 
+
+  /* Identificación no productiva: diferenciada de acciones naranjas y navegación verde. */
+  --azulAmbienteTest: #2d6fb7;
+  --azulAmbienteTestOscuro: #1f4f85;
   
   --blanco: white;
   --negro: black;

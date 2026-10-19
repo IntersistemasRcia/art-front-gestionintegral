@@ -18,6 +18,7 @@ import { Person, Lock, Visibility, VisibilityOff, Mail } from "@mui/icons-materi
 import CustomButton from "@/utils/ui/button/CustomButton";
 import CustomModal from "@/utils/ui/form/CustomModal";
 import usuarioAPI from "@/data/usuarioAPI";
+import EnvironmentBanner from "@/components/EnvironmentBanner";
 import styles from "./Signin.module.css";
 
 export default function Signin() {
@@ -196,6 +197,7 @@ export default function Signin() {
 
         <Box className={styles.rightCardContent}>
           <h1 className={styles.formTitle}>Iniciar Sesión</h1>
+          <EnvironmentBanner location="login" />
 
           <Box component="form" onSubmit={handleSubmit} className={styles.form}>
             {error && (

@@ -64,6 +64,11 @@ jobs:
             Write-Host "Using $sourceEnvFile for build (.env.production generated)."
           }
 
+      - name: Validate application environment
+        shell: powershell
+        run: |
+          node scripts/validate-app-environment.mjs production
+
       - name: Notify Teams - Start
         if: ${{ env.TEAMS_WEBHOOK_URL != '' }}
         shell: powershell

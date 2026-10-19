@@ -86,6 +86,18 @@ Get-NetTCPConnection -LocalPort 8600 -ErrorAction SilentlyContinue
 8) Notas de seguridad
 
 - No guardes secretos en archivos en el repo. Coloca archivos `.env` solo en la máquina de despliegue con permisos restringidos.
+
+### Identificación de ambiente
+
+El archivo de entorno utilizado para construir cada instancia debe declarar `NEXT_PUBLIC_APP_ENVIRONMENT` con el valor exacto que corresponda:
+
+| Despliegue | Valor requerido |
+|---|---|
+| Develop | `DEVELOPMENT` |
+| TEST | `TEST` |
+| Producción | `PRODUCTION` |
+
+El workflow valida este valor antes de compilar. Sólo `TEST` muestra la leyenda visual **AMBIENTE TEST**; los valores ausentes o no reconocidos no muestran la leyenda y provocan el fallo del despliegue.
 - Los runners self-hosted tienen acceso a los recursos de la máquina: asegúrate de aislar la máquina si corres trabajos de terceros.
 
 Si quieres, puedo añadir los comandos para instalar `pm2-windows-service` o un ejemplo de configuración para IIS reverse-proxy.

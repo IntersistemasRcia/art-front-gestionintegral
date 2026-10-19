@@ -13,6 +13,7 @@ import { useSearch } from '@/data/SearchContext';
 import CustomButton from "@/utils/ui/button/CustomButton";
 import Formato from "@/utils/Formato";
 import { TextField, InputAdornment } from '@mui/material';
+import EnvironmentBanner from "./EnvironmentBanner";
 
 function Navbar() {
   const { data: session, status } = useSession();
@@ -45,6 +46,7 @@ function Navbar() {
             height={60} 
           />
         </Link>
+        <EnvironmentBanner location="navigation" />
         <div className={styles.searchContainer}>
           <TextField
             placeholder="Buscar en el menú..."
