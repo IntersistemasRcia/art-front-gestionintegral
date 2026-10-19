@@ -1,68 +1,66 @@
-.tag {
-  position: relative;
+.loginNotice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 2.1rem auto 0;
+  color: var(--grisOscuro);
+  line-height: 1.25;
+  text-align: center;
+}
+
+.loginNoticeTitle {
+  color: #0356b6;
+  font-size: 1.45rem;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.loginNoticeDescription {
+  color: var(--grisOscuro);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.navigationTag {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
-  min-height: 3rem;
-  padding: 0.45rem 1.25rem 0.45rem 2rem;
-  border: 1px solid var(--azulAmbienteTestOscuro);
-  background: linear-gradient(
-    145deg,
-    var(--azulAmbienteTest),
-    var(--azulAmbienteTestOscuro)
-  );
-  color: var(--blanco);
-  box-shadow: 0 0.15rem 0.3rem rgba(31, 79, 133, 0.28);
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  line-height: 1.1;
-  text-align: center;
-  white-space: nowrap;
-  clip-path: polygon(0.95rem 0, 100% 0, 100% 100%, 0.95rem 100%, 0 50%);
-}
-
-.tag::before {
-  position: absolute;
-  top: 50%;
-  left: 0.82rem;
-  width: 0.48rem;
-  height: 0.48rem;
-  content: "";
-  border: 1px solid var(--blanco);
-  border-radius: 50%;
-  background-color: var(--blanco);
-  transform: translateY(-50%);
-}
-
-.login {
-  margin: -1.2rem auto 2.2rem;
-}
-
-.navigation {
   align-self: center;
   flex: 0 0 auto;
+  min-height: 2.8rem;
   margin: 0 1.5rem;
+  padding: 0.35rem 1.7rem;
+  border: 1px solid var(--amarilloAmbienteTestOscuro);
+  border-radius: 0.45rem;
+  background: var(--amarilloAmbienteTest);
+  box-shadow: 0 0.1rem 0.2rem rgba(137, 104, 0, 0.16);
+  color: #242424;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
-  .navigation {
+  .navigationTag {
     margin: 0 0.75rem;
-    padding: 0.35rem 1rem 0.35rem 1.75rem;
+    padding: 0.35rem 1rem;
     font-size: 1.3rem;
   }
 }
 
 @media (max-width: 600px) {
-  .login {
-    margin: -0.8rem auto 1.6rem;
-    font-size: 1.3rem;
+  .loginNotice {
+    margin-top: 1.6rem;
   }
 
-  .navigation {
+  .navigationTag {
     margin: 0 0.4rem;
-    padding: 0.25rem 0.65rem 0.25rem 1.55rem;
+    padding: 0.25rem 0.65rem;
     font-size: 1.1rem;
   }
 }

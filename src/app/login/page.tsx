@@ -197,7 +197,6 @@ export default function Signin() {
 
         <Box className={styles.rightCardContent}>
           <h1 className={styles.formTitle}>Iniciar Sesión</h1>
-          <EnvironmentBanner location="login" />
 
           <Box component="form" onSubmit={handleSubmit} className={styles.form}>
             {error && (
@@ -289,6 +288,8 @@ export default function Signin() {
                 Olvidaste la contraseña?
               </a>
             </Box>
+
+            <EnvironmentBanner location="login" />
           </Box>
         </Box>
       </Box>
