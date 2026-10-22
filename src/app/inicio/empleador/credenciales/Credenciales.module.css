@@ -119,6 +119,22 @@
   flex: 1;
 }
 
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.filterFieldCuil {
+  min-width: 160px;
+}
+
+.filterFieldNombre {
+  min-width: 260px;
+  flex: 1;
+}
+
 .modalLegend {
   margin-top: 12px;
 }

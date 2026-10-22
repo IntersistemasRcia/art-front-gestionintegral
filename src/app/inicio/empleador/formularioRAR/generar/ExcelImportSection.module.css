@@ -236,6 +236,35 @@
   font-size: 13px;
 }
 
+/* Autocorrecciones */
+.seccionAutocorrecciones {
+  margin-bottom: 20px;
+}
+
+.seccionAutocorreccionesTitle {
+  margin: 0 0 10px 0;
+  color: var(--naranjaOscuro);
+}
+
+.listaAutocorrecciones {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--naranjaClaroClaro);
+  padding: 10px;
+  border-radius: 3px;
+  border: 1px solid var(--naranjaClaro);
+}
+
+.listaAutocorreccionesItems {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.itemAutocorreccion {
+  margin-bottom: 5px;
+  color: var(--grisOscuro);
+}
+
 /* Botones del modal */
 .modalButtons {
   display: flex;

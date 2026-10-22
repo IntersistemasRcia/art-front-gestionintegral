@@ -42,12 +42,27 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Sin catálogo de agentes no se puede validar el Código Agente: se informa y no se lee el Excel
+    if (agentesCausantes.length === 0) {
+      onMensajeError('No se pudo obtener el listado de agentes causantes.');
+      event.target.value = '';
+      return;
+    }
+
+    const codigosAgenteValidos = new Set(
+      agentesCausantes.map((a) => Number(a.codigo)).filter(Number.isFinite)
+    );
+
     // No limitamos por cantidad ingresada, traemos todo el Excel
     const maxAImportar = 10000;
 
     setCargandoExcel(true);
     try {
-      const resultado = await importarTrabajadoresDesdeExcel(file, maxAImportar, fechaCargaFormulario);
+      const resultado = await importarTrabajadoresDesdeExcel(file, {
+        maxTrabajadores: maxAImportar,
+        fechaCargaFormulario,
+        codigosAgenteValidos,
+      });
       
       // Calcular estadísticas del Excel
       const cuilsExpuestos = new Set<string>();
@@ -274,6 +289,24 @@ const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({
                     {resultadoImportacion.exitosos.map((t, i) => (
                       <li key={i} style={{ marginBottom: '5px', color: '#333' }}>
                         {t.CUIL} - {t.Nombre}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* AUTOCORRECCIONES */}
+            {resultadoImportacion.autocorrecciones.length > 0 && (
+              <div className={styles.seccionAutocorrecciones}>
+                <h4 className={styles.seccionAutocorreccionesTitle}>
+                  ⚠ Valores Autocorregidos
+                </h4>
+                <div className={styles.listaAutocorrecciones}>
+                  <ul className={styles.listaAutocorreccionesItems}>
+                    {resultadoImportacion.autocorrecciones.map((ac, i) => (
+                      <li key={i} className={styles.itemAutocorreccion}>
+                        Fila {ac.fila} — {ac.campo}: &quot;{ac.valorOriginal}&quot; → Valor agregado: &quot;{ac.valorResultante}&quot;
                       </li>
                     ))}
                   </ul>

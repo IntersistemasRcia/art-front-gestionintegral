@@ -18,6 +18,14 @@
   margin: 0.5% 0% !important;
 }
 
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
 .tableHead {
   background-color: var(--verde) !important;
 }

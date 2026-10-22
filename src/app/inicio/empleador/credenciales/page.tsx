@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { FaFilePdf } from "react-icons/fa";
 import styles from "./Credenciales.module.css";
 import DataTable from '@/utils/ui/table/DataTable';
@@ -23,6 +23,16 @@ import { applySRTPolizasVerIndependientes } from '@/utils/srtPolizasParams';
 
 const getPeriodos = (): number[] => Array.from({ length: 3 }, (_, i) => Number(dayjs().subtract(i, "month").format("YYYYMM")));
 
+/** Tamaño de página usado internamente para traer toda la nómina del empleador (varias páginas si hace falta). */
+const FETCH_ALL_PAGE_SIZE = 100;
+
+const maskCuil = (value: string) => {
+  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 11);
+  if (digits.length > 10) return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
+  if (digits.length > 2) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return digits;
+};
+
 function CredencialesPage() {
   const { user } = useAuth();
   const { empresas, isLoading: isLoadingEmpresas } = useEmpresasStore();
@@ -37,73 +47,104 @@ function CredencialesPage() {
 
   const selectedEmpresaCUIT = Number(normalizeDigits(empresaSeleccionada?.cuit ?? 0));
   const empresaCUIT = selectedEmpresaCUIT || Number(normalizeDigits((user as any)?.cuit ?? 0));
-  const [PageIndex, setPageIndex] = useState<number>(1);
-  const [PageSize, setPageSize] = useState<number>(10);
-  const [pageCount, setPageCount] = useState<number>(1);
   const [apiRows, setApiRows] = useState<any[]>([]);
   const [isLoadingRows, setIsLoadingRows] = useState<boolean>(false);
   const [rowsError, setRowsError] = useState<any>(null);
   const [localRows, setLocalRows] = useState<any[]>([]);
 
-  useEffect(() => {
-    setPageIndex(1);
-    setPageCount(1);
-  }, [selectedEmpresaCUIT]);
+  const emptyFiltro = { cuil: "", nombre: "" };
+  const [filtroDraft, setFiltroDraft] = useState(emptyFiltro);
+  const [filtroCommitted, setFiltroCommitted] = useState(emptyFiltro);
+
+  const handleBuscarFiltro = () => setFiltroCommitted(filtroDraft);
+  const handleLimpiarFiltro = () => {
+    setFiltroDraft(emptyFiltro);
+    setFiltroCommitted(emptyFiltro);
+  };
 
   useEffect(() => {
     let canceled = false;
 
     if (!selectedEmpresaCUIT) {
       setApiRows([]);
-      setPageCount(1);
       setRowsError(null);
       setIsLoadingRows(false);
       return;
     }
 
+    const parsePage = (response: any) => {
+      const rawItems = response?.data ?? response?.DATA ?? response?.items ?? response?.Items ?? response;
+      const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+      const mapped = items.map((row: any) => ({
+        cuil: row?.cuil ?? row?.CUIL ?? row?.cuit ?? row?.CUIT ?? row?.trabCUIL,
+        nombre: row?.nombre ?? row?.Nombre ?? row?.nombreEmpleador ?? row?.NombreEmpleador ?? row?.apellidoNombre ?? row?.ApellidoNombre ?? '',
+      }));
+
+      const pages =
+        typeof response?.pages === 'number' ? response.pages :
+          typeof response?.totalPages === 'number' ? response.totalPages :
+            typeof response?.TotalPages === 'number' ? response.TotalPages :
+              undefined;
+      const total =
+        typeof response?.total === 'number' ? response.total :
+          typeof response?.totalCount === 'number' ? response.totalCount :
+            typeof response?.TotalCount === 'number' ? response.TotalCount :
+              typeof response?.TOTAL === 'number' ? response.TOTAL :
+                typeof response?.count === 'number' ? response.count :
+                  typeof response?.Count === 'number' ? response.Count :
+                    typeof response?.meta?.total === 'number' ? response.meta.total :
+                      undefined;
+
+      return { mapped, pages, total };
+    };
+
     const fetchTrabajadores = async () => {
       setIsLoadingRows(true);
       setRowsError(null);
       try {
-        const response = await ArtAPI.getEmpleadorTrabajadores({
+        // Se trae toda la nómina del empleador recorriendo todas las páginas del
+        // endpoint paginado (mismo request que ya funcionaba antes, PageIndex/PageSize
+        // incluidos), para poder filtrar y paginar sobre el total del lado del cliente.
+        const first = await ArtAPI.getEmpleadorTrabajadores({
           CUIL: selectedEmpresaCUIT,
-          PageIndex,
-          PageSize,
+          PageIndex: 1,
+          PageSize: FETCH_ALL_PAGE_SIZE,
           Periodos: getPeriodos(),
         });
 
         if (canceled) return;
 
-        const rawItems = response?.data ?? response?.DATA ?? response?.items ?? response?.Items ?? response;
-        const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+        const firstParsed = parsePage(first);
+        let allRows = firstParsed.mapped;
 
-        const mappedRows = items.map((row: any) => ({
-          cuil: row?.cuil ?? row?.CUIL ?? row?.cuit ?? row?.CUIT ?? row?.trabCUIL,
-          nombre: row?.nombre ?? row?.Nombre ?? row?.nombreEmpleador ?? row?.NombreEmpleador ?? row?.apellidoNombre ?? row?.ApellidoNombre ?? '',
-        }));
+        const totalPages =
+          firstParsed.pages ??
+          (firstParsed.total ? Math.max(1, Math.ceil(firstParsed.total / FETCH_ALL_PAGE_SIZE)) : 1);
 
-        setApiRows(mappedRows);
+        if (totalPages > 1) {
+          const restResponses = await Promise.all(
+            Array.from({ length: totalPages - 1 }, (_, i) =>
+              ArtAPI.getEmpleadorTrabajadores({
+                CUIL: selectedEmpresaCUIT,
+                PageIndex: i + 2,
+                PageSize: FETCH_ALL_PAGE_SIZE,
+                Periodos: getPeriodos(),
+              })
+            )
+          );
 
-        const total =
-          typeof response?.total === 'number' ? response.total :
-            typeof response?.totalCount === 'number' ? response.totalCount :
-              typeof response?.TotalCount === 'number' ? response.TotalCount :
-                typeof response?.TOTAL === 'number' ? response.TOTAL :
-                  typeof response?.count === 'number' ? response.count :
-                    typeof response?.Count === 'number' ? response.Count :
-                      typeof response?.meta?.total === 'number' ? response.meta.total :
-                        undefined;
-
-        if (typeof total === 'number' && PageSize > 0) {
-          setPageCount(Math.max(1, Math.ceil(total / PageSize)));
-        } else {
-          setPageCount(items.length > 0 ? Math.ceil(items.length / PageSize) : 1);
+          if (canceled) return;
+          restResponses.forEach((response) => {
+            allRows = allRows.concat(parsePage(response).mapped);
+          });
         }
+
+        setApiRows(allRows);
       } catch (err) {
         if (canceled) return;
+        console.error('Error cargando EmpleadorTrabajadores', err);
         setRowsError(err);
         setApiRows([]);
-        setPageCount(1);
       } finally {
         if (!canceled) setIsLoadingRows(false);
       }
@@ -114,9 +155,20 @@ function CredencialesPage() {
     return () => {
       canceled = true;
     };
-  }, [selectedEmpresaCUIT, PageIndex, PageSize]);
+  }, [selectedEmpresaCUIT]);
 
-  const data: any[] = PageIndex === 1 ? [...localRows, ...apiRows] : apiRows;
+  const data: any[] = useMemo(() => {
+    const cuilFiltro = filtroCommitted.cuil.replace(/\D/g, '');
+    const nombreFiltro = filtroCommitted.nombre.trim().toLowerCase();
+
+    return [...localRows, ...apiRows]
+      .filter((row) => {
+        const matchCuil = !cuilFiltro || normalizeDigits(row.cuil) === cuilFiltro;
+        const matchNombre = !nombreFiltro || String(row.nombre ?? '').toLowerCase().includes(nombreFiltro);
+        return matchCuil && matchNombre;
+      })
+      .sort((a, b) => (Number(a.cuil) || 0) - (Number(b.cuil) || 0));
+  }, [localRows, apiRows, filtroCommitted]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newCuil, setNewCuil] = useState("");
@@ -192,15 +244,6 @@ function CredencialesPage() {
     },
   ];
 
-  const handlePageChange = (newPageIndex: number) => {
-    setPageIndex(newPageIndex);
-  };
-
-  const handlePageSizeChange = (newPageSize: number) => {
-    setPageSize(newPageSize);
-    setPageIndex(1);
-  };
-
   return (
     <div>
       <div className={styles.toolbar}>
@@ -218,6 +261,23 @@ function CredencialesPage() {
               noOptionsText={isLoadingEmpresas ? 'Cargando...' : empresas.length === 0 ? 'No hay empresas disponibles' : 'No se encontraron empresas'}
             />
           </div>
+          <div className={styles.filterRow}>
+            <TextField
+              label="CUIL"
+              value={filtroDraft.cuil}
+              onChange={e => setFiltroDraft(p => ({ ...p, cuil: maskCuil(e.target.value) }))}
+              inputProps={{ inputMode: 'numeric', pattern: '\\d*' }}
+              className={styles.filterFieldCuil}
+            />
+            <TextField
+              label="Nombre"
+              value={filtroDraft.nombre}
+              onChange={e => setFiltroDraft(p => ({ ...p, nombre: e.target.value }))}
+              className={styles.filterFieldNombre}
+            />
+            <CustomButton onClick={handleBuscarFiltro}>Buscar</CustomButton>
+            <CustomButton variant="outlined" onClick={handleLimpiarFiltro}>Limpiar</CustomButton>
+          </div>
           <CustomButton onClick={() => setModalOpen(true)}>
             Agregar nuevo personal
           </CustomButton>
@@ -226,12 +286,7 @@ function CredencialesPage() {
       <DataTable
         data={data}
         columns={columns}
-        manualPagination={true}
-        pageIndex={PageIndex}
-        pageSize={PageSize}
-        pageCount={pageCount}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
+        enableFiltering={false}
         pageSizeOptions={[10]}
         isLoading={isLoadingRows}
       />
@@ -268,16 +323,7 @@ function CredencialesPage() {
                 label="CUIL"
                 value={newCuil}
                 onBlur={() => setTouchedCuil(true)}
-                onChange={e => {
-                  const digits = String(e.target.value).replace(/\D/g, '').slice(0, 11);
-                  let formatted = digits;
-                  if (digits.length > 2 && digits.length <= 10) {
-                    formatted = digits.slice(0, 2) + '-' + digits.slice(2);
-                  } else if (digits.length > 10) {
-                    formatted = digits.slice(0, 2) + '-' + digits.slice(2, 10) + '-' + digits.slice(10);
-                  }
-                  setNewCuil(formatted);
-                }}
+                onChange={e => setNewCuil(maskCuil(e.target.value))}
                 inputProps={{ inputMode: 'numeric', pattern: '\\d*' }}
                 error={touchedCuil && !!cuilError}
                 helperText={touchedCuil && cuilError ? cuilError : ''}

@@ -8,6 +8,8 @@ import { TextField, FormControl, InputLabel, Select, MenuItem, Autocomplete } fr
 import { useSearchParams, useRouter } from 'next/navigation';
 import CustomButton from '@/utils/ui/button/CustomButton';
 import dayjs from 'dayjs';
+import useSWR from 'swr';
+import axios from 'axios';
 import styles from './GenerarFormularioRGRL.module.css';
 import { CUIP } from '@/utils/Formato';
 import { isoToClarion, clarionToIso } from '@/utils/clarionDate';
@@ -62,6 +64,16 @@ const fetchEstablecimientos = async (cuit: number): Promise<Establecimiento[]> =
 
 function soloDigitosCuit(value: unknown): string {
   return String(value ?? '').replace(/\D/g, '');
+}
+
+const MSG_SUPERFICIE_CANT_CERO = 'Cantidad de trabajadores y Superficie no pueden estar en cero.';
+const MSG_ARCA_SIN_DATOS = 'No se encontró información para el CUIT ingresado en ARCA. Ingrese manualmente el nombre o razón social.';
+const MSG_ARCA_ERROR = 'No fue posible consultar ARCA. Puede ingresar manualmente el nombre o razón social e intentar nuevamente más tarde.';
+
+// true si el valor es 0, vacío, null o undefined (no altera el manejo de negativos / no numéricos)
+function esCeroOVacio(value: number | string | null | undefined): boolean {
+  if (value === null || value === undefined || value === '') return true;
+  return Number(value) === 0;
 }
 
 function empresaIdDesdeStorePorCuit(empresasList: Empresa[], cuitValor: unknown): number | undefined {
@@ -194,6 +206,7 @@ const GenerarFormularioRGRL: React.FC<{
   const [modalMsgOpen, setModalMsgOpen] = useState(false);
   const [modalMsg, setModalMsg] = useState('');
   const [modalMsgType, setModalMsgType] = useState<MessageType>('warning');
+  const [modalMsgTitle, setModalMsgTitle] = useState('Datos faltantes');
   const [fechaSRTEdit, setFechaSRTEdit] = useState<string>('');
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -315,6 +328,14 @@ const GenerarFormularioRGRL: React.FC<{
   const crearFormulario = async () => {
     if (!cuit || !establecimientoSel || !tipoSel) {
       setError('Completá CUIT, Establecimiento y Tipo de formulario.');
+      return;
+    }
+    if (esCeroOVacio(estSuperficie) || esCeroOVacio(estCantTrab)) {
+      setError('');
+      setModalMsgTitle('Ocurrió un inconveniente');
+      setModalMsg(MSG_SUPERFICIE_CANT_CERO);
+      setModalMsgType('error');
+      setModalMsgOpen(true);
       return;
     }
     setLoading(true);
@@ -455,6 +476,50 @@ const GenerarFormularioRGRL: React.FC<{
   const [gremiosUI, setGremiosUI] = useState<GremioUI[]>([]);
   const [contratistasUI, setContratistasUI] = useState<ContratistaUI[]>([]);
   const [responsablesUI, setResponsablesUI] = useState<ResponsableUI[]>([]);
+
+  // ARCA: autocompletar nombre en nuevas cargas al tipear un CUIL de 11 dígitos.
+  // Sólo se dispara desde el onChange de los campos (nunca en carga, edición ni réplica).
+  const [arcaTarget, setArcaTarget] = useState<{ scope: 'contratista' | 'responsable'; idx: number; cuil: number; nombrePrevio: string } | null>(null);
+
+  const pedirARCA = useCallback((scope: 'contratista' | 'responsable', idx: number, raw: string, nombrePrevio: string) => {
+    const digitos = raw.replace(/\D/g, '');
+    setArcaTarget(digitos.length === 11 ? { scope, idx, cuil: Number(digitos), nombrePrevio } : null);
+  }, []);
+
+  const { data: arcaData, error: arcaError, isValidating: arcaConsultando } = useSWR(
+    arcaTarget ? ['rgrl-arca', arcaTarget.cuil] : null,
+    () => ArtAPI.getARCA({ CUIL: arcaTarget!.cuil }),
+    { revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false }
+  );
+
+  useEffect(() => {
+    if (!arcaTarget || arcaConsultando) return;
+    const { scope, idx, cuil, nombrePrevio } = arcaTarget;
+    const avisar = (msg: string, type: MessageType) => {
+      setModalMsgTitle('Ocurrió un inconveniente');
+      setModalMsg(msg);
+      setModalMsgType(type);
+      setModalMsgOpen(true);
+    };
+
+    if (arcaError) {
+      const detalle = axios.isAxiosError(arcaError) ? JSON.stringify(arcaError.response?.data) + arcaError.message : String(arcaError);
+      if (/inexistente|no existe/i.test(detalle)) avisar(MSG_ARCA_SIN_DATOS, 'info');
+      else avisar(MSG_ARCA_ERROR, 'error');
+      return;
+    }
+    if (!arcaData) return;
+
+    const nombre = [arcaData.nombre, arcaData.apellido].filter(Boolean).join(' ').trim() || (arcaData.razonSocial?.trim() ?? '');
+    if (!nombre) return avisar(MSG_ARCA_SIN_DATOS, 'info');
+
+    const coincide = (cuitFila: number | undefined, nombreFila: string) => Number(cuitFila ?? 0) === cuil && nombreFila === nombrePrevio;
+    if (scope === 'contratista') {
+      setContratistasUI((prev) => coincide(prev[idx]?.cuit, prev[idx]?.contratista ?? '') ? prev.map((r, i) => i === idx ? { ...r, contratista: nombre } : r) : prev);
+    } else {
+      setResponsablesUI((prev) => coincide(prev[idx]?.cuit, prev[idx]?.responsable ?? '') ? prev.map((r, i) => i === idx ? { ...r, responsable: nombre } : r) : prev);
+    }
+  }, [arcaData, arcaError, arcaConsultando, arcaTarget]);
 
   const [nuevoResponsable, setNuevoResponsable] = useState<ResponsableUI>({
     cuit: undefined,
@@ -811,6 +876,7 @@ const GenerarFormularioRGRL: React.FC<{
 
   const guardarPUT = async (completar: boolean, options?: { redirigir?: boolean; fechaSRTOverride?: string | null }) => {
     if (!form) return;
+    setModalMsgTitle('Datos faltantes');
 
     for (let i = 0; i < gremiosUI.length; i++) {
       const g = gremiosUI[i] ?? {};
@@ -1371,12 +1437,14 @@ const GenerarFormularioRGRL: React.FC<{
                         next[idx] = { ...(next[idx] ?? {}), cuit: val };
                         return next;
                       });
+                      pedirARCA('contratista', idx, digits, contratistasUI[idx]?.contratista ?? '');
                     }}
                     inputMode="numeric"
                   />
                   <TextField
                     label="Contratista"
                     value={contratistasUI[idx]?.contratista ?? ''}
+                    placeholder={arcaConsultando && arcaTarget?.scope === 'contratista' && arcaTarget.idx === idx ? 'Consultando ARCA...' : undefined}
                     onChange={(e) => {
                       const val = e.target.value;
                       setContratistasUI((prev) => {
@@ -1412,12 +1480,14 @@ const GenerarFormularioRGRL: React.FC<{
                         next[idx] = { ...(next[idx] ?? {}), cuit: val };
                         return next;
                       });
+                      pedirARCA('responsable', idx, digits, responsablesUI[idx]?.responsable ?? '');
                     }}
                     inputMode="numeric"
                   />
                   <TextField
                     label="Nombre y apellido"
                     value={responsablesUI[idx]?.responsable ?? ''}
+                    placeholder={arcaConsultando && arcaTarget?.scope === 'responsable' && arcaTarget.idx === idx ? 'Consultando ARCA...' : undefined}
                     onChange={(e) => {
                       const val = e.target.value;
                       setResponsablesUI((prev) => {
@@ -1751,7 +1821,7 @@ const GenerarFormularioRGRL: React.FC<{
           onClose={handleCloseModalMsg}
           message={modalMsg}
           type={modalMsgType}
-          title="Datos faltantes"
+          title={modalMsgTitle}
         />
       </div>
     );
@@ -1791,7 +1861,7 @@ const GenerarFormularioRGRL: React.FC<{
         onClose={handleCloseModalMsg}
         message={modalMsg}
         type={modalMsgType}
-        title="Datos faltantes" // Título personalizado para esta alerta
+        title={modalMsgTitle} // Título personalizado para esta alerta
       />
     </div>
   );
