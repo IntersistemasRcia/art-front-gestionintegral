@@ -360,7 +360,7 @@ export async function importarTrabajadoresDesdeExcel(
 
     // Validar Nombre
     if (!nombre) {
-      erroresFila.push('Nombre es requerido');
+      erroresFila.push('Apellido y Nombre es requerido');
     }
 
     // Validar Sector
@@ -497,7 +497,7 @@ export async function descargarPlantillaExcel() {
   // Definir encabezados
   worksheet.columns = [
     { header: 'CUIL', key: 'CUIL', width: 18 },
-    { header: 'Nombre', key: 'Nombre', width: 35 },
+    { header: 'Apellido y Nombre', key: 'Nombre', width: 35 },
     { header: 'Sector/Tareas', key: 'SectorTareas', width: 30 },
     { header: 'Fecha Ingreso\n(DD/MM/YYYY)', key: 'Ingreso', width: 18 },
     { header: 'Fecha Inicio\nExposición (DD/MM/YYYY)', key: 'FechaInicio', width: 22 },
@@ -537,7 +537,7 @@ export async function descargarPlantillaExcel() {
     '',
     '2️⃣ Datos obligatorios',
     '   • CUIL: formato válido con o sin guiones (ej: 20-12345678-9 / 20123456789)',
-    '   • Nombre completo: ej. Juan Pérez.',
+    '   • Apellido y Nombre: ej. Pérez Juan.',
     '   • Sector/Tareas: ej. Producción, Administración.',
     '   • Fecha ingreso: DD/MM/AAAA (ej: 15/01/2023). Debe ser igual o anterior a la fecha de carga del formulario.',
     '   • Fecha inicio exposición: igual o posterior a ingreso.',
@@ -552,7 +552,7 @@ export async function descargarPlantillaExcel() {
     '4️⃣ Si un trabajador tiene varios agentes',
     '   • Ingrese una fila por cada agente.',
     '',
-    '✅ Ejemplo simple: CUIL: 20-12345678-9 | Nombre: Juan Pérez | Sector: Producción | Fecha ingreso: 15/01/2023 | Inicio exposición: 15/01/2023 | Horas: 8 | Último examen: 30/06/2024 | Código agente: 40005'
+    '✅ Ejemplo simple: CUIL: 20-12345678-9 | Apellido y Nombre: Pérez Juan | Sector: Producción | Fecha ingreso: 15/01/2023 | Inicio exposición: 15/01/2023 | Horas: 8 | Último examen: 30/06/2024 | Código agente: 40005'
   ];
 
   instrucciones.forEach((linea) => {
