@@ -210,6 +210,8 @@ export function SiniestrosContextProvider({ children }: { children: ReactNode })
 
       { name: "PosibleRecupero", label: "Posible Recupero", ...optionsSelect(posibleRecuperoOptions) },
       { name: "ObservacionPosibleRecupero", label: "Observación Recupero" },
+      { name: "PorcentajeReservaEstimada", label: "Porcentaje Reserva estimada", type: "number", formatter: numeroFormatter },
+      { name: "PorcentajeReservaActuarial", label: "Porcentaje Reserva actuarial", type: "number", formatter: numeroFormatter },
     ],
   });
 
