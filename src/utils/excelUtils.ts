@@ -354,7 +354,7 @@ export async function importarTrabajadoresDesdeExcel(
 
     // Validar CUIL
     const cuilNumerico = cuil.replace(/\D/g, '');
-    if (!cuil || cuilNumerico.length < 11) {
+    if (!cuil || cuilNumerico.length !== 11) {
       erroresFila.push('CUIL inválido (debe tener 11 dígitos)');
     }
 
