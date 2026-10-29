@@ -68,16 +68,6 @@ jobs:
             Write-Host "Using $sourceEnvFile for build (.env.production generated)."
           }
 
-      # - name: Notify Teams - Start
-      #   if: ${{ env.TEAMS_WEBHOOK_URL != '' }}
-      #   shell: powershell
-      #   run: |
-      #     $webhook = $env:TEAMS_WEBHOOK_URL
-      #     if ([string]::IsNullOrEmpty($webhook)) { Write-Host "No Teams webhook configured - skipping"; exit 0 }
-      #     $msg = "**Deployment started**`nRepository: $env:REPO`nBranch: $env:BRANCH`nCommit: $env:COMMIT`nActor: $env:ACTOR`nRun: $env:RUN_URL"
-      #     $body = @{ text = $msg } | ConvertTo-Json
-      #     Invoke-RestMethod -Uri $webhook -Method Post -Body $body -ContentType 'application/json'
-
       - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
@@ -104,8 +94,6 @@ jobs:
         shell: powershell
         timeout-minutes: 45
         run: |
-          # Run npm ci using cmd.exe to ensure stdout/stderr redirection works reliably on Windows
-          # This writes all output to npmci_verbose.log in the working directory.
           cmd /c "npm ci --verbose > npmci_verbose.log 2>&1"
 
       - name: Upload npm ci verbose log
@@ -123,36 +111,28 @@ jobs:
       - name: Backup current deployment (keep configured count)
         shell: powershell
         run: |
-          # Determine deploy dir from secret or fallback
           if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
           if (-not (Test-Path $DEPLOY_DIR)) { Write-Host "No existing deploy dir: $DEPLOY_DIR - skipping backup"; exit 0 }
 
-          # Determine backup dir: use BACKUP_PATH secret if provided, otherwise use DEPLOY_DIR\backups
           if ([string]::IsNullOrEmpty($env:BACKUP_PATH)) { $BACKUP_DIR = Join-Path $DEPLOY_DIR 'backups' } else { $BACKUP_DIR = $env:BACKUP_PATH }
           New-Item -ItemType Directory -Force -Path $BACKUP_DIR | Out-Null
 
           $timestamp = Get-Date -Format "yyyyMMddHHmmss"
-          # prepare local logs folder
           New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
           $temp = Join-Path $env:TEMP ("deploy_backup_$timestamp")
           New-Item -ItemType Directory -Force -Path $temp | Out-Null
 
-          # Mirror current deployment to temp excluding backups and large folders
           $robolog = Join-Path (Get-Location) ("robocopy_backup_$timestamp.log")
           robocopy $DEPLOY_DIR $temp /MIR /XD .git .github\workflows node_modules backups _deploy_logs /LOG:$robolog /TEE
           $rc = $LASTEXITCODE
-          # robocopy exit codes: 0=no files copied, 1=some files copied, 2=some files mismatched, 3=some files copied and mismatched
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
-          exit 0
 
           $backupFile = Join-Path $BACKUP_DIR ("backup_$timestamp.zip")
           Compress-Archive -Path (Join-Path $temp '*') -DestinationPath $backupFile -Force
 
-          # Remove temp
           Remove-Item -Recurse -Force $temp
 
-          # Keep only MAX_BACKUPS latest backups (default 5)
           if ([string]::IsNullOrEmpty($env:MAX_BACKUPS)) { $max = 5 } else { $max = [int]$env:MAX_BACKUPS }
           $backups = Get-ChildItem -Path $BACKUP_DIR -Filter '*.zip' | Sort-Object LastWriteTime -Descending
           if ($backups.Count -gt $max) {
@@ -162,13 +142,10 @@ jobs:
       - name: Copy build to deployment directory (Windows)
         shell: powershell
         run: |
-          # SITE_PATH is provided via repository secret (secrets.SITE_PATH). If not set, fallback to C:\inetpub\sitios\ArtFrontGestionIntegral
           if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
           New-Item -ItemType Directory -Force -Path $DEPLOY_DIR | Out-Null
-          # ensure deploy logs folder exists
           New-Item -ItemType Directory -Force -Path .\_deploy_logs | Out-Null
           
-          # Backup .env files before deployment to avoid overwriting
           $envFiles = @('.env', '.env.local', '.env.production', '.env.production.local', '.env.development')
           $tempEnvDir = Join-Path $env:TEMP "env_backup_$(Get-Date -Format 'yyyyMMddHHmmss')"
           New-Item -ItemType Directory -Force -Path $tempEnvDir | Out-Null
@@ -180,15 +157,12 @@ jobs:
             }
           }
           
-          # Use robocopy to mirror repository to deploy dir while excluding .git, workflows and node_modules
-          # /MIR mirrors the directory, /XD excludes directories, /XF excludes files
           $robolog2 = Join-Path (Get-Location) 'robocopy_deploy.log'
           robocopy . $DEPLOY_DIR /MIR /XD .git .github\workflows node_modules .github /XF .env .env.local .env.development .env.production .env.production.local web.config server.js /LOG:$robolog2 /TEE
           $rc = $LASTEXITCODE
           if ($rc -gt 3) { throw "robocopy failed with code $rc" }
           Write-Host "robocopy finished with exit code $rc (treated as success)"
           
-          # Restore backed up .env files
           foreach ($envFile in $envFiles) {
             $backupPath = Join-Path $tempEnvDir $envFile
             if (Test-Path $backupPath) {
@@ -197,17 +171,14 @@ jobs:
             }
           }
           
-          # Clean up temp backup
           Remove-Item -Recurse -Force $tempEnvDir -ErrorAction SilentlyContinue
           
-          # Verify .next folder exists
           $nextPath = Join-Path $DEPLOY_DIR '.next'
           if (Test-Path $nextPath) {
             Write-Host ".next build folder successfully copied to deployment directory"
           } else {
             Write-Host "WARNING: .next folder not found after copy!"
           }
-          exit 0
 
       - name: Stop PM2 application before deployment (Windows)
         shell: powershell
@@ -216,7 +187,6 @@ jobs:
           Set-Location -Path $DEPLOY_DIR
           $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
           
-          # Check if PM2 is available
           if (Get-Command pm2 -ErrorAction SilentlyContinue) {
             Write-Host "Stopping PM2 application: $appName"
             pm2 stop $appName -s | Out-Null
@@ -231,7 +201,6 @@ jobs:
           if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
           Set-Location -Path $DEPLOY_DIR
           
-          # Check if .next folder exists before installing dependencies
           $nextPath = Join-Path $DEPLOY_DIR '.next'
           $nextExists = Test-Path $nextPath
           if ($nextExists) {
@@ -242,20 +211,12 @@ jobs:
           
           npm ci --omit=dev
           
-          # Verify .next folder still exists after npm ci, rebuild if missing
           if (-not (Test-Path $nextPath)) {
             Write-Host "ERROR: .next folder missing after npm ci! Rebuilding..."
             npm run build
           } else {
             Write-Host ".next folder verified after npm ci"
           }
-
-      # - name: Upload robocopy logs
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: robocopy-logs
-      #     path: _deploy_logs/*.log
 
       - name: Ensure PM2 is installed (Windows)
         shell: powershell
@@ -270,10 +231,8 @@ jobs:
           if ([string]::IsNullOrEmpty($env:SITE_PATH)) { $DEPLOY_DIR = 'C:\inetpub\sitios\ArtFrontGestionIntegral' } else { $DEPLOY_DIR = $env:SITE_PATH }
           Set-Location -Path $DEPLOY_DIR
 
-          # Use PM2 to start or reload the app from ecosystem.config.js (idempotent)
-          # This will start the process if not running, or reload it with zero-downtime when possible.
           $appName = if ([string]::IsNullOrEmpty($env:SITE_NAME)) { 'ArtFrontGestionIntegral' } else { $env:SITE_NAME }
-          pm2 delete $appName -s | Out-Null  # silently delete existing process if any
+          pm2 delete $appName -s | Out-Null
           pm2 start ecosystem.config.js
           if ($LASTEXITCODE -ne 0) {
             Write-Host "pm2 startOrReload failed with code $LASTEXITCODE, attempting start then restart fallback"
@@ -329,7 +288,7 @@ jobs:
         shell: powershell
         run: |
           $webhook = $env:TEAMS_WEBHOOK_URL
-          $conclusion = '${{ job.status }}'  # SUCCESS, FAILURE, CANCELLED
+          $conclusion = '${{ job.status }}'
           $msg = "**Deployment finished**`nRepository: $env:REPO`nBranch: $env:BRANCH`nCommit: $env:COMMIT`nActor: $env:ACTOR`nResult: $conclusion`nRun: $env:RUN_URL"
           $body = @{ text = $msg } | ConvertTo-Json
           Invoke-RestMethod -Uri $webhook -Method Post -Body $body -ContentType 'application/json'
