@@ -115,11 +115,25 @@ const optionsSelect = (options: any, formatter = valueOptionsFormatter, values =
 
 const SNOptions = { S: "Si", N: "No" };
 const posibleRecuperoOptions = { Si: "Si", No: "No" };
+const TFOptions = { 1: "Si", 0: "No" };
 const tipoSiniestroOptions = {
   AccidenteTrabajo: "AccidenteTrabajo",
   Enfermedad: "P - Enfermedad Profesional",
   AccidenteInItinere: "AccidenteinItinere",
   Reingreso: "Reingreso",
+};
+const estadoEnvioRegistroOptions = {
+  P: "Pendientes",
+  R: "Rechazado",
+  A: "Aprobado",
+};
+const motivoAltaMedicaOptions = {
+  L: "Alta Médica con Regreso al Trabajo",
+  P: "Declaración de ILP",
+  D: "Muerte por Causas Laborales",
+  I: "Muerte inculpable",
+  A: "Transcurso de un año",
+  B: "Abandono de Tratamiento (LRT Art.20 Apart.2)",
 };
 
 const SiniestrosContext = createContext<DataContextType | undefined>(undefined);
@@ -177,7 +191,7 @@ export function SiniestrosContextProvider({ children }: { children: ReactNode })
       { name: "Roam", label: "ROAM", ...optionsSelect(SNOptions) },
       { name: "Cronico", label: "Crónico", ...optionsSelect(SNOptions) },
 
-      { name: "FechaOcurrencia", label: "Fecha Ocurrencia", type: "date", formatter: fechaFormatter },
+      { name: "FechaPMI", label: "Fecha PMI", type: "date", formatter: fechaFormatter },
       { name: "FechaTomaConocimiento", label: "Toma de Conocimiento", type: "date", formatter: fechaFormatter },
       { name: "FechaDenuncia", label: "Fecha Denuncia", type: "date", formatter: fechaFormatter },
 
@@ -212,6 +226,16 @@ export function SiniestrosContextProvider({ children }: { children: ReactNode })
       { name: "ObservacionPosibleRecupero", label: "Observación Recupero" },
       { name: "PorcentajeReservaEstimada", label: "Porcentaje Reserva estimada", type: "number", formatter: numeroFormatter },
       { name: "PorcentajeReservaActuarial", label: "Porcentaje Reserva actuarial", type: "number", formatter: numeroFormatter },
+
+      { name: "FechaInicioInasistencia", label: "Fecha de Inicio de Inasistencia (Baja Laboral)", type: "date", formatter: fechaFormatter },
+      { name: "FechaCeseILT", label: "Fecha Cese de ILT", type: "date", formatter: fechaFormatter },
+      { name: "FechaDefuncion", label: "Fecha de Defunción", type: "date", formatter: fechaFormatter },
+      { name: "TratamientoPendiente", label: "Tratamiento Pendiente", ...optionsSelect(SNOptions) },
+      { name: "Recalificacion", label: "Recalificación", ...optionsSelect(SNOptions) },
+      { name: "EstadoEnvioRegistro", label: "Estado Envío Registro AT/EP SRT", ...optionsSelect(estadoEnvioRegistroOptions) },
+      { name: "MotivoAltaMedica", label: "Motivo del Alta Médica", ...optionsSelect(motivoAltaMedicaOptions) },
+      { name: "SuspensionPlazo", label: "Suspensión de Plazo", ...optionsSelect(TFOptions) },
+      { name: "VencimientoPlazo", label: "Fecha de Vencimiento Plazo", type: "date", formatter: fechaFormatter },
     ],
   });
 
