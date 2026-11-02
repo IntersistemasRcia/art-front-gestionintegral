@@ -355,6 +355,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
   const [pendingRefresh, setPendingRefresh] = useState<boolean>(false);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageCount, setTablePageCount] = useState(1);
+  const [soloVigentes, setSoloVigentes] = useState(true);
 
   // Accede a las propiedades de la sesión con seguridad
   const { empresaCUIT } = user as any;
@@ -526,6 +527,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         setTablePage(1);
         const responseRaw = await ArtAPI.getFormulariosRGRL({
           empresasId: empresasIds,
+          SoloVigentes: soloVigentes,
           PageIndex: 1,
           PageSize: 10,
         });
@@ -536,7 +538,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
         setLoading(false);
       }
     },
-    [empresaIdsFiltro, canFetchFormularios]
+    [empresaIdsFiltro, canFetchFormularios, soloVigentes]
   );
 
   // Variante rápida que solo actualiza la tabla sin activar el loading global
@@ -546,6 +548,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       if (!canFetchFormularios) return;
       const responseRaw = await ArtAPI.getFormulariosRGRL({
         empresasId: empresasIds,
+          SoloVigentes: soloVigentes,
         PageIndex: page,
         PageSize: 10,
       });
@@ -553,7 +556,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       setFormulariosRGRL(response.data ?? []);
       setTablePageCount(response.pages ?? 1);
     },
-    [empresaIdsFiltro, canFetchFormularios]
+    [empresaIdsFiltro, canFetchFormularios, soloVigentes]
   );
 
   const handlePageChange = useCallback(
@@ -562,6 +565,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       if (!canFetchFormularios) return;
       const responseRaw = await ArtAPI.getFormulariosRGRL({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: page,
         PageSize: 10,
       });
@@ -569,7 +573,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       setFormulariosRGRL(response.data ?? []);
       setTablePageCount(response.pages ?? 1);
     },
-    [canFetchFormularios, empresaIdsFiltro]
+    [canFetchFormularios, empresaIdsFiltro, soloVigentes]
   );
   
   // Carga inicial y recarga cuando cambian la empresa seleccionada o "referenteDatos".
@@ -577,7 +581,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
     if (canFetchFormularios) {
       fetchFormularios(empresaIdsFiltro);
     }
-  }, [fetchFormularios, referenteDatos, canFetchFormularios, empresaIdsFiltro]);
+  }, [fetchFormularios, referenteDatos, canFetchFormularios, empresaIdsFiltro, soloVigentes]);
 
   const handleCloseModalMsg = async () => {
     setModalMsgOpen(false);
@@ -809,6 +813,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       // Primera consulta para obtener el total de registros
       const countResponse = await ArtAPI.getFormulariosRGRL({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: 1,
         PageSize: 1,
       });
@@ -833,6 +838,7 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
       // Segunda consulta trayendo todos los registros sin paginación
       const allResponse = await ArtAPI.getFormulariosRGRL({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: 1,
         PageSize: totalCount,
       });
@@ -886,6 +892,9 @@ const FormulariosRGRL: React.FC<FormulariosRGRLProps> = ({ cuit, referenteDatos 
               }
               disabled={isLoadingEmpresas}
             />
+            <label style={{ display: 'block', marginTop: 8 }}>
+              <input type="checkbox" checked={soloVigentes} onChange={(event) => { setSoloVigentes(event.target.checked); setTablePage(1); }} /> Vigentes
+            </label>
           </Box>
 
           {/* Acciones: editar, generar, replicar y exportar */}

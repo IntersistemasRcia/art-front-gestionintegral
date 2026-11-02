@@ -171,7 +171,7 @@ const FormularioRARCrear: React.FC<CrearProps> = ({
     },
     {
       accessorKey: 'Nombre',
-      header: 'Nombre',
+      header: 'Apellido y Nombre',
       size: 180,
     },
     {
@@ -751,7 +751,7 @@ React.useEffect(() => {
 
     // Validar Nombre
     if (!nombre || nombre.trim() === '') {
-      nuevosErrores.nombre = 'El nombre completo es requerido';
+      nuevosErrores.nombre = 'Apellido y Nombre es requerido';
     }
 
     // Validar Sector
@@ -1603,7 +1603,7 @@ React.useEffect(() => {
                 error={!!erroresCampos.cuil}
               />
               <TextField
-                label={consultandoCuil ? "Nombre Completo (Consultando...)" : "Nombre Completo"}
+                label={consultandoCuil ? "Apellido y Nombre (Consultando...)" : "Apellido y Nombre"}
                 name="nombre"
                 value={nombre}
                 onChange={(e) => {

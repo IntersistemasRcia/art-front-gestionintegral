@@ -384,9 +384,13 @@ export default function CoberturaPage() {
                 if (rowNumber === 1) return; // Saltar encabezado
 
                 const cuilValue = row.getCell(1).value;
-                const nombreValue = row.getCell(2).value;
 
-                const nombre = nombreValue == null ? '' : String(nombreValue).trim().toUpperCase();
+                // `.text` resuelve rich text, fórmulas e hipervínculos (con `.value` se obtenía "[object Object]")
+                const nombre = row.getCell(2).text.trim().toUpperCase();
+                if (nombre.includes('[OBJECT OBJECT]')) {
+                    errores.push(`No se pudo interpretar el valor de la columna Nombre y Apellido en la fila ${rowNumber}. Verifique el formato del dato.`);
+                    return;
+                }
                 const cuilRaw = cuilValue == null ? '' : String(cuilValue).trim();
 
                 // Fila sin datos obligatorios

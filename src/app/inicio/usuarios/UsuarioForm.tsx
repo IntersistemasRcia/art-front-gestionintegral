@@ -195,6 +195,9 @@ export const LEYENDA_ASOCIAR_EMPRESA_ANTES_DE_GUARDAR =
 const EMAIL_DUPLICADO_MSG = "Ya existe un usuario registrado con este email";
 const EMAIL_VERIFICACION_ERROR_MSG = "No se pudo verificar el email. Intente nuevamente.";
 const EMAIL_VERIFICANDO_MSG = "Verificando email...";
+const ARCA_REVISAR_PANEL_MSG = "La consulta a ARCA falló. Revise el apartado \"Información de ARCA\".";
+const ARCA_ERROR_SIN_TAREA_MSG =
+  "No se pudo consultar ARCA. Para guardar el usuario, solicitá la intervención de una persona autorizada.";
 
 // Título a mostrar cuando el usuario ya fue registrado pero necesita relacionar empresas
 export const TITULO_USUARIO_REGISTRADO = "Usuario Registrado";
@@ -234,6 +237,7 @@ export default function UsuarioForm({
 
   const { user, hasTask } = useAuth();
   const isAdminEmpleador = user?.rol?.toLowerCase() === "administradorempleador";
+  const canEditArca = hasTask("Usuarios_AccionEditarARCA");
   // --- Lógica de Modos y Estado ---
   const isViewing = method === "view";
   const isEditing = method === "edit";
@@ -625,6 +629,7 @@ export default function UsuarioForm({
         setForm((prev: UsuarioFormFields) => ({
           ...prev,
           [name]: formattedCuit,
+          ...(canEditArca ? {} : { nombre: "", apellido: "", fechaNacimiento: undefined }),
         }));
         // Si completó 11 dígitos, disparar consulta ARCA
         if (cleanValue.length === 11) {
@@ -806,23 +811,39 @@ export default function UsuarioForm({
   );
 
   // Llamada ARCA: usar useSWR con key null hasta completar 11 dígitos
-  const { data: arcaData, isValidating: isLoadingArca, error: arcaError } = useSWR(
+  const { data: arcaData, isValidating: isLoadingArca, error: arcaError, mutate: mutateArca } = useSWR(
     arcaCUIL ? ArtAPI.getARCAURL({ CUIL: arcaCUIL }) : null,
     () => ArtAPI.getARCA({ CUIL: arcaCUIL }),
-    { revalidateOnFocus: false, revalidateOnReconnect: false }
+    { revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false }
   );
 
   const { data: sectores, isValidating: isLoadingSectores, error: sectoresError } = AuthAPI.useGetRefSectores();
 
-  useEffect(() => {
-    if (!arcaData) return;
+  const hasArcaError = Boolean(arcaError) && !isLoadingArca;
+
+  const applyArcaData =(data: typeof arcaData) => {
+    if (!data) return;
     setForm(prev => ({
       ...prev,
-      nombre: ([arcaData.nombre, arcaData.apellido].filter(Boolean).join(' ')) || prev.nombre,
-      apellido: arcaData.apellido ?? prev.apellido,
-      fechaNacimiento: arcaData.fechaNacimiento ? dayjs(arcaData.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
+      nombre: ([data.nombre, data.apellido].filter(Boolean).join(' ')) || prev.nombre,
+      apellido: data.apellido ?? prev.apellido,
+      fechaNacimiento: data.fechaNacimiento ? dayjs(data.fechaNacimiento).format('DD/MM/YYYY') : prev.fechaNacimiento,
     }));
+  };
+
+  useEffect(() => {
+    applyArcaData(arcaData);
   }, [arcaData]);
+
+  const handleConsultaArca = async () => {
+    const cuil = Number(form.cuit.replace(/[^0-9]/g, ''));
+    if (String(cuil).length !== 11) return;
+    if (cuil === arcaCUIL) {
+      applyArcaData(await mutateArca());
+    } else {
+      setArcaCUIL(cuil);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -838,7 +859,14 @@ export default function UsuarioForm({
       return;
     }
 
-    // Set default values for hidden fields       
+    if (!canEditArca && arcaError) {
+      setModalMsgText(ARCA_ERROR_SIN_TAREA_MSG);
+      setModalMsgType('error');
+      setModalMsgOpen(true);
+      return;
+    }
+
+    // Set default values for hidden fields
     // Determinar empresaId según si es administrador
     let finalEmpresaId = form.empresaId;
     if (isCreating && isAdminUser) {
@@ -934,16 +962,42 @@ export default function UsuarioForm({
 
               <div className={styles.formRow}>
                 <TextField
+                  label="CUIT/CUIL"
+                  name="cuit"
+                  value={form.cuit}
+                  onChange={handleTextFieldChange}
+                  onBlur={() => handleBlur("cuit")}
+                  error={(touched.cuit && !!errors.cuit) || hasArcaError}
+                  helperText={touched.cuit && errors.cuit}
+                  FormHelperTextProps={{ className: styles.arcaHelper }}
+                  fullWidth
+                  required={!isDisabled}
+                  disabled={isDisabled}
+                  placeholder="Ingrese CUIT (11 dígitos)"
+                  className={styles.cuitField}
+                />
+                {canEditArca && !isDisabled && (
+                  <CustomButton
+                    type="button"
+                    className={styles.arcaButton}
+                    onClick={handleConsultaArca}
+                    disabled={isLoadingArca || form.cuit.replace(/[^0-9]/g, '').length !== 11}
+                  >
+                    Consulta en ARCA
+                  </CustomButton>
+                )}
+                <TextField
                   label="Nombre/Apellido"
                   name="nombre"
                   value={form.nombre}
                   onChange={handleTextFieldChange}
                   onBlur={() => handleBlur("nombre")}
-                  error={touched.nombre && !!errors.nombre}
-                  helperText={touched.nombre && errors.nombre}
+                  error={(touched.nombre && !!errors.nombre) || hasArcaError}
+                  helperText={(touched.nombre && errors.nombre) || (hasArcaError && isCreating ? ARCA_REVISAR_PANEL_MSG : undefined)}
+                  FormHelperTextProps={{ className: styles.arcaHelper }}
                   fullWidth
                   required={!isDisabled}
-                  disabled={isDisabled}
+                  disabled={isDisabled || !canEditArca}
                   placeholder="Ingrese nombre"
                 />
               </div>
@@ -969,19 +1023,6 @@ export default function UsuarioForm({
               )}
 
               <div className={styles.formRow}>
-                <TextField
-                  label="CUIT/CUIL"
-                  name="cuit"
-                  value={form.cuit}
-                  onChange={handleTextFieldChange}
-                  onBlur={() => handleBlur("cuit")}
-                  error={touched.cuit && !!errors.cuit}
-                  helperText={touched.cuit && errors.cuit}
-                  fullWidth
-                  required={!isDisabled}
-                  disabled={isDisabled}
-                  placeholder="Ingrese CUIT (11 dígitos)"
-                />
                 <div className={styles.phoneField}>
                   <PhoneInput
                     country="ar"
@@ -1333,6 +1374,9 @@ export default function UsuarioForm({
                   <li>La contraseña temporal deberá ser cambiada</li>
                   <li>Posteriormente se podrán configurar los permisos</li>
                   <li>Los campos marcados con * son obligatorios</li>
+                  {!canEditArca && (
+                    <li>El Nombre/Apellido se completa automáticamente al ingresar el CUIT/CUIL</li>
+                  )}
                   {rolRequiereEmpresa && (
                   <li>
                     Tras registrar, use la solapa &quot;Empresas del Usuario&quot;: debe asociar al menos una
@@ -1353,7 +1397,9 @@ export default function UsuarioForm({
                       <Typography variant="body2">Consultando ARCA...</Typography>
                     </div>
                   ) : arcaError ? (
-                    <Typography variant="body2" color="error">No se pudo consultar ARCA</Typography>
+                    <Typography variant="body2" color="error">
+                      {canEditArca ? "No se pudo consultar ARCA" : ARCA_ERROR_SIN_TAREA_MSG}
+                    </Typography>
                   ) : arcaData ? (
                     <ul className={styles.infoList}>
                       <li><strong>Nombre:</strong> {arcaData.nombre || ''}</li>

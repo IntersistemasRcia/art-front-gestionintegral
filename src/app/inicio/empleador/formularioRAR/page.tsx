@@ -31,17 +31,19 @@ const fechaFormatter = (v: any) => Formato.Fecha(v);
 const cuipFormatter = (v: any) => Formato.CUIP(v);
 const formatearFecha = (f: any) => fechaFormatter(f);
 
-/* Agente Causante como "Código - Descripción" sin ceros a la izquierda (RN-004, RN-006).
-   Código y descripción provienen del propio detalle del RAR (/api/FormulariosRAR/{id}). */
-const formatearAgenteCausante = (
+/* Agente Causante en columnas independientes: código (sin ceros a la izquierda) y descripción.
+   Si falta uno de los datos, solo su valor queda vacío. Ambos provienen del propio detalle
+   del RAR (/api/FormulariosRAR/{id}). */
+const formatearCodigoAgente = (
   codigoAgente: FormularioRARDetalleItem['codigoAgente'],
-  descripcionAgente: FormularioRARDetalleItem['descripcionAgente'],
 ): string => {
   const codigo = Number(codigoAgente);
-  if (!codigo) return '—';
-  const descripcion = (descripcionAgente ?? '').trim();
-  return descripcion ? `${codigo} - ${descripcion}` : String(codigo);
+  return codigo ? String(codigo) : '';
 };
+
+const formatearDescripcionAgente = (
+  descripcionAgente: FormularioRARDetalleItem['descripcionAgente'],
+): string => (descripcionAgente ?? '').trim();
 
 /* Spinner simple */
 const Spinner: React.FC = () => (
@@ -94,6 +96,7 @@ const FormulariosRAR: React.FC = () => {
   // PAGINACIÓN controlada por componente
   const [PageIndex, setPageIndex] = useState<number>(0);
   const [PageSize, setPageSize] = useState<number>(10);
+  const [soloVigentes, setSoloVigentes] = useState(true);
   const [pageCount, setPageCount] = useState<number>(0);
 
   // modos
@@ -189,7 +192,7 @@ const FormulariosRAR: React.FC = () => {
   // SWR detectará automáticamente cuando cambia el CUIT porque está en la clave
   const apiPageIndex = PageIndex;
   const paramsFormularios = canFetchFormularios
-    ? { empresasId: empresaIdsFiltro, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno' }
+    ? { empresasId: empresaIdsFiltro, PageIndex: apiPageIndex, PageSize: PageSize, OrderBy: '-Interno', SoloVigentes: soloVigentes }
     : undefined;
   
   const { data: formulariosData, error: formulariosError, isLoading: isLoadingSWR, isValidating, mutate: mutateFormularios } =
@@ -297,7 +300,8 @@ const FormulariosRAR: React.FC = () => {
           fechaInicioExposicion: detalle.fechaInicioExposicion ? formatearFecha(detalle.fechaInicioExposicion) : '',
           fechaFinExposicion: detalle.fechaFinExposicion ? formatearFecha(detalle.fechaFinExposicion) : '',
           horasExposicion: Number(detalle.horasExposicion ?? 0),
-          agenteCausante: formatearAgenteCausante(detalle.codigoAgente, detalle.descripcionAgente),
+          codigoAgenteCausante: formatearCodigoAgente(detalle.codigoAgente),
+          descripcionAgenteCausante: formatearDescripcionAgente(detalle.descripcionAgente),
           fechaUltimoExamenMedico: detalle.fechaUltimoExamenMedico ? formatearFecha(detalle.fechaUltimoExamenMedico) : '',
         }));
         setDetallesInterno(detallesFormateados);
@@ -320,6 +324,7 @@ const FormulariosRAR: React.FC = () => {
       setExportingExcel(true);
       const countResponse = await ArtAPI.getFormulariosRAR({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: 1,
         PageSize: 1,
       });
@@ -339,6 +344,7 @@ const FormulariosRAR: React.FC = () => {
       }
       const allResponse = await ArtAPI.getFormulariosRAR({
         empresasId: empresaIdsFiltro,
+        SoloVigentes: soloVigentes,
         PageIndex: 1,
         PageSize: totalCount,
       });
@@ -417,7 +423,8 @@ const FormulariosRAR: React.FC = () => {
           const detallesConNombre = Array.isArray(detalles)
             ? (detalles as FormularioRARDetalleItem[]).map((d) => ({
                 ...d,
-                agenteNombre: formatearAgenteCausante(d?.codigoAgente, d?.descripcionAgente),
+                codigoAgenteCausante: formatearCodigoAgente(d?.codigoAgente),
+                descripcionAgenteCausante: formatearDescripcionAgente(d?.descripcionAgente),
               }))
             : [];
 
@@ -719,10 +726,16 @@ const FormulariosRAR: React.FC = () => {
       size: 80
     },
     {
-      accessorKey: 'agenteCausante',
-      header: 'Agente Causante',
-      cell: (info: any) => info.getValue() || '—',
-      size: 160
+      accessorKey: 'codigoAgenteCausante',
+      header: 'Código agente causante',
+      cell: (info: any) => info.getValue() || '',
+      size: 150
+    },
+    {
+      accessorKey: 'descripcionAgenteCausante',
+      header: 'Descripción agente causante',
+      cell: (info: any) => info.getValue() || '',
+      size: 220
     },
     {
       accessorKey: 'fechaUltimoExamenMedico',
@@ -877,17 +890,19 @@ const FormulariosRAR: React.FC = () => {
       fechaIngreso: fechaFormatter(t.fechaIngreso || ''),
       horasExposicion: t.horasExposicion || 0,
       fechaUltimoExamen: fechaFormatter(t.fechaUltimoExamenMedico || ''),
-      agenteNombre: t.agenteNombre || '—',
+      codigoAgenteCausante: t.codigoAgenteCausante || '',
+      descripcionAgenteCausante: t.descripcionAgenteCausante || '',
     }));
 
     const columnasTrabajadores = [
-      { key: 'cuil', title: 'CUIL', width: '15%' },
-      { key: 'nombre', title: 'Apellido y Nombre', width: '25%' },
-      { key: 'sectorTarea', title: 'Sector/Tarea', width: '20%' },
-      { key: 'fechaIngreso', title: 'Fecha Ingreso', width: '12%' },
-      { key: 'horasExposicion', title: 'Horas Exp.', width: '10%' },
-      { key: 'fechaUltimoExamen', title: 'Fecha Últ. Examen', width: '12%' },
-      { key: 'agenteNombre', title: 'Agente Causante', width: '18%' },
+      { key: 'cuil', title: 'CUIL', width: '12%' },
+      { key: 'nombre', title: 'Apellido y Nombre', width: '20%' },
+      { key: 'sectorTarea', title: 'Sector/Tarea', width: '15%' },
+      { key: 'fechaIngreso', title: 'Fecha Ingreso', width: '10%' },
+      { key: 'horasExposicion', title: 'Horas Exp.', width: '8%' },
+      { key: 'fechaUltimoExamen', title: 'Fecha Últ. Examen', width: '10%' },
+      { key: 'codigoAgenteCausante', title: 'Código agente causante', width: '10%' },
+      { key: 'descripcionAgenteCausante', title: 'Descripción agente causante', width: '15%' },
     ];
 
     return (
@@ -1153,6 +1168,9 @@ const FormulariosRAR: React.FC = () => {
               }
               disabled={isLoadingEmpresas}
             />
+            <label style={{ display: 'block', marginTop: 8 }}>
+              <input type="checkbox" checked={soloVigentes} onChange={(event) => { setSoloVigentes(event.target.checked); setPageIndex(0); }} /> Vigentes
+            </label>
           </Box>
 
           <CustomTab
