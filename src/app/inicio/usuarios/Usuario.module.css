@@ -98,6 +98,21 @@
   flex: 1 !important;
 }
 
+.arcaButton {
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+}
+
+.arcaHelper {
+  position: absolute;
+  top: 100%;
+  white-space: nowrap;
+}
+
+.cuitField {
+  flex: 0.33 !important;
+}
+
 /* Ayuda para contraseñas */
 .passwordHelp {
   font-size: 12px !important;

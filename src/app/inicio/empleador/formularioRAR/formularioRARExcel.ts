@@ -19,7 +19,8 @@ export const exportarDetalleRARExcel = async (
     fechaInicioExposicion: d.fechaInicioExposicion || '—',
     fechaFinExposicion: d.fechaFinExposicion || '—',
     horasExposicion: d.horasExposicion || '0',
-    agenteCausante: d.agenteCausante || '—',
+    codigoAgenteCausante: d.codigoAgenteCausante || '',
+    descripcionAgenteCausante: d.descripcionAgenteCausante || '',
     fechaUltimoExamenMedico: d.fechaUltimoExamenMedico || '—',
   }));
 
@@ -42,6 +43,7 @@ const DETALLE_EXCEL_COLUMNS: Record<string, TableColumn> = {
   fechaInicioExposicion: { header: 'Fecha Inicio Exp.', key: 'fechaInicioExposicion' },
   fechaFinExposicion: { header: 'Fecha Fin Exp.', key: 'fechaFinExposicion' },
   horasExposicion: { header: 'Horas Exp.', key: 'horasExposicion' },
-  agenteCausante: { header: 'Agente Causante', key: 'agenteCausante' },
+  codigoAgenteCausante: { header: 'Código agente causante', key: 'codigoAgenteCausante' },
+  descripcionAgenteCausante: { header: 'Descripción agente causante', key: 'descripcionAgenteCausante' },
   fechaUltimoExamenMedico: { header: 'Último Examen Médico', key: 'fechaUltimoExamenMedico' },
 };

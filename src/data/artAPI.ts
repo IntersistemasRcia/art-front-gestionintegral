@@ -74,6 +74,7 @@ export type ApiFormulariosRGRLParams = {
   pageIndex?: number;
   pageSize?: number;
   orderBy?: string;
+  SoloVigentes?: boolean;
 };
 
 export type ApiFormulariosRGRLResponse = {
@@ -91,6 +92,7 @@ type GetFormulariosRARBySpecsBody = {
   pageIndex: number;
   pageSize: number;
   orderBy: string;
+  soloVigentes?: boolean;
 };
 
 type GetFormulariosRGRLBySpecsBody = {
@@ -98,6 +100,7 @@ type GetFormulariosRGRLBySpecsBody = {
   pageIndex: number;
   pageSize: number;
   orderBy: string;
+  soloVigentes?: boolean;
 };
 
 /** Body POST `/api/VEmpleadorDDJJ` */
@@ -548,6 +551,7 @@ export class ArtAPIClass extends ExternalAPI {
       pageIndex: params.PageIndex ?? 0,
       pageSize: params.PageSize ?? 10,
       orderBy: params.OrderBy ?? "-Interno",
+      soloVigentes: params.SoloVigentes,
     };
     return tokenizable.post(this.getFormulariosRARURL(), body).then(({ data }) => data);
   };
@@ -567,6 +571,7 @@ export class ArtAPIClass extends ExternalAPI {
           JSON.stringify(paramsWithEmpresas.empresasId),
           paramsWithEmpresas.PageIndex ?? 0,
           paramsWithEmpresas.PageSize ?? 10,
+          paramsWithEmpresas.SoloVigentes ?? true,
           paramsWithEmpresas.OrderBy ?? "-Interno",
           paramsWithEmpresas.FechaPresentacion ?? "",
           paramsWithEmpresas.RefEstablecimientoId ?? 0,
@@ -679,6 +684,7 @@ export class ArtAPIClass extends ExternalAPI {
       pageIndex: params.pageIndex ?? params.PageIndex ?? 0,
       pageSize: params.pageSize ?? params.PageSize ?? 10,
       orderBy: params.orderBy ?? params.OrderBy ?? "-creacionFechaHora",
+      soloVigentes: params.SoloVigentes,
     };
     return tokenizable
       .post<ApiFormulariosRGRLResponse>(this.getFormulariosRGRLURL(), body)
@@ -693,6 +699,7 @@ export class ArtAPIClass extends ExternalAPI {
         params.pageIndex ?? params.PageIndex ?? 0,
         params.pageSize ?? params.PageSize ?? 10,
         params.orderBy ?? params.OrderBy ?? "-creacionFechaHora",
+        params.SoloVigentes ?? true,
       ],
       () => this.getFormulariosRGRL(params),
       {

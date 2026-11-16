@@ -16,6 +16,7 @@ export type ParametersFormularioRar = {
   FechaPresentacion?: string;
   RefEstablecimientoId?: number;
   PageIndex?: number;
+  SoloVigentes?: boolean;
   PageSize?: number;
   OrderBy?: string;
 };
@@ -90,7 +91,8 @@ export type DetalleTrabajador = {
   fechaInicioExposicion: string;
   fechaFinExposicion: string;
   horasExposicion: number;
-  agenteCausante: string;
+  codigoAgenteCausante: string;
+  descripcionAgenteCausante: string;
   fechaUltimoExamenMedico: string;
 };
 //#endregion Types Formularios RAR (GET por interno)
